@@ -1,0 +1,8 @@
+node_modules/
+data/
+dist/
+.DS_Store
+dist-v2/
+development-vault.json
+dist-v3/
+dist-v4/

@@ -1,0 +1,34 @@
+{
+  "name": "inkdesk",
+  "version": "0.4.0",
+  "description": "Local writing desk for Content OS",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "node dev.cjs",
+    "dev:server": "node server.cjs",
+    "build:watch": "esbuild renderer.js --bundle --format=esm --outfile=bundle.js --watch",
+    "test": "node --test test.cjs vault.test.cjs knowledge.test.cjs model.test.cjs",
+    "package:mac": "electron-packager . Inkdesk --platform=darwin --arch=arm64 --out=dist-v4 --overwrite --icon=assets/Inkdesk.icns --ignore='^/data' --ignore='^/dist' --ignore='screenshot-' --extra-resource=assets/reference-reader",
+    "build": "esbuild renderer.js --bundle --format=esm --outfile=bundle.js",
+    "test:ui": "node smoke-ui.cjs && node review-ui.cjs && node workflow-v4.cjs"
+  },
+  "dependencies": {
+    "@tiptap/core": "^3.31.3",
+    "@tiptap/extension-image": "^3.31.3",
+    "@tiptap/extension-table": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
+    "diff": "^9.0.0",
+    "marked": "^15.0.0",
+    "turndown": "^7.2.0",
+    "turndown-plugin-gfm": "^1.0.2",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "@playwright/test": "^1.63.0",
+    "electron": "^44.3.0",
+    "esbuild": "^0.25.0",
+    "prettier": "^3.9.6"
+  }
+}
