@@ -28914,7 +28914,7 @@ var esc = (s) => String(s ?? "").replace(
 );
 var state;
 var editor;
-var page = "write";
+var page = "dashboard";
 var tab = "chat";
 var account = "AI";
 var current;
@@ -29036,7 +29036,7 @@ function render2() {
     editor.destroy();
     editor = null;
   }
-  $("#app").innerHTML = `<aside class="sidebar"><div class="brand"><span class="brand-icon">i</span> inkdesk <small>\u5199\u4F5C\u5DE5\u4F5C\u53F0</small></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">\u91D1\u5947 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">\u91D1\u5947 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">\u25EB <span>\u6570\u636E\u6982\u89C8</span></button><button data-page="write" class="${page === "write" ? "chosen" : ""}">\u25A4 <span>\u5199\u4F5C\u684C\u9762</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">\u2727 <span>\u9009\u9898\u4E0E\u7075\u611F</span></button><button data-page="materials">\u25A7 <span>\u9879\u76EE\u7D20\u6750</span></button><button data-page="archive">\u25A3 <span>\u5DF2\u5F52\u6863</span></button><button data-page="profile">\u25CE <span>\u8D26\u53F7\u4EBA\u8BBE</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0">\uFF0B</button></div><div class="docs">${state.documents.filter(
+  $("#app").innerHTML = `<aside class="sidebar"><div class="brand"><span class="brand-icon">i</span> inkdesk <small>\u5199\u4F5C\u5DE5\u4F5C\u53F0</small></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">\u91D1\u5947 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">\u91D1\u5947 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">\u25EB <span>\u4EEA\u8868\u76D8</span></button><button data-page="write" class="${page === "write" ? "chosen" : ""}">\u25A4 <span>\u5199\u4F5C\u684C\u9762</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">\u2727 <span>\u9009\u9898\u4E0E\u7075\u611F</span></button><button data-page="materials">\u25A7 <span>\u9879\u76EE\u7D20\u6750</span></button><button data-page="archive">\u25A3 <span>\u5DF2\u5F52\u6863</span></button><button data-page="profile">\u25CE <span>\u8D26\u53F7\u4EBA\u8BBE</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0">\uFF0B</button></div><div class="docs">${state.documents.filter(
     (d) => d.account === account && d.status !== "final" && d.status !== "archive"
   ).map(
     (d) => `<button class="doc ${current?.id === d.id ? "selected" : ""}" data-id="${d.id}"><span>${esc(d.title)}</span><small>${new Date(d.updated).toLocaleDateString("zh-CN")} \xB7 ${d.body.length} \u5B57</small></button>`
@@ -29645,11 +29645,175 @@ async function copyPublish(doc3) {
   await api("copy", { html: html2, text: d.body.textContent });
   toast("\u6392\u7248\u5DF2\u590D\u5236\uFF1B\u672C\u5730\u56FE\u7247\u8BF7\u5728\u516C\u4F17\u53F7\u8865\u5165");
 }
+async function pickNoteTable() {
+  if (!isWeb()) {
+    const filePath = await api("pick-note-table");
+    return filePath ? { filePath } : null;
+  }
+  const files = await pickFiles({
+    accept: ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  });
+  const f = files[0];
+  if (!f) return null;
+  return {
+    bytes: [...new Uint8Array(await f.arrayBuffer())]
+  };
+}
+function askFollowers(defaultVal) {
+  return new Promise((resolve) => {
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog"><h2>\u66F4\u65B0\u8D26\u53F7\u6570\u636E</h2><p>\u8BF7\u8F93\u5165\u5F53\u524D\u7C89\u4E1D\u91CF\uFF08\u5C06\u663E\u793A\u5728\u4EEA\u8868\u76D8\uFF09</p><input id="follower-input" type="number" min="0" step="1" value="${esc(defaultVal ?? "")}" placeholder="\u4F8B\u5982 12000"><div class="row"><button type="button" id="cancel-followers">\u53D6\u6D88</button><button type="button" id="confirm-followers" class="primary">\u7EE7\u7EED</button></div></div>`;
+    document.body.append(m);
+    const input = $("#follower-input");
+    input.focus();
+    $("#cancel-followers").onclick = () => {
+      m.remove();
+      resolve(null);
+    };
+    $("#confirm-followers").onclick = () => {
+      const n = Number(String(input.value).replace(/,/g, "").trim());
+      m.remove();
+      resolve(Number.isFinite(n) && n >= 0 ? n : null);
+    };
+  });
+}
+function showUnmatchedMatcher(preview) {
+  return new Promise((resolve) => {
+    const archives = preview.archives || [];
+    const halfYearAgo = (() => {
+      const d = /* @__PURE__ */ new Date();
+      d.setMonth(d.getMonth() - 6);
+      return [
+        d.getFullYear(),
+        String(d.getMonth() + 1).padStart(2, "0"),
+        String(d.getDate()).padStart(2, "0")
+      ].join("-");
+    })();
+    const recent = () => archives.filter((a) => !a.date || String(a.date).slice(0, 10) >= halfYearAgo);
+    const filterArchives = (q) => {
+      const list2 = q ? archives : recent();
+      const key = String(q || "").trim().toLowerCase();
+      if (!key) return list2;
+      return list2.filter(
+        (a) => a.title.toLowerCase().includes(key) || String(a.date || "").includes(key)
+      );
+    };
+    const optionsHtml = (u, q = "") => {
+      const suggested = (u.suggestions || []).map((s) => s.path);
+      const list2 = filterArchives(q);
+      const merged = [];
+      const seen = /* @__PURE__ */ new Set();
+      for (const s of u.suggestions || []) {
+        const a = archives.find((x) => x.path === s.path);
+        if (a && !seen.has(a.path)) {
+          seen.add(a.path);
+          merged.push({ ...a, hint: `\u5EFA\u8BAE ${s.score}%` });
+        }
+      }
+      for (const a of list2) {
+        if (!seen.has(a.path)) {
+          seen.add(a.path);
+          merged.push(a);
+        }
+      }
+      const preferred = u.suggestions?.[0]?.path || "";
+      return `<option value="">\u8DF3\u8FC7</option>` + merged.map(
+        (a) => `<option value="${esc(a.path)}" ${a.path === preferred ? "selected" : ""}>${esc(a.title)}${a.date ? " \xB7 " + esc(String(a.date).slice(0, 10)) : ""}${a.hint ? " \xB7 " + a.hint : ""}</option>`
+      ).join("");
+    };
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog import-dialog"><div class="row"><h2>\u672A\u80FD\u81EA\u52A8\u5339\u914D\u7684\u7B14\u8BB0</h2><button type="button" id="close-unmatched">\u5173\u95ED</button></div><p>\u5DF2\u6309\u76F8\u4F3C\u5EA6\u7ED9\u51FA\u5EFA\u8BAE\uFF1B\u5217\u8868\u9ED8\u8BA4\u8FD1\u534A\u5E74\uFF0C\u4E5F\u53EF\u641C\u7D22\u5168\u90E8\u5F52\u6863\u3002</p>${preview.unmatched.map(
+      (u) => `<div class="match-row" data-index="${u.index}"><p><strong>${esc(u.row.title)}</strong>${u.row["\u9996\u6B21\u53D1\u5E03\u65F6\u95F4"] ? `<small>${esc(u.row["\u9996\u6B21\u53D1\u5E03\u65F6\u95F4"])}</small>` : ""}</p><input class="match-search" type="search" placeholder="\u641C\u7D22\u5F52\u6863\u6587\u7AE0\u2026"><select class="match-pick" aria-label="\u5339\u914D\u5F52\u6863">${optionsHtml(u)}</select></div>`
+    ).join(
+      ""
+    )}<div class="row"><button type="button" id="cancel-unmatched">\u53D6\u6D88\u5BFC\u5165</button><button type="button" id="confirm-unmatched" class="primary">\u786E\u8BA4\u5339\u914D</button></div></div>`;
+    document.body.append(m);
+    m.querySelectorAll(".match-row").forEach((row) => {
+      const u = preview.unmatched.find((x) => x.index === +row.dataset.index);
+      const search = row.querySelector(".match-search");
+      const pick = row.querySelector(".match-pick");
+      search.oninput = () => {
+        const current2 = pick.value;
+        pick.innerHTML = optionsHtml(u, search.value);
+        if ([...pick.options].some((o) => o.value === current2))
+          pick.value = current2;
+      };
+    });
+    $("#close-unmatched").onclick = $("#cancel-unmatched").onclick = () => {
+      m.remove();
+      resolve(null);
+    };
+    $("#confirm-unmatched").onclick = () => {
+      const extra = [];
+      m.querySelectorAll(".match-row").forEach((row) => {
+        const path = row.querySelector(".match-pick").value;
+        if (path) extra.push({ index: +row.dataset.index, path });
+      });
+      m.remove();
+      resolve(extra);
+    };
+  });
+}
+function formatDelta(n) {
+  if (n == null || n === 0 || !Number.isFinite(Number(n))) return "";
+  const v = Number(n);
+  return (v > 0 ? "+" : "") + v.toLocaleString();
+}
+async function runNoteImport() {
+  try {
+    const filePayload = await pickNoteTable();
+    if (!filePayload) return;
+    const followers = await askFollowers(state.followers?.[account]);
+    if (followers === null) return toast("\u7C89\u4E1D\u91CF\u65E0\u6548\u6216\u5DF2\u53D6\u6D88");
+    const preview = await api("import-notes-preview", {
+      account,
+      ...filePayload
+    });
+    let pairs = preview.matched.map((m) => ({
+      index: m.index,
+      path: m.path
+    }));
+    if (preview.unmatched.length) {
+      const manual = await showUnmatchedMatcher(preview);
+      if (manual === null) return toast("\u5DF2\u53D6\u6D88\u5BFC\u5165");
+      pairs = pairs.concat(manual);
+    }
+    if (!pairs.length) return toast("\u6CA1\u6709\u53EF\u66F4\u65B0\u7684\u5339\u914D\u9879");
+    const result = await api("import-notes-apply", {
+      account,
+      followers,
+      rows: preview.rows,
+      pairs
+    });
+    Object.assign(state, result);
+    dirty = false;
+    page = "dashboard";
+    render2();
+    toast(`\u5DF2\u66F4\u65B0 ${result.updated?.length ?? pairs.length} \u7BC7\u5F52\u6863\u4E0E YAML`);
+  } catch (e) {
+    toast(e.message);
+  }
+}
 function renderDashboard() {
   const rows = state.metrics.filter(
     (r) => r["\u8D26\u53F7"] === account || r["\u8D26\u53F7"] === "\u91D1\u5947_" + account
   );
+  const deltas = state.metricDeltas?.[account] || null;
   const sum = (k) => rows.some((r) => r[k] !== null) ? rows.reduce((s, r) => s + (r[k] || 0), 0).toLocaleString() : "\u2014";
+  const deltaMark = (key) => {
+    const text = formatDelta(deltas?.[key]);
+    if (!text) return "";
+    const cls = Number(deltas[key]) > 0 ? "up" : "down";
+    return `<em class="delta ${cls}">${text}</em>`;
+  };
+  const cellDelta = (path, key) => {
+    const text = formatDelta(deltas?.articles?.[path]?.[key]);
+    if (!text) return "";
+    const cls = Number(deltas.articles[path][key]) > 0 ? "up" : "down";
+    return ` <em class="delta ${cls}">${text}</em>`;
+  };
   const sortKeys = [
     ["\u9605\u8BFB", "\u6309\u9605\u8BFB\u91CF"],
     ["\u6536\u85CF", "\u6309\u6536\u85CF"],
@@ -29662,7 +29826,8 @@ function renderDashboard() {
       return String(b["\u65E5\u671F"] || "").localeCompare(String(a["\u65E5\u671F"] || ""));
     return (b[metricsSort] || 0) - (a[metricsSort] || 0);
   });
-  $("#main").innerHTML = `<header><div><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><button id="metrics" class="primary">\u5237\u65B0\u5F52\u6863\u6570\u636E</button></header><section class="dashboard"><div class="page-title"><h1>\u8BA9\u6BCF\u4E00\u6B21\u8868\u8FBE\uFF0C\u90FD\u6709\u56DE\u54CD\u3002</h1></div><div class="stats">${[
+  $("#main").innerHTML = `<header><div><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><button id="import-notes" class="primary">\u66F4\u65B0\u6570\u636E</button></header><section class="dashboard"><div class="page-title"><h1>\u8BA9\u6BCF\u4E00\u6B21\u8868\u8FBE\uFF0C\u90FD\u6709\u56DE\u54CD\u3002</h1>${deltas?.at ? `<p class="muted">\u76F8\u5BF9\u4E0A\u6B21\u66F4\u65B0\u7684\u53D8\u5316\u4F1A\u4FDD\u7559\u5230\u4E0B\u6B21\u5BFC\u5165</p>` : ""}</div><div class="stats">${[
+    ["\u7C89\u4E1D\u91CF", "\u7C89\u4E1D\u91CF"],
     ["\u9605\u8BFB", "\u603B\u9605\u8BFB"],
     ["\u70B9\u8D5E", "\u603B\u70B9\u8D5E"],
     ["\u6536\u85CF", "\u603B\u6536\u85CF"],
@@ -29670,29 +29835,18 @@ function renderDashboard() {
     ["\u6DA8\u7C89", "\u6587\u7AE0\u6DA8\u7C89\u5408\u8BA1"],
     ["\u6587\u7AE0", "\u603B\u6587\u7AE0\u6570\u91CF"]
   ].map(
-    ([k, l]) => `<div><small>${l}</small><strong title="${k === "\u6DA8\u7C89" ? "\u6C47\u603B\u6587\u7AE0 YAML \u7684\u6DA8\u7C89\u5B57\u6BB5\uFF0C\u4E0D\u662F\u8D26\u53F7\u51C0\u589E\u7C89\u4E1D\uFF0C\u4E5F\u4E0D\u662F\u5DE5\u4F5C\u53F0\u4F30\u7B97" : ""}">${k === "\u6587\u7AE0" ? rows.length.toLocaleString() : sum(k)}</strong></div>`
+    ([k, l]) => `<div><small>${l}</small><strong title="${k === "\u6DA8\u7C89" ? "\u6C47\u603B\u6587\u7AE0 YAML \u7684\u6DA8\u7C89\u5B57\u6BB5\uFF0C\u4E0D\u662F\u8D26\u53F7\u51C0\u589E\u7C89\u4E1D\uFF0C\u4E5F\u4E0D\u662F\u5DE5\u4F5C\u53F0\u4F30\u7B97" : k === "\u7C89\u4E1D\u91CF" ? "\u5BFC\u5165\u6570\u636E\u65F6\u586B\u5199\u7684\u5F53\u524D\u7C89\u4E1D\u91CF" : ""}">${k === "\u6587\u7AE0" ? rows.length.toLocaleString() : k === "\u7C89\u4E1D\u91CF" ? state.followers?.[account] != null ? Number(state.followers[account]).toLocaleString() : "\u2014" : sum(k)}${deltaMark(k)}</strong></div>`
   ).join(
     ""
   )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>\u6587\u7AE0\u8868\u73B0</h3><select id="metrics-sort" aria-label="\u6587\u7AE0\u6392\u5E8F\u65B9\u5F0F">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${rows.length ? `<table><thead><tr><th>\u6587\u7AE0</th><th>\u65E5\u671F</th><th>\u9605\u8BFB</th><th>\u70B9\u8D5E</th><th>\u6536\u85CF</th><th>\u6DA8\u7C89</th></tr></thead><tbody>${sorted.map(
-    (r) => `<tr><td>${esc(r["\u6807\u9898"])}</td><td>${esc(r["\u65E5\u671F"])}</td><td>${r["\u9605\u8BFB"] ?? "\u2014"}</td><td>${r["\u70B9\u8D5E"] ?? "\u2014"}</td><td>${r["\u6536\u85CF"] ?? "\u2014"}</td><td>${r["\u6DA8\u7C89"] ?? "\u2014"}</td></tr>`
+    (r) => `<tr><td>${esc(r["\u6807\u9898"])}</td><td>${esc(r["\u65E5\u671F"])}</td><td>${r["\u9605\u8BFB"] ?? "\u2014"}${cellDelta(r.path, "\u9605\u8BFB")}</td><td>${r["\u70B9\u8D5E"] ?? "\u2014"}${cellDelta(r.path, "\u70B9\u8D5E")}</td><td>${r["\u6536\u85CF"] ?? "\u2014"}${cellDelta(r.path, "\u6536\u85CF")}</td><td>${r["\u6DA8\u7C89"] ?? "\u2014"}${cellDelta(r.path, "\u6DA8\u7C89")}</td></tr>`
   ).join("")}</tbody></table>` : '<div class="empty-data">\u8FD8\u6CA1\u6709\u6570\u636E\u3002<p>\u6587\u7AE0\u5F52\u6863\u540E\uFF0C\u5728 YAML \u4E2D\u586B\u5199\u5E73\u53F0\u6570\u636E\u5373\u53EF\u67E5\u770B\u3002</p></div>'}</div></section>`;
   renderCalendar(rows);
   $("#metrics-sort").onchange = (e) => {
     metricsSort = e.target.value;
     renderDashboard();
   };
-  $("#metrics").onclick = async () => {
-    try {
-      const r = await api("metrics");
-      if (r) {
-        state.metrics = r;
-        renderDashboard();
-        toast("\u5DF2\u91CD\u65B0\u8BFB\u53D6\u5F52\u6863 YAML");
-      }
-    } catch (e) {
-      toast(e.message);
-    }
-  };
+  $("#import-notes").onclick = () => runNoteImport();
 }
 function renderTopics() {
   const docs = state.documents.filter(

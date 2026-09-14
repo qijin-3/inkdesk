@@ -9,6 +9,7 @@ const {
   net,
 } = require("electron");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { DeskCore } = require("./desk-core.cjs");
@@ -174,6 +175,28 @@ ipcMain.handle("image", async (_, payload = {}) => {
   if (r.canceled) return null;
   return desk.image({ ...payload, filePath: r.filePaths[0] });
 });
+
+ipcMain.handle("pick-note-table", async () => {
+  const result = await dialog.showOpenDialog({
+    title: "选择笔记列表明细表",
+    defaultPath: path.join(
+      os.homedir(),
+      "Downloads",
+      "笔记列表明细表.xlsx",
+    ),
+    properties: ["openFile"],
+    filters: [{ name: "Excel", extensions: ["xlsx"] }],
+  });
+  if (result.canceled) return null;
+  return result.filePaths[0];
+});
+
+ipcMain.handle("import-notes-preview", (_, data) =>
+  desk.importNotesPreview(data),
+);
+ipcMain.handle("import-notes-apply", (_, data) =>
+  desk.importNotesApply(data),
+);
 
 ipcMain.handle("copy", async (_, p) => {
   const payload = { "text/plain": p.text };

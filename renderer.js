@@ -77,7 +77,7 @@ const esc = (s) =>
   );
 let state,
   editor,
-  page = "write",
+  page = "dashboard",
   tab = "chat",
   account = "AI",
   current,
@@ -217,7 +217,7 @@ function render() {
     editor = null;
   }
   $("#app").innerHTML =
-    `<aside class="sidebar"><div class="brand"><span class="brand-icon">i</span> inkdesk <small>写作工作台</small></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">金奇 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">金奇 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">◫ <span>数据概览</span></button><button data-page="write" class="${page === "write" ? "chosen" : ""}">▤ <span>写作桌面</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">✧ <span>选题与灵感</span></button><button data-page="materials">▧ <span>项目素材</span></button><button data-page="archive">▣ <span>已归档</span></button><button data-page="profile">◎ <span>账号人设</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章">＋</button></div><div class="docs">${
+    `<aside class="sidebar"><div class="brand"><span class="brand-icon">i</span> inkdesk <small>写作工作台</small></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">金奇 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">金奇 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">◫ <span>仪表盘</span></button><button data-page="write" class="${page === "write" ? "chosen" : ""}">▤ <span>写作桌面</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">✧ <span>选题与灵感</span></button><button data-page="materials">▧ <span>项目素材</span></button><button data-page="archive">▣ <span>已归档</span></button><button data-page="profile">◎ <span>账号人设</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章">＋</button></div><div class="docs">${
       state.documents
         .filter(
           (d) =>
@@ -938,14 +938,209 @@ async function copyPublish(doc) {
   await api("copy", { html, text: d.body.textContent });
   toast("排版已复制；本地图片请在公众号补入");
 }
+
+/** 选择笔记列表明细 xlsx */
+async function pickNoteTable() {
+  if (!isWeb()) {
+    const filePath = await api("pick-note-table");
+    return filePath ? { filePath } : null;
+  }
+  const files = await pickFiles({
+    accept:
+      ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const f = files[0];
+  if (!f) return null;
+  return {
+    bytes: [...new Uint8Array(await f.arrayBuffer())],
+  };
+}
+
+/** 弹窗询问当前粉丝量 */
+function askFollowers(defaultVal) {
+  return new Promise((resolve) => {
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog"><h2>更新账号数据</h2><p>请输入当前粉丝量（将显示在仪表盘）</p><input id="follower-input" type="number" min="0" step="1" value="${esc(defaultVal ?? "")}" placeholder="例如 12000"><div class="row"><button type="button" id="cancel-followers">取消</button><button type="button" id="confirm-followers" class="primary">继续</button></div></div>`;
+    document.body.append(m);
+    const input = $("#follower-input");
+    input.focus();
+    $("#cancel-followers").onclick = () => {
+      m.remove();
+      resolve(null);
+    };
+    $("#confirm-followers").onclick = () => {
+      const n = Number(String(input.value).replace(/,/g, "").trim());
+      m.remove();
+      resolve(Number.isFinite(n) && n >= 0 ? n : null);
+    };
+  });
+}
+
+/** 为未自动匹配的表格行选择归档文章（优先建议，默认近半年，可搜索） */
+function showUnmatchedMatcher(preview) {
+  return new Promise((resolve) => {
+    const archives = preview.archives || [];
+    const halfYearAgo = (() => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - 6);
+      return [
+        d.getFullYear(),
+        String(d.getMonth() + 1).padStart(2, "0"),
+        String(d.getDate()).padStart(2, "0"),
+      ].join("-");
+    })();
+    /** 近半年归档；搜索时扩大到全量 */
+    const recent = () =>
+      archives.filter((a) => !a.date || String(a.date).slice(0, 10) >= halfYearAgo);
+    /** 按关键词筛选归档，无关键词时返回近半年列表 */
+    const filterArchives = (q) => {
+      const list = q ? archives : recent();
+      const key = String(q || "")
+        .trim()
+        .toLowerCase();
+      if (!key) return list;
+      return list.filter(
+        (a) =>
+          a.title.toLowerCase().includes(key) ||
+          String(a.date || "").includes(key),
+      );
+    };
+    /** 渲染单条未匹配行的下拉选项 */
+    const optionsHtml = (u, q = "") => {
+      const suggested = (u.suggestions || []).map((s) => s.path);
+      const list = filterArchives(q);
+      const merged = [];
+      const seen = new Set();
+      for (const s of u.suggestions || []) {
+        const a = archives.find((x) => x.path === s.path);
+        if (a && !seen.has(a.path)) {
+          seen.add(a.path);
+          merged.push({ ...a, hint: `建议 ${s.score}%` });
+        }
+      }
+      for (const a of list) {
+        if (!seen.has(a.path)) {
+          seen.add(a.path);
+          merged.push(a);
+        }
+      }
+      const preferred = u.suggestions?.[0]?.path || "";
+      return (
+        `<option value="">跳过</option>` +
+        merged
+          .map(
+            (a) =>
+              `<option value="${esc(a.path)}" ${a.path === preferred ? "selected" : ""}>${esc(a.title)}${a.date ? " · " + esc(String(a.date).slice(0, 10)) : ""}${a.hint ? " · " + a.hint : ""}</option>`,
+          )
+          .join("")
+      );
+    };
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog import-dialog"><div class="row"><h2>未能自动匹配的笔记</h2><button type="button" id="close-unmatched">关闭</button></div><p>已按相似度给出建议；列表默认近半年，也可搜索全部归档。</p>${preview.unmatched
+      .map(
+        (u) =>
+          `<div class="match-row" data-index="${u.index}"><p><strong>${esc(u.row.title)}</strong>${u.row["首次发布时间"] ? `<small>${esc(u.row["首次发布时间"])}</small>` : ""}</p><input class="match-search" type="search" placeholder="搜索归档文章…"><select class="match-pick" aria-label="匹配归档">${optionsHtml(u)}</select></div>`,
+      )
+      .join(
+        "",
+      )}<div class="row"><button type="button" id="cancel-unmatched">取消导入</button><button type="button" id="confirm-unmatched" class="primary">确认匹配</button></div></div>`;
+    document.body.append(m);
+    m.querySelectorAll(".match-row").forEach((row) => {
+      const u = preview.unmatched.find((x) => x.index === +row.dataset.index);
+      const search = row.querySelector(".match-search");
+      const pick = row.querySelector(".match-pick");
+      search.oninput = () => {
+        const current = pick.value;
+        pick.innerHTML = optionsHtml(u, search.value);
+        if ([...pick.options].some((o) => o.value === current))
+          pick.value = current;
+      };
+    });
+    $("#close-unmatched").onclick = $("#cancel-unmatched").onclick = () => {
+      m.remove();
+      resolve(null);
+    };
+    $("#confirm-unmatched").onclick = () => {
+      const extra = [];
+      m.querySelectorAll(".match-row").forEach((row) => {
+        const path = row.querySelector(".match-pick").value;
+        if (path) extra.push({ index: +row.dataset.index, path });
+      });
+      m.remove();
+      resolve(extra);
+    };
+  });
+}
+
+/** 格式化增减：+12 / -3；无变化返回空串 */
+function formatDelta(n) {
+  if (n == null || n === 0 || !Number.isFinite(Number(n))) return "";
+  const v = Number(n);
+  return (v > 0 ? "+" : "") + v.toLocaleString();
+}
+
+/** 从 xlsx 导入笔记数据并更新归档 YAML */
+async function runNoteImport() {
+  try {
+    const filePayload = await pickNoteTable();
+    if (!filePayload) return;
+    const followers = await askFollowers(state.followers?.[account]);
+    if (followers === null) return toast("粉丝量无效或已取消");
+    const preview = await api("import-notes-preview", {
+      account,
+      ...filePayload,
+    });
+    let pairs = preview.matched.map((m) => ({
+      index: m.index,
+      path: m.path,
+    }));
+    if (preview.unmatched.length) {
+      const manual = await showUnmatchedMatcher(preview);
+      if (manual === null) return toast("已取消导入");
+      pairs = pairs.concat(manual);
+    }
+    if (!pairs.length) return toast("没有可更新的匹配项");
+    const result = await api("import-notes-apply", {
+      account,
+      followers,
+      rows: preview.rows,
+      pairs,
+    });
+    Object.assign(state, result);
+    dirty = false;
+    page = "dashboard";
+    render();
+    toast(`已更新 ${result.updated?.length ?? pairs.length} 篇归档与 YAML`);
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
 function renderDashboard() {
   const rows = state.metrics.filter(
     (r) => r["账号"] === account || r["账号"] === "金奇_" + account,
   );
+  const deltas = state.metricDeltas?.[account] || null;
   const sum = (k) =>
     rows.some((r) => r[k] !== null)
       ? rows.reduce((s, r) => s + (r[k] || 0), 0).toLocaleString()
       : "—";
+  /** 卡片数值旁的增减标记 */
+  const deltaMark = (key) => {
+    const text = formatDelta(deltas?.[key]);
+    if (!text) return "";
+    const cls = Number(deltas[key]) > 0 ? "up" : "down";
+    return `<em class="delta ${cls}">${text}</em>`;
+  };
+  /** 表格单元格增减 */
+  const cellDelta = (path, key) => {
+    const text = formatDelta(deltas?.articles?.[path]?.[key]);
+    if (!text) return "";
+    const cls = Number(deltas.articles[path][key]) > 0 ? "up" : "down";
+    return ` <em class="delta ${cls}">${text}</em>`;
+  };
   const sortKeys = [
     ["阅读", "按阅读量"],
     ["收藏", "按收藏"],
@@ -960,7 +1155,8 @@ function renderDashboard() {
     return (b[metricsSort] || 0) - (a[metricsSort] || 0);
   });
   $("#main").innerHTML =
-    `<header><div><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><button id="metrics" class="primary">刷新归档数据</button></header><section class="dashboard"><div class="page-title"><h1>让每一次表达，都有回响。</h1></div><div class="stats">${[
+    `<header><div><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><button id="import-notes" class="primary">更新数据</button></header><section class="dashboard"><div class="page-title"><h1>让每一次表达，都有回响。</h1>${deltas?.at ? `<p class="muted">相对上次更新的变化会保留到下次导入</p>` : ""}</div><div class="stats">${[
+      ["粉丝量", "粉丝量"],
       ["阅读", "总阅读"],
       ["点赞", "总点赞"],
       ["收藏", "总收藏"],
@@ -970,7 +1166,7 @@ function renderDashboard() {
     ]
       .map(
         ([k, l]) =>
-          `<div><small>${l}</small><strong title="${k === "涨粉" ? "汇总文章 YAML 的涨粉字段，不是账号净增粉丝，也不是工作台估算" : ""}">${k === "文章" ? rows.length.toLocaleString() : sum(k)}</strong></div>`,
+          `<div><small>${l}</small><strong title="${k === "涨粉" ? "汇总文章 YAML 的涨粉字段，不是账号净增粉丝，也不是工作台估算" : k === "粉丝量" ? "导入数据时填写的当前粉丝量" : ""}">${k === "文章" ? rows.length.toLocaleString() : k === "粉丝量" ? (state.followers?.[account] != null ? Number(state.followers[account]).toLocaleString() : "—") : sum(k)}${deltaMark(k)}</strong></div>`,
       )
       .join(
         "",
@@ -979,7 +1175,7 @@ function renderDashboard() {
         ? `<table><thead><tr><th>文章</th><th>日期</th><th>阅读</th><th>点赞</th><th>收藏</th><th>涨粉</th></tr></thead><tbody>${sorted
             .map(
               (r) =>
-                `<tr><td>${esc(r["标题"])}</td><td>${esc(r["日期"])}</td><td>${r["阅读"] ?? "—"}</td><td>${r["点赞"] ?? "—"}</td><td>${r["收藏"] ?? "—"}</td><td>${r["涨粉"] ?? "—"}</td></tr>`,
+                `<tr><td>${esc(r["标题"])}</td><td>${esc(r["日期"])}</td><td>${r["阅读"] ?? "—"}${cellDelta(r.path, "阅读")}</td><td>${r["点赞"] ?? "—"}${cellDelta(r.path, "点赞")}</td><td>${r["收藏"] ?? "—"}${cellDelta(r.path, "收藏")}</td><td>${r["涨粉"] ?? "—"}${cellDelta(r.path, "涨粉")}</td></tr>`,
             )
             .join("")}</tbody></table>`
         : '<div class="empty-data">还没有数据。<p>文章归档后，在 YAML 中填写平台数据即可查看。</p></div>'
@@ -989,18 +1185,7 @@ function renderDashboard() {
     metricsSort = e.target.value;
     renderDashboard();
   };
-  $("#metrics").onclick = async () => {
-    try {
-      const r = await api("metrics");
-      if (r) {
-        state.metrics = r;
-        renderDashboard();
-        toast("已重新读取归档 YAML");
-      }
-    } catch (e) {
-      toast(e.message);
-    }
-  };
+  $("#import-notes").onclick = () => runNoteImport();
 }
 function renderTopics() {
   const docs = state.documents.filter(

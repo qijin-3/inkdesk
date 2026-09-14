@@ -31,6 +31,9 @@ const channels = [
   "metrics",
   "agent",
   "cancel",
+  "pick-note-table",
+  "import-notes-preview",
+  "import-notes-apply",
 ];
 contextBridge.exposeInMainWorld("desk", {
   web: false,

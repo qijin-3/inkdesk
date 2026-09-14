@@ -543,6 +543,36 @@ class Vault {
     atomic(this.p(p.path), text);
     return this.profile(account);
   }
+
+  /**
+   * 更新归档文章 YAML，并按表格标题重命名文件。
+   * @param {string} rel 相对路径
+   * @param {object} fields YAML 字段
+   * @param {string} newTitle 表格中的笔记标题
+   */
+  syncArchiveFromImport(rel, fields, newTitle) {
+    if (!rel.includes("/03_Archive/")) throw Error("只能更新归档文章");
+    const from = this.p(rel);
+    const raw = fs.readFileSync(from, "utf8");
+    const { yaml, body } = split(raw);
+    for (const [k, v] of Object.entries(fields)) yaml.set(k, v);
+    const dir = path.posix.dirname(rel);
+    const destName = clean(newTitle) + ".md";
+    let destRel = dir + "/" + destName;
+    if (destRel !== rel && fs.existsSync(this.p(destRel)))
+      throw Error("归档中已有同名文章：" + newTitle);
+    atomic(from, "---\n" + yaml.toString() + "---\n" + body);
+    if (destRel !== rel) {
+      fs.renameSync(from, this.p(destRel));
+      for (const [id, item] of Object.entries(this.index)) {
+        if (item.path === rel) item.path = destRel;
+      }
+      this.writeJSON(this.meta + "/index.json", this.index);
+      rel = destRel;
+    }
+    this.cache.clear();
+    return rel;
+  }
 }
 function number(v) {
   if (v === null || v === undefined || String(v).trim() === "") return null;

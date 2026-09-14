@@ -573,7 +573,7 @@ header select {
 }
 .stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 18px;
   margin-bottom: 30px;
 }
@@ -612,7 +612,7 @@ header select {
   margin-left: 20px;
 }
 #publishing-calendar > p {
-  margin: 4px 0 18px;
+  margin: 4px 0 6px;
   color: #5f6f66;
 }
 #heatmap-year,
@@ -627,6 +627,48 @@ header select {
 }
 .performance-head {
   margin-bottom: 12px;
+}
+.import-dialog .match-row {
+  margin: 14px 0 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eeeee5;
+}
+.import-dialog .match-row p {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+.import-dialog .match-row small {
+  display: block;
+  margin-top: 4px;
+  color: #8a9688;
+  font-size: 11px;
+}
+.import-dialog .match-search {
+  width: 100%;
+  margin-bottom: 8px;
+}
+.import-dialog select {
+  width: 100%;
+}
+.stats strong .delta,
+td .delta {
+  font-style: normal;
+  font-size: 0.55em;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.stats strong .delta.up,
+td .delta.up {
+  color: #2f7a4f;
+}
+.stats strong .delta.down,
+td .delta.down {
+  color: #a14b3c;
+}
+.page-title .muted {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #8a9688;
 }
 .empty-data {
   text-align: center;
@@ -947,7 +989,7 @@ pre {
 }
 .heatmap-scroll {
   overflow-x: auto;
-  padding: 12px 0;
+  padding: 2px 0 8px;
 }
 .heatmap-grid {
   display: grid;
