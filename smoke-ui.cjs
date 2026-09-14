@@ -34,7 +34,7 @@ const path = require("node:path");
     await win.screenshot({ path: path.resolve("screenshot-writing.png") });
     await win.locator('[data-page="dashboard"]').click();
     await win.screenshot({ path: path.resolve("screenshot-dashboard.png") });
-    await win.locator('[data-page="write"]').click();
+    await win.locator(".doc").first().click();
     await win.waitForTimeout(700);
     const saved = fs.readFileSync(
       path.join(dir, "Content_OS/金奇_AI/02_Drafts/把写作还给自己.md"),

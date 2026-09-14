@@ -61,6 +61,11 @@ const API_CHANNELS = [
   "published-read",
   "vault-reveal",
   "vault-open",
+  "draft-delete",
+  "materials-list",
+  "materials-read",
+  "materials-delete",
+  "materials-link",
 ];
 
 /**
@@ -330,6 +335,16 @@ class DeskCore {
         return this.knowledge.toggle(data.articleId, data.id, data.enabled);
       case "project-upload":
         return this.projectUpload(data);
+      case "draft-delete":
+        return this.deleteDraft(data);
+      case "materials-list":
+        return this.listMaterials(data);
+      case "materials-read":
+        return this.knowledge.materialText(data);
+      case "materials-delete":
+        return this.knowledge.deleteMaterial(data);
+      case "materials-link":
+        return this.knowledge.linkMaterial(data.articleId, data.id);
       case "finalize":
         return this.finalize(data);
       case "image":
@@ -549,6 +564,37 @@ class DeskCore {
         this.vault.json(this.vault.meta + "/articles/" + id + ".json", {})
           .materials || [],
     };
+  }
+
+  /**
+   * 列出素材库，并用当前草稿标题补全引用信息。
+   * @param {string|{ account?: string }} [data]
+   */
+  listMaterials(data) {
+    const account =
+      typeof data === "string" ? data : data?.account || undefined;
+    const list = this.knowledge.allMaterials(account);
+    const titles = Object.fromEntries(
+      (this.store.documents || []).map((d) => [d.id, d.title]),
+    );
+    return list.map((m) => ({
+      ...m,
+      usedBy: (m.usedBy || []).map((u) => ({
+        ...u,
+        title: titles[u.id] || u.title,
+      })),
+    }));
+  }
+
+  /**
+   * 删除草稿并刷新工作区状态。
+   * @param {string} id
+   */
+  deleteDraft(id) {
+    if (this.active) throw Error("请等待 AI 完成后再删除");
+    this.save();
+    this.vault.deleteDoc(id);
+    return { ...this.reload(), dataPath: this.data };
   }
 
   /**

@@ -72,6 +72,13 @@ test("project files are copied, fully extracted, isolated and persisted with AI 
   const again = new Knowledge(k.v, k.reader);
   assert.equal(again.refs("a")[0].enabled, false);
   assert.throws(() => k.refText("b", refs[0].id));
+  // 同一文件再上传到另一篇，应复用共享素材并计入引用
+  fs.writeFileSync(src, "唯一来源内容，给项目 a");
+  k.toggle("a", refs[0].id, true);
+  await k.upload("b", [src]);
+  assert.equal(k.refs("b").length, 1);
+  assert.equal(k.refs("b")[0].id, refs[0].id);
+  assert.equal(k.allMaterials().find((m) => m.id === refs[0].id).refCount, 2);
 });
 test("unreadable files retained but never silently sent to AI", async (t) => {
   const { root, k } = setup(t);

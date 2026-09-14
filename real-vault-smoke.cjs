@@ -56,7 +56,7 @@ function hashes(dir, result = {}) {
     await w.locator("[data-model-tab]").first().click();
     await w.screenshot({ path: "screenshot-profile.png" });
     await w.locator('[data-page="materials"]').click();
-    await w.locator('[data-page="write"]').click();
+    await w.locator(".doc").first().click();
     assert.deepEqual(errors, []);
     const after = hashes(root);
     for (const [p, h] of Object.entries(before)) assert.equal(after[p], h, p);

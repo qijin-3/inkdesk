@@ -94,9 +94,15 @@ p {
   flex-shrink: 0;
   background: #eceee5;
   border-right: 1px solid #dde1d5;
-  padding: 52px 18px 20px;
+  padding: 28px 18px 20px;
   display: flex;
   flex-direction: column;
+}
+.brand-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
 }
 .brand {
   font-size: 22px;
@@ -106,6 +112,8 @@ p {
   align-items: center;
   gap: 9px;
   flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
 }
 .brand small {
   font-size: 10px;
@@ -113,6 +121,12 @@ p {
   margin-left: 37px;
   letter-spacing: 2px;
   color: #7d8c7c;
+}
+.brand-settings {
+  flex-shrink: 0;
+  margin-top: 2px;
+  border: 1px solid #dedfd6;
+  background: #fffdf8;
 }
 .brand-icon {
   font-family: Georgia, serif;
@@ -204,21 +218,6 @@ nav span {
 .doc.selected {
   background: #fffdf6;
   box-shadow: 0 2px 6px #435a3008;
-}
-.side-bottom {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.side-bottom button {
-  background: none;
-  border: 0;
-  text-align: left;
-}
-.side-bottom span {
-  font-size: 9px;
-  color: #97a18e;
-  margin: 14px 8px 0;
 }
 main {
   flex: 1;
@@ -372,13 +371,41 @@ header select {
 .workspace {
   display: flex;
   height: calc(100vh - 85px);
+  min-width: 0;
 }
 .paper-wrap {
   flex: 1;
-  min-width: 400px;
+  min-width: 280px;
   position: relative;
   overflow: auto;
   padding-bottom: 65px;
+  scrollbar-width: none;
+}
+.paper-wrap::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.workspace-resizer {
+  width: 5px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  z-index: 3;
+  touch-action: none;
+}
+.workspace-resizer:hover,
+.workspace-resizer.dragging {
+  background: #c5d0c0;
+}
+body.resizing-workspace {
+  cursor: col-resize;
+  user-select: none;
+}
+body.resizing-workspace * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 .formatbar {
   display: flex;
@@ -483,6 +510,8 @@ header select {
 .assistant {
   width: 350px;
   flex-shrink: 0;
+  min-width: 0;
+  max-width: min(560px, 48vw);
   border-left: 1px solid #e2e5db;
   background: #f0f2ea;
   display: flex;
@@ -521,14 +550,27 @@ header select {
 #panel {
   flex: 1;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   padding: 0 16px;
+  box-sizing: border-box;
 }
 .panel-scroll {
   flex: 1;
+  min-width: 0;
   overflow: auto;
+  overflow-x: hidden;
   padding: 16px 0;
+  scrollbar-width: none;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.panel-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 .welcome {
   text-align: center;
@@ -552,6 +594,9 @@ header select {
   background: #fffdf7;
   border-radius: 10px;
   padding: 10px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 .composer textarea {
   background: none;
@@ -566,6 +611,12 @@ header select {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-width: 0;
+}
+#composer-input {
+  display: block !important;
+  width: 100%;
+  min-width: 0;
 }
 .composer span {
   font-size: 9px;
@@ -581,6 +632,9 @@ header select {
   padding: 13px;
   border: 1px solid #e1e6d8;
   border-radius: 9px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
 }
 .message.user {
   background: #e4ebdd;
@@ -925,7 +979,8 @@ th {
     width: 195px;
   }
   .assistant {
-    width: 310px;
+    width: min(310px, 42vw);
+    max-width: 42vw;
   }
   .paper {
     padding: 35px 30px;
@@ -1167,6 +1222,8 @@ pre {
 #composer-input .tiptap {
   min-height: 90px;
   max-height: 240px;
+  width: 100%;
+  box-sizing: border-box;
   overflow: auto;
   padding: 10px;
   outline: none;
@@ -1176,6 +1233,13 @@ pre {
   border: 1px solid #dedfd6;
   border-radius: 8px;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  scrollbar-width: none;
+}
+#composer-input .tiptap::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 #composer-input .tiptap p {
   margin: 0;
@@ -1203,6 +1267,7 @@ pre {
 }
 .composer-tools {
   display: flex !important;
+  align-items: center;
   justify-content: flex-start !important;
   gap: 5px;
   flex-wrap: wrap;
@@ -1211,6 +1276,11 @@ pre {
 .composer-tools button {
   padding: 4px 6px;
   font-size: 10px;
+}
+.composer-tools #send {
+  margin-left: auto;
+  padding: 6px 12px;
+  font-size: 11px;
 }
 .material-cards {
   display: grid;
@@ -1252,9 +1322,44 @@ pre {
   margin-bottom: 14px;
   color: #537a60;
 }
-.material-card label {
+.context-menu {
+  position: fixed;
+  z-index: 200;
+  min-width: 140px;
+  background: #fffef8;
+  border: 1px solid #dfe3d7;
+  border-radius: 8px;
+  box-shadow: 0 10px 28px #263e3420;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.context-menu button {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  width: 100%;
+}
+.context-menu button:hover {
+  background: #eef1e7;
+}
+.context-menu button.danger {
+  color: #a5483f;
+}
+.material-card .ref-count {
+  display: block;
+  margin-top: 10px;
+  color: #7b8b80;
   font-size: 11px;
-  color: #748471;
+}
+.material-card .card-open {
+  width: 100%;
+}
+#material-filter {
+  max-width: 220px;
 }
 .reference-drawer {
   position: fixed;

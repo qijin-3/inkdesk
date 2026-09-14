@@ -37,6 +37,11 @@ const channels = [
   "published-read",
   "vault-reveal",
   "vault-open",
+  "draft-delete",
+  "materials-list",
+  "materials-read",
+  "materials-delete",
+  "materials-link",
 ];
 contextBridge.exposeInMainWorld("desk", {
   web: false,

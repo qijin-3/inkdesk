@@ -129,6 +129,11 @@ const passthrough = new Set([
   "published-read",
   "vault-reveal",
   "vault-open",
+  "draft-delete",
+  "materials-list",
+  "materials-read",
+  "materials-delete",
+  "materials-link",
 ]);
 
 for (const name of passthrough) {

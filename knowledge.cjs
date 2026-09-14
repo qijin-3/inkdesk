@@ -268,25 +268,145 @@ class Knowledge {
     if (!/^[\w-]+$/.test(id) || !this.v.index[id]) throw Error("项目不存在");
     return `${this.v.meta}/projects/${id}`;
   }
-  refs(id) {
+  /** 共享素材库目录（相对 vault meta） */
+  libraryDir() {
+    return `${this.v.meta}/library`;
+  }
+  /** 读取共享素材列表 */
+  materials() {
+    this.migrateLibrary();
+    return this.v.json(`${this.libraryDir()}/materials.json`, []);
+  }
+  /** 写入共享素材列表 */
+  saveMaterials(list) {
+    this.v.writeJSON(`${this.libraryDir()}/materials.json`, list);
+  }
+  /** 读取某篇文章的素材链接（仅 id + enabled） */
+  links(id) {
+    this.migrateLibrary();
     return this.v.json(this.project(id) + "/references.json", []);
   }
+  /** 写入某篇文章的素材链接 */
+  saveLinks(id, list) {
+    this.v.writeJSON(this.project(id) + "/references.json", list);
+  }
+  /**
+   * 将旧版「每文一份完整素材」迁移为共享库 + 链接。
+   */
+  migrateLibrary() {
+    const libPath = `${this.libraryDir()}/materials.json`;
+    const library = this.v.json(libPath, []);
+    const byId = new Map(library.map((m) => [m.id, m]));
+    let changed = false;
+    for (const id of Object.keys(this.v.index || {})) {
+      if (!/^[\w-]+$/.test(id)) continue;
+      const rel = `${this.v.meta}/projects/${id}/references.json`;
+      if (!fs.existsSync(this.v.p(rel))) continue;
+      const raw = this.v.json(rel, []);
+      if (!raw.length) continue;
+      if (!raw.some((r) => r && r.path)) continue;
+      const links = [];
+      for (const r of raw) {
+        if (!r?.id) continue;
+        if (r.path) {
+          if (!byId.has(r.id)) {
+            const item = {
+              id: r.id,
+              name: r.name,
+              path: r.path,
+              textPath: r.textPath,
+              bytes: r.bytes,
+              characters: r.characters,
+              status: r.status,
+              error: r.error || "",
+              at: r.at,
+              ocr: !!r.ocr,
+              hash: r.hash || "",
+            };
+            byId.set(r.id, item);
+            library.push(item);
+            changed = true;
+          }
+          links.push({ id: r.id, enabled: !!r.enabled });
+        } else {
+          links.push({ id: r.id, enabled: !!r.enabled });
+        }
+      }
+      this.v.writeJSON(rel, links);
+      changed = true;
+    }
+    if (changed) this.v.writeJSON(libPath, library);
+  }
+  refs(id) {
+    const lib = this.materials();
+    return this.links(id)
+      .map((link) => {
+        const m = lib.find((x) => x.id === link.id);
+        return m ? { ...m, enabled: !!link.enabled } : null;
+      })
+      .filter(Boolean);
+  }
+  /**
+   * 列出素材库；附带被哪些文章引用。
+   * @param {string} [account]
+   */
+  allMaterials(account) {
+    const lib = this.materials();
+    const docs = Object.entries(this.v.index || {})
+      .filter(([, v]) => v.status === "draft")
+      .map(([id, v]) => {
+        const title = path.basename(v.path || "", ".md") || id;
+        const acc = String(v.path || "").includes("金奇_Dev") ? "Dev" : "AI";
+        return { id, title, account: acc };
+      })
+      .filter((d) => !account || d.account === account);
+    const usage = new Map();
+    for (const d of docs) {
+      try {
+        for (const link of this.links(d.id)) {
+          if (!usage.has(link.id)) usage.set(link.id, []);
+          usage.get(link.id).push({ id: d.id, title: d.title });
+        }
+      } catch {
+        /* 无项目目录 */
+      }
+    }
+    return lib
+      .map((m) => {
+        const usedBy = usage.get(m.id) || [];
+        return { ...m, usedBy, refCount: usedBy.length };
+      })
+      .sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+  }
   async upload(id, paths) {
-    const base = this.project(id),
-      list = this.refs(id);
+    this.project(id);
+    const library = this.materials();
+    const links = this.links(id);
     for (const src of paths) {
       if (
         !fs.statSync(src).isFile() ||
         fs.statSync(src).size > 40 * 1024 * 1024
       )
         throw Error("仅支持 40MB 以内的文件");
+      const bytes = fs.readFileSync(src);
+      const fileHash = digest(bytes);
+      const existing = library.find(
+        (m) => m.hash === fileHash && m.status === "ready",
+      );
+      if (existing) {
+        if (!links.some((l) => l.id === existing.id)) {
+          links.push({ id: existing.id, enabled: true });
+          this.saveLinks(id, links);
+        }
+        continue;
+      }
       const rid = crypto.randomUUID(),
         name =
           clean(path.basename(src, path.extname(src))) +
           path.extname(src).toLowerCase(),
-        rel = "00_wiki/_data/raw/projects/" + id + "/files/" + rid + "/" + name;
+        rel = "00_wiki/_data/raw/library/" + rid + "/" + name;
       fs.mkdirSync(path.dirname(this.v.p(rel)), { recursive: true });
-      fs.copyFileSync(src, this.v.p(rel));
+      fs.writeFileSync(this.v.p(rel), bytes);
       let text = "",
         status = "ready",
         error = "";
@@ -297,26 +417,28 @@ class Knowledge {
         status = "unreadable";
         error = e.message;
       }
-      const textPath = base + "/text/" + rid + ".txt";
+      const textPath = this.libraryDir() + "/text/" + rid + ".txt";
       atomic(this.v.p(textPath), text);
-      list.splice(0, list.length, ...this.refs(id));
-      list.push({
+      library.push({
         id: rid,
         name,
         path: rel,
         textPath,
-        bytes: fs.statSync(src).size,
+        bytes: bytes.length,
         characters: text.length,
         status,
         error,
-        enabled: status === "ready",
         at: new Date().toISOString(),
         ocr: /\.(png|jpe?g|webp|gif)$/i.test(name),
+        hash: fileHash,
       });
-      this.v.writeJSON(base + "/references.json", list);
+      this.saveMaterials(library);
+      links.push({ id: rid, enabled: status === "ready" });
+      this.saveLinks(id, links);
     }
-    return list;
+    return this.refs(id);
   }
+  /** 从文件提取纯文本，供素材入库 */
   async extract(p) {
     const ext = path.extname(p).toLowerCase();
     if (
@@ -359,18 +481,78 @@ class Knowledge {
     );
   }
   refText(id, rid) {
-    const r = this.refs(id).find((r) => r.id === rid);
-    if (!r) throw Error("素材不存在");
-    return { ...r, text: fs.readFileSync(this.v.p(r.textPath), "utf8") };
+    const linked = this.refs(id).find((r) => r.id === rid);
+    if (!linked) throw Error("素材不存在");
+    return {
+      ...linked,
+      text:
+        linked.status === "ready"
+          ? fs.readFileSync(this.v.p(linked.textPath), "utf8")
+          : "",
+    };
+  }
+  /** 按素材 id 读取正文（素材库预览） */
+  materialText(rid) {
+    const m = this.materials().find((x) => x.id === rid);
+    if (!m) throw Error("素材不存在");
+    return {
+      ...m,
+      text:
+        m.status === "ready" ? fs.readFileSync(this.v.p(m.textPath), "utf8") : "",
+    };
   }
   toggle(id, rid, enabled) {
-    const list = this.refs(id),
+    const list = this.links(id),
       r = list.find((r) => r.id === rid);
     if (!r) throw Error("素材不存在");
-    if (enabled && r.status !== "ready") throw Error("文件尚未解析成功");
+    const m = this.materials().find((x) => x.id === rid);
+    if (enabled && m && m.status !== "ready") throw Error("文件尚未解析成功");
     r.enabled = !!enabled;
-    this.v.writeJSON(this.project(id) + "/references.json", list);
-    return list;
+    this.saveLinks(id, list);
+    return this.refs(id);
+  }
+  /**
+   * 删除共享素材，并解除所有文章链接。
+   * @param {string} rid
+   */
+  deleteMaterial(rid) {
+    const library = this.materials();
+    const m = library.find((x) => x.id === rid);
+    if (!m) throw Error("素材不存在");
+    for (const id of Object.keys(this.v.index || {})) {
+      if (!/^[\w-]+$/.test(id)) continue;
+      try {
+        const links = this.links(id).filter((l) => l.id !== rid);
+        this.saveLinks(id, links);
+      } catch {
+        /* ignore */
+      }
+    }
+    for (const p of [m.path, m.textPath]) {
+      try {
+        if (p && fs.existsSync(this.v.p(p))) fs.unlinkSync(this.v.p(p));
+      } catch {
+        /* ignore */
+      }
+    }
+    this.saveMaterials(library.filter((x) => x.id !== rid));
+    return this.allMaterials();
+  }
+  /**
+   * 将已有素材关联到文章。
+   * @param {string} articleId
+   * @param {string} rid
+   */
+  linkMaterial(articleId, rid) {
+    this.project(articleId);
+    const m = this.materials().find((x) => x.id === rid);
+    if (!m) throw Error("素材不存在");
+    const links = this.links(articleId);
+    if (!links.some((l) => l.id === rid)) {
+      links.push({ id: rid, enabled: m.status === "ready" });
+      this.saveLinks(articleId, links);
+    }
+    return this.refs(articleId);
   }
   projectContext(id, linked = []) {
     const selected = this.refs(id).filter(

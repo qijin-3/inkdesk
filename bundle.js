@@ -28864,6 +28864,7 @@ var composer = null;
 var profileTab = "identity";
 var heatmapYear = (/* @__PURE__ */ new Date()).getFullYear();
 var metricsSort = "\u9605\u8BFB";
+var materialsFilter = "all";
 var $ = (s) => document.querySelector(s);
 var api = (n, d) => window.desk.call(n, d);
 function isWeb() {
@@ -29037,11 +29038,11 @@ function render2() {
     editor.destroy();
     editor = null;
   }
-  $("#app").innerHTML = `<aside class="sidebar"><div class="brand"><span class="brand-icon">i</span> inkdesk <small>\u5199\u4F5C\u5DE5\u4F5C\u53F0</small></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">\u91D1\u5947 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">\u91D1\u5947 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">\u25EB <span>\u4EEA\u8868\u76D8</span></button><button data-page="write" class="${page === "write" ? "chosen" : ""}">\u25A4 <span>\u5199\u4F5C\u684C\u9762</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">\u2727 <span>\u9009\u9898\u4E0E\u7075\u611F</span></button><button data-page="materials">\u25A7 <span>\u9879\u76EE\u7D20\u6750</span></button><button data-page="profile">\u25CE <span>\u8D26\u53F7\u4EBA\u8BBE</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0">\uFF0B</button></div><div class="docs">${state.documents.filter(
+  $("#app").innerHTML = `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk <small>\u5199\u4F5C\u5DE5\u4F5C\u53F0</small></div><button type="button" data-page="settings" class="icon-btn brand-settings" title="\u8BBE\u7F6E" aria-label="\u8BBE\u7F6E">\u2699</button></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">\u91D1\u5947 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">\u91D1\u5947 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">\u25EB <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">\u2727 <span>\u9009\u9898\u4E0E\u7075\u611F</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">\u25A7 <span>\u7D20\u6750\u5E93</span></button><button data-page="profile">\u25CE <span>\u8D26\u53F7\u4EBA\u8BBE</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0">\uFF0B</button></div><div class="docs">${state.documents.filter(
     (d) => d.account === account && d.status !== "final" && d.status !== "archive"
   ).map(
     (d) => `<button class="doc ${current?.id === d.id ? "selected" : ""}" data-id="${d.id}"><span>${esc(d.title)}</span><small>${new Date(d.updated).toLocaleDateString("zh-CN")} \xB7 ${d.body.length} \u5B57</small></button>`
-  ).join("") || '<p class="muted">\u4ECE\u4E00\u4E2A\u60F3\u6CD5\u5F00\u59CB\u3002</p>'}</div><div class="side-bottom"><button id="source">\u21BB \u5237\u65B0\u5F00\u53D1\u526F\u672C</button><button data-page="settings">\u2699 \u8FDE\u63A5\u4E0E\u5B58\u50A8</button><span>\u672C\u5730\u4F18\u5148 \xB7 \u4F60\u7684\u8868\u8FBE\uFF0C\u4F60\u505A\u4E3B</span></div></aside><main id="main"></main>`;
+  ).join("") || '<p class="muted">\u4ECE\u4E00\u4E2A\u60F3\u6CD5\u5F00\u59CB\u3002</p>'}</div></aside><main id="main"></main>`;
   if (page === "write") renderWrite();
   else if (page === "dashboard") renderDashboard();
   else if (page === "topics") renderTopics();
@@ -29083,7 +29084,71 @@ function render2() {
     }
   );
   $("#new").onclick = newDoc;
-  $("#source").onclick = refreshVault;
+  $$(".doc").forEach((b) => {
+    b.oncontextmenu = (e) => {
+      e.preventDefault();
+      showContextMenu(e.clientX, e.clientY, [
+        {
+          label: "\u5220\u9664\u8349\u7A3F",
+          danger: true,
+          run: () => deleteDraft(b.dataset.id)
+        }
+      ]);
+    };
+  });
+}
+function showContextMenu(x, y, items) {
+  $("#context-menu")?.remove();
+  const menu = document.createElement("div");
+  menu.id = "context-menu";
+  menu.className = "context-menu";
+  menu.style.left = Math.min(x, window.innerWidth - 180) + "px";
+  menu.style.top = Math.min(y, window.innerHeight - 80) + "px";
+  menu.innerHTML = items.map(
+    (it, i) => `<button type="button" data-ctx="${i}" class="${it.danger ? "danger" : ""}">${esc(it.label)}</button>`
+  ).join("");
+  document.body.append(menu);
+  const close2 = () => {
+    menu.remove();
+    window.removeEventListener("click", close2);
+    window.removeEventListener("contextmenu", close2);
+    window.removeEventListener("scroll", close2, true);
+  };
+  [...menu.querySelectorAll("[data-ctx]")].forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      const item = items[+b.dataset.ctx];
+      close2();
+      item?.run();
+    };
+  });
+  setTimeout(() => {
+    window.addEventListener("click", close2);
+    window.addEventListener("contextmenu", close2);
+    window.addEventListener("scroll", close2, true);
+  }, 0);
+}
+async function deleteDraft(id) {
+  if (busy) return toast("\u8BF7\u7B49\u5F85 AI \u5B8C\u6210\u540E\u518D\u5220\u9664");
+  const doc3 = state.documents.find((d) => d.id === id);
+  if (!doc3) return;
+  if (!confirm(`\u786E\u5B9A\u5220\u9664\u8349\u7A3F\u300C${doc3.title}\u300D\uFF1F\u6B64\u64CD\u4F5C\u4E0D\u53EF\u6062\u590D\u3002`)) return;
+  sync();
+  try {
+    await persist();
+    const result = await api("draft-delete", id);
+    Object.assign(state, result);
+    if (current?.id === id) {
+      current = state.documents.find((d) => d.account === account) || state.documents[0] || null;
+      page = current ? "write" : "dashboard";
+    }
+    dirty = false;
+    pending = null;
+    render2();
+    toast("\u8349\u7A3F\u5DF2\u5220\u9664");
+  } catch (e) {
+    toast(e.message);
+  }
 }
 function $$(s) {
   return [...document.querySelectorAll(s)];
@@ -29094,7 +29159,7 @@ function renderWrite() {
     $("#start").onclick = newDoc;
     return;
   }
-  $("#main").innerHTML = `<header><div><span class="eyebrow">${account === "AI" ? "AI \u5B9E\u8DF5\u4E0E\u601D\u8003" : "BUILD IN PUBLIC"}</span><span class="crumb"> / \u5199\u4F5C\u684C\u9762</span></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold"><b>B</b></button><button data-fmt="italic"><i>I</i></button><button data-fmt="heading">H2</button><button data-fmt="bulletList">\u2637</button><button data-fmt="blockquote">\u275D</button><span></span><button id="image">\uFF0B \u56FE\u7247</button><button id="outline">\u5927\u7EB2</button><button id="focus">\u4E13\u6CE8</button></div><div id="outline-list" hidden></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">\u9879\u76EE\u53C2\u8003\u6587\u4EF6</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">\u5F15\u7528\u9009\u6BB5</button><button data-task="review">\u770B\u7A3F</button><button data-task="rewrite">\u6DA6\u8272\u9009\u6BB5</button><button data-task="check">\u6838\u67E5</button></div></section><aside class="assistant"><div class="assistant-head"><span>\u2727 \u5199\u4F5C\u4F19\u4F34</span><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select></div><div class="tabs">${[
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><span class="eyebrow">${account === "AI" ? "AI \u5B9E\u8DF5\u4E0E\u601D\u8003" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold"><b>B</b></button><button data-fmt="italic"><i>I</i></button><button data-fmt="heading">H2</button><button data-fmt="bulletList">\u2637</button><button data-fmt="blockquote">\u275D</button><span></span><button id="image">\uFF0B \u56FE\u7247</button><button id="outline">\u5927\u7EB2</button><button id="focus">\u4E13\u6CE8</button></div><div id="outline-list" hidden></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">\u9879\u76EE\u53C2\u8003\u6587\u4EF6</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">\u5F15\u7528\u9009\u6BB5</button><button data-task="review">\u770B\u7A3F</button><button data-task="rewrite">\u6DA6\u8272\u9009\u6BB5</button><button data-task="check">\u6838\u67E5</button></div></section><div class="workspace-resizer" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant"><div class="assistant-head"><span>\u2727 \u5199\u4F5C\u4F19\u4F34</span><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select></div><div class="tabs">${[
     ["chat", "\u5BF9\u8BDD"],
     ["topics", "\u601D\u8DEF"],
     ["titles", "\u6807\u9898"],
@@ -29165,6 +29230,7 @@ function renderWrite() {
   $("#article-materials").onclick = () => {
     sync();
     persist();
+    materialsFilter = current.id;
     page = "materials";
     render2();
   };
@@ -29230,6 +29296,7 @@ function renderWrite() {
   };
   $("#focus").onclick = () => {
     $(".assistant").classList.toggle("hidden");
+    $("#workspace-resizer")?.classList.toggle("hidden");
     $(".sidebar").classList.toggle("hidden");
   };
   $("#outline").onclick = () => {
@@ -29329,7 +29396,45 @@ function renderWrite() {
   });
   $("#tag-selection").onmousedown = (e) => e.preventDefault();
   $("#tag-selection").onclick = tagSelection;
+  bindWorkspaceResize();
   renderPanel();
+}
+function bindWorkspaceResize() {
+  const resizer = $("#workspace-resizer");
+  const aside = $(".assistant");
+  const workspace = $(".workspace");
+  if (!resizer || !aside || !workspace) return;
+  const clamp = (w) => {
+    const max = Math.max(280, workspace.clientWidth - 300);
+    return Math.min(Math.max(Math.round(w), 280), Math.min(560, max));
+  };
+  const stored = Number(localStorage.getItem("inkdesk-assistant-width"));
+  if (Number.isFinite(stored) && stored > 0) aside.style.width = clamp(stored) + "px";
+  let startX = 0;
+  let startW = 0;
+  const onMove = (e) => {
+    aside.style.width = clamp(startW + (startX - e.clientX)) + "px";
+  };
+  const onUp = () => {
+    resizer.classList.remove("dragging");
+    document.body.classList.remove("resizing-workspace");
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    localStorage.setItem(
+      "inkdesk-assistant-width",
+      String(Math.round(aside.getBoundingClientRect().width))
+    );
+  };
+  resizer.onpointerdown = (e) => {
+    if (aside.classList.contains("hidden")) return;
+    e.preventDefault();
+    startX = e.clientX;
+    startW = aside.getBoundingClientRect().width;
+    resizer.classList.add("dragging");
+    document.body.classList.add("resizing-workspace");
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
 }
 function renderPanel() {
   if (composer) {
@@ -29348,7 +29453,7 @@ function renderPanel() {
   let content = "";
   if (tab === "chat") {
     content = conversation().messages.map(
-      (m) => `<div class="message ${m.role}"><small>${m.role === "user" ? "\u4F60" : "\u5199\u4F5C\u4F19\u4F34"}</small><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? `<span class="inline-reference">${esc(p.label)}</span>` : esc(p.text)).join("") : esc(m.text)}</div></div>`
+      (m) => `<div class="message ${m.role}"><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? `<span class="inline-reference">${esc(p.label)}</span>` : esc(p.text)).join("") : esc(m.text)}</div></div>`
     ).join("") || '<div class="welcome"><span>\u2727</span><h3>\u5148\u4FDD\u7559\u4F60\u7684\u58F0\u97F3\u3002</h3><p>\u4E00\u8D77\u804A\u60F3\u6CD5\uFF0C\u6216\u9009\u4E2D\u4E00\u6BB5\u6587\u5B57\u63A8\u6572\u3002<br>\u4FEE\u6539\u5148\u9884\u89C8\uFF0C\u7531\u4F60\u51B3\u5B9A\u662F\u5426\u91C7\u7528\u3002</p></div>';
   } else {
     const labels = {
@@ -29368,7 +29473,7 @@ function renderPanel() {
     (p) => `<${p.added ? "ins" : p.removed ? "del" : "span"}>${esc(p.value)}</${p.added ? "ins" : p.removed ? "del" : "span"}>`
   ).join(
     ""
-  )}</div><div class="row"><button id="accept" class="primary">\u63A5\u53D7\u4FEE\u6539</button><button id="reject">\u4FDD\u7559\u539F\u6587</button></div></div>` : ""}${content}</div><div class="composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload">\uFF0B \u4E0A\u4F20\u6587\u4EF6</button><button id="chat-reference">@ \u9879\u76EE\u6587\u4EF6</button><button id="rewrite-tags">\u6539\u5199\u6807\u7B7E\u9009\u6BB5</button></div><div><span>${busy ? "\u6B63\u5728\u601D\u8003\u2026" : "\u53EA\u5728\u9700\u8981\u65F6\u8C03\u7528 AI"}</span><button id="send" class="primary">${busy ? "\u505C\u6B62" : "\u53D1\u9001 \u2191"}</button></div></div>`;
+  )}</div><div class="row"><button id="accept" class="primary">\u63A5\u53D7\u4FEE\u6539</button><button id="reject">\u4FDD\u7559\u539F\u6587</button></div></div>` : ""}${content}</div><div class="composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload">\uFF0B \u4E0A\u4F20\u6587\u4EF6</button><button id="chat-reference">@ \u9879\u76EE\u6587\u4EF6</button><button id="rewrite-tags">\u6539\u5199\u6807\u7B7E\u9009\u6BB5</button><button id="send" class="primary">${busy ? "\u505C\u6B62" : "\u53D1\u9001 \u2191"}</button></div></div>`;
   if (tab === "chat") {
     $("#conversation").value = conversation().id;
     $("#conversation").onchange = (e) => {
@@ -29924,7 +30029,7 @@ function renderTopics() {
   const docs = state.documents.filter(
     (d) => d.account === account && d.topics?.length
   );
-  $("#main").innerHTML = `<header><span class="eyebrow">IDEAS TO COME BACK TO</span></header><section class="dashboard"><div class="page-title"><h1>\u503C\u5F97\u7EE7\u7EED\u804A\u7684\u60F3\u6CD5\u3002</h1><p>\u6BCF\u4E00\u4E2A\u89D2\u5EA6\u90FD\u4E0E\u539F\u6765\u7684\u6587\u7AE0\u5173\u8054\uFF0C\u968F\u65F6\u56DE\u6765\u7EE7\u7EED\u5199\u3002</p></div><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc(d.title)}</h3><div>${esc(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">\u7EE7\u7EED\u8FD9\u7BC7\u6587\u7AE0 \u2192</button></div>`).join("") || '<div class="empty-data">\u6253\u5F00\u4E00\u7BC7\u6587\u7AE0\uFF0C\u5728\u300C\u601D\u8DEF\u300D\u9762\u677F\u751F\u6210\u6216\u8BA8\u8BBA\u9009\u9898\u3002</div>'}</div></section>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u503C\u5F97\u7EE7\u7EED\u804A\u7684\u60F3\u6CD5\u3002</h1><span class="eyebrow">IDEAS TO COME BACK TO</span></div></header><section class="dashboard"><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc(d.title)}</h3><div>${esc(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">\u7EE7\u7EED\u8FD9\u7BC7\u6587\u7AE0 \u2192</button></div>`).join("") || '<div class="empty-data">\u6253\u5F00\u4E00\u7BC7\u6587\u7AE0\uFF0C\u5728\u300C\u601D\u8DEF\u300D\u9762\u677F\u751F\u6210\u6216\u8BA8\u8BBA\u9009\u9898\u3002</div>'}</div></section>`;
   $$("[data-open]").forEach(
     (b) => b.onclick = () => {
       current = state.documents.find((d) => d.id === b.dataset.open);
@@ -29935,7 +30040,7 @@ function renderTopics() {
   );
 }
 function renderSettings() {
-  $("#main").innerHTML = `<header><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></header><section class="dashboard settings"><h1>\u8FDE\u63A5\u4E0E\u5B58\u50A8</h1><p>\u7F16\u8F91\u4E0E\u4FDD\u5B58\u4E0D\u4F9D\u8D56 AI \u8BA2\u9605\u3002\u4EC5\u5728\u4F60\u8C03\u7528\u65F6\u8FDE\u63A5 Agent\u3002</p><div class="dashboard-card"><h3>Agent \u8FDE\u63A5</h3><label>\u9ED8\u8BA4 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option><option value="codex">Codex ${state.agents.codex ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option></select></label><label>\u6A21\u578B\uFF08\u7559\u7A7A\u6CBF\u7528 CLI \u9ED8\u8BA4\uFF09<input id="model" value="${esc(state.model)}" placeholder="\u53EF\u9009\u6A21\u578B ID"></label><p>\u590D\u7528 CLI \u767B\u5F55\u3002\u82E5\u672A\u767B\u5F55\uFF0C\u8BF7\u5148\u5728\u7EC8\u7AEF\u6267\u884C agent login \u6216 codex login\u3002\u6B64\u7248\u672C\u4E0D\u4FDD\u5B58\u8D26\u53F7\u51ED\u636E\u3002</p><button class="primary" id="save-settings">\u4FDD\u5B58\u8BBE\u7F6E</button></div><div class="dashboard-card"><h3>\u672C\u5730\u6570\u636E</h3>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<p>${esc(state.dataPath)}</p><h3>Content_OS \u6765\u6E90</h3><p>${esc(state.source || "\u5C1A\u672A\u9009\u62E9")}</p><p>\u5F00\u53D1\u9636\u6BB5\u76F4\u63A5\u8BFB\u5199\u72EC\u7ACB\u526F\u672C\uFF1B\u6B63\u6587\u5728 02_Drafts\uFF0C\u5B9A\u7A3F\u540E\u79FB\u52A8\u5230 03_Archive\uFF0C\u56FE\u7247\u5728 Attachment/\u6587\u7AE0\u540D\uFF0C\u7D20\u6750\u5728 00_wiki\uFF0C\u7248\u672C\u548C\u5BF9\u8BDD\u5728 _system/inkdesk\u3002\u4E0A\u7EBF\u540E\u518D\u914D\u7F6E\u6B63\u5F0F\u76EE\u5F55\u3002</p></div></section>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BBE\u7F6E</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><div class="dashboard-card"><h3>Agent \u8FDE\u63A5</h3><label>\u9ED8\u8BA4 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option><option value="codex">Codex ${state.agents.codex ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option></select></label><label>\u6A21\u578B\uFF08\u7559\u7A7A\u6CBF\u7528 CLI \u9ED8\u8BA4\uFF09<input id="model" value="${esc(state.model)}" placeholder="\u53EF\u9009\u6A21\u578B ID"></label><p>\u590D\u7528 CLI \u767B\u5F55\u3002\u82E5\u672A\u767B\u5F55\uFF0C\u8BF7\u5148\u5728\u7EC8\u7AEF\u6267\u884C agent login \u6216 codex login\u3002\u6B64\u7248\u672C\u4E0D\u4FDD\u5B58\u8D26\u53F7\u51ED\u636E\u3002</p><button class="primary" id="save-settings">\u4FDD\u5B58\u8BBE\u7F6E</button></div><div class="dashboard-card"><h3>\u672C\u5730\u6570\u636E</h3>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<p>${esc(state.dataPath)}</p><h3>Content_OS \u6765\u6E90</h3><p>${esc(state.source || "\u5C1A\u672A\u9009\u62E9")}</p><p>\u5F00\u53D1\u9636\u6BB5\u76F4\u63A5\u8BFB\u5199\u72EC\u7ACB\u526F\u672C\uFF1B\u6B63\u6587\u5728 02_Drafts\uFF0C\u5B9A\u7A3F\u540E\u79FB\u52A8\u5230 03_Archive\uFF0C\u56FE\u7247\u5728 Attachment/\u6587\u7AE0\u540D\uFF0C\u7D20\u6750\u5728 00_wiki\uFF0C\u7248\u672C\u548C\u5BF9\u8BDD\u5728 _system/inkdesk\u3002\u4E0A\u7EBF\u540E\u518D\u914D\u7F6E\u6B63\u5F0F\u76EE\u5F55\u3002</p><button type="button" id="refresh-vault">\u21BB \u5237\u65B0\u5F00\u53D1\u526F\u672C</button></div></section>`;
   $("#setting-provider").value = state.provider;
   $("#save-settings").onclick = () => {
     state.provider = $("#setting-provider").value;
@@ -29943,6 +30048,7 @@ function renderSettings() {
     persist();
     toast("\u8BBE\u7F6E\u5DF2\u4FDD\u5B58");
   };
+  $("#refresh-vault").onclick = () => refreshVault();
 }
 async function refreshVault() {
   if (busy) return toast("AI \u6B63\u5728\u56DE\u590D\uFF0C\u8BF7\u7ED3\u675F\u540E\u5237\u65B0");
@@ -30144,69 +30250,93 @@ function openPreview({ title, text, path: rel, reference, doc: doc3 = current })
   }
 }
 async function renderMaterials() {
-  const doc3 = current;
-  $("#main").innerHTML = `<header><span class="eyebrow">\u5199\u4F5C\u9879\u76EE \xB7 \u53C2\u8003\u7D20\u6750</span></header><section class="dashboard"><h1>\u8FD9\u7BC7\u6587\u7AE0\u7684\u7D20\u6750\u3002</h1><div class="row"><select id="material-project">${state.documents.filter((d) => d.account === account).map((d) => `<option value="${d.id}">${esc(d.title)}</option>`).join(
-    ""
-  )}</select><button id="upload-reference" class="primary" ${doc3 ? "" : "disabled"}>\uFF0B \u4E0A\u4F20\u6587\u4EF6</button></div><p>\u70B9\u51FB\u5361\u7247\u5728\u53F3\u4FA7\u9884\u89C8\uFF1B\u53EF\u628A\u6587\u4EF6\u6216\u9009\u5B9A\u884C\u5F15\u7528\u5230\u5BF9\u8BDD\u4E2D\u3002\u6CA1\u6709\u6587\u4EF6\u6807\u7B7E\u65F6\uFF0CAI \u4F7F\u7528\u52FE\u9009\u7684\u9879\u76EE\u8D44\u6599\u3002</p><div id="project-files" class="material-cards"></div><div id="legacy-materials" class="material-cards"></div></section>`;
-  $("#material-project").value = doc3?.id || "";
-  $("#material-project").onchange = (e) => {
+  const drafts = state.documents.filter((d) => d.account === account);
+  if (materialsFilter !== "all" && !drafts.some((d) => d.id === materialsFilter))
+    materialsFilter = "all";
+  const uploadTarget = materialsFilter !== "all" ? drafts.find((d) => d.id === materialsFilter) : current?.account === account ? current : drafts[0];
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7D20\u6750\u5E93</h1><span class="eyebrow">WRITING MATERIALS</span></div><div class="header-actions"><select id="material-filter" aria-label="\u6309\u6587\u7AE0\u7B5B\u9009\u7D20\u6750"><option value="all">\u5168\u90E8\u7D20\u6750</option>${drafts.map((d) => `<option value="${d.id}">${esc(d.title)}</option>`).join("")}</select><button id="upload-reference" class="primary" ${uploadTarget ? "" : "disabled"}>\uFF0B \u4E0A\u4F20\u6587\u4EF6</button></div></header><section class="dashboard"><div id="project-files" class="material-cards"></div></section>`;
+  $("#material-filter").value = materialsFilter;
+  $("#material-filter").onchange = (e) => {
+    materialsFilter = e.target.value;
     $("#reference-drawer")?.remove();
     $("#published-drawer")?.remove();
-    current = state.documents.find((d) => d.id === e.target.value);
+    if (materialsFilter !== "all")
+      current = state.documents.find((d) => d.id === materialsFilter) || current;
     renderMaterials();
   };
-  if (!doc3) {
-    $("#project-files").innerHTML = "<p>\u8BF7\u5148\u521B\u5EFA\u4E00\u7BC7\u8349\u7A3F\u3002</p>";
-    return;
-  }
-  const draw = (refs) => {
-    if (page !== "materials" || current?.id !== doc3.id) return;
-    $("#project-files").innerHTML = refs.map(
-      (r) => `<article class="material-card"><button class="card-open" data-ref-preview="${r.id}"><span class="file-icon">${esc(r.name.split(".").pop().toUpperCase())}</span><strong>${esc(r.name)}</strong><small>${(r.bytes / 1024).toFixed(1)} KB \xB7 ${r.characters} \u5B57</small><p>${r.status === "ready" ? r.ocr ? "\u5DF2\u63D0\u53D6\u56FE\u7247\u6587\u5B57" : "\u5DF2\u63D0\u53D6\u53C2\u8003\u6587\u5B57" : esc(r.error)}</p></button><label><input type="checkbox" data-ref-toggle="${r.id}" ${r.enabled ? "checked" : ""} ${r.status === "ready" ? "" : "disabled"}> \u9ED8\u8BA4\u4F9B AI \u53C2\u8003</label></article>`
-    ).join("") || "<p>\u4E0A\u4F20\u91C7\u8BBF\u7A3F\u3001\u62A5\u544A\u3001\u56FE\u7247\u6216\u5176\u4ED6\u53C2\u8003\u6587\u4EF6\u3002</p>";
-    $$("[data-ref-toggle]").forEach(
-      (b) => b.onchange = async () => {
-        try {
-          draw(
-            await api("project-toggle", {
-              articleId: doc3.id,
-              id: b.dataset.refToggle,
-              enabled: b.checked
-            })
-          );
-        } catch (e) {
-          toast(e.message);
-        }
-      }
+  const draw = (list2) => {
+    if (page !== "materials") return;
+    const rows = materialsFilter === "all" ? list2 : list2.filter(
+      (m) => (m.usedBy || []).some((u) => u.id === materialsFilter)
     );
+    $("#project-files").innerHTML = rows.map(
+      (r) => `<article class="material-card" data-material="${r.id}"><button type="button" class="card-open" data-ref-preview="${r.id}"><span class="file-icon">${esc((r.name.split(".").pop() || "").toUpperCase())}</span><strong>${esc(r.name)}</strong><small class="ref-count">\u88AB ${r.refCount || 0} \u7BC7\u6587\u7AE0\u5F15\u7528</small></button></article>`
+    ).join("") || '<p class="empty-data">\u8FD8\u6CA1\u6709\u7D20\u6750\u3002\u4E0A\u4F20\u540E\u53EF\u5728\u591A\u7BC7\u6587\u7AE0\u95F4\u5171\u7528\u3002</p>';
     $$("[data-ref-preview]").forEach(
       (b) => b.onclick = async () => {
         try {
-          const r = await api("project-read", {
-            articleId: doc3.id,
-            id: b.dataset.refPreview
-          });
+          const r = await api("materials-read", b.dataset.refPreview);
           openPreview({
             title: r.name,
             text: r.text || r.error,
             path: r.path,
             reference: r.status === "ready" ? r : null,
-            doc: doc3
+            doc: uploadTarget || current
           });
         } catch (e) {
           toast(e.message);
         }
       }
     );
+    $$("[data-material]").forEach((card) => {
+      card.oncontextmenu = (e) => {
+        e.preventDefault();
+        const id = card.dataset.material;
+        const items = [
+          {
+            label: "\u5220\u9664\u7D20\u6750",
+            danger: true,
+            run: async () => {
+              if (!confirm("\u786E\u5B9A\u5220\u9664\u6B64\u7D20\u6750\uFF1F\u5C06\u4ECE\u6240\u6709\u6587\u7AE0\u89E3\u9664\u5F15\u7528\u3002")) return;
+              try {
+                draw(await api("materials-delete", id));
+                toast("\u7D20\u6750\u5DF2\u5220\u9664");
+              } catch (err) {
+                toast(err.message);
+              }
+            }
+          }
+        ];
+        if (materialsFilter !== "all" && uploadTarget) {
+          items.unshift({
+            label: "\u5173\u8054\u5230\u5F53\u524D\u7B5B\u9009\u6587\u7AE0",
+            run: async () => {
+              try {
+                await api("materials-link", {
+                  articleId: uploadTarget.id,
+                  id
+                });
+                draw(await api("materials-list", { account }));
+                toast("\u5DF2\u5173\u8054");
+              } catch (err) {
+                toast(err.message);
+              }
+            }
+          });
+        }
+        showContextMenu(e.clientX, e.clientY, items);
+      };
+    });
   };
   $("#upload-reference").onclick = async () => {
+    if (!uploadTarget) return toast("\u8BF7\u5148\u521B\u5EFA\u4E00\u7BC7\u8349\u7A3F\u518D\u4E0A\u4F20");
     const b = $("#upload-reference");
     b.disabled = true;
     b.textContent = "\u6B63\u5728\u63D0\u53D6\u6587\u5B57\u2026";
     try {
       if (!await persist()) return;
-      const list2 = await uploadProjectFiles(doc3.id);
-      if (list2) draw(list2);
+      const list2 = await uploadProjectFiles(uploadTarget.id);
+      if (list2) draw(await api("materials-list", { account }));
     } catch (e) {
       toast(e.message);
     } finally {
@@ -30217,21 +30347,9 @@ async function renderMaterials() {
     }
   };
   try {
-    draw(await api("project-refs", doc3.id));
+    draw(await api("materials-list", { account }));
   } catch (e) {
     toast(e.message);
-  }
-  if ($("#legacy-materials")) {
-    $("#legacy-materials").innerHTML = (doc3.materials || []).map(
-      (rel) => `<button class="material-card" data-legacy="${esc(rel)}"><strong>${esc(rel.split("/").pop())}</strong><small>\u6B64\u524D\u5173\u8054\u7684\u7D20\u6750</small></button>`
-    ).join("");
-    $$("[data-legacy]").forEach(
-      (b) => b.onclick = async () => openPreview({
-        title: b.dataset.legacy.split("/").pop(),
-        text: await api("material-read", b.dataset.legacy),
-        doc: doc3
-      })
-    );
   }
 }
 async function renderProfile() {
@@ -30242,7 +30360,7 @@ async function renderProfile() {
     if (page !== "profile" || account !== a) return;
     const draw = () => {
       const definition = model.definitions.find((d) => d.id === profileTab);
-      $("#main").innerHTML = `<header><span class="eyebrow">\u91D1\u5947 ${a} \xB7 \u8D26\u53F7\u6A21\u578B</span></header><section class="dashboard profile-manager"><h1>\u4FDD\u6301\u81EA\u5DF1\u7684\u58F0\u97F3\uFF0C\u9010\u6B65\u9A8C\u8BC1\u6709\u6548\u7684\u8868\u8FBE\u3002</h1><p>\u56FA\u5B9A\u56DB\u4E2A\u5185\u5BB9\u6A21\u5757\uFF0C\u4E00\u4EFD\u5F53\u524D\u8BBE\u5B9A\u3002\u65E7\u6587\u6863\u4EC5\u4F5C\u5386\u53F2\u8D44\u6599\uFF0C\u4E0D\u518D\u4E0E\u5F53\u524D\u8BBE\u5B9A\u540C\u65F6\u751F\u6548\u3002</p><nav class="model-tabs">${[...model.definitions, { id: "history", title: "\u8FED\u4EE3\u8BB0\u5F55" }].map((d) => `<button data-model-tab="${d.id}" class="${profileTab === d.id ? "active" : ""}">${d.title}</button>`).join("")}</nav><div id="model-content">${definition ? `<h2>${definition.title}</h2><p>${{ identity: "\u53EA\u7EF4\u62A4\u6211\u662F\u8C01\u3001\u5199\u7ED9\u8C01\u3001\u5E0C\u671B\u63D0\u4F9B\u4EC0\u4E48\u4EF7\u503C\u3002", voice: "\u7EF4\u62A4\u81EA\u7136\u7684\u8868\u8FBE\u504F\u597D\u4E0E\u5FC5\u8981\u8FB9\u754C\uFF0C\u907F\u514D\u628A\u6BCF\u7BC7\u6587\u7AE0\u5199\u6210\u89C4\u5219\u68C0\u67E5\u8868\u3002", examples: "\u4FDD\u7559\u6211\u8BA4\u53EF\u7684\u771F\u5B9E\u7ECF\u5386\u548C\u8303\u6587\u7247\u6BB5\uFF0C\u5E76\u5199\u6E05\u51FA\u5904\u4E0E\u4E3A\u4EC0\u4E48\u50CF\u6211\u3002", learning: "\u7528\u6709\u6765\u6E90\u7684\u6570\u636E\u89C2\u5BDF\u6307\u5BFC\u4E0B\u4E00\u6B21\u5C0F\u5B9E\u9A8C\uFF1B\u6700\u591A\u4FDD\u7559\u4E09\u4E2A\uFF0C\u8FC7\u65F6\u5C31\u66FF\u6362\u3002" }[profileTab]}</p><textarea id="model-text" rows="15" maxlength="${definition.limit}">${esc(model.modules[profileTab])}</textarea><div class="row"><button id="save-model" class="primary">\u4FDD\u5B58\u5F53\u524D\u6A21\u5757</button><small>${definition.limit} \u5B57\u4EE5\u5185</small></div>${profileTab === "learning" ? `<p class="notice">\u5F53\u524D\u8D26\u53F7\u6709 ${state.metrics.filter((r) => r["\u8D26\u53F7"] === a).length} \u7BC7\u5F52\u6863\u6570\u636E\u3002\u5355\u7BC7\u6CE2\u52A8\u4E0D\u4EE3\u8868\u8868\u8FBE\u65B9\u5F0F\u7684\u56E0\u679C\u6548\u679C\u3002</p>` : ""}${profileTab === "examples" ? `<details><summary>\u67E5\u770B\u65E7 Profile \u8D44\u6599\uFF08\u53EA\u8BFB\uFF09</summary><div class="material-cards">${model.legacy.filter((f) => f.editable).map(
+      $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u4FDD\u6301\u81EA\u5DF1\u7684\u58F0\u97F3\uFF0C\u9010\u6B65\u9A8C\u8BC1\u6709\u6548\u7684\u8868\u8FBE\u3002</h1><span class="eyebrow">\u91D1\u5947 ${a} \xB7 \u8D26\u53F7\u6A21\u578B</span></div></header><section class="dashboard profile-manager"><nav class="model-tabs">${[...model.definitions, { id: "history", title: "\u8FED\u4EE3\u8BB0\u5F55" }].map((d) => `<button data-model-tab="${d.id}" class="${profileTab === d.id ? "active" : ""}">${d.title}</button>`).join("")}</nav><div id="model-content">${definition ? `<h2>${definition.title}</h2><p>${{ identity: "\u53EA\u7EF4\u62A4\u6211\u662F\u8C01\u3001\u5199\u7ED9\u8C01\u3001\u5E0C\u671B\u63D0\u4F9B\u4EC0\u4E48\u4EF7\u503C\u3002", voice: "\u7EF4\u62A4\u81EA\u7136\u7684\u8868\u8FBE\u504F\u597D\u4E0E\u5FC5\u8981\u8FB9\u754C\uFF0C\u907F\u514D\u628A\u6BCF\u7BC7\u6587\u7AE0\u5199\u6210\u89C4\u5219\u68C0\u67E5\u8868\u3002", examples: "\u4FDD\u7559\u6211\u8BA4\u53EF\u7684\u771F\u5B9E\u7ECF\u5386\u548C\u8303\u6587\u7247\u6BB5\uFF0C\u5E76\u5199\u6E05\u51FA\u5904\u4E0E\u4E3A\u4EC0\u4E48\u50CF\u6211\u3002", learning: "\u7528\u6709\u6765\u6E90\u7684\u6570\u636E\u89C2\u5BDF\u6307\u5BFC\u4E0B\u4E00\u6B21\u5C0F\u5B9E\u9A8C\uFF1B\u6700\u591A\u4FDD\u7559\u4E09\u4E2A\uFF0C\u8FC7\u65F6\u5C31\u66FF\u6362\u3002" }[profileTab]}</p><textarea id="model-text" rows="15" maxlength="${definition.limit}">${esc(model.modules[profileTab])}</textarea><div class="row"><button id="save-model" class="primary">\u4FDD\u5B58\u5F53\u524D\u6A21\u5757</button><small>${definition.limit} \u5B57\u4EE5\u5185</small></div>${profileTab === "learning" ? `<p class="notice">\u5F53\u524D\u8D26\u53F7\u6709 ${state.metrics.filter((r) => r["\u8D26\u53F7"] === a).length} \u7BC7\u5F52\u6863\u6570\u636E\u3002\u5355\u7BC7\u6CE2\u52A8\u4E0D\u4EE3\u8868\u8868\u8FBE\u65B9\u5F0F\u7684\u56E0\u679C\u6548\u679C\u3002</p>` : ""}${profileTab === "examples" ? `<details><summary>\u67E5\u770B\u65E7 Profile \u8D44\u6599\uFF08\u53EA\u8BFB\uFF09</summary><div class="material-cards">${model.legacy.filter((f) => f.editable).map(
         (f) => `<button class="material-card" data-model-legacy="${esc(f.path)}"><strong>${esc(f.path)}</strong></button>`
       ).join("")}</div></details>` : ""}` : `<button id="iterate-model" class="primary">\u2727 \u6839\u636E\u65B0\u6587\u7AE0\u548C\u6570\u636E\u63D0\u51FA\u8C03\u6574</button><p>\u5411\u5F53\u524D ${esc(state.provider)} \u63D0\u4F9B\u672C\u8D26\u53F7\u6A21\u578B\u3001\u6700\u8FD1 12 \u7BC7\u6587\u7AE0\u53CA YAML\uFF1B\u957F\u6587\u6BCF\u7BC7\u524D 3000 \u5B57\u3002\u53EA\u5EFA\u8BAE\u66FF\u6362\u73B0\u6709\u6A21\u5757\u5185\u5BB9\u3002</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} \xB7 ${p.status === "pending" ? "\u5F85\u5BA1\u9605" : p.status === "applied" ? "\u5DF2\u91C7\u7EB3" : "\u5DF2\u4FDD\u7559\u539F\u8BBE\u5B9A"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("\u3001")}</p><button data-model-proposal="${p.id}">\u67E5\u770B\u5EFA\u8BAE</button></div>`).join("") || "<p>\u8FD8\u6CA1\u6709 AI \u8C03\u6574\u5EFA\u8BAE\u3002</p>"}</div><h3>\u5386\u53F2\u7248\u672C</h3>${model.history.map((h2) => `<div class="result-card"><small>${esc(h2.at)} \xB7 ${esc(h2.reason)}</small><details><summary>\u67E5\u770B\u5F53\u65F6\u7684\u8BBE\u5B9A</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h2.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h2.id}">\u6062\u590D\u6B64\u7248\u672C</button></div>`).join("")}`}</div></section>`;
       const save = async () => {

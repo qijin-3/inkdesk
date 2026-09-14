@@ -458,6 +458,25 @@ class Vault {
     }
     return dest;
   }
+  /**
+   * 删除草稿及其本地元数据（版本、对话、项目链接）；不删除共享素材库正文。
+   * @param {string} id
+   */
+  deleteDoc(id) {
+    const item = this.index[id];
+    if (!item || item.status !== "draft") throw Error("只能删除草稿");
+    const file = this.p(item.path);
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+    for (const folder of ["versions", "conversations", "projects"]) {
+      const dir = this.p(`${this.meta}/${folder}/${id}`);
+      if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+    }
+    const article = this.p(`${this.meta}/articles/${id}.json`);
+    if (fs.existsSync(article)) fs.unlinkSync(article);
+    delete this.index[id];
+    this.writeJSON(this.meta + "/index.json", this.index);
+    this.cache.delete(id);
+  }
   image(title, bytes, ext) {
     if (
       !/^\.(png|jpe?g|gif|webp)$/i.test(ext) ||

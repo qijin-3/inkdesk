@@ -63,7 +63,7 @@ const { _electron: electron } = require("@playwright/test"),
     await w.locator("[data-ref-preview]").click();
     assert.match(await w.locator(".material-preview").innerText(), /13579/);
     await w.locator("#close-ref").click();
-    await w.locator('[data-page="write"]').click();
+    await w.locator(".doc.selected, .doc").first().click();
     await w.locator("#instruction").fill("按参考资料找证据");
     await w.locator("#send").click();
     await w.locator(".message.assistant").waitFor();
