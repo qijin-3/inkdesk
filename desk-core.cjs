@@ -58,6 +58,9 @@ const API_CHANNELS = [
   "pick-note-table",
   "import-notes-preview",
   "import-notes-apply",
+  "published-read",
+  "vault-reveal",
+  "vault-open",
 ];
 
 /**
@@ -256,6 +259,12 @@ class DeskCore {
       }
       case "archive-records":
         return this.archiveRecords(data);
+      case "published-read":
+        return this.readPublished(data);
+      case "vault-reveal":
+        return this.openVaultFile(data, "reveal");
+      case "vault-open":
+        return this.openVaultFile(data, "open");
       case "material-read":
         return this.vault.readMaterial(data);
       case "material-add":
@@ -476,6 +485,38 @@ class DeskCore {
     };
     this.save();
     return { ...this.reload(), dataPath: this.data, updated };
+  }
+
+  /**
+   * 读取已发布（03_Archive）文章正文，供仪表盘预览。
+   * @param {string} rel vault 相对路径
+   */
+  readPublished(rel) {
+    if (
+      typeof rel !== "string" ||
+      !rel.includes("/03_Archive/") ||
+      !rel.endsWith(".md")
+    )
+      throw Error("不是已发布文章");
+    within(this.vault.root, this.vault.p(rel));
+    const { body } = split(fs.readFileSync(this.vault.p(rel), "utf8"));
+    return this.vault.display(body, rel);
+  }
+
+  /**
+   * 在 Finder 中定位或用系统默认应用打开 vault 内 Markdown。
+   * @param {string} rel vault 相对路径
+   * @param {"reveal"|"open"} mode
+   */
+  openVaultFile(rel, mode) {
+    if (typeof rel !== "string" || !rel.endsWith(".md"))
+      throw Error("无效路径");
+    const abs = within(this.vault.root, this.vault.p(rel));
+    if (!fs.existsSync(abs)) throw Error("文件不存在");
+    if (process.platform !== "darwin") throw Error("当前仅支持 macOS");
+    const { execFileSync } = require("node:child_process");
+    execFileSync("open", mode === "reveal" ? ["-R", abs] : [abs]);
+    return abs;
   }
 
   /** 读取归档文章的版本与对话 */

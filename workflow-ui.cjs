@@ -145,8 +145,8 @@ const assert = require("node:assert/strict"),
     app = null;
     app = await electron.launch({ args: [path.resolve("main.cjs")], env });
     const r = await app.firstWindow();
-    await r.locator('[data-page="archive"]').click();
-    await r.locator("[data-archive]").waitFor();
+    await r.locator('[data-page="dashboard"]').click();
+    await r.locator("[data-published]").first().waitFor();
     await r.locator('[data-page="materials"]').click();
     assert.match(await r.locator("#material-list").innerText(), /可靠案例/);
     console.log(

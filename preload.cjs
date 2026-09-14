@@ -34,6 +34,9 @@ const channels = [
   "pick-note-table",
   "import-notes-preview",
   "import-notes-apply",
+  "published-read",
+  "vault-reveal",
+  "vault-open",
 ];
 contextBridge.exposeInMainWorld("desk", {
   web: false,

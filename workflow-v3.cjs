@@ -76,8 +76,11 @@ const { _electron: electron } = require("@playwright/test"),
     assert.doesNotMatch(fs.readFileSync(capture, "utf8"), /项目甲专属/);
     await w.locator("#article-materials").click();
     assert.match(await w.locator("#project-files").innerText(), /把采访稿/);
-    await w.locator('[data-page="archive"]').click();
-    assert.equal(await w.locator(".archive-table tbody tr").count(), 2);
+    await w.locator('[data-page="dashboard"]').click();
+    assert.equal(
+      await w.locator(".dashboard-card table tbody tr").count(),
+      2,
+    );
     assert.equal(await w.locator("#main .result-card").count(), 0);
     await w.locator('[data-page="dashboard"]').click();
     assert.match(

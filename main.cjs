@@ -126,6 +126,9 @@ const passthrough = new Set([
   "project-toggle",
   "metrics",
   "cancel",
+  "published-read",
+  "vault-reveal",
+  "vault-open",
 ]);
 
 for (const name of passthrough) {

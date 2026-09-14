@@ -208,6 +208,7 @@ function sync() {
 function render() {
   saveProfileEditor = null;
   $("#reference-drawer")?.remove();
+  $("#published-drawer")?.remove();
   if (composer) {
     composer.destroy();
     composer = null;
@@ -217,7 +218,7 @@ function render() {
     editor = null;
   }
   $("#app").innerHTML =
-    `<aside class="sidebar"><div class="brand"><span class="brand-icon">i</span> inkdesk <small>写作工作台</small></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">金奇 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">金奇 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">◫ <span>仪表盘</span></button><button data-page="write" class="${page === "write" ? "chosen" : ""}">▤ <span>写作桌面</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">✧ <span>选题与灵感</span></button><button data-page="materials">▧ <span>项目素材</span></button><button data-page="archive">▣ <span>已归档</span></button><button data-page="profile">◎ <span>账号人设</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章">＋</button></div><div class="docs">${
+    `<aside class="sidebar"><div class="brand"><span class="brand-icon">i</span> inkdesk <small>写作工作台</small></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">金奇 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">金奇 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">◫ <span>仪表盘</span></button><button data-page="write" class="${page === "write" ? "chosen" : ""}">▤ <span>写作桌面</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">✧ <span>选题与灵感</span></button><button data-page="materials">▧ <span>项目素材</span></button><button data-page="profile">◎ <span>账号人设</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章">＋</button></div><div class="docs">${
       state.documents
         .filter(
           (d) =>
@@ -235,7 +236,6 @@ function render() {
   else if (page === "dashboard") renderDashboard();
   else if (page === "topics") renderTopics();
   else if (page === "materials") renderMaterials();
-  else if (page === "archive") renderArchive();
   else if (page === "profile") renderProfile();
   else renderSettings();
   $$("[data-page]").forEach(
@@ -554,7 +554,7 @@ function renderWrite() {
       Object.assign(state, result);
       current = state.documents.find((d) => d.account === account);
       pending = null;
-      page = "archive";
+      page = "dashboard";
       render();
       toast("已定稿并移入本账号 Archive，版本与对话已保留");
     } catch (e) {
@@ -1155,7 +1155,7 @@ function renderDashboard() {
     return (b[metricsSort] || 0) - (a[metricsSort] || 0);
   });
   $("#main").innerHTML =
-    `<header><div><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><button id="import-notes" class="primary">更新数据</button></header><section class="dashboard"><div class="page-title"><h1>让每一次表达，都有回响。</h1>${deltas?.at ? `<p class="muted">相对上次更新的变化会保留到下次导入</p>` : ""}</div><div class="stats">${[
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">让每一次表达，都有回响。</h1><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><div class="header-actions"><button type="button" id="refresh-dashboard" class="ghost icon-btn" title="从磁盘同步本地数据" aria-label="刷新">↻</button><button id="import-notes" class="primary">更新数据</button></div></header><section class="dashboard"><div class="stats">${[
       ["粉丝量", "粉丝量"],
       ["阅读", "总阅读"],
       ["点赞", "总点赞"],
@@ -1170,12 +1170,12 @@ function renderDashboard() {
       )
       .join(
         "",
-      )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>文章表现</h3><select id="metrics-sort" aria-label="文章排序方式">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${
+      )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>已发布</h3><select id="metrics-sort" aria-label="文章排序方式">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${
       rows.length
         ? `<table><thead><tr><th>文章</th><th>日期</th><th>阅读</th><th>点赞</th><th>收藏</th><th>涨粉</th></tr></thead><tbody>${sorted
             .map(
               (r) =>
-                `<tr><td>${esc(r["标题"])}</td><td>${esc(r["日期"])}</td><td>${r["阅读"] ?? "—"}${cellDelta(r.path, "阅读")}</td><td>${r["点赞"] ?? "—"}${cellDelta(r.path, "点赞")}</td><td>${r["收藏"] ?? "—"}${cellDelta(r.path, "收藏")}</td><td>${r["涨粉"] ?? "—"}${cellDelta(r.path, "涨粉")}</td></tr>`,
+                `<tr><td><button type="button" class="title-preview" data-published="${esc(r.path)}">${esc(r["标题"])}</button></td><td>${esc(r["日期"])}</td><td>${r["阅读"] ?? "—"}${cellDelta(r.path, "阅读")}</td><td>${r["点赞"] ?? "—"}${cellDelta(r.path, "点赞")}</td><td>${r["收藏"] ?? "—"}${cellDelta(r.path, "收藏")}</td><td>${r["涨粉"] ?? "—"}${cellDelta(r.path, "涨粉")}</td></tr>`,
             )
             .join("")}</tbody></table>`
         : '<div class="empty-data">还没有数据。<p>文章归档后，在 YAML 中填写平台数据即可查看。</p></div>'
@@ -1185,8 +1185,96 @@ function renderDashboard() {
     metricsSort = e.target.value;
     renderDashboard();
   };
+  $("#refresh-dashboard").onclick = () => refreshDashboardData();
   $("#import-notes").onclick = () => runNoteImport();
+  $$("[data-published]").forEach(
+    (b) => (b.onclick = () => openPublishedPreview(b.dataset.published)),
+  );
 }
+
+/**
+ * 在右侧抽屉预览已发布文章，并支持在 Finder / 默认应用中打开源文件。
+ * @param {string} rel vault 相对路径
+ */
+async function openPublishedPreview(rel) {
+  const row = (state.archives || []).find((a) => a.path === rel);
+  const title =
+    row?.title || rel.split("/").pop().replace(/\.md$/, "") || "文章";
+  $("#published-drawer")?.remove();
+  const n = document.createElement("aside");
+  n.id = "published-drawer";
+  n.className = "reference-drawer published-drawer";
+  n.innerHTML = `<div class="published-drawer-head"><span class="published-drawer-label">预览</span><div class="published-drawer-toolbar"><button type="button" id="published-reveal" class="icon-btn" data-tip="在 Finder 中显示" title="在 Finder 中显示" aria-label="在 Finder 中显示">⌁</button><button type="button" id="published-open" class="icon-btn" data-tip="用默认应用打开" title="用默认应用打开" aria-label="用默认应用打开">↗</button><button type="button" id="close-published" class="icon-btn" data-tip="关闭" title="关闭" aria-label="关闭">×</button></div></div><div class="material-preview" id="published-body"><h3 class="published-article-title">${esc(title)}</h3><p class="muted">加载中…</p></div>`;
+  document.body.append(n);
+  $("#close-published").onclick = () => n.remove();
+  try {
+    const body = row?.body ?? (await api("published-read", rel));
+    $("#published-body").innerHTML =
+      `<h3 class="published-article-title">${esc(title)}</h3>` + safeHTML(body);
+  } catch (e) {
+    $("#published-body").innerHTML =
+      `<h3 class="published-article-title">${esc(title)}</h3><p class="notice">${esc(e.message)}</p>`;
+  }
+  $("#published-reveal").onclick = async () => {
+    try {
+      await api("vault-reveal", rel);
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+  $("#published-open").onclick = async () => {
+    try {
+      await api("vault-open", rel);
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+}
+
+/** 仪表盘刷新：重新读取开发副本，同步外部改动的 YAML / 归档 */
+async function refreshDashboardData() {
+  if (busy) return toast("AI 正在回复，请结束后再刷新");
+  sync();
+  const apply = (result) => {
+    const id = current?.id;
+    Object.assign(state, result);
+    current =
+      state.documents.find((d) => d.id === id) ||
+      state.documents.find((d) => d.account === account);
+    dirty = false;
+    pending = null;
+    page = "dashboard";
+    render();
+    toast(
+      state.warnings?.length
+        ? "已同步，部分文件未读取，请在存储设置查看"
+        : "已同步本地数据",
+    );
+  };
+  if (!(await persist())) {
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML =
+      '<div class="dialog"><h2>本次保存未完成</h2><p>可以保留当前未保存内容到本地恢复文件，再读取磁盘版本。</p><button id="cancel-reload">继续编辑</button><button id="recover-reload" class="primary">备份未保存内容并刷新</button></div>';
+    document.body.append(m);
+    $("#cancel-reload").onclick = () => m.remove();
+    $("#recover-reload").onclick = async () => {
+      try {
+        apply(await api("recover-refresh", state));
+        m.remove();
+      } catch (e) {
+        toast(e.message);
+      }
+    };
+    return;
+  }
+  try {
+    apply(await api("refresh"));
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
 function renderTopics() {
   const docs = state.documents.filter(
     (d) => d.account === account && d.topics?.length,
@@ -1283,45 +1371,6 @@ function showMaterial(rel, body) {
       page = "write";
       render();
     };
-}
-function renderArchive() {
-  $("#main").innerHTML =
-    `<header><span class="eyebrow">已归档 · 最终版本</span></header><section class="dashboard"><h1>已经写完的文章。</h1><p>金奇 ${account} · 按发布时间从近到远排列</p><table class="archive-table"><thead><tr><th>文章标题</th><th>发布时间</th><th>体裁</th><th>阅读 / 观看</th><th>收藏</th><th>操作</th></tr></thead><tbody>${
-      (state.archives || [])
-        .filter((d) => d.account === account)
-        .sort((a, b) =>
-          String(b.fields["发布时间"] || "").localeCompare(
-            String(a.fields["发布时间"] || ""),
-          ),
-        )
-        .map(
-          (d) =>
-            `<tr><td>${esc(d.title)}</td><td>${esc(d.fields["发布时间"] || "尚未填写")}</td><td>${esc(d.fields["体裁"] || "—")}</td><td>${esc(d.fields["观看量"] ?? d.fields["阅读"] ?? "—")}</td><td>${esc(d.fields["收藏"] ?? "—")}</td><td><button data-archive="${esc(d.path)}">查看全文</button></td></tr>`,
-        )
-        .join("") ||
-      '<tr><td colspan="6">定稿确认后，文章会出现在这里。</td></tr>'
-    }</tbody></table></section>`;
-  $$("[data-archive]").forEach(
-    (b) =>
-      (b.onclick = async () => {
-        const d = state.archives.find((d) => d.path === b.dataset.archive);
-        const m = document.createElement("div");
-        m.className = "modal";
-        m.innerHTML = `<div class="dialog"><div class="row"><h2>${esc(d.title)}</h2><button id="close-archive">关闭</button></div><div class="material-preview">${safeHTML(d.body)}</div><button id="copy-archive" class="primary">复制公众号排版</button><button id="archive-history">查看关联记录</button><div id="archive-records"></div></div>`;
-        document.body.append(m);
-        $("#close-archive").onclick = () => m.remove();
-        $("#copy-archive").onclick = () => copyPublish(d);
-        $("#archive-history").onclick = async () => {
-          try {
-            const record = await api("archive-records", d.path);
-            $("#archive-records").innerHTML =
-              `<h3>版本 ${record.versions.length} · 对话 ${record.conversations.length}</h3>${record.versions.map((v) => `<details><summary>${esc(v.name)} · ${esc(v.at)}</summary><pre>${esc(v.body)}</pre></details>`).join("")}${record.conversations.map((c) => `<details><summary>${esc(c.title)}</summary>${c.messages.map((m) => `<p><b>${m.role === "user" ? "你" : "写作伙伴"}</b>：${esc(m.text)}</p>`).join("")}</details>`).join("")}<p>关联素材：${esc(record.materials.join("、") || "无")}</p>`;
-          } catch (e) {
-            toast(e.message);
-          }
-        };
-      }),
-  );
 }
 function putTag(reference, doc = current, session = conversation(doc)) {
   if (current?.id !== doc.id || conversation(doc).id !== session.id) {
@@ -1439,6 +1488,7 @@ async function chooseChatFile() {
 }
 function openPreview({ title, text, path: rel, reference, doc = current }) {
   $("#reference-drawer")?.remove();
+  $("#published-drawer")?.remove();
   const n = document.createElement("aside");
   n.id = "reference-drawer";
   n.className = "reference-drawer";
@@ -1497,6 +1547,7 @@ async function renderMaterials() {
   $("#material-project").value = doc?.id || "";
   $("#material-project").onchange = (e) => {
     $("#reference-drawer")?.remove();
+  $("#published-drawer")?.remove();
     current = state.documents.find((d) => d.id === e.target.value);
     renderMaterials();
   };

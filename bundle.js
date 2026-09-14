@@ -29028,6 +29028,7 @@ function sync() {
 function render2() {
   saveProfileEditor = null;
   $("#reference-drawer")?.remove();
+  $("#published-drawer")?.remove();
   if (composer) {
     composer.destroy();
     composer = null;
@@ -29036,7 +29037,7 @@ function render2() {
     editor.destroy();
     editor = null;
   }
-  $("#app").innerHTML = `<aside class="sidebar"><div class="brand"><span class="brand-icon">i</span> inkdesk <small>\u5199\u4F5C\u5DE5\u4F5C\u53F0</small></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">\u91D1\u5947 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">\u91D1\u5947 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">\u25EB <span>\u4EEA\u8868\u76D8</span></button><button data-page="write" class="${page === "write" ? "chosen" : ""}">\u25A4 <span>\u5199\u4F5C\u684C\u9762</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">\u2727 <span>\u9009\u9898\u4E0E\u7075\u611F</span></button><button data-page="materials">\u25A7 <span>\u9879\u76EE\u7D20\u6750</span></button><button data-page="archive">\u25A3 <span>\u5DF2\u5F52\u6863</span></button><button data-page="profile">\u25CE <span>\u8D26\u53F7\u4EBA\u8BBE</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0">\uFF0B</button></div><div class="docs">${state.documents.filter(
+  $("#app").innerHTML = `<aside class="sidebar"><div class="brand"><span class="brand-icon">i</span> inkdesk <small>\u5199\u4F5C\u5DE5\u4F5C\u53F0</small></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">\u91D1\u5947 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">\u91D1\u5947 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">\u25EB <span>\u4EEA\u8868\u76D8</span></button><button data-page="write" class="${page === "write" ? "chosen" : ""}">\u25A4 <span>\u5199\u4F5C\u684C\u9762</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">\u2727 <span>\u9009\u9898\u4E0E\u7075\u611F</span></button><button data-page="materials">\u25A7 <span>\u9879\u76EE\u7D20\u6750</span></button><button data-page="profile">\u25CE <span>\u8D26\u53F7\u4EBA\u8BBE</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0">\uFF0B</button></div><div class="docs">${state.documents.filter(
     (d) => d.account === account && d.status !== "final" && d.status !== "archive"
   ).map(
     (d) => `<button class="doc ${current?.id === d.id ? "selected" : ""}" data-id="${d.id}"><span>${esc(d.title)}</span><small>${new Date(d.updated).toLocaleDateString("zh-CN")} \xB7 ${d.body.length} \u5B57</small></button>`
@@ -29045,7 +29046,6 @@ function render2() {
   else if (page === "dashboard") renderDashboard();
   else if (page === "topics") renderTopics();
   else if (page === "materials") renderMaterials();
-  else if (page === "archive") renderArchive();
   else if (page === "profile") renderProfile();
   else renderSettings();
   $$("[data-page]").forEach(
@@ -29316,7 +29316,7 @@ function renderWrite() {
       Object.assign(state, result);
       current = state.documents.find((d) => d.account === account);
       pending = null;
-      page = "archive";
+      page = "dashboard";
       render2();
       toast("\u5DF2\u5B9A\u7A3F\u5E76\u79FB\u5165\u672C\u8D26\u53F7 Archive\uFF0C\u7248\u672C\u4E0E\u5BF9\u8BDD\u5DF2\u4FDD\u7559");
     } catch (e) {
@@ -29826,7 +29826,7 @@ function renderDashboard() {
       return String(b["\u65E5\u671F"] || "").localeCompare(String(a["\u65E5\u671F"] || ""));
     return (b[metricsSort] || 0) - (a[metricsSort] || 0);
   });
-  $("#main").innerHTML = `<header><div><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><button id="import-notes" class="primary">\u66F4\u65B0\u6570\u636E</button></header><section class="dashboard"><div class="page-title"><h1>\u8BA9\u6BCF\u4E00\u6B21\u8868\u8FBE\uFF0C\u90FD\u6709\u56DE\u54CD\u3002</h1>${deltas?.at ? `<p class="muted">\u76F8\u5BF9\u4E0A\u6B21\u66F4\u65B0\u7684\u53D8\u5316\u4F1A\u4FDD\u7559\u5230\u4E0B\u6B21\u5BFC\u5165</p>` : ""}</div><div class="stats">${[
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BA9\u6BCF\u4E00\u6B21\u8868\u8FBE\uFF0C\u90FD\u6709\u56DE\u54CD\u3002</h1><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><div class="header-actions"><button type="button" id="refresh-dashboard" class="ghost icon-btn" title="\u4ECE\u78C1\u76D8\u540C\u6B65\u672C\u5730\u6570\u636E" aria-label="\u5237\u65B0">\u21BB</button><button id="import-notes" class="primary">\u66F4\u65B0\u6570\u636E</button></div></header><section class="dashboard"><div class="stats">${[
     ["\u7C89\u4E1D\u91CF", "\u7C89\u4E1D\u91CF"],
     ["\u9605\u8BFB", "\u603B\u9605\u8BFB"],
     ["\u70B9\u8D5E", "\u603B\u70B9\u8D5E"],
@@ -29838,15 +29838,87 @@ function renderDashboard() {
     ([k, l]) => `<div><small>${l}</small><strong title="${k === "\u6DA8\u7C89" ? "\u6C47\u603B\u6587\u7AE0 YAML \u7684\u6DA8\u7C89\u5B57\u6BB5\uFF0C\u4E0D\u662F\u8D26\u53F7\u51C0\u589E\u7C89\u4E1D\uFF0C\u4E5F\u4E0D\u662F\u5DE5\u4F5C\u53F0\u4F30\u7B97" : k === "\u7C89\u4E1D\u91CF" ? "\u5BFC\u5165\u6570\u636E\u65F6\u586B\u5199\u7684\u5F53\u524D\u7C89\u4E1D\u91CF" : ""}">${k === "\u6587\u7AE0" ? rows.length.toLocaleString() : k === "\u7C89\u4E1D\u91CF" ? state.followers?.[account] != null ? Number(state.followers[account]).toLocaleString() : "\u2014" : sum(k)}${deltaMark(k)}</strong></div>`
   ).join(
     ""
-  )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>\u6587\u7AE0\u8868\u73B0</h3><select id="metrics-sort" aria-label="\u6587\u7AE0\u6392\u5E8F\u65B9\u5F0F">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${rows.length ? `<table><thead><tr><th>\u6587\u7AE0</th><th>\u65E5\u671F</th><th>\u9605\u8BFB</th><th>\u70B9\u8D5E</th><th>\u6536\u85CF</th><th>\u6DA8\u7C89</th></tr></thead><tbody>${sorted.map(
-    (r) => `<tr><td>${esc(r["\u6807\u9898"])}</td><td>${esc(r["\u65E5\u671F"])}</td><td>${r["\u9605\u8BFB"] ?? "\u2014"}${cellDelta(r.path, "\u9605\u8BFB")}</td><td>${r["\u70B9\u8D5E"] ?? "\u2014"}${cellDelta(r.path, "\u70B9\u8D5E")}</td><td>${r["\u6536\u85CF"] ?? "\u2014"}${cellDelta(r.path, "\u6536\u85CF")}</td><td>${r["\u6DA8\u7C89"] ?? "\u2014"}${cellDelta(r.path, "\u6DA8\u7C89")}</td></tr>`
+  )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>\u5DF2\u53D1\u5E03</h3><select id="metrics-sort" aria-label="\u6587\u7AE0\u6392\u5E8F\u65B9\u5F0F">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${rows.length ? `<table><thead><tr><th>\u6587\u7AE0</th><th>\u65E5\u671F</th><th>\u9605\u8BFB</th><th>\u70B9\u8D5E</th><th>\u6536\u85CF</th><th>\u6DA8\u7C89</th></tr></thead><tbody>${sorted.map(
+    (r) => `<tr><td><button type="button" class="title-preview" data-published="${esc(r.path)}">${esc(r["\u6807\u9898"])}</button></td><td>${esc(r["\u65E5\u671F"])}</td><td>${r["\u9605\u8BFB"] ?? "\u2014"}${cellDelta(r.path, "\u9605\u8BFB")}</td><td>${r["\u70B9\u8D5E"] ?? "\u2014"}${cellDelta(r.path, "\u70B9\u8D5E")}</td><td>${r["\u6536\u85CF"] ?? "\u2014"}${cellDelta(r.path, "\u6536\u85CF")}</td><td>${r["\u6DA8\u7C89"] ?? "\u2014"}${cellDelta(r.path, "\u6DA8\u7C89")}</td></tr>`
   ).join("")}</tbody></table>` : '<div class="empty-data">\u8FD8\u6CA1\u6709\u6570\u636E\u3002<p>\u6587\u7AE0\u5F52\u6863\u540E\uFF0C\u5728 YAML \u4E2D\u586B\u5199\u5E73\u53F0\u6570\u636E\u5373\u53EF\u67E5\u770B\u3002</p></div>'}</div></section>`;
   renderCalendar(rows);
   $("#metrics-sort").onchange = (e) => {
     metricsSort = e.target.value;
     renderDashboard();
   };
+  $("#refresh-dashboard").onclick = () => refreshDashboardData();
   $("#import-notes").onclick = () => runNoteImport();
+  $$("[data-published]").forEach(
+    (b) => b.onclick = () => openPublishedPreview(b.dataset.published)
+  );
+}
+async function openPublishedPreview(rel) {
+  const row = (state.archives || []).find((a) => a.path === rel);
+  const title = row?.title || rel.split("/").pop().replace(/\.md$/, "") || "\u6587\u7AE0";
+  $("#published-drawer")?.remove();
+  const n = document.createElement("aside");
+  n.id = "published-drawer";
+  n.className = "reference-drawer published-drawer";
+  n.innerHTML = `<div class="published-drawer-head"><span class="published-drawer-label">\u9884\u89C8</span><div class="published-drawer-toolbar"><button type="button" id="published-reveal" class="icon-btn" data-tip="\u5728 Finder \u4E2D\u663E\u793A" title="\u5728 Finder \u4E2D\u663E\u793A" aria-label="\u5728 Finder \u4E2D\u663E\u793A">\u2301</button><button type="button" id="published-open" class="icon-btn" data-tip="\u7528\u9ED8\u8BA4\u5E94\u7528\u6253\u5F00" title="\u7528\u9ED8\u8BA4\u5E94\u7528\u6253\u5F00" aria-label="\u7528\u9ED8\u8BA4\u5E94\u7528\u6253\u5F00">\u2197</button><button type="button" id="close-published" class="icon-btn" data-tip="\u5173\u95ED" title="\u5173\u95ED" aria-label="\u5173\u95ED">\xD7</button></div></div><div class="material-preview" id="published-body"><h3 class="published-article-title">${esc(title)}</h3><p class="muted">\u52A0\u8F7D\u4E2D\u2026</p></div>`;
+  document.body.append(n);
+  $("#close-published").onclick = () => n.remove();
+  try {
+    const body = row?.body ?? await api("published-read", rel);
+    $("#published-body").innerHTML = `<h3 class="published-article-title">${esc(title)}</h3>` + safeHTML(body);
+  } catch (e) {
+    $("#published-body").innerHTML = `<h3 class="published-article-title">${esc(title)}</h3><p class="notice">${esc(e.message)}</p>`;
+  }
+  $("#published-reveal").onclick = async () => {
+    try {
+      await api("vault-reveal", rel);
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+  $("#published-open").onclick = async () => {
+    try {
+      await api("vault-open", rel);
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+}
+async function refreshDashboardData() {
+  if (busy) return toast("AI \u6B63\u5728\u56DE\u590D\uFF0C\u8BF7\u7ED3\u675F\u540E\u518D\u5237\u65B0");
+  sync();
+  const apply2 = (result) => {
+    const id = current?.id;
+    Object.assign(state, result);
+    current = state.documents.find((d) => d.id === id) || state.documents.find((d) => d.account === account);
+    dirty = false;
+    pending = null;
+    page = "dashboard";
+    render2();
+    toast(
+      state.warnings?.length ? "\u5DF2\u540C\u6B65\uFF0C\u90E8\u5206\u6587\u4EF6\u672A\u8BFB\u53D6\uFF0C\u8BF7\u5728\u5B58\u50A8\u8BBE\u7F6E\u67E5\u770B" : "\u5DF2\u540C\u6B65\u672C\u5730\u6570\u636E"
+    );
+  };
+  if (!await persist()) {
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML = '<div class="dialog"><h2>\u672C\u6B21\u4FDD\u5B58\u672A\u5B8C\u6210</h2><p>\u53EF\u4EE5\u4FDD\u7559\u5F53\u524D\u672A\u4FDD\u5B58\u5185\u5BB9\u5230\u672C\u5730\u6062\u590D\u6587\u4EF6\uFF0C\u518D\u8BFB\u53D6\u78C1\u76D8\u7248\u672C\u3002</p><button id="cancel-reload">\u7EE7\u7EED\u7F16\u8F91</button><button id="recover-reload" class="primary">\u5907\u4EFD\u672A\u4FDD\u5B58\u5185\u5BB9\u5E76\u5237\u65B0</button></div>';
+    document.body.append(m);
+    $("#cancel-reload").onclick = () => m.remove();
+    $("#recover-reload").onclick = async () => {
+      try {
+        apply2(await api("recover-refresh", state));
+        m.remove();
+      } catch (e) {
+        toast(e.message);
+      }
+    };
+    return;
+  }
+  try {
+    apply2(await api("refresh"));
+  } catch (e) {
+    toast(e.message);
+  }
 }
 function renderTopics() {
   const docs = state.documents.filter(
@@ -29928,34 +30000,6 @@ function showMaterial(rel, body) {
       page = "write";
       render2();
     };
-}
-function renderArchive() {
-  $("#main").innerHTML = `<header><span class="eyebrow">\u5DF2\u5F52\u6863 \xB7 \u6700\u7EC8\u7248\u672C</span></header><section class="dashboard"><h1>\u5DF2\u7ECF\u5199\u5B8C\u7684\u6587\u7AE0\u3002</h1><p>\u91D1\u5947 ${account} \xB7 \u6309\u53D1\u5E03\u65F6\u95F4\u4ECE\u8FD1\u5230\u8FDC\u6392\u5217</p><table class="archive-table"><thead><tr><th>\u6587\u7AE0\u6807\u9898</th><th>\u53D1\u5E03\u65F6\u95F4</th><th>\u4F53\u88C1</th><th>\u9605\u8BFB / \u89C2\u770B</th><th>\u6536\u85CF</th><th>\u64CD\u4F5C</th></tr></thead><tbody>${(state.archives || []).filter((d) => d.account === account).sort(
-    (a, b) => String(b.fields["\u53D1\u5E03\u65F6\u95F4"] || "").localeCompare(
-      String(a.fields["\u53D1\u5E03\u65F6\u95F4"] || "")
-    )
-  ).map(
-    (d) => `<tr><td>${esc(d.title)}</td><td>${esc(d.fields["\u53D1\u5E03\u65F6\u95F4"] || "\u5C1A\u672A\u586B\u5199")}</td><td>${esc(d.fields["\u4F53\u88C1"] || "\u2014")}</td><td>${esc(d.fields["\u89C2\u770B\u91CF"] ?? d.fields["\u9605\u8BFB"] ?? "\u2014")}</td><td>${esc(d.fields["\u6536\u85CF"] ?? "\u2014")}</td><td><button data-archive="${esc(d.path)}">\u67E5\u770B\u5168\u6587</button></td></tr>`
-  ).join("") || '<tr><td colspan="6">\u5B9A\u7A3F\u786E\u8BA4\u540E\uFF0C\u6587\u7AE0\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC\u3002</td></tr>'}</tbody></table></section>`;
-  $$("[data-archive]").forEach(
-    (b) => b.onclick = async () => {
-      const d = state.archives.find((d2) => d2.path === b.dataset.archive);
-      const m = document.createElement("div");
-      m.className = "modal";
-      m.innerHTML = `<div class="dialog"><div class="row"><h2>${esc(d.title)}</h2><button id="close-archive">\u5173\u95ED</button></div><div class="material-preview">${safeHTML(d.body)}</div><button id="copy-archive" class="primary">\u590D\u5236\u516C\u4F17\u53F7\u6392\u7248</button><button id="archive-history">\u67E5\u770B\u5173\u8054\u8BB0\u5F55</button><div id="archive-records"></div></div>`;
-      document.body.append(m);
-      $("#close-archive").onclick = () => m.remove();
-      $("#copy-archive").onclick = () => copyPublish(d);
-      $("#archive-history").onclick = async () => {
-        try {
-          const record = await api("archive-records", d.path);
-          $("#archive-records").innerHTML = `<h3>\u7248\u672C ${record.versions.length} \xB7 \u5BF9\u8BDD ${record.conversations.length}</h3>${record.versions.map((v) => `<details><summary>${esc(v.name)} \xB7 ${esc(v.at)}</summary><pre>${esc(v.body)}</pre></details>`).join("")}${record.conversations.map((c) => `<details><summary>${esc(c.title)}</summary>${c.messages.map((m2) => `<p><b>${m2.role === "user" ? "\u4F60" : "\u5199\u4F5C\u4F19\u4F34"}</b>\uFF1A${esc(m2.text)}</p>`).join("")}</details>`).join("")}<p>\u5173\u8054\u7D20\u6750\uFF1A${esc(record.materials.join("\u3001") || "\u65E0")}</p>`;
-        } catch (e) {
-          toast(e.message);
-        }
-      };
-    }
-  );
 }
 function putTag(reference, doc3 = current, session = conversation(doc3)) {
   if (current?.id !== doc3.id || conversation(doc3).id !== session.id) {
@@ -30057,6 +30101,7 @@ async function chooseChatFile() {
 }
 function openPreview({ title, text, path: rel, reference, doc: doc3 = current }) {
   $("#reference-drawer")?.remove();
+  $("#published-drawer")?.remove();
   const n = document.createElement("aside");
   n.id = "reference-drawer";
   n.className = "reference-drawer";
@@ -30106,6 +30151,7 @@ async function renderMaterials() {
   $("#material-project").value = doc3?.id || "";
   $("#material-project").onchange = (e) => {
     $("#reference-drawer")?.remove();
+    $("#published-drawer")?.remove();
     current = state.documents.find((d) => d.id === e.target.value);
     renderMaterials();
   };

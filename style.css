@@ -50,6 +50,21 @@ button.primary {
 button.primary:hover {
   background: #214638;
 }
+button.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: #5f6f66;
+}
+button.ghost:hover {
+  background: #eef0ea;
+  border-color: #e2e3d9;
+}
+button.icon-btn {
+  min-width: 37px;
+  padding: 8px 10px;
+  font-size: 17px;
+  line-height: 1;
+}
 .secondary {
   background: #eaf0e6;
 }
@@ -75,7 +90,7 @@ p {
   display: flex;
 }
 .sidebar {
-  width: 230px;
+  width: 280px;
   flex-shrink: 0;
   background: #eceee5;
   border-right: 1px solid #dde1d5;
@@ -217,13 +232,125 @@ main::-webkit-scrollbar {
   height: 0;
 }
 header {
-  height: 85px;
+  min-height: 85px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 24px 30px 12px;
   -webkit-app-region: drag;
   border-bottom: 1px solid #e7e7de;
+}
+.header-lead {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+header .dashboard-tagline {
+  font-family: "Songti SC", Georgia, serif;
+  font-weight: 400;
+  font-size: 26px;
+  margin: 0;
+  line-height: 1.25;
+  -webkit-app-region: drag;
+}
+button.title-preview {
+  font: inherit;
+  color: #2f4f44;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: #b8c9bf;
+  text-underline-offset: 3px;
+}
+button.title-preview:hover {
+  color: #1a3d32;
+  text-decoration-color: #537a60;
+}
+.reference-drawer.published-drawer {
+  width: max(640px, min(52vw, 800px));
+  height: 100vh;
+  overflow: hidden;
+  padding-bottom: 24px;
+}
+.published-drawer-head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-shrink: 0;
+}
+.published-drawer-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #5a6f65;
+}
+.published-drawer-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #2a4038;
+}
+.published-drawer-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+.published-drawer-toolbar .icon-btn {
+  position: relative;
+  border: 1px solid #dedfd6;
+  background: #fffdf8;
+}
+.published-drawer-toolbar .icon-btn:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 2;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 400;
+  color: #fffefa;
+  background: #2f4f44;
+  border-radius: 6px;
+  padding: 6px 8px;
+  pointer-events: none;
+  box-shadow: 0 6px 16px #263e3428;
+}
+.published-drawer .material-preview {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  max-height: none;
+  overflow: auto;
+  line-height: 1.85;
+  font-size: 15px;
+  scrollbar-width: none;
+}
+.published-drawer .material-preview::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.published-drawer .published-article-title {
+  margin: 0 0 18px;
+  font-family: "Songti SC", Georgia, serif;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #243830;
+}
+.published-drawer .material-preview img {
+  max-width: 100%;
+  height: auto;
 }
 header button,
 header select {
