@@ -7,6 +7,35 @@ function validDate(value) {
     ? key
     : null;
 }
+
+/**
+ * 汇总账号写作跨度：写作天数、发布篇数、平均间隔、距上次更新天数。
+ * @param {Array<{日期?: string}>} rows
+ * @param {string} today YYYY-MM-DD
+ */
+function publishSummary(rows, today) {
+  const dates = rows
+    .map((r) => validDate(r["日期"]))
+    .filter((d) => d && d <= today)
+    .sort();
+  if (!dates.length) return null;
+  const dayMs = 86400000,
+    first = dates[0],
+    last = dates[dates.length - 1],
+    published = dates.length,
+    writingDays =
+      Math.round(
+        (Date.parse(today + "T00:00:00Z") - Date.parse(first + "T00:00:00Z")) /
+          dayMs,
+      ) + 1,
+    daysSinceLast = Math.round(
+      (Date.parse(today + "T00:00:00Z") - Date.parse(last + "T00:00:00Z")) /
+        dayMs,
+    ),
+    avgDays = Math.max(1, Math.round(writingDays / published));
+  return { writingDays, published, avgDays, daysSinceLast };
+}
+
 function calendar(rows, year, today) {
   const counts = {},
     articles = {};
@@ -50,4 +79,4 @@ function calendar(rows, year, today) {
     future,
   };
 }
-module.exports = { calendar, validDate };
+module.exports = { calendar, validDate, publishSummary };

@@ -5,7 +5,7 @@ const test = require("node:test"),
   os = require("node:os");
 const { Vault } = require("./vault.cjs"),
   { Knowledge } = require("./knowledge.cjs"),
-  { calendar, validDate } = require("./calendar.cjs");
+  { calendar, validDate, publishSummary } = require("./calendar.cjs");
 function setup(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ink-knowledge-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -43,6 +43,19 @@ test("publishing heatmap validates dates, leap year, same-day frequency and miss
   assert.equal(c.activeDays, 1);
   assert.equal(c.missing, 2);
   assert.equal(c.future, 1);
+  const s = publishSummary(
+    [
+      { 日期: "2024-02-01", 标题: "a" },
+      { 日期: "2024-02-29", 标题: "b" },
+      { 日期: null },
+      { 日期: "2024-12-31" },
+    ],
+    "2024-03-01",
+  );
+  assert.equal(s.published, 2);
+  assert.equal(s.writingDays, 30);
+  assert.equal(s.avgDays, 15);
+  assert.equal(s.daysSinceLast, 1);
 });
 test("project files are copied, fully extracted, isolated and persisted with AI toggles", async (t) => {
   const { root, k } = setup(t);

@@ -33,6 +33,16 @@ var require_calendar = __commonJS({
       const key = m.slice(1).join("-"), d = /* @__PURE__ */ new Date(key + "T00:00:00Z");
       return Number.isFinite(+d) && d.toISOString().slice(0, 10) === key ? key : null;
     }
+    function publishSummary2(rows, today) {
+      const dates = rows.map((r) => validDate2(r["\u65E5\u671F"])).filter((d) => d && d <= today).sort();
+      if (!dates.length) return null;
+      const dayMs = 864e5, first2 = dates[0], last = dates[dates.length - 1], published = dates.length, writingDays = Math.round(
+        (Date.parse(today + "T00:00:00Z") - Date.parse(first2 + "T00:00:00Z")) / dayMs
+      ) + 1, daysSinceLast = Math.round(
+        (Date.parse(today + "T00:00:00Z") - Date.parse(last + "T00:00:00Z")) / dayMs
+      ), avgDays = Math.max(1, Math.round(writingDays / published));
+      return { writingDays, published, avgDays, daysSinceLast };
+    }
     function calendar2(rows, year, today) {
       const counts = {}, articles = {};
       let missing = 0, future = 0;
@@ -71,7 +81,7 @@ var require_calendar = __commonJS({
         future
       };
     }
-    module.exports = { calendar: calendar2, validDate: validDate2 };
+    module.exports = { calendar: calendar2, validDate: validDate2, publishSummary: publishSummary2 };
   }
 });
 
@@ -28853,6 +28863,7 @@ var saveProfileEditor = null;
 var composer = null;
 var profileTab = "identity";
 var heatmapYear = (/* @__PURE__ */ new Date()).getFullYear();
+var metricsSort = "\u9605\u8BFB";
 var $ = (s) => document.querySelector(s);
 var api = (n, d) => window.desk.call(n, d);
 function isWeb() {
@@ -29639,21 +29650,37 @@ function renderDashboard() {
     (r) => r["\u8D26\u53F7"] === account || r["\u8D26\u53F7"] === "\u91D1\u5947_" + account
   );
   const sum = (k) => rows.some((r) => r[k] !== null) ? rows.reduce((s, r) => s + (r[k] || 0), 0).toLocaleString() : "\u2014";
-  $("#main").innerHTML = `<header><div><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><button id="metrics" class="primary">\u5237\u65B0\u5F52\u6863\u6570\u636E</button></header><section class="dashboard"><div class="page-title"><h1>\u8BA9\u6BCF\u4E00\u6B21\u8868\u8FBE\uFF0C\u90FD\u6709\u56DE\u54CD\u3002</h1><p>\u91D1\u5947 ${account} \xB7 \u76F4\u63A5\u8BFB\u53D6\u672C\u8D26\u53F7 03_Archive \u6587\u7AE0\u7684 YAML\uFF0C\u7F3A\u5931\u6570\u636E\u4FDD\u6301\u4E3A\u7A7A\u3002</p></div><div class="stats">${[
+  const sortKeys = [
+    ["\u9605\u8BFB", "\u6309\u9605\u8BFB\u91CF"],
+    ["\u6536\u85CF", "\u6309\u6536\u85CF"],
+    ["\u70B9\u8D5E", "\u6309\u70B9\u8D5E"],
+    ["\u6DA8\u7C89", "\u6309\u6DA8\u7C89"],
+    ["\u65E5\u671F", "\u6309\u65E5\u671F"]
+  ];
+  const sorted = [...rows].sort((a, b) => {
+    if (metricsSort === "\u65E5\u671F")
+      return String(b["\u65E5\u671F"] || "").localeCompare(String(a["\u65E5\u671F"] || ""));
+    return (b[metricsSort] || 0) - (a[metricsSort] || 0);
+  });
+  $("#main").innerHTML = `<header><div><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><button id="metrics" class="primary">\u5237\u65B0\u5F52\u6863\u6570\u636E</button></header><section class="dashboard"><div class="page-title"><h1>\u8BA9\u6BCF\u4E00\u6B21\u8868\u8FBE\uFF0C\u90FD\u6709\u56DE\u54CD\u3002</h1></div><div class="stats">${[
     ["\u9605\u8BFB", "\u603B\u9605\u8BFB"],
+    ["\u70B9\u8D5E", "\u603B\u70B9\u8D5E"],
     ["\u6536\u85CF", "\u603B\u6536\u85CF"],
     ["\u8BC4\u8BBA", "\u603B\u8BC4\u8BBA"],
-    ["\u6DA8\u7C89", "\u6587\u7AE0\u6DA8\u7C89\u5408\u8BA1"]
+    ["\u6DA8\u7C89", "\u6587\u7AE0\u6DA8\u7C89\u5408\u8BA1"],
+    ["\u6587\u7AE0", "\u603B\u6587\u7AE0\u6570\u91CF"]
   ].map(
-    ([k, l]) => `<div><small>${l}</small><strong title="${k === "\u6DA8\u7C89" ? "\u6C47\u603B\u6587\u7AE0 YAML \u7684\u6DA8\u7C89\u5B57\u6BB5\uFF0C\u4E0D\u662F\u8D26\u53F7\u51C0\u589E\u7C89\u4E1D\uFF0C\u4E5F\u4E0D\u662F\u5DE5\u4F5C\u53F0\u4F30\u7B97" : ""}">${sum(k)}</strong><span>${rows.length} \u7BC7\u5F52\u6863\u6587\u7AE0</span></div>`
+    ([k, l]) => `<div><small>${l}</small><strong title="${k === "\u6DA8\u7C89" ? "\u6C47\u603B\u6587\u7AE0 YAML \u7684\u6DA8\u7C89\u5B57\u6BB5\uFF0C\u4E0D\u662F\u8D26\u53F7\u51C0\u589E\u7C89\u4E1D\uFF0C\u4E5F\u4E0D\u662F\u5DE5\u4F5C\u53F0\u4F30\u7B97" : ""}">${k === "\u6587\u7AE0" ? rows.length.toLocaleString() : sum(k)}</strong></div>`
   ).join(
     ""
-  )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><h3>\u6587\u7AE0\u8868\u73B0 <small>\u6309\u9605\u8BFB\u91CF\u6392\u5E8F</small></h3>${rows.length ? `<table><thead><tr><th>\u6587\u7AE0</th><th>\u65E5\u671F</th><th>\u9605\u8BFB</th><th>\u6536\u85CF</th><th>\u6DA8\u7C89</th></tr></thead><tbody>${[
-    ...rows
-  ].sort((a, b) => (b["\u9605\u8BFB"] || 0) - (a["\u9605\u8BFB"] || 0)).map(
-    (r) => `<tr><td>${esc(r["\u6807\u9898"])}</td><td>${esc(r["\u65E5\u671F"])}</td><td>${r["\u9605\u8BFB"] ?? "\u2014"}</td><td>${r["\u6536\u85CF"] ?? "\u2014"}</td><td>${r["\u6DA8\u7C89"] ?? "\u2014"}</td></tr>`
-  ).join("")}</tbody></table>` : '<div class="empty-data">\u8FD8\u6CA1\u6709\u6570\u636E\u3002<p>\u6587\u7AE0\u5F52\u6863\u540E\uFF0C\u5728 YAML \u4E2D\u586B\u5199\u5E73\u53F0\u6570\u636E\u5373\u53EF\u67E5\u770B\u3002</p></div>'}</div><div class="notice">\u65B0\u589E\u5173\u6CE8\u662F\u6587\u7AE0 YAML\u300C\u6DA8\u7C89\u300D\u7684\u5408\u8BA1\uFF0C\u4E0D\u662F\u8D26\u53F7\u51C0\u589E\u7C89\u4E1D\uFF1B\u9605\u8BFB\u53D6 YAML \u7684\u300C\u89C2\u770B\u91CF\u300D\uFF08\u517C\u5BB9\u300C\u9605\u8BFB\u300D\uFF09\u3002\u5F52\u6863\u4E0D\u4EE3\u8868\u5DF2\u5728\u5E73\u53F0\u53D1\u5E03\uFF0C\u4E0D\u81EA\u52A8\u8865\u96F6\u6216\u586B\u5199\u53D1\u5E03\u65F6\u95F4\u3002</div></section>`;
+  )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>\u6587\u7AE0\u8868\u73B0</h3><select id="metrics-sort" aria-label="\u6587\u7AE0\u6392\u5E8F\u65B9\u5F0F">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${rows.length ? `<table><thead><tr><th>\u6587\u7AE0</th><th>\u65E5\u671F</th><th>\u9605\u8BFB</th><th>\u70B9\u8D5E</th><th>\u6536\u85CF</th><th>\u6DA8\u7C89</th></tr></thead><tbody>${sorted.map(
+    (r) => `<tr><td>${esc(r["\u6807\u9898"])}</td><td>${esc(r["\u65E5\u671F"])}</td><td>${r["\u9605\u8BFB"] ?? "\u2014"}</td><td>${r["\u70B9\u8D5E"] ?? "\u2014"}</td><td>${r["\u6536\u85CF"] ?? "\u2014"}</td><td>${r["\u6DA8\u7C89"] ?? "\u2014"}</td></tr>`
+  ).join("")}</tbody></table>` : '<div class="empty-data">\u8FD8\u6CA1\u6709\u6570\u636E\u3002<p>\u6587\u7AE0\u5F52\u6863\u540E\uFF0C\u5728 YAML \u4E2D\u586B\u5199\u5E73\u53F0\u6570\u636E\u5373\u53EF\u67E5\u770B\u3002</p></div>'}</div></section>`;
   renderCalendar(rows);
+  $("#metrics-sort").onchange = (e) => {
+    metricsSort = e.target.value;
+    renderDashboard();
+  };
   $("#metrics").onclick = async () => {
     try {
       const r = await api("metrics");
@@ -30161,17 +30188,17 @@ function renderCalendar(rows) {
   const c = (0, import_calendar.calendar)(rows, heatmapYear, today);
   const node = $("#publishing-calendar");
   if (!node) return;
-  node.innerHTML = `<div class="row"><h3>\u53D1\u5E03\u70ED\u529B\u56FE</h3><select id="heatmap-year" aria-label="\u70ED\u529B\u56FE\u5E74\u4EFD">${years.map((y) => `<option ${y === heatmapYear ? "selected" : ""}>${y}</option>`).join("")}</select></div><p>${c.published} \u7BC7\u53D1\u5E03 \xB7 ${c.activeDays} \u4E2A\u53D1\u5E03\u65E5 \xB7 \u5E73\u5747\u6BCF\u5468 ${c.weekly} \u7BC7</p><div class="heatmap-scroll"><div class="heatmap-grid" role="group" aria-label="\u6BCF\u65E5\u53D1\u5E03\u6570\u91CF">${"<span></span>".repeat(c.offset)}${c.days.map((d) => `<button class="heatmap-day level-${Math.min(d.count, 4)} ${d.future ? "future" : ""} ${d.date === today ? "is-today" : ""}" ${d.date === today ? 'aria-current="date"' : ""} data-heat-date="${d.date}" title="${d.date} \xB7 ${d.count} \u7BC7${d.future ? "\uFF08\u672A\u6765\u65E5\u671F\uFF09" : ""}" aria-label="${d.date} \u53D1\u5E03 ${d.count} \u7BC7"></button>`).join("")}</div></div><div class="heatmap-legend">\u5C11 ${[0, 1, 2, 3, 4].map((n) => `<span class="heatmap-day level-${n}"></span>`).join("")} \u591A <small>\u63CF\u8FB9\u683C\u4E3A\u4ECA\u5929\uFF08${today}\uFF09\uFF1B\u60AC\u505C\u67E5\u770B\u53D1\u5E03\u6587\u7AE0</small></div><div id="heatmap-detail">\u60AC\u505C\u65E5\u671F\u67E5\u770B\u6587\u7AE0\uFF1B\u952E\u76D8\u805A\u7126\u540C\u6837\u53EF\u67E5\u770B\u3002</div><p class="muted">\u53EA\u7EDF\u8BA1 YAML\u300C\u53D1\u5E03\u65F6\u95F4\u300D\u3002${c.missing} \u7BC7\u65E0\u6709\u6548\u65E5\u671F\u3001${c.future} \u7BC7\u672A\u6765\u65E5\u671F\u672A\u8BA1\u5165\u5B9E\u9645\u53D1\u5E03\u3002</p>`;
+  const heatTip = (d) => {
+    const head = `${d.date}${d.date === today ? " \xB7 \u4ECA\u5929" : ""} \xB7 ${d.count} \u7BC7${d.future ? "\uFF08\u672A\u6765\u65E5\u671F\uFF09" : ""}`;
+    return d.titles.length ? head + "\n" + d.titles.join("\n") : head;
+  };
+  const summary = (0, import_calendar.publishSummary)(rows, today);
+  const summaryText = summary ? `\u60A8\u5DF2\u5199\u4F5C ${summary.writingDays} \u5929\uFF0C\u5171\u53D1\u5E03 ${summary.published} \u7BC7\uFF0C\u5E73\u5747 ${summary.avgDays} \u5929\u53D1\u5E03\u4E00\u7BC7\uFF0C\u4E0A\u4E00\u6B21\u66F4\u65B0\u662F\u5728 ${summary.daysSinceLast} \u5929\u524D` : "\u6682\u65E0\u6709\u6548\u53D1\u5E03\u8BB0\u5F55";
+  node.innerHTML = `<div class="row"><h3>\u53D1\u5E03\u70ED\u529B\u56FE</h3><select id="heatmap-year" aria-label="\u70ED\u529B\u56FE\u5E74\u4EFD">${years.map((y) => `<option ${y === heatmapYear ? "selected" : ""}>${y}</option>`).join("")}</select></div><p>${summaryText}</p><div class="heatmap-scroll"><div class="heatmap-grid" role="group" aria-label="\u6BCF\u65E5\u53D1\u5E03\u6570\u91CF">${"<span></span>".repeat(c.offset)}${c.days.map((d) => `<button class="heatmap-day level-${Math.min(d.count, 4)} ${d.future ? "future" : ""} ${d.date === today ? "is-today" : ""}" ${d.date === today ? 'aria-current="date"' : ""} data-heat-date="${d.date}" title="${esc(heatTip(d))}" aria-label="${esc(heatTip(d).replace(/\n/g, "\uFF0C"))}"></button>`).join("")}</div></div>`;
   $("#heatmap-year").onchange = (e) => {
     heatmapYear = +e.target.value;
     renderCalendar(rows);
   };
-  $$("[data-heat-date]").forEach(
-    (b) => b.onmouseenter = b.onfocus = () => {
-      const d = c.days.find((d2) => d2.date === b.dataset.heatDate);
-      $("#heatmap-detail").innerHTML = `<strong>${d.date}${d.date === today ? " \xB7 \u4ECA\u5929" : ""} \xB7 ${d.count} \u7BC7</strong>${d.titles.map((t) => `<p>${esc(t)}</p>`).join("")}`;
-    }
-  );
 }
 window.addEventListener("beforeunload", () => {
   sync();

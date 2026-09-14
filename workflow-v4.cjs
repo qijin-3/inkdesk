@@ -141,9 +141,10 @@ const { _electron: electron } = require("@playwright/test"),
       await w.locator('.heatmap-day.is-today[aria-current="date"]').count(),
       1,
     );
-    await w.locator(`[data-heat-date="${year}-01-10"]`).hover();
-    assert.match(await w.locator("#heatmap-detail").innerText(), /2 篇/);
-    assert.match(await w.locator("#main").innerText(), /不是账号净增粉丝/);
+    assert.match(
+      await w.locator(`[data-heat-date="${year}-01-10"]`).getAttribute("title"),
+      /2 篇[\s\S]*第一篇/,
+    );
     await w.locator('[data-page="profile"]').click();
     await w.locator("[data-model-tab]").first().waitFor();
     assert.equal(await w.locator("[data-model-tab]").count(), 5);

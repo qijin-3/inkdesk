@@ -80,9 +80,10 @@ const { _electron: electron } = require("@playwright/test"),
     assert.equal(await w.locator(".archive-table tbody tr").count(), 2);
     assert.equal(await w.locator("#main .result-card").count(), 0);
     await w.locator('[data-page="dashboard"]').click();
-    await w.locator(`[data-heat-date="${year}-01-10"]`).click();
-    assert.match(await w.locator("#heatmap-detail").innerText(), /2 篇/);
-    assert.match(await w.locator("#heatmap-detail").innerText(), /第一篇/);
+    assert.match(
+      await w.locator(`[data-heat-date="${year}-01-10"]`).getAttribute("title"),
+      /2 篇[\s\S]*第一篇/,
+    );
     await w.locator('[data-page="profile"]').click();
     await w.locator('[data-profile-file="Author_DNA/语言风格.md"]').click();
     assert.match(await w.locator("#profile-text").inputValue(), /讲人话/);

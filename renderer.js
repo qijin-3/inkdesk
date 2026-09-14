@@ -7,11 +7,12 @@ import { gfm } from "turndown-plugin-gfm";
 import { marked } from "marked";
 import TurndownService from "turndown";
 import { diffWords } from "diff";
-import { calendar, validDate } from "./calendar.cjs";
+import { calendar, validDate, publishSummary } from "./calendar.cjs";
 let saveProfileEditor = null;
 let composer = null,
   profileTab = "identity";
 let heatmapYear = new Date().getFullYear();
+let metricsSort = "阅读";
 const $ = (s) => document.querySelector(s),
   api = (n, d) => window.desk.call(n, d);
 
@@ -945,33 +946,49 @@ function renderDashboard() {
     rows.some((r) => r[k] !== null)
       ? rows.reduce((s, r) => s + (r[k] || 0), 0).toLocaleString()
       : "—";
+  const sortKeys = [
+    ["阅读", "按阅读量"],
+    ["收藏", "按收藏"],
+    ["点赞", "按点赞"],
+    ["涨粉", "按涨粉"],
+    ["日期", "按日期"],
+  ];
+  /** 按当前排序字段排列归档文章 */
+  const sorted = [...rows].sort((a, b) => {
+    if (metricsSort === "日期")
+      return String(b["日期"] || "").localeCompare(String(a["日期"] || ""));
+    return (b[metricsSort] || 0) - (a[metricsSort] || 0);
+  });
   $("#main").innerHTML =
-    `<header><div><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><button id="metrics" class="primary">刷新归档数据</button></header><section class="dashboard"><div class="page-title"><h1>让每一次表达，都有回响。</h1><p>金奇 ${account} · 直接读取本账号 03_Archive 文章的 YAML，缺失数据保持为空。</p></div><div class="stats">${[
+    `<header><div><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><button id="metrics" class="primary">刷新归档数据</button></header><section class="dashboard"><div class="page-title"><h1>让每一次表达，都有回响。</h1></div><div class="stats">${[
       ["阅读", "总阅读"],
+      ["点赞", "总点赞"],
       ["收藏", "总收藏"],
       ["评论", "总评论"],
       ["涨粉", "文章涨粉合计"],
+      ["文章", "总文章数量"],
     ]
       .map(
         ([k, l]) =>
-          `<div><small>${l}</small><strong title="${k === "涨粉" ? "汇总文章 YAML 的涨粉字段，不是账号净增粉丝，也不是工作台估算" : ""}">${sum(k)}</strong><span>${rows.length} 篇归档文章</span></div>`,
+          `<div><small>${l}</small><strong title="${k === "涨粉" ? "汇总文章 YAML 的涨粉字段，不是账号净增粉丝，也不是工作台估算" : ""}">${k === "文章" ? rows.length.toLocaleString() : sum(k)}</strong></div>`,
       )
       .join(
         "",
-      )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><h3>文章表现 <small>按阅读量排序</small></h3>${
+      )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>文章表现</h3><select id="metrics-sort" aria-label="文章排序方式">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${
       rows.length
-        ? `<table><thead><tr><th>文章</th><th>日期</th><th>阅读</th><th>收藏</th><th>涨粉</th></tr></thead><tbody>${[
-            ...rows,
-          ]
-            .sort((a, b) => (b["阅读"] || 0) - (a["阅读"] || 0))
+        ? `<table><thead><tr><th>文章</th><th>日期</th><th>阅读</th><th>点赞</th><th>收藏</th><th>涨粉</th></tr></thead><tbody>${sorted
             .map(
               (r) =>
-                `<tr><td>${esc(r["标题"])}</td><td>${esc(r["日期"])}</td><td>${r["阅读"] ?? "—"}</td><td>${r["收藏"] ?? "—"}</td><td>${r["涨粉"] ?? "—"}</td></tr>`,
+                `<tr><td>${esc(r["标题"])}</td><td>${esc(r["日期"])}</td><td>${r["阅读"] ?? "—"}</td><td>${r["点赞"] ?? "—"}</td><td>${r["收藏"] ?? "—"}</td><td>${r["涨粉"] ?? "—"}</td></tr>`,
             )
             .join("")}</tbody></table>`
         : '<div class="empty-data">还没有数据。<p>文章归档后，在 YAML 中填写平台数据即可查看。</p></div>'
-    }</div><div class="notice">新增关注是文章 YAML「涨粉」的合计，不是账号净增粉丝；阅读取 YAML 的「观看量」（兼容「阅读」）。归档不代表已在平台发布，不自动补零或填写发布时间。</div></section>`;
+    }</div></section>`;
   renderCalendar(rows);
+  $("#metrics-sort").onchange = (e) => {
+    metricsSort = e.target.value;
+    renderDashboard();
+  };
   $("#metrics").onclick = async () => {
     try {
       const r = await api("metrics");
@@ -1572,20 +1589,20 @@ function renderCalendar(rows) {
   const c = calendar(rows, heatmapYear, today);
   const node = $("#publishing-calendar");
   if (!node) return;
-  node.innerHTML = `<div class="row"><h3>发布热力图</h3><select id="heatmap-year" aria-label="热力图年份">${years.map((y) => `<option ${y === heatmapYear ? "selected" : ""}>${y}</option>`).join("")}</select></div><p>${c.published} 篇发布 · ${c.activeDays} 个发布日 · 平均每周 ${c.weekly} 篇</p><div class="heatmap-scroll"><div class="heatmap-grid" role="group" aria-label="每日发布数量">${"<span></span>".repeat(c.offset)}${c.days.map((d) => `<button class="heatmap-day level-${Math.min(d.count, 4)} ${d.future ? "future" : ""} ${d.date === today ? "is-today" : ""}" ${d.date === today ? 'aria-current="date"' : ""} data-heat-date="${d.date}" title="${d.date} · ${d.count} 篇${d.future ? "（未来日期）" : ""}" aria-label="${d.date} 发布 ${d.count} 篇"></button>`).join("")}</div></div><div class="heatmap-legend">少 ${[0, 1, 2, 3, 4].map((n) => `<span class="heatmap-day level-${n}"></span>`).join("")} 多 <small>描边格为今天（${today}）；悬停查看发布文章</small></div><div id="heatmap-detail">悬停日期查看文章；键盘聚焦同样可查看。</div><p class="muted">只统计 YAML「发布时间」。${c.missing} 篇无有效日期、${c.future} 篇未来日期未计入实际发布。</p>`;
+  /** 生成热力格悬停提示：日期、篇数与当日文章标题 */
+  const heatTip = (d) => {
+    const head = `${d.date}${d.date === today ? " · 今天" : ""} · ${d.count} 篇${d.future ? "（未来日期）" : ""}`;
+    return d.titles.length ? head + "\n" + d.titles.join("\n") : head;
+  };
+  const summary = publishSummary(rows, today);
+  const summaryText = summary
+    ? `您已写作 ${summary.writingDays} 天，共发布 ${summary.published} 篇，平均 ${summary.avgDays} 天发布一篇，上一次更新是在 ${summary.daysSinceLast} 天前`
+    : "暂无有效发布记录";
+  node.innerHTML = `<div class="row"><h3>发布热力图</h3><select id="heatmap-year" aria-label="热力图年份">${years.map((y) => `<option ${y === heatmapYear ? "selected" : ""}>${y}</option>`).join("")}</select></div><p>${summaryText}</p><div class="heatmap-scroll"><div class="heatmap-grid" role="group" aria-label="每日发布数量">${"<span></span>".repeat(c.offset)}${c.days.map((d) => `<button class="heatmap-day level-${Math.min(d.count, 4)} ${d.future ? "future" : ""} ${d.date === today ? "is-today" : ""}" ${d.date === today ? 'aria-current="date"' : ""} data-heat-date="${d.date}" title="${esc(heatTip(d))}" aria-label="${esc(heatTip(d).replace(/\n/g, "，"))}"></button>`).join("")}</div></div>`;
   $("#heatmap-year").onchange = (e) => {
     heatmapYear = +e.target.value;
     renderCalendar(rows);
   };
-  $$("[data-heat-date]").forEach(
-    (b) =>
-      (b.onmouseenter = b.onfocus =
-        () => {
-          const d = c.days.find((d) => d.date === b.dataset.heatDate);
-          $("#heatmap-detail").innerHTML =
-            `<strong>${d.date}${d.date === today ? " · 今天" : ""} · ${d.count} 篇</strong>${d.titles.map((t) => `<p>${esc(t)}</p>`).join("")}`;
-        }),
-  );
 }
 window.addEventListener("beforeunload", () => {
   sync();
