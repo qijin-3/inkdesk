@@ -1,3 +1,4 @@
+import { bindSocialPreview } from "./social-layout.js";
 import { Composer } from "./composer.js";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
@@ -90,6 +91,9 @@ let state,
   selectionContext = null,
   dirty = false;
 let editorHTML = "";
+let previewMode = false;
+let previewDocId = null;
+let socialPreviewCtl = null;
 function conversation(doc = current) {
   doc.conversations ||= [];
   if (!doc.conversations.length)
@@ -217,6 +221,14 @@ function render() {
   if (editor) {
     editor.destroy();
     editor = null;
+  }
+  if (socialPreviewCtl) {
+    socialPreviewCtl.destroy();
+    socialPreviewCtl = null;
+  }
+  if (page !== "write") {
+    previewMode = false;
+    previewDocId = null;
   }
   $("#app").innerHTML =
     `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk <small>写作工作台</small></div><button type="button" data-page="settings" class="icon-btn brand-settings" title="设置" aria-label="设置">⚙</button></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">金奇 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">金奇 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">◫ <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">✧ <span>选题与灵感</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">▧ <span>素材库</span></button><button data-page="profile">◎ <span>账号人设</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章">＋</button></div><div class="docs">${
@@ -376,6 +388,193 @@ async function deleteDraft(id) {
 function $$(s) {
   return [...document.querySelectorAll(s)];
 }
+
+/**
+ * 将 Markdown 转为公众号剪贴板 HTML，本地图片替换为上传占位。
+ */
+function publishHTML(md) {
+  const d = new DOMParser().parseFromString(safeHTML(md), "text/html");
+  d.querySelectorAll("img").forEach((img) => {
+    const p = d.createElement("p");
+    p.textContent = "【请上传图片：" + (img.alt || "正文配图") + "】";
+    img.replaceWith(p);
+  });
+  const styles = {
+    p: "margin:0 0 20px;line-height:1.9;font-size:16px;color:#333;",
+    h1: "font-size:25px;line-height:1.5;margin:28px 0 18px;",
+    h2: "font-size:21px;line-height:1.5;margin:28px 0 16px;color:#214f45;",
+    h3: "font-size:18px;margin:24px 0 12px;",
+    blockquote:
+      "border-left:3px solid #648779;padding:8px 16px;margin:20px 0;color:#666;",
+    li: "line-height:1.9;margin:8px 0;",
+    strong: "font-weight:bold;color:#214f45;",
+  };
+  Object.entries(styles).forEach(([tag, style]) =>
+    d.querySelectorAll(tag).forEach((n) => n.setAttribute("style", style)),
+  );
+  return `<section style="font-family:PingFang SC,Arial,sans-serif;padding:8px;">${d.body.innerHTML}</section>`;
+}
+
+/**
+ * 生成小红书分页用的正文 HTML；桌面端把网页资源路径转回 inkasset。
+ */
+function socialSourceHTML() {
+  const html = editor ? editor.getHTML() : safeHTML(current.body);
+  const d = new DOMParser().parseFromString(html, "text/html");
+  if (!isWeb())
+    d.querySelectorAll("img").forEach((img) => {
+      const src = img.getAttribute("src");
+      if (src?.startsWith("/api/asset/"))
+        img.src = src
+          .replace("/api/asset/vault/", "inkasset://vault/")
+          .replace("/api/asset/local/", "inkasset://local/");
+    });
+  return d.body.innerHTML;
+}
+
+/**
+ * 进入或退出预览模式，并重建写作页。
+ */
+function togglePreview() {
+  sync();
+  previewMode = !previewMode;
+  previewDocId = previewMode ? current.id : null;
+  if (editor) {
+    editor.destroy();
+    editor = null;
+  }
+  if (composer) {
+    composer.destroy();
+    composer = null;
+  }
+  if (socialPreviewCtl) {
+    socialPreviewCtl.destroy();
+    socialPreviewCtl = null;
+  }
+  renderWrite();
+}
+
+/**
+ * 绑定写作页与预览页共用的页眉操作（预览切换、版本、定稿）。
+ */
+function bindArticleHeader() {
+  $("#layout").onclick = togglePreview;
+  $("#save-version").onclick = () => {
+    sync();
+    const modal = document.createElement("div");
+    modal.className = "modal";
+    modal.innerHTML =
+      '<div class="dialog"><h2>保存一个版本</h2><input id="version-name" placeholder="如：自己的初稿 / 精修版"><div class="row"><button id="version-cancel">取消</button><button id="version-confirm" class="primary">保存版本</button></div></div>';
+    document.body.append(modal);
+    $("#version-cancel").onclick = () => modal.remove();
+    $("#version-confirm").onclick = async () => {
+      current.snapshots.push({
+        id: crypto.randomUUID(),
+        at: new Date().toISOString(),
+        name: $("#version-name").value.trim() || "手动保存",
+        body: current.body,
+      });
+      dirty = true;
+      if (await persist()) {
+        modal.remove();
+        toast("版本已保存");
+      }
+    };
+  };
+  $("#history").onclick = async () => {
+    sync();
+    if (!(await persist())) return;
+    try {
+      current.snapshots = await api("versions", current.id);
+    } catch (e) {
+      return toast(e.message);
+    }
+    const modal = document.createElement("div");
+    modal.className = "modal";
+    modal.innerHTML = `<div class="dialog"><div class="row"><h2>版本与修改记录</h2><button id="close-history">关闭</button></div><p class="muted">记录只保存在本机，不自动发送给 AI。</p><div class="history-items">${
+      (current.snapshots || [])
+        .map(
+          (x, i) =>
+            `<div class="result-card"><small>${esc(x.name || "修改前快照")} · ${new Date(x.at).toLocaleString("zh-CN")}</small><div>${esc(x.body.slice(0, 260))}</div><button data-restore="${i}">恢复此版本</button></div>`,
+        )
+        .reverse()
+        .join("") || "<p>接受修改或定稿时，会在这里保存快照。</p>"
+    }${(current.decisions || [])
+      .slice(-10)
+      .reverse()
+      .map(
+        (x) =>
+          `<div class="result-card"><small>${x.action === "accepted" ? "已接受" : "已拒绝"} · ${new Date(x.at).toLocaleString("zh-CN")}</small><div>${esc(x.before)} → ${esc(x.after)}</div></div>`,
+      )
+      .join("")}</div></div>`;
+    document.body.append(modal);
+    $("#close-history").onclick = () => modal.remove();
+    $$("[data-restore]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          const body = current.snapshots[+b.dataset.restore].body;
+          sync();
+          current.snapshots.push({
+            at: new Date().toISOString(),
+            body: current.body,
+          });
+          if (editor) {
+            editor.commands.setContent(safeHTML(body));
+            sync();
+          } else current.body = body;
+          changed();
+          pending = null;
+          modal.remove();
+          toast("版本已恢复，恢复前的正文也已保存");
+          if (previewMode) renderWrite();
+        }),
+    );
+  };
+  $("#finalize").onclick = async () => {
+    if (busy) return toast("请等待 AI 完成后再定稿");
+    sync();
+    if (!(await persist())) return;
+    try {
+      let result = await api("finalize", current.id);
+      if (isWeb() && result?.needsConfirmation) {
+        const ok = confirm(result.message + "\n\n" + result.detail);
+        if (!ok) return;
+        result = await api("finalize", {
+          id: current.id,
+          confirmed: true,
+          contentSnapshot: result.contentSnapshot,
+        });
+      }
+      if (!result || result.needsConfirmation) return;
+      Object.assign(state, result);
+      current = state.documents.find((d) => d.account === account);
+      pending = null;
+      page = "dashboard";
+      render();
+      toast("已定稿并移入本账号 Archive，版本与对话已保留");
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+}
+
+/**
+ * 渲染预览模式：左侧公众号排版，右侧小红书分页。
+ */
+function renderPreview() {
+  previewDocId = current.id;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><span class="eyebrow">${account === "AI" ? "AI 实践与思考" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout" class="primary">退出预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize">定稿</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="article-preview">${safeHTML(current.body)}</div></article></section><div class="workspace-resizer" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant"><div class="assistant-head"><span>小红书分页</span><label class="social-size-label">字号 <select id="social-size"><option value="30">标准</option><option value="36">大字</option><option value="26">紧凑</option></select></label></div><div class="preview-actions"><button id="social-export" class="primary wide" disabled>导出图片</button><button id="copy-publish" class="wide">复制排版（公众号）</button><p id="social-status" class="notice">正在排版…</p></div><div id="panel"><div id="social-pages"></div></div></aside></div>`;
+  bindArticleHeader();
+  $("#copy-publish").onclick = () => copyPublish(current);
+  socialPreviewCtl = bindSocialPreview($(".assistant"), {
+    html: socialSourceHTML(),
+    title: current.title,
+    api,
+    web: isWeb(),
+  });
+  bindWorkspaceResize();
+}
+
 function renderWrite() {
   if (!current) {
     $("#main").innerHTML =
@@ -383,14 +582,20 @@ function renderWrite() {
     $("#start").onclick = newDoc;
     return;
   }
+  if (previewMode && previewDocId && previewDocId !== current.id)
+    previewMode = false;
+  if (tab === "publish") tab = "chat";
+  if (previewMode) {
+    renderPreview();
+    return;
+  }
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><span class="eyebrow">${account === "AI" ? "AI 实践与思考" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold"><b>B</b></button><button data-fmt="italic"><i>I</i></button><button data-fmt="heading">H2</button><button data-fmt="bulletList">☷</button><button data-fmt="blockquote">❝</button><span></span><button id="image">＋ 图片</button><button id="outline">大纲</button><button id="focus">专注</button></div><div id="outline-list" hidden></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">项目参考文件</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">引用选段</button><button data-task="review">看稿</button><button data-task="rewrite">润色选段</button><button data-task="check">核查</button></div></section><div class="workspace-resizer" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant"><div class="assistant-head"><span>✧ 写作伙伴</span><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select></div><div class="tabs">${[
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><span class="eyebrow">${account === "AI" ? "AI 实践与思考" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout">预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold"><b>B</b></button><button data-fmt="italic"><i>I</i></button><button data-fmt="heading">H2</button><button data-fmt="bulletList">☷</button><button data-fmt="blockquote">❝</button><span></span><button id="image">＋ 图片</button><button id="outline">大纲</button><button id="focus">专注</button></div><div id="outline-list" hidden></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">项目参考文件</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">引用选段</button><button data-task="review">看稿</button><button data-task="rewrite">润色选段</button><button data-task="check">核查</button></div></section><div class="workspace-resizer" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant"><div class="assistant-head"><span>✧ 写作伙伴</span><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select></div><div class="tabs">${[
       ["chat", "对话"],
       ["topics", "思路"],
       ["titles", "标题"],
       ["prompts", "配图"],
       ["checks", "核查"],
-      ["publish", "发布"],
     ]
       .map(
         ([id, name]) =>
@@ -552,100 +757,7 @@ function renderWrite() {
           ].scrollIntoView({ behavior: "smooth" })),
     );
   };
-  $("#save-version").onclick = () => {
-    sync();
-    const modal = document.createElement("div");
-    modal.className = "modal";
-    modal.innerHTML =
-      '<div class="dialog"><h2>保存一个版本</h2><input id="version-name" placeholder="如：自己的初稿 / 精修版"><div class="row"><button id="version-cancel">取消</button><button id="version-confirm" class="primary">保存版本</button></div></div>';
-    document.body.append(modal);
-    $("#version-cancel").onclick = () => modal.remove();
-    $("#version-confirm").onclick = async () => {
-      current.snapshots.push({
-        id: crypto.randomUUID(),
-        at: new Date().toISOString(),
-        name: $("#version-name").value.trim() || "手动保存",
-        body: current.body,
-      });
-      dirty = true;
-      if (await persist()) {
-        modal.remove();
-        toast("版本已保存");
-      }
-    };
-  };
-  $("#history").onclick = async () => {
-    sync();
-    if (!(await persist())) return;
-    try {
-      current.snapshots = await api("versions", current.id);
-    } catch (e) {
-      return toast(e.message);
-    }
-    const modal = document.createElement("div");
-    modal.className = "modal";
-    modal.innerHTML = `<div class="dialog"><div class="row"><h2>版本与修改记录</h2><button id="close-history">关闭</button></div><p class="muted">记录只保存在本机，不自动发送给 AI。</p><div class="history-items">${
-      (current.snapshots || [])
-        .map(
-          (x, i) =>
-            `<div class="result-card"><small>${esc(x.name || "修改前快照")} · ${new Date(x.at).toLocaleString("zh-CN")}</small><div>${esc(x.body.slice(0, 260))}</div><button data-restore="${i}">恢复此版本</button></div>`,
-        )
-        .reverse()
-        .join("") || "<p>接受修改或定稿时，会在这里保存快照。</p>"
-    }${(current.decisions || [])
-      .slice(-10)
-      .reverse()
-      .map(
-        (x) =>
-          `<div class="result-card"><small>${x.action === "accepted" ? "已接受" : "已拒绝"} · ${new Date(x.at).toLocaleString("zh-CN")}</small><div>${esc(x.before)} → ${esc(x.after)}</div></div>`,
-      )
-      .join("")}</div></div>`;
-    document.body.append(modal);
-    $("#close-history").onclick = () => modal.remove();
-    $$("[data-restore]").forEach(
-      (b) =>
-        (b.onclick = () => {
-          const body = current.snapshots[+b.dataset.restore].body;
-          sync();
-          current.snapshots.push({
-            at: new Date().toISOString(),
-            body: current.body,
-          });
-          editor.commands.setContent(safeHTML(body));
-          sync();
-          changed();
-          pending = null;
-          modal.remove();
-          toast("版本已恢复，恢复前的正文也已保存");
-        }),
-    );
-  };
-  $("#finalize").onclick = async () => {
-    if (busy) return toast("请等待 AI 完成后再定稿");
-    sync();
-    if (!(await persist())) return;
-    try {
-      let result = await api("finalize", current.id);
-      if (isWeb() && result?.needsConfirmation) {
-        const ok = confirm(result.message + "\n\n" + result.detail);
-        if (!ok) return;
-        result = await api("finalize", {
-          id: current.id,
-          confirmed: true,
-          contentSnapshot: result.contentSnapshot,
-        });
-      }
-      if (!result || result.needsConfirmation) return;
-      Object.assign(state, result);
-      current = state.documents.find((d) => d.account === account);
-      pending = null;
-      page = "dashboard";
-      render();
-      toast("已定稿并移入本账号 Archive，版本与对话已保留");
-    } catch (e) {
-      toast(e.message);
-    }
-  };
+  bindArticleHeader();
   $$("[data-task]").forEach((b) => {
     b.onmousedown = (e) => e.preventDefault();
     b.onclick = () => runTask(b.dataset.task);
@@ -667,8 +779,9 @@ function bindWorkspaceResize() {
 
   /** 将宽度限制在可用范围内 */
   const clamp = (w) => {
+    const cap = workspace.classList.contains("preview-mode") ? 640 : 560;
     const max = Math.max(280, workspace.clientWidth - 300);
-    return Math.min(Math.max(Math.round(w), 280), Math.min(560, max));
+    return Math.min(Math.max(Math.round(w), 280), Math.min(cap, max));
   };
 
   const stored = Number(localStorage.getItem("inkdesk-assistant-width"));
@@ -706,6 +819,7 @@ function bindWorkspaceResize() {
   };
 }
 function renderPanel() {
+  if (previewMode) return;
   if (composer) {
     composer.destroy();
     composer = null;
@@ -713,11 +827,7 @@ function renderPanel() {
   $$("[data-task]").forEach((b) => (b.disabled = busy));
   const panel = $("#panel");
   if (!panel) return;
-  if (tab === "publish") {
-    panel.innerHTML = `<div class="panel-intro"><h3>公众号排版</h3><p>将正文转换为可复制的富文本。</p></div><button id="copy-publish" class="primary wide">复制公众号排版</button><p class="notice">本地图片需在公众号编辑器中上传。复制时会转换为图片占位提示。</p><div class="publish-preview">${safeHTML(current.body)}</div>`;
-    $("#copy-publish").onclick = () => copyPublish(current);
-    return;
-  }
+  if (tab === "publish") tab = "chat";
   const key = tab;
   let content = "";
   if (tab === "chat") {
@@ -1051,26 +1161,8 @@ async function copyPublish(doc) {
   if (!doc) doc = current;
   if (doc === current) sync();
   if (!doc) return;
-  const d = new DOMParser().parseFromString(safeHTML(doc.body), "text/html");
-  d.querySelectorAll("img").forEach((img) => {
-    const p = d.createElement("p");
-    p.textContent = "【请上传图片：" + (img.alt || "正文配图") + "】";
-    img.replaceWith(p);
-  });
-  const styles = {
-    p: "margin:0 0 20px;line-height:1.9;font-size:16px;color:#333;",
-    h1: "font-size:25px;line-height:1.5;margin:28px 0 18px;",
-    h2: "font-size:21px;line-height:1.5;margin:28px 0 16px;color:#214f45;",
-    h3: "font-size:18px;margin:24px 0 12px;",
-    blockquote:
-      "border-left:3px solid #648779;padding:8px 16px;margin:20px 0;color:#666;",
-    li: "line-height:1.9;margin:8px 0;",
-    strong: "font-weight:bold;color:#214f45;",
-  };
-  Object.entries(styles).forEach(([tag, style]) =>
-    d.querySelectorAll(tag).forEach((n) => n.setAttribute("style", style)),
-  );
-  const html = `<section style="font-family:PingFang SC,Arial,sans-serif;padding:8px;">${d.body.innerHTML}</section>`;
+  const html = publishHTML(doc.body);
+  const d = new DOMParser().parseFromString(html, "text/html");
   await api("copy", { html, text: d.body.textContent });
   toast("排版已复制；本地图片请在公众号补入");
 }

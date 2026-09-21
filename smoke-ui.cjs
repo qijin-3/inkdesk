@@ -18,7 +18,7 @@ const path = require("node:path");
       .locator(".paper .tiptap")
       .fill("最近写文章，我总在几个软件之间切换。\n我想把注意力放回文字本身。");
     await win.waitForTimeout(900);
-    await win.locator('[data-tab="publish"]').click();
+    await win.locator("#layout").click();
     await win.locator("#copy-publish").click();
     const html = await app.evaluate(async ({ clipboard }) => {
       const items = await clipboard.read();

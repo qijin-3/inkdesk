@@ -100,7 +100,7 @@ const assert = require("node:assert/strict"),
       /亲历/,
     );
     await w.locator(".doc").first().click();
-    await w.locator('[data-tab="publish"]').click();
+    await w.locator("#layout").click();
     await w.locator("#copy-publish").click();
     const html = await app.evaluate(async ({ clipboard }) => {
       for (const i of await clipboard.read())

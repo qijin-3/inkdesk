@@ -1426,3 +1426,120 @@ pre {
 .message .inline-reference {
   font-size: 11px;
 }
+.workspace.preview-mode .paper-wrap {
+  background: #f3f2ed;
+}
+.workspace.preview-mode .paper {
+  background: #fff;
+  box-shadow: 0 8px 32px #2a3c2812;
+  margin: 28px auto 56px;
+}
+.workspace.preview-mode .assistant {
+  background: #e9eae4;
+}
+.workspace.preview-mode #panel {
+  overflow: auto;
+  padding: 0 14px 24px;
+  scrollbar-width: thin;
+}
+.preview-actions {
+  padding: 0 16px 8px;
+}
+.preview-actions .wide {
+  margin: 6px 0;
+}
+.preview-actions .notice {
+  margin: 8px 0 4px;
+}
+.social-size-label {
+  font-size: 11px;
+  color: #6a7466;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.social-size-label select {
+  font-size: 11px;
+  padding: 4px 6px;
+}
+.wechat-preview {
+  font-family: "PingFang SC", Arial, sans-serif;
+  color: #333;
+  padding-top: 52px;
+}
+.wechat-preview .preview-title {
+  font-size: 25px;
+  line-height: 1.5;
+  margin: 0 0 8px;
+  font-weight: 600;
+  color: #111;
+}
+.wechat-preview #article-preview,
+.wechat-preview #article-preview p,
+.wechat-preview #article-preview li {
+  color: #333;
+  font-size: 16px;
+  line-height: 1.9;
+}
+.wechat-preview #article-preview p {
+  margin: 0 0 20px;
+}
+.wechat-preview #article-preview h1 {
+  font-size: 25px;
+  line-height: 1.5;
+  margin: 28px 0 18px;
+  color: #111;
+}
+.wechat-preview #article-preview h2 {
+  font-size: 21px;
+  line-height: 1.5;
+  margin: 28px 0 16px;
+  color: #214f45;
+}
+.wechat-preview #article-preview h3 {
+  font-size: 18px;
+  margin: 24px 0 12px;
+  color: #214f45;
+}
+.wechat-preview #article-preview blockquote {
+  border-left: 3px solid #648779;
+  padding: 8px 16px;
+  margin: 20px 0;
+  color: #666;
+}
+.wechat-preview #article-preview li {
+  margin: 8px 0;
+}
+.wechat-preview #article-preview strong {
+  font-weight: 700;
+  color: #214f45;
+}
+.wechat-preview #article-preview img {
+  max-width: 100%;
+  height: auto;
+}
+#social-pages {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: #d5d6d0;
+  padding: 14px;
+  border-radius: 12px;
+}
+#social-pages figure {
+  margin: 0;
+  min-width: 0;
+  background: #fff;
+}
+#social-pages canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  box-shadow: 0 10px 28px #00000014;
+}
+#social-pages figcaption {
+  text-align: center;
+  padding: 8px;
+  color: #666;
+  font-size: 11px;
+}

@@ -85,6 +85,154 @@ var require_calendar = __commonJS({
   }
 });
 
+// social-layout.js
+async function socialPages(html2, title, size = 30) {
+  await document.fonts.ready;
+  const root2 = new DOMParser().parseFromString(html2, "text/html").body;
+  const pages = [];
+  let ctx, y;
+  const W = 1200, H = 1600, pad = 100, bottom = H - pad;
+  function page2() {
+    if (pages.length >= 17) throw Error("\u5185\u5BB9\u8D85\u8FC7 17 \u5F20\uFF0C\u8BF7\u7F29\u5C0F\u5B57\u53F7\u6216\u7CBE\u7B80\u6B63\u6587\u540E\u91CD\u8BD5\u3002\u672A\u5BFC\u51FA\u622A\u65AD\u5185\u5BB9\u3002");
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, W, H);
+    ctx.textBaseline = "top";
+    y = pad;
+    pages.push(canvas);
+  }
+  function font(n, bold) {
+    ctx.font = `${bold ? 800 : 400} ${n}px "PingFang SC", sans-serif`;
+  }
+  function text(runs, n, heading2 = false) {
+    const line = n * 1.55;
+    let x = pad;
+    if (y + line > bottom) page2();
+    for (const run3 of runs) for (const ch of Array.from(run3.text)) {
+      font(n, heading2 || run3.bold);
+      const width = ctx.measureText(ch).width;
+      if (ch === "\n" || x + width > W - pad) {
+        x = pad;
+        y += line;
+        if (y + line > bottom) page2();
+        font(n, heading2 || run3.bold);
+      }
+      if (ch === "\n") continue;
+      ctx.fillStyle = !heading2 && run3.bold ? "#1647ff" : "#111";
+      ctx.fillText(ch, x, y);
+      x += width;
+    }
+    y += line + (heading2 ? 26 : 22);
+  }
+  async function picture(src) {
+    const img = new Image();
+    if (/^https?:/.test(src)) img.crossOrigin = "anonymous";
+    img.src = src;
+    await Promise.race([img.decode(), new Promise((_, r) => setTimeout(() => r(Error("\u56FE\u7247\u52A0\u8F7D\u8D85\u65F6")), 12e3))]);
+    const scale = Math.min((W - pad * 2) / img.naturalWidth, 620 / img.naturalHeight);
+    const w = img.naturalWidth * scale, h2 = img.naturalHeight * scale;
+    if (y + h2 > bottom) page2();
+    ctx.drawImage(img, (W - w) / 2, y, w, h2);
+    y += h2 + 26;
+  }
+  async function block2(node) {
+    if (node.nodeName === "IMG") {
+      await picture(node.getAttribute("src"));
+      return;
+    }
+    if (node.nodeName === "HR") {
+      if (y !== pad) page2();
+      return;
+    }
+    if (node.querySelector?.("img")) {
+      for (const child of node.childNodes) await block2(child);
+      return;
+    }
+    if (["UL", "OL", "BLOCKQUOTE", "TABLE", "TBODY", "THEAD"].includes(node.nodeName)) {
+      for (const child of node.children) await block2(child);
+      return;
+    }
+    const runs = [];
+    function collect(n, bold = false) {
+      if (n.nodeType === 3) runs.push({ text: n.textContent, bold });
+      else if (n.nodeName === "BR") runs.push({ text: "\n", bold });
+      else for (const c of n.childNodes) collect(c, bold || ["STRONG", "B"].includes(n.nodeName));
+    }
+    collect(node);
+    if (!runs.some((r) => r.text.trim())) return;
+    if (node.nodeName === "LI") runs.unshift({ text: "\u2022 ", bold: false });
+    text(runs, /^H[1-6]$/.test(node.nodeName) ? size * 1.8 : size, /^H[1-6]$/.test(node.nodeName));
+  }
+  page2();
+  if (title) text([{ text: title }], size * 2, true);
+  for (const node of root2.childNodes) await block2(node);
+  for (const c of pages) c.toDataURL("image/png");
+  return pages;
+}
+function bindSocialPreview(root2, { html: html2, title, api: api2, web }) {
+  const q = (s) => root2.querySelector(s);
+  let pages = [];
+  let generation = 0;
+  async function draw() {
+    const g = ++generation;
+    const exportBtn = q("#social-export");
+    const status = q("#social-status");
+    const list2 = q("#social-pages");
+    exportBtn.disabled = true;
+    status.textContent = "\u6B63\u5728\u6392\u7248\u2026";
+    list2.replaceChildren();
+    try {
+      const next2 = await socialPages(html2, title, +q("#social-size").value);
+      if (g !== generation) return;
+      pages = next2;
+      for (const [i, c] of pages.entries()) {
+        const figure = document.createElement("figure");
+        const label = document.createElement("figcaption");
+        label.textContent = `${i + 1} / ${pages.length}`;
+        figure.append(c, label);
+        list2.append(figure);
+      }
+      status.textContent = `\u5171 ${pages.length} \u5F20`;
+      exportBtn.disabled = false;
+    } catch (e) {
+      if (g === generation) status.textContent = "\u6392\u7248\u5931\u8D25\uFF1A" + e.message;
+    }
+  }
+  q("#social-size").onchange = draw;
+  q("#social-export").onclick = async () => {
+    const b = q("#social-export");
+    b.disabled = true;
+    try {
+      const images = pages.map((c) => c.toDataURL("image/png"));
+      if (web) {
+        for (const [i, url] of images.entries()) {
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${title.replace(/[\\/:*?"<>|]/g, "_")}-${String(i + 1).padStart(2, "0")}.png`;
+          a.click();
+        }
+        q("#social-status").textContent = "\u5DF2\u63D0\u4EA4\u6D4F\u89C8\u5668\u4E0B\u8F7D\uFF0C\u8BF7\u5141\u8BB8\u4E0B\u8F7D\u591A\u4E2A\u6587\u4EF6";
+      } else {
+        const result = await api2("export-social", { title, images });
+        q("#social-status").textContent = result ? `\u5DF2\u5BFC\u51FA ${images.length} \u5F20\u5230 ${result}` : "\u5DF2\u53D6\u6D88\u5BFC\u51FA";
+      }
+    } catch (e) {
+      q("#social-status").textContent = e.message;
+    } finally {
+      b.disabled = false;
+    }
+  };
+  draw();
+  return {
+    destroy() {
+      generation++;
+    }
+  };
+}
+
 // node_modules/@tiptap/core/dist/rolldown-runtime-D7D4PA-g.js
 var __defProp2 = Object.defineProperty;
 var __exportAll = (all, no_symbols) => {
@@ -22951,7 +23099,7 @@ var Composer = class {
 
 // node_modules/@tiptap/extension-image/dist/index.js
 var inputRegex4 = /(?:^|\s)(!\[(.+|:?)]\((\S+)(?:(?:\s+)["'](\S+)["'])?\))$/;
-var Image = Node2.create({
+var Image2 = Node2.create({
   name: "image",
   addOptions() {
     return {
@@ -23111,7 +23259,7 @@ var Image = Node2.create({
     })];
   }
 });
-var src_default2 = Image;
+var src_default2 = Image2;
 
 // node_modules/prosemirror-tables/dist/index.js
 var readFromCache;
@@ -28926,6 +29074,9 @@ var selectedText = "";
 var selectionContext = null;
 var dirty = false;
 var editorHTML = "";
+var previewMode = false;
+var previewDocId = null;
+var socialPreviewCtl = null;
 function conversation(doc3 = current) {
   doc3.conversations ||= [];
   if (!doc3.conversations.length)
@@ -29037,6 +29188,14 @@ function render2() {
   if (editor) {
     editor.destroy();
     editor = null;
+  }
+  if (socialPreviewCtl) {
+    socialPreviewCtl.destroy();
+    socialPreviewCtl = null;
+  }
+  if (page !== "write") {
+    previewMode = false;
+    previewDocId = null;
   }
   $("#app").innerHTML = `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk <small>\u5199\u4F5C\u5DE5\u4F5C\u53F0</small></div><button type="button" data-page="settings" class="icon-btn brand-settings" title="\u8BBE\u7F6E" aria-label="\u8BBE\u7F6E">\u2699</button></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">\u91D1\u5947 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">\u91D1\u5947 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">\u25EB <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">\u2727 <span>\u9009\u9898\u4E0E\u7075\u611F</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">\u25A7 <span>\u7D20\u6750\u5E93</span></button><button data-page="profile">\u25CE <span>\u8D26\u53F7\u4EBA\u8BBE</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0">\uFF0B</button></div><div class="docs">${state.documents.filter(
     (d) => d.account === account && d.status !== "final" && d.status !== "archive"
@@ -29153,19 +29312,175 @@ async function deleteDraft(id) {
 function $$(s) {
   return [...document.querySelectorAll(s)];
 }
+function publishHTML(md) {
+  const d = new DOMParser().parseFromString(safeHTML(md), "text/html");
+  d.querySelectorAll("img").forEach((img) => {
+    const p = d.createElement("p");
+    p.textContent = "\u3010\u8BF7\u4E0A\u4F20\u56FE\u7247\uFF1A" + (img.alt || "\u6B63\u6587\u914D\u56FE") + "\u3011";
+    img.replaceWith(p);
+  });
+  const styles = {
+    p: "margin:0 0 20px;line-height:1.9;font-size:16px;color:#333;",
+    h1: "font-size:25px;line-height:1.5;margin:28px 0 18px;",
+    h2: "font-size:21px;line-height:1.5;margin:28px 0 16px;color:#214f45;",
+    h3: "font-size:18px;margin:24px 0 12px;",
+    blockquote: "border-left:3px solid #648779;padding:8px 16px;margin:20px 0;color:#666;",
+    li: "line-height:1.9;margin:8px 0;",
+    strong: "font-weight:bold;color:#214f45;"
+  };
+  Object.entries(styles).forEach(
+    ([tag2, style2]) => d.querySelectorAll(tag2).forEach((n) => n.setAttribute("style", style2))
+  );
+  return `<section style="font-family:PingFang SC,Arial,sans-serif;padding:8px;">${d.body.innerHTML}</section>`;
+}
+function socialSourceHTML() {
+  const html2 = editor ? editor.getHTML() : safeHTML(current.body);
+  const d = new DOMParser().parseFromString(html2, "text/html");
+  if (!isWeb())
+    d.querySelectorAll("img").forEach((img) => {
+      const src = img.getAttribute("src");
+      if (src?.startsWith("/api/asset/"))
+        img.src = src.replace("/api/asset/vault/", "inkasset://vault/").replace("/api/asset/local/", "inkasset://local/");
+    });
+  return d.body.innerHTML;
+}
+function togglePreview() {
+  sync();
+  previewMode = !previewMode;
+  previewDocId = previewMode ? current.id : null;
+  if (editor) {
+    editor.destroy();
+    editor = null;
+  }
+  if (composer) {
+    composer.destroy();
+    composer = null;
+  }
+  if (socialPreviewCtl) {
+    socialPreviewCtl.destroy();
+    socialPreviewCtl = null;
+  }
+  renderWrite();
+}
+function bindArticleHeader() {
+  $("#layout").onclick = togglePreview;
+  $("#save-version").onclick = () => {
+    sync();
+    const modal = document.createElement("div");
+    modal.className = "modal";
+    modal.innerHTML = '<div class="dialog"><h2>\u4FDD\u5B58\u4E00\u4E2A\u7248\u672C</h2><input id="version-name" placeholder="\u5982\uFF1A\u81EA\u5DF1\u7684\u521D\u7A3F / \u7CBE\u4FEE\u7248"><div class="row"><button id="version-cancel">\u53D6\u6D88</button><button id="version-confirm" class="primary">\u4FDD\u5B58\u7248\u672C</button></div></div>';
+    document.body.append(modal);
+    $("#version-cancel").onclick = () => modal.remove();
+    $("#version-confirm").onclick = async () => {
+      current.snapshots.push({
+        id: crypto.randomUUID(),
+        at: (/* @__PURE__ */ new Date()).toISOString(),
+        name: $("#version-name").value.trim() || "\u624B\u52A8\u4FDD\u5B58",
+        body: current.body
+      });
+      dirty = true;
+      if (await persist()) {
+        modal.remove();
+        toast("\u7248\u672C\u5DF2\u4FDD\u5B58");
+      }
+    };
+  };
+  $("#history").onclick = async () => {
+    sync();
+    if (!await persist()) return;
+    try {
+      current.snapshots = await api("versions", current.id);
+    } catch (e) {
+      return toast(e.message);
+    }
+    const modal = document.createElement("div");
+    modal.className = "modal";
+    modal.innerHTML = `<div class="dialog"><div class="row"><h2>\u7248\u672C\u4E0E\u4FEE\u6539\u8BB0\u5F55</h2><button id="close-history">\u5173\u95ED</button></div><p class="muted">\u8BB0\u5F55\u53EA\u4FDD\u5B58\u5728\u672C\u673A\uFF0C\u4E0D\u81EA\u52A8\u53D1\u9001\u7ED9 AI\u3002</p><div class="history-items">${(current.snapshots || []).map(
+      (x, i) => `<div class="result-card"><small>${esc(x.name || "\u4FEE\u6539\u524D\u5FEB\u7167")} \xB7 ${new Date(x.at).toLocaleString("zh-CN")}</small><div>${esc(x.body.slice(0, 260))}</div><button data-restore="${i}">\u6062\u590D\u6B64\u7248\u672C</button></div>`
+    ).reverse().join("") || "<p>\u63A5\u53D7\u4FEE\u6539\u6216\u5B9A\u7A3F\u65F6\uFF0C\u4F1A\u5728\u8FD9\u91CC\u4FDD\u5B58\u5FEB\u7167\u3002</p>"}${(current.decisions || []).slice(-10).reverse().map(
+      (x) => `<div class="result-card"><small>${x.action === "accepted" ? "\u5DF2\u63A5\u53D7" : "\u5DF2\u62D2\u7EDD"} \xB7 ${new Date(x.at).toLocaleString("zh-CN")}</small><div>${esc(x.before)} \u2192 ${esc(x.after)}</div></div>`
+    ).join("")}</div></div>`;
+    document.body.append(modal);
+    $("#close-history").onclick = () => modal.remove();
+    $$("[data-restore]").forEach(
+      (b) => b.onclick = () => {
+        const body = current.snapshots[+b.dataset.restore].body;
+        sync();
+        current.snapshots.push({
+          at: (/* @__PURE__ */ new Date()).toISOString(),
+          body: current.body
+        });
+        if (editor) {
+          editor.commands.setContent(safeHTML(body));
+          sync();
+        } else current.body = body;
+        changed();
+        pending = null;
+        modal.remove();
+        toast("\u7248\u672C\u5DF2\u6062\u590D\uFF0C\u6062\u590D\u524D\u7684\u6B63\u6587\u4E5F\u5DF2\u4FDD\u5B58");
+        if (previewMode) renderWrite();
+      }
+    );
+  };
+  $("#finalize").onclick = async () => {
+    if (busy) return toast("\u8BF7\u7B49\u5F85 AI \u5B8C\u6210\u540E\u518D\u5B9A\u7A3F");
+    sync();
+    if (!await persist()) return;
+    try {
+      let result = await api("finalize", current.id);
+      if (isWeb() && result?.needsConfirmation) {
+        const ok = confirm(result.message + "\n\n" + result.detail);
+        if (!ok) return;
+        result = await api("finalize", {
+          id: current.id,
+          confirmed: true,
+          contentSnapshot: result.contentSnapshot
+        });
+      }
+      if (!result || result.needsConfirmation) return;
+      Object.assign(state, result);
+      current = state.documents.find((d) => d.account === account);
+      pending = null;
+      page = "dashboard";
+      render2();
+      toast("\u5DF2\u5B9A\u7A3F\u5E76\u79FB\u5165\u672C\u8D26\u53F7 Archive\uFF0C\u7248\u672C\u4E0E\u5BF9\u8BDD\u5DF2\u4FDD\u7559");
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+}
+function renderPreview() {
+  previewDocId = current.id;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><span class="eyebrow">${account === "AI" ? "AI \u5B9E\u8DF5\u4E0E\u601D\u8003" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize">\u5B9A\u7A3F</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="article-preview">${safeHTML(current.body)}</div></article></section><div class="workspace-resizer" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant"><div class="assistant-head"><span>\u5C0F\u7EA2\u4E66\u5206\u9875</span><label class="social-size-label">\u5B57\u53F7 <select id="social-size"><option value="30">\u6807\u51C6</option><option value="36">\u5927\u5B57</option><option value="26">\u7D27\u51D1</option></select></label></div><div class="preview-actions"><button id="social-export" class="primary wide" disabled>\u5BFC\u51FA\u56FE\u7247</button><button id="copy-publish" class="wide">\u590D\u5236\u6392\u7248\uFF08\u516C\u4F17\u53F7\uFF09</button><p id="social-status" class="notice">\u6B63\u5728\u6392\u7248\u2026</p></div><div id="panel"><div id="social-pages"></div></div></aside></div>`;
+  bindArticleHeader();
+  $("#copy-publish").onclick = () => copyPublish(current);
+  socialPreviewCtl = bindSocialPreview($(".assistant"), {
+    html: socialSourceHTML(),
+    title: current.title,
+    api,
+    web: isWeb()
+  });
+  bindWorkspaceResize();
+}
 function renderWrite() {
   if (!current) {
     $("#main").innerHTML = '<div class="empty"><span class="eyebrow">A SPACE FOR YOUR WORDS</span><h1>\u628A\u60F3\u8BF4\u7684\u8BDD\uFF0C\u5199\u4E0B\u6765\u3002</h1><p>\u4ECE\u8349\u7A3F\u5F00\u59CB\uFF0C\u6216\u5BFC\u5165\u5DF2\u6709\u6587\u7AE0\u3002AI \u5728\u4F60\u9700\u8981\u65F6\u5E2E\u5FD9\u3002</p><button class="primary" id="start">\uFF0B \u65B0\u5EFA\u6587\u7AE0</button></div>';
     $("#start").onclick = newDoc;
     return;
   }
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><span class="eyebrow">${account === "AI" ? "AI \u5B9E\u8DF5\u4E0E\u601D\u8003" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold"><b>B</b></button><button data-fmt="italic"><i>I</i></button><button data-fmt="heading">H2</button><button data-fmt="bulletList">\u2637</button><button data-fmt="blockquote">\u275D</button><span></span><button id="image">\uFF0B \u56FE\u7247</button><button id="outline">\u5927\u7EB2</button><button id="focus">\u4E13\u6CE8</button></div><div id="outline-list" hidden></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">\u9879\u76EE\u53C2\u8003\u6587\u4EF6</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">\u5F15\u7528\u9009\u6BB5</button><button data-task="review">\u770B\u7A3F</button><button data-task="rewrite">\u6DA6\u8272\u9009\u6BB5</button><button data-task="check">\u6838\u67E5</button></div></section><div class="workspace-resizer" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant"><div class="assistant-head"><span>\u2727 \u5199\u4F5C\u4F19\u4F34</span><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select></div><div class="tabs">${[
+  if (previewMode && previewDocId && previewDocId !== current.id)
+    previewMode = false;
+  if (tab === "publish") tab = "chat";
+  if (previewMode) {
+    renderPreview();
+    return;
+  }
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><span class="eyebrow">${account === "AI" ? "AI \u5B9E\u8DF5\u4E0E\u601D\u8003" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout">\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold"><b>B</b></button><button data-fmt="italic"><i>I</i></button><button data-fmt="heading">H2</button><button data-fmt="bulletList">\u2637</button><button data-fmt="blockquote">\u275D</button><span></span><button id="image">\uFF0B \u56FE\u7247</button><button id="outline">\u5927\u7EB2</button><button id="focus">\u4E13\u6CE8</button></div><div id="outline-list" hidden></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">\u9879\u76EE\u53C2\u8003\u6587\u4EF6</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">\u5F15\u7528\u9009\u6BB5</button><button data-task="review">\u770B\u7A3F</button><button data-task="rewrite">\u6DA6\u8272\u9009\u6BB5</button><button data-task="check">\u6838\u67E5</button></div></section><div class="workspace-resizer" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant"><div class="assistant-head"><span>\u2727 \u5199\u4F5C\u4F19\u4F34</span><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select></div><div class="tabs">${[
     ["chat", "\u5BF9\u8BDD"],
     ["topics", "\u601D\u8DEF"],
     ["titles", "\u6807\u9898"],
     ["prompts", "\u914D\u56FE"],
-    ["checks", "\u6838\u67E5"],
-    ["publish", "\u53D1\u5E03"]
+    ["checks", "\u6838\u67E5"]
   ].map(
     ([id, name]) => `<button data-tab="${id}" class="${tab === id ? "active" : ""}">${name}</button>`
   ).join("")}</div><div id="panel"></div></aside></div>`;
@@ -29309,87 +29624,7 @@ function renderWrite() {
       (b) => b.onclick = () => $$("#editor h1,#editor h2,#editor h3")[+b.dataset.heading].scrollIntoView({ behavior: "smooth" })
     );
   };
-  $("#save-version").onclick = () => {
-    sync();
-    const modal = document.createElement("div");
-    modal.className = "modal";
-    modal.innerHTML = '<div class="dialog"><h2>\u4FDD\u5B58\u4E00\u4E2A\u7248\u672C</h2><input id="version-name" placeholder="\u5982\uFF1A\u81EA\u5DF1\u7684\u521D\u7A3F / \u7CBE\u4FEE\u7248"><div class="row"><button id="version-cancel">\u53D6\u6D88</button><button id="version-confirm" class="primary">\u4FDD\u5B58\u7248\u672C</button></div></div>';
-    document.body.append(modal);
-    $("#version-cancel").onclick = () => modal.remove();
-    $("#version-confirm").onclick = async () => {
-      current.snapshots.push({
-        id: crypto.randomUUID(),
-        at: (/* @__PURE__ */ new Date()).toISOString(),
-        name: $("#version-name").value.trim() || "\u624B\u52A8\u4FDD\u5B58",
-        body: current.body
-      });
-      dirty = true;
-      if (await persist()) {
-        modal.remove();
-        toast("\u7248\u672C\u5DF2\u4FDD\u5B58");
-      }
-    };
-  };
-  $("#history").onclick = async () => {
-    sync();
-    if (!await persist()) return;
-    try {
-      current.snapshots = await api("versions", current.id);
-    } catch (e) {
-      return toast(e.message);
-    }
-    const modal = document.createElement("div");
-    modal.className = "modal";
-    modal.innerHTML = `<div class="dialog"><div class="row"><h2>\u7248\u672C\u4E0E\u4FEE\u6539\u8BB0\u5F55</h2><button id="close-history">\u5173\u95ED</button></div><p class="muted">\u8BB0\u5F55\u53EA\u4FDD\u5B58\u5728\u672C\u673A\uFF0C\u4E0D\u81EA\u52A8\u53D1\u9001\u7ED9 AI\u3002</p><div class="history-items">${(current.snapshots || []).map(
-      (x, i) => `<div class="result-card"><small>${esc(x.name || "\u4FEE\u6539\u524D\u5FEB\u7167")} \xB7 ${new Date(x.at).toLocaleString("zh-CN")}</small><div>${esc(x.body.slice(0, 260))}</div><button data-restore="${i}">\u6062\u590D\u6B64\u7248\u672C</button></div>`
-    ).reverse().join("") || "<p>\u63A5\u53D7\u4FEE\u6539\u6216\u5B9A\u7A3F\u65F6\uFF0C\u4F1A\u5728\u8FD9\u91CC\u4FDD\u5B58\u5FEB\u7167\u3002</p>"}${(current.decisions || []).slice(-10).reverse().map(
-      (x) => `<div class="result-card"><small>${x.action === "accepted" ? "\u5DF2\u63A5\u53D7" : "\u5DF2\u62D2\u7EDD"} \xB7 ${new Date(x.at).toLocaleString("zh-CN")}</small><div>${esc(x.before)} \u2192 ${esc(x.after)}</div></div>`
-    ).join("")}</div></div>`;
-    document.body.append(modal);
-    $("#close-history").onclick = () => modal.remove();
-    $$("[data-restore]").forEach(
-      (b) => b.onclick = () => {
-        const body = current.snapshots[+b.dataset.restore].body;
-        sync();
-        current.snapshots.push({
-          at: (/* @__PURE__ */ new Date()).toISOString(),
-          body: current.body
-        });
-        editor.commands.setContent(safeHTML(body));
-        sync();
-        changed();
-        pending = null;
-        modal.remove();
-        toast("\u7248\u672C\u5DF2\u6062\u590D\uFF0C\u6062\u590D\u524D\u7684\u6B63\u6587\u4E5F\u5DF2\u4FDD\u5B58");
-      }
-    );
-  };
-  $("#finalize").onclick = async () => {
-    if (busy) return toast("\u8BF7\u7B49\u5F85 AI \u5B8C\u6210\u540E\u518D\u5B9A\u7A3F");
-    sync();
-    if (!await persist()) return;
-    try {
-      let result = await api("finalize", current.id);
-      if (isWeb() && result?.needsConfirmation) {
-        const ok = confirm(result.message + "\n\n" + result.detail);
-        if (!ok) return;
-        result = await api("finalize", {
-          id: current.id,
-          confirmed: true,
-          contentSnapshot: result.contentSnapshot
-        });
-      }
-      if (!result || result.needsConfirmation) return;
-      Object.assign(state, result);
-      current = state.documents.find((d) => d.account === account);
-      pending = null;
-      page = "dashboard";
-      render2();
-      toast("\u5DF2\u5B9A\u7A3F\u5E76\u79FB\u5165\u672C\u8D26\u53F7 Archive\uFF0C\u7248\u672C\u4E0E\u5BF9\u8BDD\u5DF2\u4FDD\u7559");
-    } catch (e) {
-      toast(e.message);
-    }
-  };
+  bindArticleHeader();
   $$("[data-task]").forEach((b) => {
     b.onmousedown = (e) => e.preventDefault();
     b.onclick = () => runTask(b.dataset.task);
@@ -29405,8 +29640,9 @@ function bindWorkspaceResize() {
   const workspace = $(".workspace");
   if (!resizer || !aside || !workspace) return;
   const clamp = (w) => {
+    const cap = workspace.classList.contains("preview-mode") ? 640 : 560;
     const max = Math.max(280, workspace.clientWidth - 300);
-    return Math.min(Math.max(Math.round(w), 280), Math.min(560, max));
+    return Math.min(Math.max(Math.round(w), 280), Math.min(cap, max));
   };
   const stored = Number(localStorage.getItem("inkdesk-assistant-width"));
   if (Number.isFinite(stored) && stored > 0) aside.style.width = clamp(stored) + "px";
@@ -29437,6 +29673,7 @@ function bindWorkspaceResize() {
   };
 }
 function renderPanel() {
+  if (previewMode) return;
   if (composer) {
     composer.destroy();
     composer = null;
@@ -29444,11 +29681,7 @@ function renderPanel() {
   $$("[data-task]").forEach((b) => b.disabled = busy);
   const panel = $("#panel");
   if (!panel) return;
-  if (tab === "publish") {
-    panel.innerHTML = `<div class="panel-intro"><h3>\u516C\u4F17\u53F7\u6392\u7248</h3><p>\u5C06\u6B63\u6587\u8F6C\u6362\u4E3A\u53EF\u590D\u5236\u7684\u5BCC\u6587\u672C\u3002</p></div><button id="copy-publish" class="primary wide">\u590D\u5236\u516C\u4F17\u53F7\u6392\u7248</button><p class="notice">\u672C\u5730\u56FE\u7247\u9700\u5728\u516C\u4F17\u53F7\u7F16\u8F91\u5668\u4E2D\u4E0A\u4F20\u3002\u590D\u5236\u65F6\u4F1A\u8F6C\u6362\u4E3A\u56FE\u7247\u5360\u4F4D\u63D0\u793A\u3002</p><div class="publish-preview">${safeHTML(current.body)}</div>`;
-    $("#copy-publish").onclick = () => copyPublish(current);
-    return;
-  }
+  if (tab === "publish") tab = "chat";
   const key = tab;
   let content = "";
   if (tab === "chat") {
@@ -29728,25 +29961,8 @@ async function copyPublish(doc3) {
   if (!doc3) doc3 = current;
   if (doc3 === current) sync();
   if (!doc3) return;
-  const d = new DOMParser().parseFromString(safeHTML(doc3.body), "text/html");
-  d.querySelectorAll("img").forEach((img) => {
-    const p = d.createElement("p");
-    p.textContent = "\u3010\u8BF7\u4E0A\u4F20\u56FE\u7247\uFF1A" + (img.alt || "\u6B63\u6587\u914D\u56FE") + "\u3011";
-    img.replaceWith(p);
-  });
-  const styles = {
-    p: "margin:0 0 20px;line-height:1.9;font-size:16px;color:#333;",
-    h1: "font-size:25px;line-height:1.5;margin:28px 0 18px;",
-    h2: "font-size:21px;line-height:1.5;margin:28px 0 16px;color:#214f45;",
-    h3: "font-size:18px;margin:24px 0 12px;",
-    blockquote: "border-left:3px solid #648779;padding:8px 16px;margin:20px 0;color:#666;",
-    li: "line-height:1.9;margin:8px 0;",
-    strong: "font-weight:bold;color:#214f45;"
-  };
-  Object.entries(styles).forEach(
-    ([tag2, style2]) => d.querySelectorAll(tag2).forEach((n) => n.setAttribute("style", style2))
-  );
-  const html2 = `<section style="font-family:PingFang SC,Arial,sans-serif;padding:8px;">${d.body.innerHTML}</section>`;
+  const html2 = publishHTML(doc3.body);
+  const d = new DOMParser().parseFromString(html2, "text/html");
   await api("copy", { html: html2, text: d.body.textContent });
   toast("\u6392\u7248\u5DF2\u590D\u5236\uFF1B\u672C\u5730\u56FE\u7247\u8BF7\u5728\u516C\u4F17\u53F7\u8865\u5165");
 }

@@ -1,5 +1,6 @@
 const { contextBridge, ipcRenderer } = require("electron");
 const channels = [
+  "export-social",
   "load",
   "model-load",
   "model-save",
