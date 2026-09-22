@@ -163,9 +163,12 @@ nav button {
   background: none;
   text-align: left;
   padding: 11px 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 nav span {
-  margin-left: 10px;
+  margin-left: 0;
 }
 .chosen {
   background: #e0e0e0 !important;
@@ -182,6 +185,10 @@ nav span {
 .list-head button {
   border: 0;
   background: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
   padding: 0;
   font-size: 22px;
 }
@@ -373,6 +380,10 @@ header select {
   height: calc(100vh - 85px);
   min-width: 0;
 }
+.workspace > .paper-wrap {
+  flex: 1;
+  min-width: 280px;
+}
 .paper-wrap {
   flex: 1;
   min-width: 280px;
@@ -421,11 +432,54 @@ body.resizing-workspace * {
 .formatbar button {
   border: 0;
   background: transparent;
-  padding: 5px 10px;
+  padding: 6px 8px;
   font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: #333;
+}
+.formatbar button .lucide {
+  display: block;
 }
 .formatbar span {
   flex: 1;
+}
+.lucide {
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+button.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+button.icon-btn .lucide {
+  display: block;
+}
+.header-actions > button,
+.composer-tools button,
+.conversation-bar button,
+.selection-bar button,
+.assistant-head-actions > button,
+.preview-actions button,
+.dashboard-card button,
+button.primary,
+button.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.assistant-head > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.welcome-icon {
+  display: inline-flex;
+  color: #666;
 }
 .paper {
   max-width: 780px;
@@ -512,22 +566,36 @@ body.resizing-workspace * {
   flex-shrink: 0;
   min-width: 0;
   max-width: min(560px, 48vw);
+  height: 100vh;
   border-left: 1px solid #e5e5e5;
   background: #f2f2f2;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 .assistant-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   padding: 20px;
   font-weight: 500;
+  flex-shrink: 0;
+}
+.assistant-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 .assistant-head select {
   font-size: 11px;
   padding: 5px;
   background: transparent;
+}
+.assistant-head #finalize {
+  font-size: 12px;
+  padding: 6px 12px;
 }
 .tabs {
   display: flex;
@@ -1441,10 +1509,10 @@ pre {
   box-sizing: border-box;
   padding: 28px 40px 48px;
 }
-.workspace.preview-mode .assistant {
+.assistant.preview-mode {
   background: #ececec;
 }
-.workspace.preview-mode #panel {
+.assistant.preview-mode #panel {
   overflow: auto;
   padding: 0 14px 24px;
   scrollbar-width: thin;

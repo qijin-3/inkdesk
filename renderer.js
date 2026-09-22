@@ -1,5 +1,6 @@
 import { bindSocialPreview } from "./social-layout.js";
 import { Composer } from "./composer.js";
+import { I } from "./icons.js";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
@@ -98,6 +99,8 @@ let editorHTML = "";
 let previewMode = false;
 let previewDocId = null;
 let socialPreviewCtl = null;
+/** 写作伙伴侧栏是否展开；仅草稿写作可用，默认收起 */
+let assistantOpen = false;
 function conversation(doc = current) {
   doc.conversations ||= [];
   if (!doc.conversations.length)
@@ -242,7 +245,7 @@ function render() {
     previewDocId = null;
   }
   $("#app").innerHTML =
-    `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk <small>写作工作台</small></div><button type="button" data-page="settings" class="icon-btn brand-settings" title="设置" aria-label="设置">⚙</button></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">金奇 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">金奇 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">◫ <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">✧ <span>选题与灵感</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">▧ <span>素材库</span></button><button data-page="profile">◎ <span>账号人设</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章">＋</button></div><div class="docs">${
+    `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk <small>写作工作台</small></div><button type="button" data-page="settings" class="icon-btn brand-settings" title="设置" aria-label="设置">${I.settings({ size: 18 })}</button></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">金奇 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">金奇 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>选题与灵感</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="profile">${I.user()} <span>账号人设</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></div><div class="docs">${
       state.documents
         .filter(
           (d) =>
@@ -255,13 +258,15 @@ function render() {
             `<button class="doc ${current?.id === d.id ? "selected" : ""}" data-id="${d.id}"><span>${esc(d.title)}</span><small>${new Date(d.updated).toLocaleDateString("zh-CN")} · ${d.body.length} 字</small></button>`,
         )
         .join("") || '<p class="muted">从一个想法开始。</p>'
-    }</div></aside><main id="main"></main>`;
+    }</div></aside><main id="main"></main><div class="workspace-resizer hidden" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant hidden" id="rail"></aside>`;
   if (page === "write") renderWrite();
   else if (page === "dashboard") renderDashboard();
   else if (page === "topics") renderTopics();
   else if (page === "materials") renderMaterials();
   else if (page === "profile") renderProfile();
   else renderSettings();
+  if (page !== "write") renderAssistantRail();
+  bindWorkspaceResize();
   $$("[data-page]").forEach(
     (b) =>
       (b.onclick = async () => {
@@ -902,7 +907,7 @@ function togglePreview() {
 }
 
 /**
- * 绑定写作页与预览页共用的页眉操作（预览切换、版本、定稿）。
+ * 绑定写作页与预览页共用的页眉操作（预览切换、版本）。
  */
 function bindArticleHeader() {
   $("#layout").onclick = togglePreview;
@@ -977,7 +982,16 @@ function bindArticleHeader() {
         }),
     );
   };
-  $("#finalize").onclick = async () => {
+}
+
+/**
+ * 绑定全局右侧栏「定稿」按钮。
+ */
+function bindFinalize() {
+  const btn = $("#finalize");
+  if (!btn) return;
+  btn.onclick = async () => {
+    if (!current) return toast("请先打开一篇草稿");
     if (busy) return toast("请等待 AI 完成后再定稿");
     sync();
     if (!(await persist())) return;
@@ -1006,29 +1020,149 @@ function bindArticleHeader() {
 }
 
 /**
- * 渲染预览模式：左侧公众号排版，右侧小红书分页。
+ * 同步右侧栏与分隔条显隐：仅草稿写作可用；写作伙伴默认收起，预览时展开小红书栏。
+ */
+function syncRailVisibility() {
+  const rail = $("#rail");
+  const resizer = $("#workspace-resizer");
+  const draftWriting = page === "write" && !!current;
+  if (!rail) return;
+  if (!draftWriting) {
+    rail.classList.add("hidden");
+    resizer?.classList.add("hidden");
+    return;
+  }
+  if (previewMode) {
+    rail.classList.remove("hidden");
+    resizer?.classList.remove("hidden");
+    return;
+  }
+  rail.classList.toggle("hidden", !assistantOpen);
+  resizer?.classList.toggle("hidden", !assistantOpen);
+  const toggle = $("#toggle-assistant");
+  if (toggle) {
+    toggle.classList.toggle("primary", assistantOpen);
+    toggle.setAttribute("aria-pressed", assistantOpen ? "true" : "false");
+  }
+}
+
+/**
+ * 展开写作伙伴（若当前在草稿写作中）。
+ */
+function openAssistant() {
+  if (page !== "write" || !current || previewMode) return;
+  if (assistantOpen && $("#panel")?.dataset.ready) {
+    syncRailVisibility();
+    return;
+  }
+  assistantOpen = true;
+  renderAssistantRail();
+}
+
+/**
+ * 渲染右侧栏：草稿预览→小红书；草稿写作且已展开→写作伙伴；其余隐藏。
+ */
+function renderAssistantRail() {
+  const rail = $("#rail");
+  if (!rail) return;
+  if (composer) {
+    composer.destroy();
+    composer = null;
+  }
+  if (socialPreviewCtl) {
+    socialPreviewCtl.destroy();
+    socialPreviewCtl = null;
+  }
+
+  const draftWriting = page === "write" && !!current;
+  if (!draftWriting) {
+    rail.innerHTML = "";
+    rail.classList.remove("preview-mode");
+    syncRailVisibility();
+    return;
+  }
+
+  const showPreviewRail = previewMode;
+  rail.classList.toggle("preview-mode", !!showPreviewRail);
+
+  if (showPreviewRail) {
+    rail.innerHTML = `<div class="assistant-head"><span>小红书分页</span><div class="assistant-head-actions"><label class="social-size-label">字号 <select id="social-size"><option value="36">标准</option><option value="42">大字</option><option value="30">紧凑</option></select></label></div></div><div class="preview-actions"><button id="social-export" class="primary wide" disabled>导出图片</button><button id="copy-publish" class="wide">复制排版（公众号）</button><button id="push-wechat" class="wide">推送到草稿箱</button><p id="social-status" class="notice">正在排版…</p></div><div id="panel" data-ready="1"><div id="social-pages"></div></div>`;
+    $("#copy-publish").onclick = () => copyPublish(current);
+    $("#push-wechat").onclick = () => pushWechatDraft(current);
+    socialPreviewCtl = bindSocialPreview(rail, {
+      html: socialSourceHTML(),
+      title: current.title,
+      api,
+      web: isWeb(),
+    });
+    syncRailVisibility();
+    return;
+  }
+
+  // 默认收起：未展开时不挂载对话，节省资源
+  if (!assistantOpen) {
+    rail.innerHTML = "";
+    syncRailVisibility();
+    return;
+  }
+
+  rail.innerHTML = `<div class="assistant-head"><span>${I.sparkles()} 写作伙伴</span><div class="assistant-head-actions"><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select><button type="button" id="close-assistant" title="收起">${I.panelClose()} 收起</button></div></div><div class="tabs">${[
+    ["chat", "对话"],
+    ["topics", "思路"],
+    ["titles", "标题"],
+    ["prompts", "配图"],
+    ["checks", "核查"],
+  ]
+    .map(
+      ([id, name]) =>
+        `<button data-tab="${id}" class="${tab === id ? "active" : ""}">${name}</button>`,
+    )
+    .join("")}</div><div id="panel" data-ready="1"></div>`;
+
+  const provider = $("#provider");
+  if (provider) {
+    provider.value = state.provider;
+    provider.onchange = (e) => {
+      state.provider = e.target.value;
+      persist();
+    };
+  }
+  $("#close-assistant").onclick = () => {
+    assistantOpen = false;
+    syncRailVisibility();
+  };
+  $$("#rail [data-tab]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        tab = b.dataset.tab;
+        $$("#rail [data-tab]").forEach((x) =>
+          x.classList.toggle("active", x === b),
+        );
+        renderPanel();
+      }),
+  );
+  renderPanel();
+  syncRailVisibility();
+}
+
+/**
+ * 渲染预览模式：中间公众号排版，右侧栏切换为小红书分页。
  */
 function renderPreview() {
   previewDocId = current.id;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><span class="eyebrow">${account === "AI" ? "AI 实践与思考" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout" class="primary">退出预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize">定稿</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="article-preview">${safeHTML(current.body)}</div></article></section><div class="workspace-resizer" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant"><div class="assistant-head"><span>小红书分页</span><label class="social-size-label">字号 <select id="social-size"><option value="36">标准</option><option value="42">大字</option><option value="30">紧凑</option></select></label></div><div class="preview-actions"><button id="social-export" class="primary wide" disabled>导出图片</button><button id="copy-publish" class="wide">复制排版（公众号）</button><button id="push-wechat" class="wide">推送到草稿箱</button><p id="social-status" class="notice">正在排版…</p></div><div id="panel"><div id="social-pages"></div></div></aside></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout" class="primary">退出预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="article-preview">${safeHTML(current.body)}</div></article></section></div>`;
   bindArticleHeader();
+  bindFinalize();
   enhanceWechatPreview();
-  $("#copy-publish").onclick = () => copyPublish(current);
-  $("#push-wechat").onclick = () => pushWechatDraft(current);
-  socialPreviewCtl = bindSocialPreview($(".assistant"), {
-    html: socialSourceHTML(),
-    title: current.title,
-    api,
-    web: isWeb(),
-  });
-  bindWorkspaceResize();
+  renderAssistantRail();
 }
 
 function renderWrite() {
   if (!current) {
     $("#main").innerHTML =
-      '<div class="empty"><span class="eyebrow">A SPACE FOR YOUR WORDS</span><h1>把想说的话，写下来。</h1><p>从草稿开始，或导入已有文章。AI 在你需要时帮忙。</p><button class="primary" id="start">＋ 新建文章</button></div>';
+      `<div class="empty"><span class="eyebrow">A SPACE FOR YOUR WORDS</span><h1>把想说的话，写下来。</h1><p>从草稿开始，或导入已有文章。AI 在你需要时帮忙。</p><button class="primary" id="start">${I.plus()} 新建文章</button></div>`;
     $("#start").onclick = newDoc;
+    renderAssistantRail();
     return;
   }
   if (previewMode && previewDocId && previewDocId !== current.id)
@@ -1039,18 +1173,7 @@ function renderWrite() {
     return;
   }
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><span class="eyebrow">${account === "AI" ? "AI 实践与思考" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout">预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold"><b>B</b></button><button data-fmt="italic"><i>I</i></button><button data-fmt="heading1">H1</button><button data-fmt="heading">H2</button><button data-fmt="bulletList">☷</button><button data-fmt="blockquote">❝</button><span></span><button id="image">＋ 图片</button><button id="outline">大纲</button><button id="focus">专注</button></div><div id="outline-list" hidden></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">项目参考文件</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">引用选段</button><button data-task="review">看稿</button><button data-task="rewrite">润色选段</button><button data-task="check">核查</button></div></section><div class="workspace-resizer" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant"><div class="assistant-head"><span>✧ 写作伙伴</span><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select></div><div class="tabs">${[
-      ["chat", "对话"],
-      ["topics", "思路"],
-      ["titles", "标题"],
-      ["prompts", "配图"],
-      ["checks", "核查"],
-    ]
-      .map(
-        ([id, name]) =>
-          `<button data-tab="${id}" class="${tab === id ? "active" : ""}">${name}</button>`,
-      )
-      .join("")}</div><div id="panel"></div></aside></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><span id="saved">已保存到本地</span><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><button id="layout">预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><button id="outline" title="大纲">${I.outline()} 大纲</button><button id="focus" title="专注">${I.focus()} 专注</button></div><div id="outline-list" hidden></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">项目参考文件</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button><button data-task="review">${I.eye()} 看稿</button><button data-task="rewrite">${I.wand()} 润色选段</button><button data-task="check">${I.check()} 核查</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [StarterKit, Image, TableKit],
@@ -1136,19 +1259,6 @@ function renderWrite() {
     current.title = e.target.value;
     changed();
   };
-  $("#provider").value = state.provider;
-  $("#provider").onchange = (e) => {
-    state.provider = e.target.value;
-    persist();
-  };
-  $$("[data-tab]").forEach(
-    (b) =>
-      (b.onclick = () => {
-        tab = b.dataset.tab;
-        $$("[data-tab]").forEach((x) => x.classList.toggle("active", x === b));
-        renderPanel();
-      }),
-  );
   $$("[data-fmt]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -1185,9 +1295,12 @@ function renderWrite() {
     }
   };
   $("#focus").onclick = () => {
-    $(".assistant").classList.toggle("hidden");
-    $("#workspace-resizer")?.classList.toggle("hidden");
     $(".sidebar").classList.toggle("hidden");
+  };
+  $("#toggle-assistant").onclick = () => {
+    assistantOpen = !assistantOpen;
+    if (assistantOpen) renderAssistantRail();
+    else syncRailVisibility();
   };
   $("#outline").onclick = () => {
     const n = $("#outline-list");
@@ -1208,29 +1321,34 @@ function renderWrite() {
     );
   };
   bindArticleHeader();
+  bindFinalize();
   $$("[data-task]").forEach((b) => {
     b.onmousedown = (e) => e.preventDefault();
-    b.onclick = () => runTask(b.dataset.task);
+    b.onclick = () => {
+      openAssistant();
+      runTask(b.dataset.task);
+    };
   });
   $("#tag-selection").onmousedown = (e) => e.preventDefault();
-  $("#tag-selection").onclick = tagSelection;
-  bindWorkspaceResize();
-  renderPanel();
+  $("#tag-selection").onclick = () => {
+    openAssistant();
+    tagSelection();
+  };
+  renderAssistantRail();
 }
 
 /**
- * 绑定写作区与助手面板之间的拖拽调宽，并恢复上次宽度。
+ * 绑定主内容区与全局右侧栏之间的拖拽调宽，并恢复上次宽度。
  */
 function bindWorkspaceResize() {
   const resizer = $("#workspace-resizer");
-  const aside = $(".assistant");
-  const workspace = $(".workspace");
-  if (!resizer || !aside || !workspace) return;
+  const aside = $("#rail") || $(".assistant");
+  if (!resizer || !aside) return;
 
   /** 将宽度限制在可用范围内 */
   const clamp = (w) => {
-    const cap = workspace.classList.contains("preview-mode") ? 640 : 560;
-    const max = Math.max(280, workspace.clientWidth - 300);
+    const cap = previewMode && page === "write" ? 640 : 560;
+    const max = Math.max(280, window.innerWidth - 480);
     return Math.min(Math.max(Math.round(w), 280), Math.min(cap, max));
   };
 
@@ -1288,7 +1406,9 @@ function renderPanel() {
             `<div class="message ${m.role}"><div>${m.parts ? m.parts.map((p) => (p.kind === "tag" ? `<span class="inline-reference">${esc(p.label)}</span>` : esc(p.text))).join("") : esc(m.text)}</div></div>`,
         )
         .join("") ||
-      '<div class="welcome"><span>✧</span><h3>先保留你的声音。</h3><p>一起聊想法，或选中一段文字推敲。<br>修改先预览，由你决定是否采用。</p></div>';
+      '<div class="welcome"><span class="welcome-icon">' +
+      I.sparkles({ size: 22 }) +
+      "</span><h3>先保留你的声音。</h3><p>一起聊想法，或选中一段文字推敲。<br>修改先预览，由你决定是否采用。</p></div>";
   } else {
     const labels = {
       topics: ["本篇思路", "围绕表达意图，准备少量可用角度。"],
@@ -1304,9 +1424,9 @@ function renderPanel() {
             `<div class="result-card"><small>${new Date(x.at).toLocaleDateString("zh-CN")}</small><div>${esc(x.text)}</div><button data-copy="${i}">复制</button>${key === "titles" ? `<button data-use="${i}">选择标题</button>` : ""}</div>`,
         )
         .join("") +
-      `<button class="secondary wide" id="generate">✧ 生成${labels[key][0]}</button>`;
+      `<button class="secondary wide" id="generate">${I.sparkles()} 生成${labels[key][0]}</button>`;
   }
-  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" title="为本篇创建新对话">＋ 新对话</button></div>` : ""}<div class="panel-scroll">${
+  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" title="为本篇创建新对话">${I.plus()} 新对话</button></div>` : ""}<div class="panel-scroll">${
     pending &&
     pending.doc === current.id &&
     pending.conversationId === conversation().id
@@ -1322,7 +1442,7 @@ function renderPanel() {
             "",
           )}</div><div class="row"><button id="accept" class="primary">接受修改</button><button id="reject">保留原文</button></div></div>`
       : ""
-  }${content}</div><div class="composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload">＋ 上传文件</button><button id="chat-reference">@ 项目文件</button><button id="rewrite-tags">改写标签选段</button><button id="send" class="primary">${busy ? "停止" : "发送 ↑"}</button></div></div>`;
+  }${content}</div><div class="composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload">${I.upload()} 上传文件</button><button id="chat-reference">${I.at()} 项目文件</button><button id="rewrite-tags">${I.tags()} 改写标签选段</button><button id="send" class="primary">${busy ? "停止" : `${I.send()} 发送`}</button></div></div>`;
   if (tab === "chat") {
     $("#conversation").value = conversation().id;
     $("#conversation").onchange = (e) => {
@@ -1865,7 +1985,7 @@ function renderDashboard() {
     return (b[metricsSort] || 0) - (a[metricsSort] || 0);
   });
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">让每一次表达，都有回响。</h1><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><div class="header-actions"><button type="button" id="refresh-dashboard" class="ghost icon-btn" title="从磁盘同步本地数据" aria-label="刷新">↻</button><button id="import-notes" class="primary">更新数据</button></div></header><section class="dashboard"><div class="stats">${[
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">让每一次表达，都有回响。</h1><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><div class="header-actions"><button type="button" id="refresh-dashboard" class="ghost icon-btn" title="从磁盘同步本地数据" aria-label="刷新">${I.refresh({ size: 18 })}</button><button id="import-notes" class="primary">更新数据</button></div></header><section class="dashboard"><div class="stats">${[
       ["粉丝量", "粉丝量"],
       ["阅读", "总阅读"],
       ["点赞", "总点赞"],
@@ -1914,7 +2034,7 @@ async function openPublishedPreview(rel) {
   const n = document.createElement("aside");
   n.id = "published-drawer";
   n.className = "reference-drawer published-drawer";
-  n.innerHTML = `<div class="published-drawer-head"><span class="published-drawer-label">预览</span><div class="published-drawer-toolbar"><button type="button" id="published-reveal" class="icon-btn" data-tip="在 Finder 中显示" title="在 Finder 中显示" aria-label="在 Finder 中显示">⌁</button><button type="button" id="published-open" class="icon-btn" data-tip="用默认应用打开" title="用默认应用打开" aria-label="用默认应用打开">↗</button><button type="button" id="close-published" class="icon-btn" data-tip="关闭" title="关闭" aria-label="关闭">×</button></div></div><div class="material-preview" id="published-body"><h3 class="published-article-title">${esc(title)}</h3><p class="muted">加载中…</p></div>`;
+  n.innerHTML = `<div class="published-drawer-head"><span class="published-drawer-label">预览</span><div class="published-drawer-toolbar"><button type="button" id="published-reveal" class="icon-btn" data-tip="在 Finder 中显示" title="在 Finder 中显示" aria-label="在 Finder 中显示">${I.folder({ size: 18 })}</button><button type="button" id="published-open" class="icon-btn" data-tip="用默认应用打开" title="用默认应用打开" aria-label="用默认应用打开">${I.external({ size: 18 })}</button><button type="button" id="close-published" class="icon-btn" data-tip="关闭" title="关闭" aria-label="关闭">${I.close({ size: 18 })}</button></div></div><div class="material-preview" id="published-body"><h3 class="published-article-title">${esc(title)}</h3><p class="muted">加载中…</p></div>`;
   document.body.append(n);
   $("#close-published").onclick = () => n.remove();
   try {
@@ -2004,7 +2124,7 @@ function renderTopics() {
 function renderSettings() {
   const wx = state.wechat || {};
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">设置</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><div class="dashboard-card"><h3>Agent 连接</h3><label>默认 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "· 已找到 CLI" : "· 未安装"}</option><option value="codex">Codex ${state.agents.codex ? "· 已找到 CLI" : "· 未安装"}</option></select></label><label>模型（留空沿用 CLI 默认）<input id="model" value="${esc(state.model)}" placeholder="可选模型 ID"></label><p>复用 CLI 登录。若未登录，请先在终端执行 agent login 或 codex login。此版本不保存账号凭据。</p><button class="primary" id="save-settings">保存设置</button></div><div class="dashboard-card"><h3>微信公众号</h3><p>用于一键推送到草稿箱。AppSecret 仅保存在本机 workspace.json。</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx…" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="密钥" autocomplete="off"></label><label>默认作者<input id="wechat-author" value="${esc(wx.author || "金奇")}" placeholder="金奇"></label><label>默认封面路径<input id="wechat-cover" value="${esc(wx.coverPath || "")}" placeholder="可选；也可依赖正文首图" readonly><button type="button" id="wechat-pick-cover">选择封面</button></label><div class="row"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存公众号设置</button></div></div><div class="dashboard-card"><h3>本地数据</h3>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<p>${esc(state.dataPath)}</p><h3>Content_OS 来源</h3><p>${esc(state.source || "尚未选择")}</p><p>开发阶段直接读写独立副本；正文在 02_Drafts，定稿后移动到 03_Archive，图片在 Attachment/文章名，素材在 00_wiki，版本和对话在 _system/inkdesk。上线后再配置正式目录。</p><button type="button" id="refresh-vault">↻ 刷新开发副本</button></div></section>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">设置</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><div class="dashboard-card"><h3>Agent 连接</h3><label>默认 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "· 已找到 CLI" : "· 未安装"}</option><option value="codex">Codex ${state.agents.codex ? "· 已找到 CLI" : "· 未安装"}</option></select></label><label>模型（留空沿用 CLI 默认）<input id="model" value="${esc(state.model)}" placeholder="可选模型 ID"></label><p>复用 CLI 登录。若未登录，请先在终端执行 agent login 或 codex login。此版本不保存账号凭据。</p><button class="primary" id="save-settings">保存设置</button></div><div class="dashboard-card"><h3>微信公众号</h3><p>用于一键推送到草稿箱。AppSecret 仅保存在本机 workspace.json。</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx…" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="密钥" autocomplete="off"></label><label>默认作者<input id="wechat-author" value="${esc(wx.author || "金奇")}" placeholder="金奇"></label><label>默认封面路径<input id="wechat-cover" value="${esc(wx.coverPath || "")}" placeholder="可选；也可依赖正文首图" readonly><button type="button" id="wechat-pick-cover">选择封面</button></label><div class="row"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存公众号设置</button></div></div><div class="dashboard-card"><h3>本地数据</h3>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<p>${esc(state.dataPath)}</p><h3>Content_OS 来源</h3><p>${esc(state.source || "尚未选择")}</p><p>开发阶段直接读写独立副本；正文在 02_Drafts，定稿后移动到 03_Archive，图片在 Attachment/文章名，素材在 00_wiki，版本和对话在 _system/inkdesk。上线后再配置正式目录。</p><button type="button" id="refresh-vault">${I.refresh()} 刷新开发副本</button></div></section>`;
   $("#setting-provider").value = state.provider;
   $("#save-settings").onclick = () => {
     state.provider = $("#setting-provider").value;
@@ -2092,7 +2212,7 @@ async function refreshVault() {
 function showMaterial(rel, body) {
   const m = document.createElement("div");
   m.className = "modal";
-  m.innerHTML = `<div class="dialog"><div class="row"><h2>${esc(rel.split("/").pop())}</h2><button id="close-material">关闭</button></div><div class="material-preview">${safeHTML(body)}</div>${current ? '<p class="notice">选中素材文字后，可将选段插入当前草稿。未选中文字时仅插入素材链接。</p><button id="insert-material" class="primary">插入到草稿末尾</button>' : ""}</div>`;
+  m.innerHTML = `<div class="dialog"><div class="row"><h2>${esc(rel.split("/").pop())}</h2><button id="close-material" class="icon-btn" title="关闭" aria-label="关闭">${I.close()}</button></div><div class="material-preview">${safeHTML(body)}</div>${current ? '<p class="notice">选中素材文字后，可将选段插入当前草稿。未选中文字时仅插入素材链接。</p><button id="insert-material" class="primary">插入到草稿末尾</button>' : ""}</div>`;
   document.body.append(m);
   $("#close-material").onclick = () => m.remove();
   if ($("#insert-material"))
@@ -2237,7 +2357,7 @@ function openPreview({ title, text, path: rel, reference, doc = current }) {
   const n = document.createElement("aside");
   n.id = "reference-drawer";
   n.className = "reference-drawer";
-  n.innerHTML = `<div class="row"><h3>${esc(title)}</h3><button id="close-drawer">关闭</button></div>${rel && /\.(png|jpe?g|gif|webp)$/i.test(rel) ? `<img class="preview-image" src="${esc(assetUrl("inkasset://vault/" + encodeURIComponent(rel)))}">` : ""}<pre id="reference-text">${esc(text)}</pre>${reference ? '<div class="drawer-actions"><button id="cite-file">引用文件</button><button id="cite-file-range" class="primary">引用所选文字</button><small>先选中预览文字，可引用对应行。</small></div>' : ""}`;
+  n.innerHTML = `<div class="row"><h3>${esc(title)}</h3><button id="close-drawer" class="icon-btn" title="关闭" aria-label="关闭">${I.close()}</button></div>${rel && /\.(png|jpe?g|gif|webp)$/i.test(rel) ? `<img class="preview-image" src="${esc(assetUrl("inkasset://vault/" + encodeURIComponent(rel)))}">` : ""}<pre id="reference-text">${esc(text)}</pre>${reference ? '<div class="drawer-actions"><button id="cite-file">引用文件</button><button id="cite-file-range" class="primary">引用所选文字</button><small>先选中预览文字，可引用对应行。</small></div>' : ""}`;
   document.body.append(n);
   $("#close-drawer").onclick = () => n.remove();
   if (reference) {
@@ -2294,7 +2414,7 @@ async function renderMaterials() {
         ? current
         : drafts[0];
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">素材库</h1><span class="eyebrow">WRITING MATERIALS</span></div><div class="header-actions"><select id="material-filter" aria-label="按文章筛选素材"><option value="all">全部素材</option>${drafts.map((d) => `<option value="${d.id}">${esc(d.title)}</option>`).join("")}</select><button id="upload-reference" class="primary" ${uploadTarget ? "" : "disabled"}>＋ 上传文件</button></div></header><section class="dashboard"><div id="project-files" class="material-cards"></div></section>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">素材库</h1><span class="eyebrow">WRITING MATERIALS</span></div><div class="header-actions"><select id="material-filter" aria-label="按文章筛选素材"><option value="all">全部素材</option>${drafts.map((d) => `<option value="${d.id}">${esc(d.title)}</option>`).join("")}</select><button id="upload-reference" class="primary" ${uploadTarget ? "" : "disabled"}>${I.upload()} 上传文件</button></div></header><section class="dashboard"><div id="project-files" class="material-cards"></div></section>`;
   $("#material-filter").value = materialsFilter;
   $("#material-filter").onchange = (e) => {
     materialsFilter = e.target.value;
@@ -2394,7 +2514,7 @@ async function renderMaterials() {
     } finally {
       if (b.isConnected) {
         b.disabled = false;
-        b.textContent = "＋ 上传文件";
+        b.innerHTML = `${I.upload()} 上传文件`;
       }
     }
   };
@@ -2426,7 +2546,7 @@ async function renderProfile() {
                       .join("")}</div></details>`
                   : ""
               }`
-            : `<button id="iterate-model" class="primary">✧ 根据新文章和数据提出调整</button><p>向当前 ${esc(state.provider)} 提供本账号模型、最近 12 篇文章及 YAML；长文每篇前 3000 字。只建议替换现有模块内容。</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} · ${p.status === "pending" ? "待审阅" : p.status === "applied" ? "已采纳" : "已保留原设定"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("、")}</p><button data-model-proposal="${p.id}">查看建议</button></div>`).join("") || "<p>还没有 AI 调整建议。</p>"}</div><h3>历史版本</h3>${model.history.map((h) => `<div class="result-card"><small>${esc(h.at)} · ${esc(h.reason)}</small><details><summary>查看当时的设定</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h.id}">恢复此版本</button></div>`).join("")}`
+            : `<button id="iterate-model" class="primary">${I.sparkles()} 根据新文章和数据提出调整</button><p>向当前 ${esc(state.provider)} 提供本账号模型、最近 12 篇文章及 YAML；长文每篇前 3000 字。只建议替换现有模块内容。</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} · ${p.status === "pending" ? "待审阅" : p.status === "applied" ? "已采纳" : "已保留原设定"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("、")}</p><button data-model-proposal="${p.id}">查看建议</button></div>`).join("") || "<p>还没有 AI 调整建议。</p>"}</div><h3>历史版本</h3>${model.history.map((h) => `<div class="result-card"><small>${esc(h.at)} · ${esc(h.reason)}</small><details><summary>查看当时的设定</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h.id}">恢复此版本</button></div>`).join("")}`
         }</div></section>`;
       const save = async () => {
         if (!definition || $("#model-text").value === model.modules[profileTab])
@@ -2514,7 +2634,7 @@ async function renderProfile() {
             busy = false;
             if (b.isConnected) {
               b.disabled = false;
-              b.textContent = "✧ 根据新文章和数据提出调整";
+              b.innerHTML = `${I.sparkles()} 根据新文章和数据提出调整`;
             }
           }
         };
