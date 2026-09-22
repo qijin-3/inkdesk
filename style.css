@@ -1265,6 +1265,193 @@ button:disabled {
   font-size: 11px;
   color: #444444;
 }
+.article-materials-panel {
+  padding: 12px 14px 20px;
+  overflow: auto;
+}
+.article-materials-panel .material-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.article-materials-panel .material-card {
+  margin: 0;
+}
+.article-materials-panel .material-preview-card {
+  height: 200px;
+  max-height: 200px;
+}
+.article-materials-panel .empty-data {
+  margin: 8px 0;
+  font-size: 12px;
+  color: #999;
+}
+.material-preview-card {
+  padding: 0 !important;
+  overflow: hidden;
+  gap: 0 !important;
+  display: flex;
+  flex-direction: column;
+  height: 200px;
+  max-height: 200px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  background: #f7f7f7;
+}
+.material-preview-card .card-open {
+  display: block;
+  position: relative;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+.mat-preview-frame {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #f7f7f7;
+  margin: 0;
+  padding: 0;
+}
+.mat-preview-body {
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #444;
+  height: 100%;
+  max-height: none;
+  overflow: hidden;
+  text-align: left;
+  word-break: break-word;
+  box-sizing: border-box;
+}
+.mat-preview-body.is-md :is(h1, h2, h3, h4) {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #222;
+}
+.mat-preview-body.is-md p {
+  margin: 0 0 6px;
+  color: #555;
+}
+.mat-preview-body.is-code {
+  margin: 0;
+  padding: 12px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+  background: #f3f3f3;
+  height: 100%;
+  box-sizing: border-box;
+}
+.mat-preview-body.is-html {
+  font-size: 12px;
+}
+.mat-preview-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  display: block;
+  background: #111;
+}
+.mat-preview-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.mat-preview-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #999;
+  background: linear-gradient(180deg, #fafafa, #f0f0f0);
+}
+.mat-preview-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  padding: 18px 12px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+  background: linear-gradient(transparent, #000000a0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.material-preview-card:hover .mat-preview-name,
+.material-preview-card:focus-within .mat-preview-name {
+  opacity: 1;
+}
+.mat-preview-refs {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #000000a8;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.mat-preview-refs em {
+  font-style: normal;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.mat-preview-refs .lucide {
+  flex-shrink: 0;
+}
+.material-preview-card:hover .mat-preview-refs,
+.material-preview-card:focus-within .mat-preview-refs {
+  opacity: 1;
+}
+.material-cards .material-preview-card {
+  height: 200px;
+  max-height: 200px;
+  padding: 0 !important;
+}
+.material-preview.is-md,
+.material-preview.is-html {
+  line-height: 1.7;
+}
+.material-preview.is-code {
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
 .profile-grid {
   display: grid;
   grid-template-columns: 1.1fr 1fr;
@@ -1586,12 +1773,108 @@ pre {
   width: min(460px, 48vw);
   z-index: 90;
   background: #ffffff;
-  box-shadow: -12px 0 35px #00000020;
-  border-left: 1px solid #e0e0e0;
-  padding: 24px;
+  box-shadow: -2px 0 12px #0000000a;
+  border-left: 1px solid #e8e8e8;
+  padding: 18px 20px 0;
   display: flex;
   flex-direction: column;
-  overflow: auto;
+  overflow: hidden;
+}
+.reference-drawer-head {
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  min-height: 36px;
+}
+.reference-drawer-head h3 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reference-drawer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.reference-drawer-toolbar .ghost:not(.icon-btn) {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-color: transparent;
+}
+.reference-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-bottom: 24px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.reference-drawer-body::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent;
+}
+.reference-drawer-body * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.reference-drawer-body *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.reference-drawer-body .material-preview,
+.reference-drawer-body #reference-text,
+.reference-drawer-body pre {
+  margin: 0;
+  max-height: none !important;
+  overflow: visible !important;
+  max-width: 100%;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  user-select: text;
+  padding: 0 0 8px;
+}
+.reference-drawer-body .material-preview.is-md,
+.reference-drawer-body .material-preview.is-html {
+  white-space: normal;
+}
+.reference-drawer-body .material-preview.is-md :is(img, pre, code),
+.reference-drawer-body .material-preview.is-html :is(img, pre, code) {
+  max-width: 100%;
+}
+.reference-drawer-body table {
+  width: 100% !important;
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  display: table;
+}
+.reference-drawer-body th,
+.reference-drawer-body td {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.reference-drawer-body .preview-image {
+  max-width: 100%;
+  max-height: none;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 .reference-drawer pre {
   flex: 1;

@@ -23458,6 +23458,13 @@ var Library = [
   ["path", { d: "M4 4v16" }]
 ];
 
+// node_modules/lucide/dist/esm/icons/link-2.mjs
+var Link2 = [
+  ["path", { d: "M9 17H7A5 5 0 0 1 7 7h2" }],
+  ["path", { d: "M15 7h2a5 5 0 1 1 0 10h-2" }],
+  ["line", { x1: "8", x2: "16", y1: "12", y2: "12" }]
+];
+
 // node_modules/lucide/dist/esm/icons/list-tree.mjs
 var ListTree = [
   ["path", { d: "M8 5h13" }],
@@ -23666,7 +23673,8 @@ var I = {
   eye: (o) => icon(Eye, o),
   wand: (o) => icon(WandSparkles, o),
   check: (o) => icon(SearchCheck, o),
-  file: (o) => icon(FileText, o)
+  file: (o) => icon(FileText, o),
+  link: (o) => icon(Link2, o)
 };
 
 // node_modules/@tiptap/extension-image/dist/index.js
@@ -29651,7 +29659,9 @@ var previewMode = false;
 var previewDocId = null;
 var socialPreviewCtl = null;
 var assistantOpen = false;
+var railMode = "assistant";
 var outlinePinned = false;
+var saveConflict = false;
 function conversation(doc3 = current) {
   doc3.conversations ||= [];
   if (!doc3.conversations.length)
@@ -29699,6 +29709,96 @@ function safeHTML(md) {
     (_, kind, rel) => "inkasset://" + kind + "/" + rel
   );
 }
+function sanitizeHtmlPreview(html2) {
+  const d = new DOMParser().parseFromString(html2 || "", "text/html");
+  d.querySelectorAll(
+    "script,iframe,object,embed,link,form,input,button,meta"
+  ).forEach((n) => n.remove());
+  d.body.querySelectorAll("*").forEach((n) => {
+    [...n.attributes].forEach((a) => {
+      if (a.name.startsWith("on") || ["href", "src"].includes(a.name) && !/^(https?:|data:image\/|#|[^:]*$)/i.test(a.value))
+        n.removeAttribute(a.name);
+    });
+  });
+  return d.body.innerHTML;
+}
+function formatJsonPreview(text) {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text || "";
+  }
+}
+function inferMaterialKind(name) {
+  const ext = String(name || "").split(".").pop().toLowerCase();
+  if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) return "image";
+  if (["md", "markdown"].includes(ext)) return "markdown";
+  if (["html", "htm"].includes(ext)) return "html";
+  if (ext === "json") return "json";
+  if (["txt", "csv", "yaml", "yml", "log", "tsv", "xml"].includes(ext))
+    return "text";
+  return "binary";
+}
+async function hydrateMaterialPreview(r) {
+  const kind = r.kind || inferMaterialKind(r.name);
+  const asset = r.asset || (kind === "image" && r.path ? "inkasset://vault/" + encodeURIComponent(r.path) : "");
+  if (kind === "image") return { ...r, kind, asset };
+  if (r.preview) return { ...r, kind, asset };
+  try {
+    const full = await api("materials-read", r.id);
+    return {
+      ...r,
+      ...full,
+      kind: full.kind || kind,
+      asset: full.asset || asset,
+      preview: String(full.text || "").slice(0, 600)
+    };
+  } catch {
+    return { ...r, kind, asset };
+  }
+}
+function materialPreviewCardHTML(r, opts = {}) {
+  const kind = r.kind || inferMaterialKind(r.name) || "binary";
+  let body = "";
+  if (kind === "image") {
+    const src = assetUrl(
+      r.asset || (r.path ? "inkasset://vault/" + encodeURIComponent(r.path) : "")
+    );
+    body = src ? `<div class="mat-preview-media"><img src="${esc(src)}" alt="" loading="lazy"></div>` : `<div class="mat-preview-placeholder">\u56FE\u7247</div>`;
+  } else if (kind === "markdown") {
+    body = `<div class="mat-preview-body is-md">${safeHTML(r.preview || "")}</div>`;
+  } else if (kind === "html") {
+    body = `<div class="mat-preview-body is-html">${sanitizeHtmlPreview(r.preview || "")}</div>`;
+  } else if (kind === "json") {
+    body = `<pre class="mat-preview-body is-code">${esc(formatJsonPreview(r.preview || ""))}</pre>`;
+  } else if (kind === "text") {
+    body = `<pre class="mat-preview-body is-code">${esc(r.preview || "")}</pre>`;
+  } else {
+    body = `<div class="mat-preview-placeholder">${esc((r.name.split(".").pop() || "FILE").toUpperCase())}</div>`;
+  }
+  const refCount = Number(r.refCount) || 0;
+  const refBadge = opts.showRefCount ? `<span class="mat-preview-refs" title="\u88AB ${refCount} \u7BC7\u6587\u7AE0\u5F15\u7528">${I.link({ size: 12 })}<em>${refCount}</em></span>` : "";
+  return `<article class="material-card material-preview-card" data-material="${r.id}" title="${esc(r.name)}"><button type="button" class="card-open" data-ref-preview="${r.id}" aria-label="${esc(r.name)}"><div class="mat-preview-frame">${body}</div><span class="mat-preview-name">${esc(r.name)}</span>${refBadge}</button></article>`;
+}
+function materialDrawerBodyHTML(r) {
+  const kind = r.kind || inferMaterialKind(r.name) || "binary";
+  const text = r.text || r.error || "";
+  if (kind === "image") {
+    const src = assetUrl(
+      r.asset || (r.path ? "inkasset://vault/" + encodeURIComponent(r.path) : "")
+    );
+    return src ? `<img class="preview-image" src="${esc(src)}" alt="${esc(r.name)}">` : `<p class="muted">\u65E0\u6CD5\u9884\u89C8\u56FE\u7247</p>`;
+  }
+  if (kind === "markdown")
+    return `<div id="reference-text" class="material-preview is-md">${safeHTML(text)}</div>`;
+  if (kind === "html")
+    return `<div id="reference-text" class="material-preview is-html">${sanitizeHtmlPreview(text)}</div>`;
+  if (kind === "json")
+    return `<pre id="reference-text" class="material-preview is-code">${esc(formatJsonPreview(text))}</pre>`;
+  if (kind === "text")
+    return `<pre id="reference-text" class="material-preview is-code">${esc(text)}</pre>`;
+  return `<p class="muted">\u5DF2\u4FDD\u7559\u539F\u6587\u4EF6\uFF0C\u5F53\u524D\u683C\u5F0F\u6682\u4E0D\u652F\u6301\u5185\u5D4C\u9884\u89C8\u3002</p><pre id="reference-text" class="material-preview is-code">${esc(text)}</pre>`;
+}
 function toast(t) {
   $("#toast").textContent = t;
   $("#toast").classList.add("show");
@@ -29706,6 +29806,7 @@ function toast(t) {
 }
 async function persist() {
   clearTimeout(saveTimer);
+  if (saveConflict) return false;
   try {
     const before = JSON.stringify(state);
     await api("save", state);
@@ -29714,9 +29815,44 @@ async function persist() {
     if (n) n.textContent = "\u5DF2\u4FDD\u5B58\u5230\u5F00\u53D1\u526F\u672C";
     return true;
   } catch (e) {
-    toast("\u4FDD\u5B58\u5931\u8D25\uFF1A" + e.message);
+    const msg = e.message || String(e);
+    if (/外部修改|外部移动|草稿已在外部/.test(msg)) {
+      showSaveConflictDialog(msg);
+      return false;
+    }
+    toast("\u4FDD\u5B58\u5931\u8D25\uFF1A" + msg);
     return false;
   }
+}
+function showSaveConflictDialog(msg) {
+  if (saveConflict) return;
+  saveConflict = true;
+  const n = $("#saved");
+  if (n) n.textContent = "\u4FDD\u5B58\u5DF2\u6682\u505C";
+  toast("\u4FDD\u5B58\u5931\u8D25\uFF1A" + msg);
+  if ($("#save-conflict-modal")) return;
+  const m = document.createElement("div");
+  m.id = "save-conflict-modal";
+  m.className = "modal";
+  m.innerHTML = '<div class="dialog"><h2>\u6587\u7AE0\u5DF2\u5728\u5916\u90E8\u4FEE\u6539</h2><p>\u78C1\u76D8\u4E0A\u7684\u8349\u7A3F\u4E0E\u5F53\u524D\u7F16\u8F91\u5668\u4E0D\u4E00\u81F4\u3002\u7EE7\u7EED\u81EA\u52A8\u4FDD\u5B58\u4F1A\u8986\u76D6\u5916\u90E8\u6539\u52A8\uFF0C\u56E0\u6B64\u5DF2\u6682\u505C\u4FDD\u5B58\u3002</p><p class="muted">\u5E38\u89C1\u539F\u56E0\uFF1A\u5728 Obsidian / \u5176\u4ED6\u7F16\u8F91\u5668\u4E2D\u6539\u8FC7\u540C\u4E00\u7BC7\uFF0C\u6216\u53E6\u4E00\u7A97\u53E3\u4E5F\u6253\u5F00\u4E86 inkdesk\u3002</p><div class="row"><button type="button" id="conflict-keep">\u5148\u7559\u5728\u7F16\u8F91\u5668</button><button type="button" id="conflict-reload" class="primary">\u5907\u4EFD\u672A\u4FDD\u5B58\u5185\u5BB9\u5E76\u5237\u65B0</button></div></div>';
+  document.body.append(m);
+  $("#conflict-keep").onclick = () => m.remove();
+  $("#conflict-reload").onclick = async () => {
+    try {
+      const id = current?.id;
+      const result = await api("recover-refresh", state);
+      Object.assign(state, result);
+      current = state.documents.find((d) => d.id === id) || state.documents.find((d) => d.account === account);
+      dirty = false;
+      saveConflict = false;
+      pending = null;
+      m.remove();
+      render2();
+      toast("\u5DF2\u4ECE\u78C1\u76D8\u91CD\u65B0\u52A0\u8F7D");
+    } catch (err) {
+      toast(err.message);
+    }
+  };
 }
 function changed() {
   const card = document.querySelector('[data-id="' + current.id + '"]');
@@ -30409,17 +30545,34 @@ function syncRailVisibility() {
   resizer?.classList.toggle("hidden", !assistantOpen);
   const toggle = $("#toggle-assistant");
   if (toggle) {
-    toggle.classList.toggle("primary", assistantOpen);
-    toggle.setAttribute("aria-pressed", assistantOpen ? "true" : "false");
+    toggle.classList.toggle("primary", assistantOpen && railMode === "assistant");
+    toggle.setAttribute(
+      "aria-pressed",
+      assistantOpen && railMode === "assistant" ? "true" : "false"
+    );
   }
+  $("#article-materials")?.classList.toggle(
+    "primary",
+    assistantOpen && railMode === "materials"
+  );
   requestAnimationFrame(() => $("#article-outline")?._place?.());
 }
 function openAssistant() {
   if (page !== "write" || !current || previewMode) return;
-  if (assistantOpen && $("#panel")?.dataset.ready) {
+  const already = assistantOpen && railMode === "assistant" && $("#panel")?.dataset.ready && $("#rail")?.dataset.railMode === "assistant";
+  railMode = "assistant";
+  if (already) {
     syncRailVisibility();
     return;
   }
+  assistantOpen = true;
+  renderAssistantRail();
+}
+function openArticleMaterials() {
+  if (page !== "write" || !current || previewMode) return;
+  sync();
+  persist();
+  railMode = "materials";
   assistantOpen = true;
   renderAssistantRail();
 }
@@ -30458,9 +30611,22 @@ function renderAssistantRail() {
   }
   if (!assistantOpen) {
     rail.innerHTML = "";
+    delete rail.dataset.railMode;
     syncRailVisibility();
     return;
   }
+  if (railMode === "materials") {
+    rail.dataset.railMode = "materials";
+    rail.innerHTML = `<div class="assistant-head"><span>${I.library()} \u672C\u6587\u7D20\u6750</span><div class="assistant-head-actions"><button type="button" id="upload-article-material">${I.upload()} \u4E0A\u4F20</button><button type="button" id="close-assistant" title="\u6536\u8D77">${I.panelClose()} \u6536\u8D77</button></div></div><div id="panel" data-ready="1" class="article-materials-panel"><div id="article-material-list" class="material-cards"></div></div>`;
+    $("#close-assistant").onclick = () => {
+      assistantOpen = false;
+      syncRailVisibility();
+    };
+    bindArticleMaterialsPanel();
+    syncRailVisibility();
+    return;
+  }
+  rail.dataset.railMode = "assistant";
   rail.innerHTML = `<div class="assistant-head"><span>${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</span><div class="assistant-head-actions"><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select><button type="button" id="close-assistant" title="\u6536\u8D77">${I.panelClose()} \u6536\u8D77</button></div></div><div class="tabs">${[
     ["chat", "\u5BF9\u8BDD"],
     ["topics", "\u601D\u8DEF"],
@@ -30494,6 +30660,81 @@ function renderAssistantRail() {
   renderPanel();
   syncRailVisibility();
 }
+function bindArticleMaterialsPanel() {
+  const listEl = $("#article-material-list");
+  const uploadBtn = $("#upload-article-material");
+  const doc3 = current;
+  if (!listEl || !doc3) return;
+  const draw = async () => {
+    if (page !== "write" || !current || current.id !== doc3.id || railMode !== "materials")
+      return;
+    try {
+      const raw = await api("project-refs", doc3.id);
+      const refs = await Promise.all(raw.map(hydrateMaterialPreview));
+      if (!listEl.isConnected) return;
+      listEl.innerHTML = refs.map((r) => materialPreviewCardHTML(r)).join("") || '<p class="empty-data">\u8FD8\u6CA1\u6709\u7D20\u6750\u3002\u4E0A\u4F20\u540E\u53EF\u5728\u5BF9\u8BDD\u4E2D\u5F15\u7528\u3002</p>';
+      $$("#article-material-list [data-ref-preview]").forEach(
+        (b) => b.onclick = async () => {
+          try {
+            const r = await api("materials-read", b.dataset.refPreview);
+            openPreview({
+              title: r.name,
+              text: r.text || r.error,
+              path: r.path,
+              reference: r.status === "ready" ? r : null,
+              material: r,
+              doc: doc3
+            });
+          } catch (e) {
+            toast(e.message);
+          }
+        }
+      );
+      $$("#article-material-list [data-material]").forEach((card) => {
+        card.oncontextmenu = (e) => {
+          e.preventDefault();
+          const id = card.dataset.material;
+          showContextMenu(e.clientX, e.clientY, [
+            {
+              label: "\u5220\u9664\u7D20\u6750",
+              danger: true,
+              run: async () => {
+                if (!confirm("\u786E\u5B9A\u5220\u9664\u6B64\u7D20\u6750\uFF1F\u5C06\u4ECE\u6240\u6709\u6587\u7AE0\u89E3\u9664\u5F15\u7528\u3002")) return;
+                try {
+                  await api("materials-delete", id);
+                  toast("\u7D20\u6750\u5DF2\u5220\u9664");
+                  draw();
+                } catch (err) {
+                  toast(err.message);
+                }
+              }
+            }
+          ]);
+        };
+      });
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+  uploadBtn.onclick = async () => {
+    uploadBtn.disabled = true;
+    const label = uploadBtn.innerHTML;
+    uploadBtn.textContent = "\u4E0A\u4F20\u4E2D\u2026";
+    try {
+      if (!await persist()) return;
+      await uploadProjectFiles(doc3.id);
+      await draw();
+    } catch (e) {
+      toast(e.message);
+    } finally {
+      if (uploadBtn.isConnected) {
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = label;
+      }
+    }
+  };
+  draw();
+}
 function renderPreview() {
   previewDocId = current.id;
   $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="article-preview">${safeHTML(current.body)}</div></article></section></div>`;
@@ -30516,7 +30757,7 @@ function renderWrite() {
     renderPreview();
     return;
   }
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button type="button" id="toggle-assistant">${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</button><button id="layout">\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">\u9879\u76EE\u53C2\u8003\u6587\u4EF6</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button><button data-task="review">${I.eye()} \u770B\u7A3F</button><button data-task="rewrite">${I.wand()} \u6DA6\u8272\u9009\u6BB5</button><button data-task="check">${I.check()} \u6838\u67E5</button></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button type="button" id="toggle-assistant">${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</button><button id="layout">\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button><button data-task="review">${I.eye()} \u770B\u7A3F</button><button data-task="rewrite">${I.wand()} \u6DA6\u8272\u9009\u6BB5</button><button data-task="check">${I.check()} \u6838\u67E5</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [src_default, src_default2, TableKit],
@@ -30576,24 +30817,13 @@ function renderWrite() {
   selectedText = "";
   selectionContext = null;
   $("#article-materials").onclick = () => {
-    sync();
-    persist();
-    materialsFilter = current.id;
-    page = "materials";
-    render2();
-  };
-  $$("[data-related]").forEach(
-    (b) => b.onclick = async () => {
-      try {
-        showMaterial(
-          b.dataset.related,
-          await api("material-read", b.dataset.related)
-        );
-      } catch (e) {
-        toast(e.message);
-      }
+    if (assistantOpen && railMode === "materials") {
+      assistantOpen = false;
+      syncRailVisibility();
+      return;
     }
-  );
+    openArticleMaterials();
+  };
   $("#title").oninput = (e) => {
     current.title = e.target.value;
     changed();
@@ -30635,9 +30865,14 @@ function renderWrite() {
     $(".sidebar").classList.toggle("hidden");
   };
   $("#toggle-assistant").onclick = () => {
-    assistantOpen = !assistantOpen;
-    if (assistantOpen) renderAssistantRail();
-    else syncRailVisibility();
+    if (assistantOpen && railMode === "assistant") {
+      assistantOpen = false;
+      syncRailVisibility();
+      return;
+    }
+    railMode = "assistant";
+    assistantOpen = true;
+    renderAssistantRail();
   };
   bindArticleHeader();
   bindFinalize();
@@ -31443,26 +31678,6 @@ async function refreshVault() {
     toast(e.message);
   }
 }
-function showMaterial(rel, body) {
-  const m = document.createElement("div");
-  m.className = "modal";
-  m.innerHTML = `<div class="dialog"><div class="row"><h2>${esc(rel.split("/").pop())}</h2><button id="close-material" class="icon-btn" title="\u5173\u95ED" aria-label="\u5173\u95ED">${I.close()}</button></div><div class="material-preview">${safeHTML(body)}</div>${current ? '<p class="notice">\u9009\u4E2D\u7D20\u6750\u6587\u5B57\u540E\uFF0C\u53EF\u5C06\u9009\u6BB5\u63D2\u5165\u5F53\u524D\u8349\u7A3F\u3002\u672A\u9009\u4E2D\u6587\u5B57\u65F6\u4EC5\u63D2\u5165\u7D20\u6750\u94FE\u63A5\u3002</p><button id="insert-material" class="primary">\u63D2\u5165\u5230\u8349\u7A3F\u672B\u5C3E</button>' : ""}</div>`;
-  document.body.append(m);
-  $("#close-material").onclick = () => m.remove();
-  if ($("#insert-material"))
-    $("#insert-material").onclick = async () => {
-      const selection = window.getSelection();
-      const selected = selection && $(".material-preview").contains(selection.anchorNode) ? selection.toString() : "";
-      current.body += "\n\n" + (selected ? "> " + selected.split("\n").join("\n> ") + "\n\n" : "") + "[[" + rel.replace(/\.md$/, "") + "]]";
-      current.materials ||= [];
-      if (!current.materials.includes(rel)) current.materials.push(rel);
-      dirty = true;
-      await persist();
-      m.remove();
-      page = "write";
-      render2();
-    };
-}
 function putTag(reference, doc3 = current, session = conversation(doc3)) {
   if (current?.id !== doc3.id || conversation(doc3).id !== session.id) {
     session.composerRefs ||= {};
@@ -31561,44 +31776,34 @@ async function chooseChatFile() {
     toast(e.message);
   }
 }
-function openPreview({ title, text, path: rel, reference, doc: doc3 = current }) {
+function openPreview({
+  title,
+  text,
+  path: rel,
+  reference,
+  material,
+  doc: doc3 = current
+}) {
   $("#reference-drawer")?.remove();
   $("#published-drawer")?.remove();
+  const r = material || reference || {
+    name: title,
+    text,
+    path: rel,
+    kind: rel && /\.(png|jpe?g|gif|webp)$/i.test(rel) ? "image" : "text"
+  };
   const n = document.createElement("aside");
   n.id = "reference-drawer";
   n.className = "reference-drawer";
-  n.innerHTML = `<div class="row"><h3>${esc(title)}</h3><button id="close-drawer" class="icon-btn" title="\u5173\u95ED" aria-label="\u5173\u95ED">${I.close()}</button></div>${rel && /\.(png|jpe?g|gif|webp)$/i.test(rel) ? `<img class="preview-image" src="${esc(assetUrl("inkasset://vault/" + encodeURIComponent(rel)))}">` : ""}<pre id="reference-text">${esc(text)}</pre>${reference ? '<div class="drawer-actions"><button id="cite-file">\u5F15\u7528\u6587\u4EF6</button><button id="cite-file-range" class="primary">\u5F15\u7528\u6240\u9009\u6587\u5B57</button><small>\u5148\u9009\u4E2D\u9884\u89C8\u6587\u5B57\uFF0C\u53EF\u5F15\u7528\u5BF9\u5E94\u884C\u3002</small></div>' : ""}`;
+  const kind = r.kind || inferMaterialKind(r.name);
+  const headActions = reference ? `<button type="button" id="cite-file" class="ghost">\u5F15\u7528\u6587\u4EF6</button>` : "";
+  n.innerHTML = `<div class="row reference-drawer-head"><h3>${esc(title)}</h3><div class="reference-drawer-toolbar">${headActions}<button type="button" id="close-drawer" class="ghost icon-btn" title="\u5173\u95ED" aria-label="\u5173\u95ED">${I.close({ size: 18 })}</button></div></div><div class="reference-drawer-body">${materialDrawerBodyHTML({ ...r, kind, text: text || r.text, path: rel || r.path })}</div>`;
   document.body.append(n);
   $("#close-drawer").onclick = () => n.remove();
   if (reference) {
     $("#cite-file").onclick = () => {
       putTag(
         { kind: "file", fileId: reference.id, label: reference.name },
-        doc3
-      );
-      n.remove();
-    };
-    $("#cite-file-range").onmousedown = (e) => e.preventDefault();
-    $("#cite-file-range").onclick = () => {
-      const selection = window.getSelection(), pre = $("#reference-text");
-      if (!selection?.rangeCount || selection.isCollapsed)
-        return toast("\u5148\u5728\u9884\u89C8\u4E2D\u9009\u62E9\u6587\u5B57");
-      const range = selection.getRangeAt(0);
-      if (!pre.contains(range.startContainer) || !pre.contains(range.endContainer))
-        return toast("\u8BF7\u9009\u62E9\u8FD9\u4EFD\u7D20\u6750\u4E2D\u7684\u6587\u5B57");
-      const before = range.cloneRange();
-      before.selectNodeContents(pre);
-      before.setEnd(range.startContainer, range.startOffset);
-      const start = before.toString().split("\n").length;
-      const end = start + range.toString().replace(/\n$/, "").split("\n").length - 1;
-      putTag(
-        {
-          kind: "file",
-          fileId: reference.id,
-          startLine: start,
-          endLine: end,
-          label: reference.name + " L" + start + "\u2013" + end
-        },
         doc3
       );
       n.remove();
@@ -31620,15 +31825,14 @@ async function renderMaterials() {
       current = state.documents.find((d) => d.id === materialsFilter) || current;
     renderMaterials();
   };
-  const draw = (list2) => {
+  const draw = async (list2) => {
     if (page !== "materials") return;
-    const rows = materialsFilter === "all" ? list2 : list2.filter(
+    const filtered = materialsFilter === "all" ? list2 : list2.filter(
       (m) => (m.usedBy || []).some((u) => u.id === materialsFilter)
     );
-    $("#project-files").innerHTML = rows.map(
-      (r) => `<article class="material-card" data-material="${r.id}"><button type="button" class="card-open" data-ref-preview="${r.id}"><span class="file-icon">${esc((r.name.split(".").pop() || "").toUpperCase())}</span><strong>${esc(r.name)}</strong><small class="ref-count">\u88AB ${r.refCount || 0} \u7BC7\u6587\u7AE0\u5F15\u7528</small></button></article>`
-    ).join("") || '<p class="empty-data">\u8FD8\u6CA1\u6709\u7D20\u6750\u3002\u4E0A\u4F20\u540E\u53EF\u5728\u591A\u7BC7\u6587\u7AE0\u95F4\u5171\u7528\u3002</p>';
-    $$("[data-ref-preview]").forEach(
+    const rows = await Promise.all(filtered.map(hydrateMaterialPreview));
+    $("#project-files").innerHTML = rows.map((r) => materialPreviewCardHTML(r, { showRefCount: true })).join("") || '<p class="empty-data">\u8FD8\u6CA1\u6709\u7D20\u6750\u3002\u4E0A\u4F20\u540E\u53EF\u5728\u591A\u7BC7\u6587\u7AE0\u95F4\u5171\u7528\u3002</p>';
+    $$("#project-files [data-ref-preview]").forEach(
       (b) => b.onclick = async () => {
         try {
           const r = await api("materials-read", b.dataset.refPreview);
@@ -31637,6 +31841,7 @@ async function renderMaterials() {
             text: r.text || r.error,
             path: r.path,
             reference: r.status === "ready" ? r : null,
+            material: r,
             doc: uploadTarget || current
           });
         } catch (e) {
@@ -31688,7 +31893,7 @@ async function renderMaterials() {
     if (!uploadTarget) return toast("\u8BF7\u5148\u521B\u5EFA\u4E00\u7BC7\u8349\u7A3F\u518D\u4E0A\u4F20");
     const b = $("#upload-reference");
     b.disabled = true;
-    b.textContent = "\u6B63\u5728\u63D0\u53D6\u6587\u5B57\u2026";
+    b.textContent = "\u4E0A\u4F20\u4E2D\u2026";
     try {
       if (!await persist()) return;
       const list2 = await uploadProjectFiles(uploadTarget.id);
@@ -31897,6 +32102,7 @@ lucide/dist/esm/icons/image-plus.mjs:
 lucide/dist/esm/icons/italic.mjs:
 lucide/dist/esm/icons/layout-dashboard.mjs:
 lucide/dist/esm/icons/library.mjs:
+lucide/dist/esm/icons/link-2.mjs:
 lucide/dist/esm/icons/list-tree.mjs:
 lucide/dist/esm/icons/list.mjs:
 lucide/dist/esm/icons/panel-right-close.mjs:

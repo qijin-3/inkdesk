@@ -101,8 +101,12 @@ let previewDocId = null;
 let socialPreviewCtl = null;
 /** 写作伙伴侧栏是否展开；仅草稿写作可用，默认收起 */
 let assistantOpen = false;
+/** 右侧栏模式：写作伙伴 / 本文素材 */
+let railMode = "assistant";
 /** 文章大纲是否固定展开 */
 let outlinePinned = false;
+/** 磁盘冲突中：抑制重复 toast，直到用户刷新或放弃 */
+let saveConflict = false;
 function conversation(doc = current) {
   doc.conversations ||= [];
   if (!doc.conversations.length)
@@ -163,6 +167,157 @@ function safeHTML(md) {
     (_, kind, rel) => "inkasset://" + kind + "/" + rel,
   );
 }
+
+/**
+ * 清洗 HTML 片段用于素材预览（去掉脚本与危险属性）。
+ * @param {string} html
+ */
+function sanitizeHtmlPreview(html) {
+  const d = new DOMParser().parseFromString(html || "", "text/html");
+  d.querySelectorAll(
+    "script,iframe,object,embed,link,form,input,button,meta",
+  ).forEach((n) => n.remove());
+  d.body.querySelectorAll("*").forEach((n) => {
+    [...n.attributes].forEach((a) => {
+      if (
+        a.name.startsWith("on") ||
+        (["href", "src"].includes(a.name) &&
+          !/^(https?:|data:image\/|#|[^:]*$)/i.test(a.value))
+      )
+        n.removeAttribute(a.name);
+    });
+  });
+  return d.body.innerHTML;
+}
+
+/**
+ * 格式化 JSON 预览文本。
+ * @param {string} text
+ */
+function formatJsonPreview(text) {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text || "";
+  }
+}
+
+/**
+ * 根据文件名推断素材类型（后端未返回 kind 时的回退）。
+ * @param {string} name
+ */
+function inferMaterialKind(name) {
+  const ext = String(name || "")
+    .split(".")
+    .pop()
+    .toLowerCase();
+  if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) return "image";
+  if (["md", "markdown"].includes(ext)) return "markdown";
+  if (["html", "htm"].includes(ext)) return "html";
+  if (ext === "json") return "json";
+  if (["txt", "csv", "yaml", "yml", "log", "tsv", "xml"].includes(ext))
+    return "text";
+  return "binary";
+}
+
+/**
+ * 格式化字节大小。
+ * @param {number} n
+ */
+function formatBytes(n) {
+  const v = Number(n) || 0;
+  if (v < 1024) return v + " B";
+  if (v < 1024 * 1024) return (v / 1024).toFixed(1) + " KB";
+  return (v / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+/**
+ * 补全预览字段：类型、图片地址、文本摘要。
+ * @param {object} r
+ */
+async function hydrateMaterialPreview(r) {
+  const kind = r.kind || inferMaterialKind(r.name);
+  const asset =
+    r.asset ||
+    (kind === "image" && r.path
+      ? "inkasset://vault/" + encodeURIComponent(r.path)
+      : "");
+  if (kind === "image") return { ...r, kind, asset };
+  if (r.preview) return { ...r, kind, asset };
+  try {
+    const full = await api("materials-read", r.id);
+    return {
+      ...r,
+      ...full,
+      kind: full.kind || kind,
+      asset: full.asset || asset,
+      preview: String(full.text || "").slice(0, 600),
+    };
+  } catch {
+    return { ...r, kind, asset };
+  }
+}
+
+/**
+ * 生成素材预览卡片 HTML（展示内容缩略而非纯文件名）。
+ * @param {object} r
+ * @param {{ showRefCount?: boolean }} [opts]
+ */
+function materialPreviewCardHTML(r, opts = {}) {
+  const kind = r.kind || inferMaterialKind(r.name) || "binary";
+  let body = "";
+  if (kind === "image") {
+    const src = assetUrl(
+      r.asset ||
+        (r.path ? "inkasset://vault/" + encodeURIComponent(r.path) : ""),
+    );
+    body = src
+      ? `<div class="mat-preview-media"><img src="${esc(src)}" alt="" loading="lazy"></div>`
+      : `<div class="mat-preview-placeholder">图片</div>`;
+  } else if (kind === "markdown") {
+    body = `<div class="mat-preview-body is-md">${safeHTML(r.preview || "")}</div>`;
+  } else if (kind === "html") {
+    body = `<div class="mat-preview-body is-html">${sanitizeHtmlPreview(r.preview || "")}</div>`;
+  } else if (kind === "json") {
+    body = `<pre class="mat-preview-body is-code">${esc(formatJsonPreview(r.preview || ""))}</pre>`;
+  } else if (kind === "text") {
+    body = `<pre class="mat-preview-body is-code">${esc(r.preview || "")}</pre>`;
+  } else {
+    body = `<div class="mat-preview-placeholder">${esc((r.name.split(".").pop() || "FILE").toUpperCase())}</div>`;
+  }
+  const refCount = Number(r.refCount) || 0;
+  const refBadge = opts.showRefCount
+    ? `<span class="mat-preview-refs" title="被 ${refCount} 篇文章引用">${I.link({ size: 12 })}<em>${refCount}</em></span>`
+    : "";
+  return `<article class="material-card material-preview-card" data-material="${r.id}" title="${esc(r.name)}"><button type="button" class="card-open" data-ref-preview="${r.id}" aria-label="${esc(r.name)}"><div class="mat-preview-frame">${body}</div><span class="mat-preview-name">${esc(r.name)}</span>${refBadge}</button></article>`;
+}
+
+/**
+ * 渲染素材抽屉正文（按类型预览原格式）。
+ * @param {object} r
+ */
+function materialDrawerBodyHTML(r) {
+  const kind = r.kind || inferMaterialKind(r.name) || "binary";
+  const text = r.text || r.error || "";
+  if (kind === "image") {
+    const src = assetUrl(
+      r.asset ||
+        (r.path ? "inkasset://vault/" + encodeURIComponent(r.path) : ""),
+    );
+    return src
+      ? `<img class="preview-image" src="${esc(src)}" alt="${esc(r.name)}">`
+      : `<p class="muted">无法预览图片</p>`;
+  }
+  if (kind === "markdown")
+    return `<div id="reference-text" class="material-preview is-md">${safeHTML(text)}</div>`;
+  if (kind === "html")
+    return `<div id="reference-text" class="material-preview is-html">${sanitizeHtmlPreview(text)}</div>`;
+  if (kind === "json")
+    return `<pre id="reference-text" class="material-preview is-code">${esc(formatJsonPreview(text))}</pre>`;
+  if (kind === "text")
+    return `<pre id="reference-text" class="material-preview is-code">${esc(text)}</pre>`;
+  return `<p class="muted">已保留原文件，当前格式暂不支持内嵌预览。</p><pre id="reference-text" class="material-preview is-code">${esc(text)}</pre>`;
+}
 function toast(t) {
   $("#toast").textContent = t;
   $("#toast").classList.add("show");
@@ -170,6 +325,7 @@ function toast(t) {
 }
 async function persist() {
   clearTimeout(saveTimer);
+  if (saveConflict) return false;
   try {
     const before = JSON.stringify(state);
     await api("save", state);
@@ -178,9 +334,52 @@ async function persist() {
     if (n) n.textContent = "已保存到开发副本";
     return true;
   } catch (e) {
-    toast("保存失败：" + e.message);
+    const msg = e.message || String(e);
+    if (/外部修改|外部移动|草稿已在外部/.test(msg)) {
+      showSaveConflictDialog(msg);
+      return false;
+    }
+    toast("保存失败：" + msg);
     return false;
   }
+}
+
+/**
+ * 磁盘与编辑器内容冲突时，只提示一次并引导刷新。
+ * @param {string} msg
+ */
+function showSaveConflictDialog(msg) {
+  if (saveConflict) return;
+  saveConflict = true;
+  const n = $("#saved");
+  if (n) n.textContent = "保存已暂停";
+  toast("保存失败：" + msg);
+  if ($("#save-conflict-modal")) return;
+  const m = document.createElement("div");
+  m.id = "save-conflict-modal";
+  m.className = "modal";
+  m.innerHTML =
+    '<div class="dialog"><h2>文章已在外部修改</h2><p>磁盘上的草稿与当前编辑器不一致。继续自动保存会覆盖外部改动，因此已暂停保存。</p><p class="muted">常见原因：在 Obsidian / 其他编辑器中改过同一篇，或另一窗口也打开了 inkdesk。</p><div class="row"><button type="button" id="conflict-keep">先留在编辑器</button><button type="button" id="conflict-reload" class="primary">备份未保存内容并刷新</button></div></div>';
+  document.body.append(m);
+  $("#conflict-keep").onclick = () => m.remove();
+  $("#conflict-reload").onclick = async () => {
+    try {
+      const id = current?.id;
+      const result = await api("recover-refresh", state);
+      Object.assign(state, result);
+      current =
+        state.documents.find((d) => d.id === id) ||
+        state.documents.find((d) => d.account === account);
+      dirty = false;
+      saveConflict = false;
+      pending = null;
+      m.remove();
+      render();
+      toast("已从磁盘重新加载");
+    } catch (err) {
+      toast(err.message);
+    }
+  };
 }
 function changed() {
   const card = document.querySelector('[data-id="' + current.id + '"]');
@@ -1047,9 +1246,16 @@ function syncRailVisibility() {
   resizer?.classList.toggle("hidden", !assistantOpen);
   const toggle = $("#toggle-assistant");
   if (toggle) {
-    toggle.classList.toggle("primary", assistantOpen);
-    toggle.setAttribute("aria-pressed", assistantOpen ? "true" : "false");
+    toggle.classList.toggle("primary", assistantOpen && railMode === "assistant");
+    toggle.setAttribute(
+      "aria-pressed",
+      assistantOpen && railMode === "assistant" ? "true" : "false",
+    );
   }
+  $("#article-materials")?.classList.toggle(
+    "primary",
+    assistantOpen && railMode === "materials",
+  );
   requestAnimationFrame(() => $("#article-outline")?._place?.());
 }
 
@@ -1058,10 +1264,28 @@ function syncRailVisibility() {
  */
 function openAssistant() {
   if (page !== "write" || !current || previewMode) return;
-  if (assistantOpen && $("#panel")?.dataset.ready) {
+  const already =
+    assistantOpen &&
+    railMode === "assistant" &&
+    $("#panel")?.dataset.ready &&
+    $("#rail")?.dataset.railMode === "assistant";
+  railMode = "assistant";
+  if (already) {
     syncRailVisibility();
     return;
   }
+  assistantOpen = true;
+  renderAssistantRail();
+}
+
+/**
+ * 打开右侧栏并显示当前文章的素材库。
+ */
+function openArticleMaterials() {
+  if (page !== "write" || !current || previewMode) return;
+  sync();
+  persist();
+  railMode = "materials";
   assistantOpen = true;
   renderAssistantRail();
 }
@@ -1109,10 +1333,24 @@ function renderAssistantRail() {
   // 默认收起：未展开时不挂载对话，节省资源
   if (!assistantOpen) {
     rail.innerHTML = "";
+    delete rail.dataset.railMode;
     syncRailVisibility();
     return;
   }
 
+  if (railMode === "materials") {
+    rail.dataset.railMode = "materials";
+    rail.innerHTML = `<div class="assistant-head"><span>${I.library()} 本文素材</span><div class="assistant-head-actions"><button type="button" id="upload-article-material">${I.upload()} 上传</button><button type="button" id="close-assistant" title="收起">${I.panelClose()} 收起</button></div></div><div id="panel" data-ready="1" class="article-materials-panel"><div id="article-material-list" class="material-cards"></div></div>`;
+    $("#close-assistant").onclick = () => {
+      assistantOpen = false;
+      syncRailVisibility();
+    };
+    bindArticleMaterialsPanel();
+    syncRailVisibility();
+    return;
+  }
+
+  rail.dataset.railMode = "assistant";
   rail.innerHTML = `<div class="assistant-head"><span>${I.sparkles()} 写作伙伴</span><div class="assistant-head-actions"><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select><button type="button" id="close-assistant" title="收起">${I.panelClose()} 收起</button></div></div><div class="tabs">${[
     ["chat", "对话"],
     ["topics", "思路"],
@@ -1153,6 +1391,96 @@ function renderAssistantRail() {
 }
 
 /**
+ * 绑定本文素材侧栏：列表、上传、预览。
+ */
+function bindArticleMaterialsPanel() {
+  const listEl = $("#article-material-list");
+  const uploadBtn = $("#upload-article-material");
+  const doc = current;
+  if (!listEl || !doc) return;
+
+  /** 刷新当前文章关联的素材卡片 */
+  const draw = async () => {
+    if (
+      page !== "write" ||
+      !current ||
+      current.id !== doc.id ||
+      railMode !== "materials"
+    )
+      return;
+    try {
+      const raw = await api("project-refs", doc.id);
+      const refs = await Promise.all(raw.map(hydrateMaterialPreview));
+      if (!listEl.isConnected) return;
+      listEl.innerHTML =
+        refs.map((r) => materialPreviewCardHTML(r)).join("") ||
+        '<p class="empty-data">还没有素材。上传后可在对话中引用。</p>';
+      $$("#article-material-list [data-ref-preview]").forEach(
+        (b) =>
+          (b.onclick = async () => {
+            try {
+              const r = await api("materials-read", b.dataset.refPreview);
+              openPreview({
+                title: r.name,
+                text: r.text || r.error,
+                path: r.path,
+                reference: r.status === "ready" ? r : null,
+                material: r,
+                doc,
+              });
+            } catch (e) {
+              toast(e.message);
+            }
+          }),
+      );
+      $$("#article-material-list [data-material]").forEach((card) => {
+        card.oncontextmenu = (e) => {
+          e.preventDefault();
+          const id = card.dataset.material;
+          showContextMenu(e.clientX, e.clientY, [
+            {
+              label: "删除素材",
+              danger: true,
+              run: async () => {
+                if (!confirm("确定删除此素材？将从所有文章解除引用。")) return;
+                try {
+                  await api("materials-delete", id);
+                  toast("素材已删除");
+                  draw();
+                } catch (err) {
+                  toast(err.message);
+                }
+              },
+            },
+          ]);
+        };
+      });
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+
+  uploadBtn.onclick = async () => {
+    uploadBtn.disabled = true;
+    const label = uploadBtn.innerHTML;
+    uploadBtn.textContent = "上传中…";
+    try {
+      if (!(await persist())) return;
+      await uploadProjectFiles(doc.id);
+      await draw();
+    } catch (e) {
+      toast(e.message);
+    } finally {
+      if (uploadBtn.isConnected) {
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = label;
+      }
+    }
+  };
+  draw();
+}
+
+/**
  * 渲染预览模式：中间公众号排版，右侧栏切换为小红书分页。
  */
 function renderPreview() {
@@ -1180,7 +1508,7 @@ function renderWrite() {
     return;
   }
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><span id="saved">已保存到本地</span><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><button id="layout">预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><button id="focus" title="专注">${I.focus()} 专注</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">项目参考文件</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button><button data-task="review">${I.eye()} 看稿</button><button data-task="rewrite">${I.wand()} 润色选段</button><button data-task="check">${I.check()} 核查</button></div></section></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><span id="saved">已保存到本地</span><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><button id="layout">预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button><button data-task="review">${I.eye()} 看稿</button><button data-task="rewrite">${I.wand()} 润色选段</button><button data-task="check">${I.check()} 核查</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [StarterKit, Image, TableKit],
@@ -1243,25 +1571,13 @@ function renderWrite() {
   selectedText = "";
   selectionContext = null;
   $("#article-materials").onclick = () => {
-    sync();
-    persist();
-    materialsFilter = current.id;
-    page = "materials";
-    render();
+    if (assistantOpen && railMode === "materials") {
+      assistantOpen = false;
+      syncRailVisibility();
+      return;
+    }
+    openArticleMaterials();
   };
-  $$("[data-related]").forEach(
-    (b) =>
-      (b.onclick = async () => {
-        try {
-          showMaterial(
-            b.dataset.related,
-            await api("material-read", b.dataset.related),
-          );
-        } catch (e) {
-          toast(e.message);
-        }
-      }),
-  );
   $("#title").oninput = (e) => {
     current.title = e.target.value;
     changed();
@@ -1305,9 +1621,14 @@ function renderWrite() {
     $(".sidebar").classList.toggle("hidden");
   };
   $("#toggle-assistant").onclick = () => {
-    assistantOpen = !assistantOpen;
-    if (assistantOpen) renderAssistantRail();
-    else syncRailVisibility();
+    if (assistantOpen && railMode === "assistant") {
+      assistantOpen = false;
+      syncRailVisibility();
+      return;
+    }
+    railMode = "assistant";
+    assistantOpen = true;
+    renderAssistantRail();
   };
   bindArticleHeader();
   bindFinalize();
@@ -2416,49 +2737,37 @@ async function chooseChatFile() {
     toast(e.message);
   }
 }
-function openPreview({ title, text, path: rel, reference, doc = current }) {
+function openPreview({
+  title,
+  text,
+  path: rel,
+  reference,
+  material,
+  doc = current,
+}) {
   $("#reference-drawer")?.remove();
   $("#published-drawer")?.remove();
+  const r = material ||
+    reference || {
+      name: title,
+      text,
+      path: rel,
+      kind: rel && /\.(png|jpe?g|gif|webp)$/i.test(rel) ? "image" : "text",
+    };
   const n = document.createElement("aside");
   n.id = "reference-drawer";
   n.className = "reference-drawer";
-  n.innerHTML = `<div class="row"><h3>${esc(title)}</h3><button id="close-drawer" class="icon-btn" title="关闭" aria-label="关闭">${I.close()}</button></div>${rel && /\.(png|jpe?g|gif|webp)$/i.test(rel) ? `<img class="preview-image" src="${esc(assetUrl("inkasset://vault/" + encodeURIComponent(rel)))}">` : ""}<pre id="reference-text">${esc(text)}</pre>${reference ? '<div class="drawer-actions"><button id="cite-file">引用文件</button><button id="cite-file-range" class="primary">引用所选文字</button><small>先选中预览文字，可引用对应行。</small></div>' : ""}`;
+  const kind = r.kind || inferMaterialKind(r.name);
+  const headActions = reference
+    ? `<button type="button" id="cite-file" class="ghost">引用文件</button>`
+    : "";
+  n.innerHTML = `<div class="row reference-drawer-head"><h3>${esc(title)}</h3><div class="reference-drawer-toolbar">${headActions}<button type="button" id="close-drawer" class="ghost icon-btn" title="关闭" aria-label="关闭">${I.close({ size: 18 })}</button></div></div><div class="reference-drawer-body">${materialDrawerBodyHTML({ ...r, kind, text: text || r.text, path: rel || r.path })}</div>`;
   document.body.append(n);
   $("#close-drawer").onclick = () => n.remove();
   if (reference) {
     $("#cite-file").onclick = () => {
       putTag(
         { kind: "file", fileId: reference.id, label: reference.name },
-        doc,
-      );
-      n.remove();
-    };
-    $("#cite-file-range").onmousedown = (e) => e.preventDefault();
-    $("#cite-file-range").onclick = () => {
-      const selection = window.getSelection(),
-        pre = $("#reference-text");
-      if (!selection?.rangeCount || selection.isCollapsed)
-        return toast("先在预览中选择文字");
-      const range = selection.getRangeAt(0);
-      if (
-        !pre.contains(range.startContainer) ||
-        !pre.contains(range.endContainer)
-      )
-        return toast("请选择这份素材中的文字");
-      const before = range.cloneRange();
-      before.selectNodeContents(pre);
-      before.setEnd(range.startContainer, range.startOffset);
-      const start = before.toString().split("\n").length;
-      const end =
-        start + range.toString().replace(/\n$/, "").split("\n").length - 1;
-      putTag(
-        {
-          kind: "file",
-          fileId: reference.id,
-          startLine: start,
-          endLine: end,
-          label: reference.name + " L" + start + "–" + end,
-        },
         doc,
       );
       n.remove();
@@ -2491,23 +2800,21 @@ async function renderMaterials() {
   };
 
   /** 渲染素材卡片列表 */
-  const draw = (list) => {
+  const draw = async (list) => {
     if (page !== "materials") return;
-    const rows =
+    const filtered =
       materialsFilter === "all"
         ? list
         : list.filter((m) =>
             (m.usedBy || []).some((u) => u.id === materialsFilter),
           );
+    const rows = await Promise.all(filtered.map(hydrateMaterialPreview));
     $("#project-files").innerHTML =
       rows
-        .map(
-          (r) =>
-            `<article class="material-card" data-material="${r.id}"><button type="button" class="card-open" data-ref-preview="${r.id}"><span class="file-icon">${esc((r.name.split(".").pop() || "").toUpperCase())}</span><strong>${esc(r.name)}</strong><small class="ref-count">被 ${r.refCount || 0} 篇文章引用</small></button></article>`,
-        )
+        .map((r) => materialPreviewCardHTML(r, { showRefCount: true }))
         .join("") ||
       "<p class=\"empty-data\">还没有素材。上传后可在多篇文章间共用。</p>";
-    $$("[data-ref-preview]").forEach(
+    $$("#project-files [data-ref-preview]").forEach(
       (b) =>
         (b.onclick = async () => {
           try {
@@ -2517,6 +2824,7 @@ async function renderMaterials() {
               text: r.text || r.error,
               path: r.path,
               reference: r.status === "ready" ? r : null,
+              material: r,
               doc: uploadTarget || current,
             });
           } catch (e) {
@@ -2569,7 +2877,7 @@ async function renderMaterials() {
     if (!uploadTarget) return toast("请先创建一篇草稿再上传");
     const b = $("#upload-reference");
     b.disabled = true;
-    b.textContent = "正在提取文字…";
+    b.textContent = "上传中…";
     try {
       if (!(await persist())) return;
       const list = await uploadProjectFiles(uploadTarget.id);

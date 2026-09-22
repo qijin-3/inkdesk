@@ -72,23 +72,40 @@ test("project files are copied, fully extracted, isolated and persisted with AI 
   const again = new Knowledge(k.v, k.reader);
   assert.equal(again.refs("a")[0].enabled, false);
   assert.throws(() => k.refText("b", refs[0].id));
-  // 同一文件再上传到另一篇，应复用共享素材并计入引用
+  // 同一文件再上传到另一篇，应复制进 library（不再只做引用映射）
   fs.writeFileSync(src, "唯一来源内容，给项目 a");
   k.toggle("a", refs[0].id, true);
-  await k.upload("b", [src]);
+  const refsB = await k.upload("b", [src]);
   assert.equal(k.refs("b").length, 1);
-  assert.equal(k.refs("b")[0].id, refs[0].id);
-  assert.equal(k.allMaterials().find((m) => m.id === refs[0].id).refCount, 2);
+  assert.notEqual(refsB[0].id, refs[0].id);
+  assert.match(refsB[0].path, /00_wiki\/_data\/raw\/library\//);
+  assert.equal(k.allMaterials().filter((m) => m.hash === refs[0].hash).length, 2);
 });
-test("unreadable files retained but never silently sent to AI", async (t) => {
+test("binary originals retained; not enabled for AI until toggled", async (t) => {
   const { root, k } = setup(t);
   const src = path.join(root, "data.unknown");
   fs.writeFileSync(src, "binary");
   const [r] = await k.upload("a", [src]);
-  assert.equal(r.status, "unreadable");
+  assert.equal(r.status, "ready");
+  assert.equal(r.kind, "binary");
   assert.equal(r.enabled, false);
-  assert.throws(() => k.toggle("a", r.id, true));
   assert.equal(k.projectContext("a"), "");
+  assert.ok(fs.existsSync(k.v.p(r.path)));
+  assert.equal(r.textPath || "", "");
+  k.toggle("a", r.id, true);
+  assert.match(k.projectContext("a"), /文件素材/);
+});
+test("markdown kept as original file without txt extract", async (t) => {
+  const { root, k } = setup(t);
+  const src = path.join(root, "note.md");
+  fs.writeFileSync(src, "# 标题\n\n正文内容");
+  const [r] = await k.upload("a", [src]);
+  assert.equal(r.kind, "markdown");
+  assert.equal(r.status, "ready");
+  assert.equal(r.textPath || "", "");
+  assert.match(fs.readFileSync(k.v.p(r.path), "utf8"), /# 标题/);
+  assert.match(k.refText("a", r.id).text, /正文内容/);
+  assert.match(r.preview, /标题/);
 });
 test("whole Profile is managed; proposals keep evidence, backups, rejection and stale protection", (t) => {
   const { v, k } = setup(t);

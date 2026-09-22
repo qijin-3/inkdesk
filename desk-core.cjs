@@ -283,10 +283,8 @@ class DeskCore {
         };
       }
       case "versions": {
-        const cache = this.vault.cache;
-        this.vault.cache = new Map();
+        // 用磁盘最新内容刷新 cache，避免沿用过期 raw 导致误报「外部修改」
         const loaded = this.vault.load();
-        this.vault.cache = cache;
         return loaded.documents.find((d) => d.id === data)?.snapshots || [];
       }
       case "archive-records":
@@ -379,10 +377,7 @@ class DeskCore {
       case "copy":
         return true;
       case "metrics": {
-        const cache = this.vault.cache;
-        this.vault.cache = new Map();
         const result = this.vault.load();
-        this.vault.cache = cache;
         this.store.metrics = result.metrics;
         this.store.archives = result.archives;
         return result.metrics;

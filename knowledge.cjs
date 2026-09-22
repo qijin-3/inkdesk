@@ -31,6 +31,29 @@ function atomic(p, text) {
   fs.writeFileSync(t, text);
   fs.renameSync(t, p);
 }
+
+/**
+ * 根据文件名判断素材预览类型。
+ * @param {string} name
+ * @returns {"markdown"|"html"|"json"|"image"|"text"|"binary"}
+ */
+function materialKind(name) {
+  const ext = path.extname(name || "").toLowerCase();
+  if ([".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(ext)) return "image";
+  if ([".md", ".markdown"].includes(ext)) return "markdown";
+  if ([".html", ".htm"].includes(ext)) return "html";
+  if (ext === ".json") return "json";
+  if (
+    [".txt", ".csv", ".yaml", ".yml", ".log", ".tsv", ".xml"].includes(ext)
+  )
+    return "text";
+  return "binary";
+}
+
+/** 是否可按 UTF-8 原文阅读 */
+function isTextKind(kind) {
+  return ["markdown", "html", "json", "text"].includes(kind);
+}
 class Knowledge {
   constructor(vault, reader) {
     this.v = vault;
@@ -342,7 +365,7 @@ class Knowledge {
     return this.links(id)
       .map((link) => {
         const m = lib.find((x) => x.id === link.id);
-        return m ? { ...m, enabled: !!link.enabled } : null;
+        return m ? this.enrichMaterial({ ...m, enabled: !!link.enabled }) : null;
       })
       .filter(Boolean);
   }
@@ -374,10 +397,63 @@ class Knowledge {
     return lib
       .map((m) => {
         const usedBy = usage.get(m.id) || [];
-        return { ...m, usedBy, refCount: usedBy.length };
+        return this.enrichMaterial({
+          ...m,
+          usedBy,
+          refCount: usedBy.length,
+        });
       })
       .sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
   }
+
+  /**
+   * 补充预览类型、摘要与资源地址（保留原文件，不另存 txt）。
+   * @param {object} m
+   */
+  enrichMaterial(m) {
+    const kind = m.kind || materialKind(m.name);
+    const asset =
+      kind === "image" && m.path
+        ? "inkasset://vault/" + encodeURIComponent(m.path)
+        : "";
+    let preview = "";
+    if (m.status === "ready" && isTextKind(kind)) {
+      try {
+        preview = this.readMaterialSource(m).slice(0, 600);
+      } catch {
+        preview = "";
+      }
+    }
+    return { ...m, kind, preview, asset };
+  }
+
+  /**
+   * 读取素材原文（优先原文件；兼容旧版 textPath）。
+   * @param {object} m
+   */
+  readMaterialSource(m) {
+    const kind = m.kind || materialKind(m.name);
+    if (kind === "image") {
+      if (m.textPath && fs.existsSync(this.v.p(m.textPath)))
+        return fs.readFileSync(this.v.p(m.textPath), "utf8");
+      return `[图片素材：${m.name}]\n（原图已保留，未提取为文本）`;
+    }
+    if (kind === "binary") {
+      if (m.textPath && fs.existsSync(this.v.p(m.textPath)))
+        return fs.readFileSync(this.v.p(m.textPath), "utf8");
+      return `[文件素材：${m.name}]\n（已保留原格式，当前不提供文本预览）`;
+    }
+    if (m.path && fs.existsSync(this.v.p(m.path))) {
+      const text = fs.readFileSync(this.v.p(m.path), "utf8");
+      if (text.includes("\uFFFD"))
+        throw Error("文字编码不是 UTF-8，请转换后上传");
+      return text;
+    }
+    if (m.textPath && fs.existsSync(this.v.p(m.textPath)))
+      return fs.readFileSync(this.v.p(m.textPath), "utf8");
+    throw Error("素材文件不存在");
+  }
+
   async upload(id, paths) {
     this.project(id);
     const library = this.materials();
@@ -390,55 +466,59 @@ class Knowledge {
         throw Error("仅支持 40MB 以内的文件");
       const bytes = fs.readFileSync(src);
       const fileHash = digest(bytes);
+      // 同一篇文章已关联相同内容时跳过，避免重复条目
       const existing = library.find(
         (m) => m.hash === fileHash && m.status === "ready",
       );
-      if (existing) {
-        if (!links.some((l) => l.id === existing.id)) {
-          links.push({ id: existing.id, enabled: true });
-          this.saveLinks(id, links);
-        }
-        continue;
-      }
+      if (existing && links.some((l) => l.id === existing.id)) continue;
+
       const rid = crypto.randomUUID(),
         name =
           clean(path.basename(src, path.extname(src))) +
           path.extname(src).toLowerCase(),
+        // 一律落入共享 library，不再写入 projects/.../files 或仅做引用映射
         rel = "00_wiki/_data/raw/library/" + rid + "/" + name;
       fs.mkdirSync(path.dirname(this.v.p(rel)), { recursive: true });
       fs.writeFileSync(this.v.p(rel), bytes);
-      let text = "",
+      const kind = materialKind(name);
+      let characters = 0,
         status = "ready",
         error = "";
-      try {
-        text = await this.extract(this.v.p(rel));
-        if (!text.trim()) throw Error("未识别出可读文字，请补充文字说明");
-      } catch (e) {
-        status = "unreadable";
-        error = e.message;
+      if (isTextKind(kind)) {
+        const text = bytes.toString("utf8");
+        if (text.includes("\uFFFD")) {
+          status = "unreadable";
+          error = "文字编码不是 UTF-8，请转换后上传";
+        } else characters = text.length;
+      } else if (kind === "image") {
+        characters = 0;
+      } else {
+        characters = bytes.length;
       }
-      const textPath = this.libraryDir() + "/text/" + rid + ".txt";
-      atomic(this.v.p(textPath), text);
       library.push({
         id: rid,
         name,
         path: rel,
-        textPath,
+        textPath: "",
         bytes: bytes.length,
-        characters: text.length,
+        characters,
         status,
         error,
         at: new Date().toISOString(),
-        ocr: /\.(png|jpe?g|webp|gif)$/i.test(name),
+        ocr: false,
         hash: fileHash,
+        kind,
       });
       this.saveMaterials(library);
-      links.push({ id: rid, enabled: status === "ready" });
+      links.push({
+        id: rid,
+        enabled: status === "ready" && kind !== "binary",
+      });
       this.saveLinks(id, links);
     }
     return this.refs(id);
   }
-  /** 从文件提取纯文本，供素材入库 */
+  /** 从文件提取纯文本（旧逻辑保留，入库流程不再调用） */
   async extract(p) {
     const ext = path.extname(p).toLowerCase();
     if (
@@ -483,23 +563,28 @@ class Knowledge {
   refText(id, rid) {
     const linked = this.refs(id).find((r) => r.id === rid);
     if (!linked) throw Error("素材不存在");
-    return {
-      ...linked,
-      text:
-        linked.status === "ready"
-          ? fs.readFileSync(this.v.p(linked.textPath), "utf8")
-          : "",
-    };
+    let text = "";
+    try {
+      text =
+        linked.status === "ready" ? this.readMaterialSource(linked) : "";
+    } catch (e) {
+      return { ...linked, text: "", error: e.message };
+    }
+    return { ...linked, text };
   }
   /** 按素材 id 读取正文（素材库预览） */
   materialText(rid) {
     const m = this.materials().find((x) => x.id === rid);
     if (!m) throw Error("素材不存在");
-    return {
-      ...m,
-      text:
-        m.status === "ready" ? fs.readFileSync(this.v.p(m.textPath), "utf8") : "",
-    };
+    const enriched = this.enrichMaterial(m);
+    let text = "";
+    try {
+      text =
+        enriched.status === "ready" ? this.readMaterialSource(enriched) : "";
+    } catch (e) {
+      return { ...enriched, text: "", error: e.message || enriched.error };
+    }
+    return { ...enriched, text: text || enriched.error || "" };
   }
   toggle(id, rid, enabled) {
     const list = this.links(id),
@@ -530,7 +615,17 @@ class Knowledge {
     }
     for (const p of [m.path, m.textPath]) {
       try {
-        if (p && fs.existsSync(this.v.p(p))) fs.unlinkSync(this.v.p(p));
+        if (p && fs.existsSync(this.v.p(p))) {
+          const abs = this.v.p(p);
+          fs.unlinkSync(abs);
+          const dir = path.dirname(abs);
+          if (
+            dir.includes("/library/") &&
+            fs.existsSync(dir) &&
+            !fs.readdirSync(dir).length
+          )
+            fs.rmdirSync(dir);
+        }
       } catch {
         /* ignore */
       }
@@ -571,10 +666,15 @@ class Knowledge {
         )
         .join("\n") +
       selected
-        .map(
-          (r) =>
-            `\n[项目素材：${r.name}${r.ocr ? "；以下是 OCR 文字，不代表完整图形语义" : ""}]\n${fs.readFileSync(this.v.p(r.textPath), "utf8")}`,
-        )
+        .map((r) => {
+          let body = "";
+          try {
+            body = this.readMaterialSource(r);
+          } catch {
+            body = r.error || "";
+          }
+          return `\n[项目素材：${r.name}${r.kind === "image" ? "；图片原文件已保留" : ""}]\n${body}`;
+        })
         .join("\n");
     if (text.length > 30000)
       throw Error(
@@ -583,4 +683,4 @@ class Knowledge {
     return text;
   }
 }
-module.exports = { Knowledge, core, digest };
+module.exports = { Knowledge, core, digest, materialKind };

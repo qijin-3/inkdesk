@@ -33,6 +33,7 @@ import {
   Pin,
   PinOff,
   FileText,
+  Link2,
 } from "lucide";
 
 /**
@@ -88,4 +89,5 @@ export const I = {
   wand: (o) => icon(WandSparkles, o),
   check: (o) => icon(SearchCheck, o),
   file: (o) => icon(FileText, o),
+  link: (o) => icon(Link2, o),
 };
