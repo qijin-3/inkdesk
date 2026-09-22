@@ -122,13 +122,6 @@ p {
   min-width: 0;
   flex: 1;
 }
-.brand small {
-  font-size: 10px;
-  width: 100%;
-  margin-left: 37px;
-  letter-spacing: 2px;
-  color: #888888;
-}
 .brand-settings {
   flex-shrink: 0;
   margin-top: 2px;
@@ -498,17 +491,29 @@ button.secondary {
   font-weight: 600;
   width: 100%;
   border: 0;
+  border-bottom: 1px solid #e8e8e8;
   background: transparent;
-  padding: 0;
+  padding: 0 0 22px;
+  margin: 0 0 32px;
   line-height: 1.5;
   border-radius: 0;
+  color: #111111;
+}
+#editor {
+  color: #2a2a2a;
 }
 .byline {
   display: flex;
-  gap: 20px;
+  gap: 12px;
   color: #aaaaaa;
   font-size: 10px;
   letter-spacing: 0.5px;
+  margin: 0;
+}
+header .byline {
+  margin: 0;
+}
+.paper > .byline {
   margin: 19px 0 36px;
 }
 .tiptap {
@@ -543,6 +548,10 @@ button.secondary {
   content: "写下一个想法…";
   color: #bbbbbb;
 }
+.formatbar button.is-active {
+  background: #ebebeb;
+  border-radius: 6px;
+}
 .selection-bar {
   position: fixed;
   bottom: 20px;
@@ -556,6 +565,9 @@ button.secondary {
   gap: 6px;
   margin-left: 28px;
   z-index: 4;
+}
+.selection-bar[hidden] {
+  display: none !important;
 }
 .selection-bar span {
   font-size: 10px;
@@ -914,11 +926,11 @@ td .delta {
 }
 .stats strong .delta.up,
 td .delta.up {
-  color: #111111;
+  color: #2f7a4f;
 }
 .stats strong .delta.down,
 td .delta.down {
-  color: #555555;
+  color: #a14b3c;
 }
 .page-title .muted {
   margin: 6px 0 0;
@@ -1610,19 +1622,19 @@ pre {
   border-radius: 3px;
 }
 .level-0 {
-  background: #eeeeee;
+  background: #e9ece3;
 }
 .level-1 {
-  background: #cccccc;
+  background: #cadbc1;
 }
 .level-2 {
-  background: #999999;
+  background: #95b897;
 }
 .level-3 {
-  background: #555555;
+  background: #5b916e;
 }
 .level-4 {
-  background: #111111;
+  background: #315d4e;
 }
 .heatmap-day:focus-visible {
   outline: 2px solid #333;
@@ -1630,6 +1642,10 @@ pre {
 }
 .heatmap-day.future {
   opacity: 0.4;
+}
+.heatmap-day.is-today {
+  outline: 2px solid #172f25;
+  outline-offset: 2px;
 }
 .row {
   gap: 10px;

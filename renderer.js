@@ -482,7 +482,7 @@ function render() {
     previewDocId = null;
   }
   $("#app").innerHTML =
-    `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk <small>写作工作台</small></div><button type="button" data-page="settings" class="icon-btn brand-settings" title="设置" aria-label="设置">${I.settings({ size: 18 })}</button></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">金奇 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">金奇 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>选题与灵感</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="profile">${I.user()} <span>账号人设</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></div><div class="docs">${
+    `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk</div><button type="button" data-page="settings" class="icon-btn brand-settings" title="设置" aria-label="设置">${I.settings({ size: 18 })}</button></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">金奇 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">金奇 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>选题与灵感</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="profile">${I.user()} <span>账号人设</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></div><div class="docs">${
       state.documents
         .filter(
           (d) =>
@@ -1565,7 +1565,7 @@ function bindArticleMaterialsPanel() {
  */
 function renderPreview() {
   previewDocId = current.id;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout" class="primary">退出预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="article-preview">${safeHTML(current.body)}</div></article></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout" class="primary">退出预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div id="article-preview">${safeHTML(current.body)}</div></article></section></div>`;
   bindArticleHeader();
   bindFinalize();
   enhanceWechatPreview();
@@ -1588,7 +1588,7 @@ function renderWrite() {
     return;
   }
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><span id="saved">已保存到本地</span><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><button id="layout">预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button><button data-task="review">${I.eye()} 看稿</button><button data-task="rewrite">${I.wand()} 润色选段</button><button data-task="check">${I.check()} 核查</button></div></section></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div></div><div class="header-actions"><span id="saved">已保存到本地</span><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><button id="layout">预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button><button data-task="review">${I.eye()} 看稿</button><button data-task="rewrite">${I.wand()} 润色选段</button><button data-task="check">${I.check()} 核查</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [StarterKit, Image, TableKit],
@@ -1699,6 +1699,17 @@ function renderWrite() {
   };
   $("#focus").onclick = () => {
     $(".sidebar").classList.toggle("hidden");
+  };
+  /** 切换底部审阅工具条显示 */
+  $("#toggle-review").onclick = () => {
+    const bar = $(".selection-bar");
+    const btn = $("#toggle-review");
+    if (!bar || !btn) return;
+    const open = bar.hasAttribute("hidden");
+    if (open) bar.removeAttribute("hidden");
+    else bar.setAttribute("hidden", "");
+    btn.classList.toggle("is-active", open);
+    btn.setAttribute("aria-pressed", open ? "true" : "false");
   };
   $("#toggle-assistant").onclick = () => {
     if (assistantOpen && railMode === "assistant") {
