@@ -11,6 +11,7 @@ const {
   rowToYaml,
   matchNoteRows,
 } = require("./note-import.cjs");
+const wechatMp = require("./wechat-mp.cjs");
 
 const defaults = {
   documents: [],
@@ -20,6 +21,12 @@ const defaults = {
   model: "",
   followers: { AI: null, Dev: null },
   metricDeltas: { AI: null, Dev: null },
+  wechat: {
+    appId: "",
+    appSecret: "",
+    author: "金奇",
+    coverPath: "",
+  },
 };
 
 /** 与 preload 一致的 API 通道名 */
@@ -66,6 +73,8 @@ const API_CHANNELS = [
   "materials-read",
   "materials-delete",
   "materials-link",
+  "wechat-draft-push",
+  "wechat-test-token",
 ];
 
 /**
@@ -80,6 +89,8 @@ class DeskCore {
     this.knowledge = null;
     this.accountModel = null;
     this.onAgentProgress = null;
+    /** @type {{ token?: string, expiresAt?: number }} */
+    this.wechatTokenCache = {};
   }
 
   /**
@@ -104,6 +115,10 @@ class DeskCore {
         metricDeltas: {
           ...defaults.metricDeltas,
           ...(loaded.metricDeltas || {}),
+        },
+        wechat: {
+          ...defaults.wechat,
+          ...(loaded.wechat || {}),
         },
       };
     } catch (e) {
@@ -162,6 +177,12 @@ class DeskCore {
       model: this.store.model,
       followers: this.store.followers || { AI: null, Dev: null },
       metricDeltas: this.store.metricDeltas || { AI: null, Dev: null },
+      wechat: {
+        appId: this.store.wechat?.appId || "",
+        appSecret: this.store.wechat?.appSecret || "",
+        author: this.store.wechat?.author || "金奇",
+        coverPath: this.store.wechat?.coverPath || "",
+      },
     };
     fs.mkdirSync(this.data, { recursive: true });
     const p = path.join(this.data, "workspace.json");
@@ -221,6 +242,12 @@ class DeskCore {
           ...this.store,
           followers: this.store.followers || { AI: null, Dev: null },
           metricDeltas: this.store.metricDeltas || { AI: null, Dev: null },
+          wechat: {
+            appId: this.store.wechat?.appId || "",
+            appSecret: this.store.wechat?.appSecret || "",
+            author: this.store.wechat?.author || "金奇",
+            coverPath: this.store.wechat?.coverPath || "",
+          },
           dataPath: this.data,
           agents: {
             cursor: !!this.executable("cursor"),
@@ -374,6 +401,10 @@ class DeskCore {
         return this.importNotesPreview(data);
       case "import-notes-apply":
         return this.importNotesApply(data);
+      case "wechat-draft-push":
+        return this.pushWechatDraft(data);
+      case "wechat-test-token":
+        return this.testWechatToken();
       default:
         throw Error("Unknown channel: " + name);
     }
@@ -845,6 +876,136 @@ class DeskCore {
       if (provider === "codex") child.stdin.end(prompt);
       else child.stdin.end();
     });
+  }
+
+  /** 校验公众号凭证能否换取 access_token */
+  async testWechatToken() {
+    const cfg = this.wechatConfig();
+    this.wechatTokenCache = {};
+    const token = await wechatMp.getAccessToken(
+      cfg.appId,
+      cfg.appSecret,
+      this.wechatTokenCache,
+    );
+    return { ok: true, preview: token.slice(0, 8) + "…" };
+  }
+
+  /**
+   * 将排版 HTML 推送到公众号草稿箱：上传正文图与封面，再 draft/add。
+   * @param {{ title: string, author?: string, digest?: string, html: string, coverPath?: string }} payload
+   */
+  async pushWechatDraft(payload) {
+    const cfg = this.wechatConfig();
+    const token = await wechatMp.getAccessToken(
+      cfg.appId,
+      cfg.appSecret,
+      this.wechatTokenCache,
+    );
+    let html = String(payload.html || "");
+    if (!html.trim()) throw Error("正文为空");
+    if (html.length > 20000) throw Error("正文超过 2 万字符，请精简后再推送");
+
+    const srcs = [
+      ...new Set(
+        [...html.matchAll(/<img\b[^>]*\bsrc=["']([^"']+)["']/gi)].map(
+          (m) => m[1],
+        ),
+      ),
+    ];
+    const uploadedFiles = [];
+    for (const src of srcs) {
+      const filePath = this.resolveWechatImageSrc(src);
+      if (!filePath) {
+        html = html.replaceAll(src, "");
+        continue;
+      }
+      const buf = wechatMp.readImageFile(filePath);
+      const url = await wechatMp.uploadContentImage(
+        token,
+        buf,
+        path.basename(filePath),
+      );
+      html = html.split(src).join(url);
+      uploadedFiles.push(filePath);
+    }
+    // 去掉上传失败留下的空 img
+    html = html.replace(/<img\b[^>]*\bsrc=["']\s*["'][^>]*>/gi, "");
+
+    let coverPath =
+      payload.coverPath || cfg.coverPath || uploadedFiles[0] || "";
+    if (!coverPath || !fs.existsSync(coverPath))
+      throw Error(
+        "缺少封面图：请在设置中指定默认封面，或在正文加入至少一张本地图片",
+      );
+    const thumb = await wechatMp.uploadPermanentImage(
+      token,
+      wechatMp.readImageFile(coverPath, 10 * 1024 * 1024),
+      path.basename(coverPath),
+    );
+
+    const title = String(payload.title || "未命名文章").slice(0, 32);
+    const author = String(payload.author || cfg.author || "金奇").slice(0, 16);
+    const digest = String(
+      payload.digest ||
+        html
+          .replace(/<[^>]+>/g, "")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 54),
+    ).slice(0, 120);
+
+    const mediaId = await wechatMp.addDraft(token, {
+      title,
+      author,
+      digest,
+      content: html,
+      thumb_media_id: thumb,
+    });
+    return { media_id: mediaId, title, imageCount: uploadedFiles.length };
+  }
+
+  /**
+   * 读取并校验公众号配置。
+   */
+  wechatConfig() {
+    const w = this.store.wechat || {};
+    const appId = String(w.appId || "").trim();
+    const appSecret = String(w.appSecret || "").trim();
+    if (!appId || !appSecret)
+      throw Error("请先在设置中填写公众号 AppID 与 AppSecret");
+    return {
+      appId,
+      appSecret,
+      author: String(w.author || "金奇").trim() || "金奇",
+      coverPath: String(w.coverPath || "").trim(),
+    };
+  }
+
+  /**
+   * 把正文里的图片 src 解析为本地绝对路径。
+   * @param {string} src
+   * @returns {string|null}
+   */
+  resolveWechatImageSrc(src) {
+    if (!src) return null;
+    try {
+      if (src.startsWith("inkasset://vault/"))
+        return this.vaultAsset(decodeURIComponent(src.slice("inkasset://vault/".length)));
+      if (src.startsWith("inkasset://local/"))
+        return this.allowedAsset(
+          path.join(this.data, "assets", decodeURIComponent(src.slice("inkasset://local/".length))),
+        );
+      if (src.startsWith("/api/asset/vault/"))
+        return this.vaultAsset(decodeURIComponent(src.slice("/api/asset/vault/".length)));
+      if (src.startsWith("/api/asset/local/"))
+        return this.allowedAsset(
+          path.join(this.data, "assets", decodeURIComponent(src.slice("/api/asset/local/".length))),
+        );
+      if (path.isAbsolute(src) && fs.existsSync(src)) return src;
+    } catch {
+      return null;
+    }
+    return null;
   }
 }
 

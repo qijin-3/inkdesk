@@ -43,6 +43,9 @@ const channels = [
   "materials-read",
   "materials-delete",
   "materials-link",
+  "wechat-draft-push",
+  "wechat-test-token",
+  "wechat-pick-cover",
 ];
 contextBridge.exposeInMainWorld("desk", {
   web: false,

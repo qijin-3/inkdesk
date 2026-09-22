@@ -295,24 +295,53 @@ export async function socialPages(html, title, size = 36) {
     y += boxH + Math.round(20 * SCALE);
   }
 
-  /** 绘制图片，超高则翻页 */
+  /**
+   * 绘制图片，超高则翻页。
+   * 一律经 fetch→blob 再画，避免 inkasset/跨域图污染 canvas。
+   * @param {string} src
+   */
   async function picture(src) {
-    const img = new Image();
-    if (/^https?:/.test(src)) img.crossOrigin = "anonymous";
-    img.src = src;
-    await Promise.race([
-      img.decode(),
-      new Promise((_, r) => setTimeout(() => r(Error("图片加载超时")), 12000)),
-    ]);
-    const scale = Math.min(
-      contentW / img.naturalWidth,
-      Math.round(620 * SCALE) / img.naturalHeight,
-    );
-    const w = img.naturalWidth * scale;
-    const h = img.naturalHeight * scale;
-    ensure(h + 26);
-    ctx.drawImage(img, pad + (contentW - w) / 2, y, w, h);
-    y += h + 26;
+    if (!src) return;
+    let objectUrl;
+    try {
+      let blob;
+      if (/^(inkasset:|\/api\/asset\/|https?:|data:|blob:)/i.test(src)) {
+        const res = await fetch(src, { mode: "cors" });
+        if (!res.ok) throw Error("图片加载失败 HTTP " + res.status);
+        blob = await res.blob();
+      } else {
+        const res = await fetch(src);
+        if (!res.ok) throw Error("图片加载失败");
+        blob = await res.blob();
+      }
+      objectUrl = URL.createObjectURL(blob);
+      const img = new Image();
+      img.src = objectUrl;
+      await Promise.race([
+        img.decode(),
+        new Promise((_, r) => setTimeout(() => r(Error("图片加载超时")), 12000)),
+      ]);
+      const scale = Math.min(
+        contentW / img.naturalWidth,
+        Math.round(620 * SCALE) / img.naturalHeight,
+      );
+      const w = img.naturalWidth * scale;
+      const h = img.naturalHeight * scale;
+      ensure(h + 26);
+      ctx.drawImage(img, pad + (contentW - w) / 2, y, w, h);
+      y += h + 26;
+    } catch (e) {
+      // 单张失败不阻断整篇排版，画占位提示
+      const msg = "［图片未加载］";
+      font(SANS, 400, Math.round(14 * SCALE));
+      ensure(Math.round(40 * SCALE));
+      ctx.fillStyle = "#999";
+      ctx.fillText(msg, pad, y + Math.round(20 * SCALE));
+      y += Math.round(40 * SCALE);
+      console.warn("social picture:", src, e);
+    } finally {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    }
   }
 
   /**

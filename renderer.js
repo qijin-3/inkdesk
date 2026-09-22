@@ -23,9 +23,13 @@ function isWeb() {
   return !!window.desk?.web;
 }
 
-/** 将 inkasset 协议转为网页可访问的路径 */
+/**
+ * 资源地址：网页端走 /api/asset，桌面端保留 inkasset 协议（由主进程托管）。
+ * @param {string} src
+ */
 function assetUrl(src) {
   if (typeof src !== "string") return src;
+  if (!isWeb()) return src;
   if (src.startsWith("inkasset://vault/"))
     return "/api/asset/vault/" + src.slice("inkasset://vault/".length);
   if (src.startsWith("inkasset://local/"))
@@ -142,9 +146,16 @@ function safeHTML(md) {
         n.removeAttribute(a.name);
     });
   });
-  return d.body.innerHTML.replace(
-    /inkasset:\/\/(vault|local)\/([^"'\s)]+)/g,
-    (_, kind, rel) => "/api/asset/" + kind + "/" + rel,
+  let html = d.body.innerHTML;
+  // 网页端：inkasset → /api/asset；桌面端：/api/asset → inkasset（主进程 protocol 加载）
+  if (isWeb())
+    return html.replace(
+      /inkasset:\/\/(vault|local)\/([^"'\s)]+)/g,
+      (_, kind, rel) => "/api/asset/" + kind + "/" + rel,
+    );
+  return html.replace(
+    /\/api\/asset\/(vault|local)\/([^"'\s)]+)/g,
+    (_, kind, rel) => "inkasset://" + kind + "/" + rel,
   );
 }
 function toast(t) {
@@ -470,18 +481,32 @@ function enhanceWechatPreview(root = $("#article-preview")) {
 }
 
 /**
- * 将 Markdown 转为公众号剪贴板 HTML，本地图片替换为上传占位。
+ * 将 Markdown 转为公众号排版 HTML。
  * 二级标题不用 h2 着色（微信会重置标题色），改为 section + span。
  * 宋体栈不含寒蝉，避免微信丢弃整段 font-family 后退化成黑体。
+ * @param {string} md
+ * @param {{ keepImages?: boolean }} [opts] keepImages 为 true 时保留 img（草稿 API 上传用）
  */
-function publishHTML(md) {
+function publishHTML(md, opts = {}) {
   const serif = WECHAT_SERIF_PUBLISH;
   const d = new DOMParser().parseFromString(safeHTML(md), "text/html");
-  d.querySelectorAll("img").forEach((img) => {
-    const p = d.createElement("p");
-    p.textContent = "【请上传图片：" + (img.alt || "正文配图") + "】";
-    img.replaceWith(p);
-  });
+  if (opts.keepImages) {
+    // 草稿推送：把网页路径还原为 inkasset，供主进程解析本地文件
+    if (!isWeb())
+      d.querySelectorAll("img").forEach((img) => {
+        const src = img.getAttribute("src");
+        if (src?.startsWith("/api/asset/"))
+          img.src = src
+            .replace("/api/asset/vault/", "inkasset://vault/")
+            .replace("/api/asset/local/", "inkasset://local/");
+      });
+  } else {
+    d.querySelectorAll("img").forEach((img) => {
+      const p = d.createElement("p");
+      p.textContent = "【请上传图片：" + (img.alt || "正文配图") + "】";
+      img.replaceWith(p);
+    });
+  }
   d.querySelectorAll("h1").forEach((h1, i) => {
     splitWechatH1(h1);
     const num = String(i + 1).padStart(2, "0");
@@ -737,10 +762,11 @@ function bindArticleHeader() {
  */
 function renderPreview() {
   previewDocId = current.id;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><span class="eyebrow">${account === "AI" ? "AI 实践与思考" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout" class="primary">退出预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize">定稿</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="article-preview">${safeHTML(current.body)}</div></article></section><div class="workspace-resizer" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant"><div class="assistant-head"><span>小红书分页</span><label class="social-size-label">字号 <select id="social-size"><option value="36">标准</option><option value="42">大字</option><option value="30">紧凑</option></select></label></div><div class="preview-actions"><button id="social-export" class="primary wide" disabled>导出图片</button><button id="copy-publish" class="wide">复制排版（公众号）</button><p id="social-status" class="notice">正在排版…</p></div><div id="panel"><div id="social-pages"></div></div></aside></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><span class="eyebrow">${account === "AI" ? "AI 实践与思考" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout" class="primary">退出预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize">定稿</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="article-preview">${safeHTML(current.body)}</div></article></section><div class="workspace-resizer" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant"><div class="assistant-head"><span>小红书分页</span><label class="social-size-label">字号 <select id="social-size"><option value="36">标准</option><option value="42">大字</option><option value="30">紧凑</option></select></label></div><div class="preview-actions"><button id="social-export" class="primary wide" disabled>导出图片</button><button id="copy-publish" class="wide">复制排版（公众号）</button><button id="push-wechat" class="wide">推送到草稿箱</button><p id="social-status" class="notice">正在排版…</p></div><div id="panel"><div id="social-pages"></div></div></aside></div>`;
   bindArticleHeader();
   enhanceWechatPreview();
   $("#copy-publish").onclick = () => copyPublish(current);
+  $("#push-wechat").onclick = () => pushWechatDraft(current);
   socialPreviewCtl = bindSocialPreview($(".assistant"), {
     html: socialSourceHTML(),
     title: current.title,
@@ -1343,6 +1369,33 @@ async function copyPublish(doc) {
   toast("排版已复制；本地图片请在公众号补入");
 }
 
+/**
+ * 推送当前文章到微信公众号草稿箱（上传正文图与封面后 draft/add）。
+ * @param {object} [doc]
+ */
+async function pushWechatDraft(doc) {
+  if (!doc) doc = current;
+  if (doc === current) sync();
+  if (!doc) return;
+  if (isWeb()) return toast("草稿推送仅支持桌面端");
+  const btn = $("#push-wechat");
+  if (btn) btn.disabled = true;
+  try {
+    const result = await api("wechat-draft-push", {
+      title: doc.title || "未命名文章",
+      html: publishHTML(doc.body, { keepImages: true }),
+    });
+    toast(
+      `已推送到草稿箱「${result.title}」` +
+        (result.imageCount ? `（上传 ${result.imageCount} 张图）` : ""),
+    );
+  } catch (e) {
+    toast(e.message || "推送失败");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 /** 选择笔记列表明细 xlsx */
 async function pickNoteTable() {
   if (!isWeb()) {
@@ -1696,14 +1749,48 @@ function renderTopics() {
   );
 }
 function renderSettings() {
+  const wx = state.wechat || {};
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">设置</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><div class="dashboard-card"><h3>Agent 连接</h3><label>默认 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "· 已找到 CLI" : "· 未安装"}</option><option value="codex">Codex ${state.agents.codex ? "· 已找到 CLI" : "· 未安装"}</option></select></label><label>模型（留空沿用 CLI 默认）<input id="model" value="${esc(state.model)}" placeholder="可选模型 ID"></label><p>复用 CLI 登录。若未登录，请先在终端执行 agent login 或 codex login。此版本不保存账号凭据。</p><button class="primary" id="save-settings">保存设置</button></div><div class="dashboard-card"><h3>本地数据</h3>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<p>${esc(state.dataPath)}</p><h3>Content_OS 来源</h3><p>${esc(state.source || "尚未选择")}</p><p>开发阶段直接读写独立副本；正文在 02_Drafts，定稿后移动到 03_Archive，图片在 Attachment/文章名，素材在 00_wiki，版本和对话在 _system/inkdesk。上线后再配置正式目录。</p><button type="button" id="refresh-vault">↻ 刷新开发副本</button></div></section>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">设置</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><div class="dashboard-card"><h3>Agent 连接</h3><label>默认 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "· 已找到 CLI" : "· 未安装"}</option><option value="codex">Codex ${state.agents.codex ? "· 已找到 CLI" : "· 未安装"}</option></select></label><label>模型（留空沿用 CLI 默认）<input id="model" value="${esc(state.model)}" placeholder="可选模型 ID"></label><p>复用 CLI 登录。若未登录，请先在终端执行 agent login 或 codex login。此版本不保存账号凭据。</p><button class="primary" id="save-settings">保存设置</button></div><div class="dashboard-card"><h3>微信公众号</h3><p>用于一键推送到草稿箱。AppSecret 仅保存在本机 workspace.json。</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx…" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="密钥" autocomplete="off"></label><label>默认作者<input id="wechat-author" value="${esc(wx.author || "金奇")}" placeholder="金奇"></label><label>默认封面路径<input id="wechat-cover" value="${esc(wx.coverPath || "")}" placeholder="可选；也可依赖正文首图" readonly><button type="button" id="wechat-pick-cover">选择封面</button></label><div class="row"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存公众号设置</button></div></div><div class="dashboard-card"><h3>本地数据</h3>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<p>${esc(state.dataPath)}</p><h3>Content_OS 来源</h3><p>${esc(state.source || "尚未选择")}</p><p>开发阶段直接读写独立副本；正文在 02_Drafts，定稿后移动到 03_Archive，图片在 Attachment/文章名，素材在 00_wiki，版本和对话在 _system/inkdesk。上线后再配置正式目录。</p><button type="button" id="refresh-vault">↻ 刷新开发副本</button></div></section>`;
   $("#setting-provider").value = state.provider;
   $("#save-settings").onclick = () => {
     state.provider = $("#setting-provider").value;
     state.model = $("#model").value.trim();
     persist();
     toast("设置已保存");
+  };
+  /** 把表单写回 state.wechat */
+  const readWechatForm = () => {
+    state.wechat = {
+      appId: $("#wechat-appid").value.trim(),
+      appSecret: $("#wechat-secret").value.trim(),
+      author: $("#wechat-author").value.trim() || "金奇",
+      coverPath: $("#wechat-cover").value.trim(),
+    };
+  };
+  $("#wechat-pick-cover").onclick = async () => {
+    if (isWeb()) return toast("封面选择仅支持桌面端");
+    try {
+      const p = await api("wechat-pick-cover");
+      if (p) $("#wechat-cover").value = p;
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+  $("#wechat-test").onclick = async () => {
+    readWechatForm();
+    await persist();
+    try {
+      await api("wechat-test-token");
+      toast("公众号凭证有效");
+    } catch (e) {
+      toast(e.message || "连接失败");
+    }
+  };
+  $("#save-wechat").onclick = () => {
+    readWechatForm();
+    persist();
+    toast("公众号设置已保存");
   };
   $("#refresh-vault").onclick = () => refreshVault();
 }

@@ -319,22 +319,46 @@ async function socialPages(html2, title, size = 36) {
     y += boxH + Math.round(20 * SCALE);
   }
   async function picture(src) {
-    const img = new Image();
-    if (/^https?:/.test(src)) img.crossOrigin = "anonymous";
-    img.src = src;
-    await Promise.race([
-      img.decode(),
-      new Promise((_, r) => setTimeout(() => r(Error("\u56FE\u7247\u52A0\u8F7D\u8D85\u65F6")), 12e3))
-    ]);
-    const scale = Math.min(
-      contentW / img.naturalWidth,
-      Math.round(620 * SCALE) / img.naturalHeight
-    );
-    const w = img.naturalWidth * scale;
-    const h2 = img.naturalHeight * scale;
-    ensure(h2 + 26);
-    ctx.drawImage(img, pad + (contentW - w) / 2, y, w, h2);
-    y += h2 + 26;
+    if (!src) return;
+    let objectUrl;
+    try {
+      let blob;
+      if (/^(inkasset:|\/api\/asset\/|https?:|data:|blob:)/i.test(src)) {
+        const res = await fetch(src, { mode: "cors" });
+        if (!res.ok) throw Error("\u56FE\u7247\u52A0\u8F7D\u5931\u8D25 HTTP " + res.status);
+        blob = await res.blob();
+      } else {
+        const res = await fetch(src);
+        if (!res.ok) throw Error("\u56FE\u7247\u52A0\u8F7D\u5931\u8D25");
+        blob = await res.blob();
+      }
+      objectUrl = URL.createObjectURL(blob);
+      const img = new Image();
+      img.src = objectUrl;
+      await Promise.race([
+        img.decode(),
+        new Promise((_, r) => setTimeout(() => r(Error("\u56FE\u7247\u52A0\u8F7D\u8D85\u65F6")), 12e3))
+      ]);
+      const scale = Math.min(
+        contentW / img.naturalWidth,
+        Math.round(620 * SCALE) / img.naturalHeight
+      );
+      const w = img.naturalWidth * scale;
+      const h2 = img.naturalHeight * scale;
+      ensure(h2 + 26);
+      ctx.drawImage(img, pad + (contentW - w) / 2, y, w, h2);
+      y += h2 + 26;
+    } catch (e) {
+      const msg = "\uFF3B\u56FE\u7247\u672A\u52A0\u8F7D\uFF3D";
+      font(SANS, 400, Math.round(14 * SCALE));
+      ensure(Math.round(40 * SCALE));
+      ctx.fillStyle = "#999";
+      ctx.fillText(msg, pad, y + Math.round(20 * SCALE));
+      y += Math.round(40 * SCALE);
+      console.warn("social picture:", src, e);
+    } finally {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    }
   }
   async function block2(node) {
     if (node.nodeName === "IMG") {
@@ -29240,6 +29264,7 @@ function isWeb() {
 }
 function assetUrl(src) {
   if (typeof src !== "string") return src;
+  if (!isWeb()) return src;
   if (src.startsWith("inkasset://vault/"))
     return "/api/asset/vault/" + src.slice("inkasset://vault/".length);
   if (src.startsWith("inkasset://local/"))
@@ -29333,9 +29358,15 @@ function safeHTML(md) {
         n.removeAttribute(a.name);
     });
   });
-  return d.body.innerHTML.replace(
-    /inkasset:\/\/(vault|local)\/([^"'\s)]+)/g,
-    (_, kind, rel) => "/api/asset/" + kind + "/" + rel
+  let html2 = d.body.innerHTML;
+  if (isWeb())
+    return html2.replace(
+      /inkasset:\/\/(vault|local)\/([^"'\s)]+)/g,
+      (_, kind, rel) => "/api/asset/" + kind + "/" + rel
+    );
+  return html2.replace(
+    /\/api\/asset\/(vault|local)\/([^"'\s)]+)/g,
+    (_, kind, rel) => "inkasset://" + kind + "/" + rel
   );
 }
 function toast(t) {
@@ -29593,14 +29624,23 @@ function enhanceWechatPreview(root2 = $("#article-preview")) {
     });
   });
 }
-function publishHTML(md) {
+function publishHTML(md, opts = {}) {
   const serif = WECHAT_SERIF_PUBLISH;
   const d = new DOMParser().parseFromString(safeHTML(md), "text/html");
-  d.querySelectorAll("img").forEach((img) => {
-    const p = d.createElement("p");
-    p.textContent = "\u3010\u8BF7\u4E0A\u4F20\u56FE\u7247\uFF1A" + (img.alt || "\u6B63\u6587\u914D\u56FE") + "\u3011";
-    img.replaceWith(p);
-  });
+  if (opts.keepImages) {
+    if (!isWeb())
+      d.querySelectorAll("img").forEach((img) => {
+        const src = img.getAttribute("src");
+        if (src?.startsWith("/api/asset/"))
+          img.src = src.replace("/api/asset/vault/", "inkasset://vault/").replace("/api/asset/local/", "inkasset://local/");
+      });
+  } else {
+    d.querySelectorAll("img").forEach((img) => {
+      const p = d.createElement("p");
+      p.textContent = "\u3010\u8BF7\u4E0A\u4F20\u56FE\u7247\uFF1A" + (img.alt || "\u6B63\u6587\u914D\u56FE") + "\u3011";
+      img.replaceWith(p);
+    });
+  }
   d.querySelectorAll("h1").forEach((h1, i) => {
     splitWechatH1(h1);
     const num = String(i + 1).padStart(2, "0");
@@ -29823,10 +29863,11 @@ function bindArticleHeader() {
 }
 function renderPreview() {
   previewDocId = current.id;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><span class="eyebrow">${account === "AI" ? "AI \u5B9E\u8DF5\u4E0E\u601D\u8003" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize">\u5B9A\u7A3F</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="article-preview">${safeHTML(current.body)}</div></article></section><div class="workspace-resizer" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant"><div class="assistant-head"><span>\u5C0F\u7EA2\u4E66\u5206\u9875</span><label class="social-size-label">\u5B57\u53F7 <select id="social-size"><option value="36">\u6807\u51C6</option><option value="42">\u5927\u5B57</option><option value="30">\u7D27\u51D1</option></select></label></div><div class="preview-actions"><button id="social-export" class="primary wide" disabled>\u5BFC\u51FA\u56FE\u7247</button><button id="copy-publish" class="wide">\u590D\u5236\u6392\u7248\uFF08\u516C\u4F17\u53F7\uFF09</button><p id="social-status" class="notice">\u6B63\u5728\u6392\u7248\u2026</p></div><div id="panel"><div id="social-pages"></div></div></aside></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><span class="eyebrow">${account === "AI" ? "AI \u5B9E\u8DF5\u4E0E\u601D\u8003" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize">\u5B9A\u7A3F</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="article-preview">${safeHTML(current.body)}</div></article></section><div class="workspace-resizer" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant"><div class="assistant-head"><span>\u5C0F\u7EA2\u4E66\u5206\u9875</span><label class="social-size-label">\u5B57\u53F7 <select id="social-size"><option value="36">\u6807\u51C6</option><option value="42">\u5927\u5B57</option><option value="30">\u7D27\u51D1</option></select></label></div><div class="preview-actions"><button id="social-export" class="primary wide" disabled>\u5BFC\u51FA\u56FE\u7247</button><button id="copy-publish" class="wide">\u590D\u5236\u6392\u7248\uFF08\u516C\u4F17\u53F7\uFF09</button><button id="push-wechat" class="wide">\u63A8\u9001\u5230\u8349\u7A3F\u7BB1</button><p id="social-status" class="notice">\u6B63\u5728\u6392\u7248\u2026</p></div><div id="panel"><div id="social-pages"></div></div></aside></div>`;
   bindArticleHeader();
   enhanceWechatPreview();
   $("#copy-publish").onclick = () => copyPublish(current);
+  $("#push-wechat").onclick = () => pushWechatDraft(current);
   socialPreviewCtl = bindSocialPreview($(".assistant"), {
     html: socialSourceHTML(),
     title: current.title,
@@ -30340,6 +30381,27 @@ async function copyPublish(doc3) {
   await api("copy", { html: html2, text: d.body.textContent });
   toast("\u6392\u7248\u5DF2\u590D\u5236\uFF1B\u672C\u5730\u56FE\u7247\u8BF7\u5728\u516C\u4F17\u53F7\u8865\u5165");
 }
+async function pushWechatDraft(doc3) {
+  if (!doc3) doc3 = current;
+  if (doc3 === current) sync();
+  if (!doc3) return;
+  if (isWeb()) return toast("\u8349\u7A3F\u63A8\u9001\u4EC5\u652F\u6301\u684C\u9762\u7AEF");
+  const btn = $("#push-wechat");
+  if (btn) btn.disabled = true;
+  try {
+    const result = await api("wechat-draft-push", {
+      title: doc3.title || "\u672A\u547D\u540D\u6587\u7AE0",
+      html: publishHTML(doc3.body, { keepImages: true })
+    });
+    toast(
+      `\u5DF2\u63A8\u9001\u5230\u8349\u7A3F\u7BB1\u300C${result.title}\u300D` + (result.imageCount ? `\uFF08\u4E0A\u4F20 ${result.imageCount} \u5F20\u56FE\uFF09` : "")
+    );
+  } catch (e) {
+    toast(e.message || "\u63A8\u9001\u5931\u8D25");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
 async function pickNoteTable() {
   if (!isWeb()) {
     const filePath = await api("pick-note-table");
@@ -30630,13 +30692,46 @@ function renderTopics() {
   );
 }
 function renderSettings() {
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BBE\u7F6E</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><div class="dashboard-card"><h3>Agent \u8FDE\u63A5</h3><label>\u9ED8\u8BA4 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option><option value="codex">Codex ${state.agents.codex ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option></select></label><label>\u6A21\u578B\uFF08\u7559\u7A7A\u6CBF\u7528 CLI \u9ED8\u8BA4\uFF09<input id="model" value="${esc(state.model)}" placeholder="\u53EF\u9009\u6A21\u578B ID"></label><p>\u590D\u7528 CLI \u767B\u5F55\u3002\u82E5\u672A\u767B\u5F55\uFF0C\u8BF7\u5148\u5728\u7EC8\u7AEF\u6267\u884C agent login \u6216 codex login\u3002\u6B64\u7248\u672C\u4E0D\u4FDD\u5B58\u8D26\u53F7\u51ED\u636E\u3002</p><button class="primary" id="save-settings">\u4FDD\u5B58\u8BBE\u7F6E</button></div><div class="dashboard-card"><h3>\u672C\u5730\u6570\u636E</h3>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<p>${esc(state.dataPath)}</p><h3>Content_OS \u6765\u6E90</h3><p>${esc(state.source || "\u5C1A\u672A\u9009\u62E9")}</p><p>\u5F00\u53D1\u9636\u6BB5\u76F4\u63A5\u8BFB\u5199\u72EC\u7ACB\u526F\u672C\uFF1B\u6B63\u6587\u5728 02_Drafts\uFF0C\u5B9A\u7A3F\u540E\u79FB\u52A8\u5230 03_Archive\uFF0C\u56FE\u7247\u5728 Attachment/\u6587\u7AE0\u540D\uFF0C\u7D20\u6750\u5728 00_wiki\uFF0C\u7248\u672C\u548C\u5BF9\u8BDD\u5728 _system/inkdesk\u3002\u4E0A\u7EBF\u540E\u518D\u914D\u7F6E\u6B63\u5F0F\u76EE\u5F55\u3002</p><button type="button" id="refresh-vault">\u21BB \u5237\u65B0\u5F00\u53D1\u526F\u672C</button></div></section>`;
+  const wx = state.wechat || {};
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BBE\u7F6E</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><div class="dashboard-card"><h3>Agent \u8FDE\u63A5</h3><label>\u9ED8\u8BA4 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option><option value="codex">Codex ${state.agents.codex ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option></select></label><label>\u6A21\u578B\uFF08\u7559\u7A7A\u6CBF\u7528 CLI \u9ED8\u8BA4\uFF09<input id="model" value="${esc(state.model)}" placeholder="\u53EF\u9009\u6A21\u578B ID"></label><p>\u590D\u7528 CLI \u767B\u5F55\u3002\u82E5\u672A\u767B\u5F55\uFF0C\u8BF7\u5148\u5728\u7EC8\u7AEF\u6267\u884C agent login \u6216 codex login\u3002\u6B64\u7248\u672C\u4E0D\u4FDD\u5B58\u8D26\u53F7\u51ED\u636E\u3002</p><button class="primary" id="save-settings">\u4FDD\u5B58\u8BBE\u7F6E</button></div><div class="dashboard-card"><h3>\u5FAE\u4FE1\u516C\u4F17\u53F7</h3><p>\u7528\u4E8E\u4E00\u952E\u63A8\u9001\u5230\u8349\u7A3F\u7BB1\u3002AppSecret \u4EC5\u4FDD\u5B58\u5728\u672C\u673A workspace.json\u3002</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx\u2026" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="\u5BC6\u94A5" autocomplete="off"></label><label>\u9ED8\u8BA4\u4F5C\u8005<input id="wechat-author" value="${esc(wx.author || "\u91D1\u5947")}" placeholder="\u91D1\u5947"></label><label>\u9ED8\u8BA4\u5C01\u9762\u8DEF\u5F84<input id="wechat-cover" value="${esc(wx.coverPath || "")}" placeholder="\u53EF\u9009\uFF1B\u4E5F\u53EF\u4F9D\u8D56\u6B63\u6587\u9996\u56FE" readonly><button type="button" id="wechat-pick-cover">\u9009\u62E9\u5C01\u9762</button></label><div class="row"><button type="button" id="wechat-test">\u6D4B\u8BD5\u8FDE\u63A5</button><button type="button" class="primary" id="save-wechat">\u4FDD\u5B58\u516C\u4F17\u53F7\u8BBE\u7F6E</button></div></div><div class="dashboard-card"><h3>\u672C\u5730\u6570\u636E</h3>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<p>${esc(state.dataPath)}</p><h3>Content_OS \u6765\u6E90</h3><p>${esc(state.source || "\u5C1A\u672A\u9009\u62E9")}</p><p>\u5F00\u53D1\u9636\u6BB5\u76F4\u63A5\u8BFB\u5199\u72EC\u7ACB\u526F\u672C\uFF1B\u6B63\u6587\u5728 02_Drafts\uFF0C\u5B9A\u7A3F\u540E\u79FB\u52A8\u5230 03_Archive\uFF0C\u56FE\u7247\u5728 Attachment/\u6587\u7AE0\u540D\uFF0C\u7D20\u6750\u5728 00_wiki\uFF0C\u7248\u672C\u548C\u5BF9\u8BDD\u5728 _system/inkdesk\u3002\u4E0A\u7EBF\u540E\u518D\u914D\u7F6E\u6B63\u5F0F\u76EE\u5F55\u3002</p><button type="button" id="refresh-vault">\u21BB \u5237\u65B0\u5F00\u53D1\u526F\u672C</button></div></section>`;
   $("#setting-provider").value = state.provider;
   $("#save-settings").onclick = () => {
     state.provider = $("#setting-provider").value;
     state.model = $("#model").value.trim();
     persist();
     toast("\u8BBE\u7F6E\u5DF2\u4FDD\u5B58");
+  };
+  const readWechatForm = () => {
+    state.wechat = {
+      appId: $("#wechat-appid").value.trim(),
+      appSecret: $("#wechat-secret").value.trim(),
+      author: $("#wechat-author").value.trim() || "\u91D1\u5947",
+      coverPath: $("#wechat-cover").value.trim()
+    };
+  };
+  $("#wechat-pick-cover").onclick = async () => {
+    if (isWeb()) return toast("\u5C01\u9762\u9009\u62E9\u4EC5\u652F\u6301\u684C\u9762\u7AEF");
+    try {
+      const p = await api("wechat-pick-cover");
+      if (p) $("#wechat-cover").value = p;
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+  $("#wechat-test").onclick = async () => {
+    readWechatForm();
+    await persist();
+    try {
+      await api("wechat-test-token");
+      toast("\u516C\u4F17\u53F7\u51ED\u8BC1\u6709\u6548");
+    } catch (e) {
+      toast(e.message || "\u8FDE\u63A5\u5931\u8D25");
+    }
+  };
+  $("#save-wechat").onclick = () => {
+    readWechatForm();
+    persist();
+    toast("\u516C\u4F17\u53F7\u8BBE\u7F6E\u5DF2\u4FDD\u5B58");
   };
   $("#refresh-vault").onclick = () => refreshVault();
 }

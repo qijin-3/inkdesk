@@ -79,14 +79,17 @@ app.whenReady().then(() => {
       ? path.join(process.resourcesPath, "reference-reader")
       : path.join(__dirname, "assets/reference-reader"),
   });
-  protocol.handle("inkasset", (request) => {
+  protocol.handle("inkasset", async (request) => {
     try {
       const id = decodeURIComponent(new URL(request.url).pathname.slice(1));
       const p =
         new URL(request.url).hostname === "vault"
           ? desk.vaultAsset(id)
           : desk.allowedAsset(path.join(desk.data, "assets", id));
-      return net.fetch(pathToFileURL(p).href);
+      const res = await net.fetch(pathToFileURL(p).href);
+      const headers = new Headers(res.headers);
+      headers.set("Access-Control-Allow-Origin", "*");
+      return new Response(res.body, { status: res.status, headers });
     } catch {
       return new Response("Not found", { status: 404 });
     }
@@ -134,11 +137,25 @@ const passthrough = new Set([
   "materials-read",
   "materials-delete",
   "materials-link",
+  "wechat-draft-push",
+  "wechat-test-token",
 ]);
 
 for (const name of passthrough) {
   ipcMain.handle(name, (_, data) => desk.invoke(name, data));
 }
+
+ipcMain.handle("wechat-pick-cover", async () => {
+  const result = await dialog.showOpenDialog({
+    title: "选择公众号默认封面",
+    properties: ["openFile"],
+    filters: [
+      { name: "图片", extensions: ["jpg", "jpeg", "png", "gif", "bmp", "webp"] },
+    ],
+  });
+  if (result.canceled) return null;
+  return result.filePaths[0] || null;
+});
 
 ipcMain.handle("project-upload", async (_, id) => {
   const result = await dialog.showOpenDialog({
