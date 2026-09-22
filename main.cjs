@@ -157,7 +157,17 @@ ipcMain.handle("wechat-pick-cover", async () => {
   return result.filePaths[0] || null;
 });
 
-ipcMain.handle("project-upload", async (_, id) => {
+ipcMain.handle("project-upload", async (_, data) => {
+  // 拖拽 / 网页：直接带路径或 bytes；按钮：弹原生选择框
+  if (
+    data &&
+    typeof data === "object" &&
+    (data.filePaths?.length || data.files?.length)
+  ) {
+    return desk.projectUpload(data);
+  }
+  const id = typeof data === "string" ? data : data?.id;
+  if (!id) return null;
   const result = await dialog.showOpenDialog({
     title: "为这篇草稿添加参考文件",
     properties: ["openFile", "multiSelections"],

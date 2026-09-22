@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 const channels = [
   "export-social",
   "load",
@@ -50,6 +50,14 @@ const channels = [
 contextBridge.exposeInMainWorld("desk", {
   web: false,
   flush: (data) => ipcRenderer.sendSync("save-sync", data),
+  /** 拖拽 File 对象解析本地绝对路径（Electron） */
+  pathForFile: (file) => {
+    try {
+      return webUtils.getPathForFile(file);
+    } catch {
+      return "";
+    }
+  },
   call: (name, data) => {
     if (!channels.includes(name)) throw Error("Invalid channel");
     return ipcRenderer.invoke(name, data);

@@ -29617,17 +29617,32 @@ function pickFiles({ multiple = false, accept = "" } = {}) {
     input.click();
   });
 }
-async function uploadProjectFiles(docId) {
+async function uploadProjectFiles(docId, droppedFiles) {
+  const list2 = droppedFiles?.length ? [...droppedFiles] : null;
+  if (list2?.length) {
+    if (!isWeb() && window.desk?.pathForFile) {
+      const filePaths = list2.map((f) => window.desk.pathForFile(f)).filter(Boolean);
+      if (filePaths.length)
+        return api("project-upload", { id: docId, filePaths });
+    }
+    const files2 = await Promise.all(
+      list2.map(async (f) => ({
+        name: f.name,
+        bytes: [...new Uint8Array(await f.arrayBuffer())]
+      }))
+    );
+    return api("project-upload", { id: docId, files: files2 });
+  }
   if (!isWeb()) return api("project-upload", docId);
-  const files = await pickFiles({ multiple: true });
-  if (!files.length) return null;
-  const payload = await Promise.all(
-    files.map(async (f) => ({
+  const picked = await pickFiles({ multiple: true });
+  if (!picked.length) return null;
+  const files = await Promise.all(
+    picked.map(async (f) => ({
       name: f.name,
       bytes: [...new Uint8Array(await f.arrayBuffer())]
     }))
   );
-  return api("project-upload", { id: docId, files: payload });
+  return api("project-upload", { id: docId, files });
 }
 async function pickImagePayload() {
   const files = await pickFiles({ accept: "image/*" });
@@ -29799,10 +29814,19 @@ function materialDrawerBodyHTML(r) {
     return `<pre id="reference-text" class="material-preview is-code">${esc(text)}</pre>`;
   return `<p class="muted">\u5DF2\u4FDD\u7559\u539F\u6587\u4EF6\uFF0C\u5F53\u524D\u683C\u5F0F\u6682\u4E0D\u652F\u6301\u5185\u5D4C\u9884\u89C8\u3002</p><pre id="reference-text" class="material-preview is-code">${esc(text)}</pre>`;
 }
-function toast(t) {
-  $("#toast").textContent = t;
-  $("#toast").classList.add("show");
-  setTimeout(() => $("#toast").classList.remove("show"), 3800);
+var toastTimer = 0;
+function toast(t, opts) {
+  const el = $("#toast");
+  if (!el) return;
+  el.textContent = t;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  if (opts?.sticky) return;
+  toastTimer = setTimeout(() => el.classList.remove("show"), 3800);
+}
+function hideToast() {
+  clearTimeout(toastTimer);
+  $("#toast")?.classList.remove("show");
 }
 async function persist() {
   clearTimeout(saveTimer);
@@ -30663,6 +30687,7 @@ function renderAssistantRail() {
 function bindArticleMaterialsPanel() {
   const listEl = $("#article-material-list");
   const uploadBtn = $("#upload-article-material");
+  const panel = $("#panel.article-materials-panel") || $(".article-materials-panel");
   const doc3 = current;
   if (!listEl || !doc3) return;
   const draw = async () => {
@@ -30672,7 +30697,7 @@ function bindArticleMaterialsPanel() {
       const raw = await api("project-refs", doc3.id);
       const refs = await Promise.all(raw.map(hydrateMaterialPreview));
       if (!listEl.isConnected) return;
-      listEl.innerHTML = refs.map((r) => materialPreviewCardHTML(r)).join("") || '<p class="empty-data">\u8FD8\u6CA1\u6709\u7D20\u6750\u3002\u4E0A\u4F20\u540E\u53EF\u5728\u5BF9\u8BDD\u4E2D\u5F15\u7528\u3002</p>';
+      listEl.innerHTML = refs.map((r) => materialPreviewCardHTML(r)).join("") || '<p class="empty-data">\u62D6\u62FD\u6587\u4EF6\u5230\u6B64\u5904\uFF0C\u6216\u70B9\u51FB\u4E0A\u65B9\u4E0A\u4F20</p>';
       $$("#article-material-list [data-ref-preview]").forEach(
         (b) => b.onclick = async () => {
           try {
@@ -30716,6 +30741,23 @@ function bindArticleMaterialsPanel() {
       toast(e.message);
     }
   };
+  const importFiles = async (files) => {
+    if (!files?.length) return;
+    toast("\u6B63\u5728\u5BFC\u5165 " + files.length + " \u4E2A\u6587\u4EF6\u2026");
+    if (uploadBtn) uploadBtn.disabled = true;
+    panel?.classList.add("is-uploading");
+    try {
+      if (!await persist()) return;
+      await uploadProjectFiles(doc3.id, files);
+      await draw();
+      toast("\u5DF2\u5BFC\u5165 " + files.length + " \u4E2A\u6587\u4EF6");
+    } catch (e) {
+      toast(e.message);
+    } finally {
+      if (uploadBtn?.isConnected) uploadBtn.disabled = false;
+      panel?.classList.remove("is-uploading");
+    }
+  };
   uploadBtn.onclick = async () => {
     uploadBtn.disabled = true;
     try {
@@ -30728,6 +30770,35 @@ function bindArticleMaterialsPanel() {
       if (uploadBtn.isConnected) uploadBtn.disabled = false;
     }
   };
+  if (panel && !panel.dataset.dropBound) {
+    panel.dataset.dropBound = "1";
+    let dragDepth = 0;
+    const isFileDrag = (dt) => !!dt && [...dt.types || []].includes("Files");
+    panel.addEventListener("dragenter", (e) => {
+      if (!isFileDrag(e.dataTransfer)) return;
+      e.preventDefault();
+      dragDepth += 1;
+      if (dragDepth === 1) toast("\u677E\u5F00\u5373\u53EF\u5BFC\u5165\u5230\u7D20\u6750", { sticky: true });
+    });
+    panel.addEventListener("dragover", (e) => {
+      if (!isFileDrag(e.dataTransfer)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    });
+    panel.addEventListener("dragleave", () => {
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) hideToast();
+    });
+    panel.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dragDepth = 0;
+      const files = [...e.dataTransfer?.files || []].filter(
+        (f) => f && f.size > 0
+      );
+      if (!files.length) return toast("\u6CA1\u6709\u53EF\u5BFC\u5165\u7684\u6587\u4EF6");
+      importFiles(files);
+    });
+  }
   draw();
 }
 function renderPreview() {

@@ -50,18 +50,35 @@ function pickFiles({ multiple = false, accept = "" } = {}) {
   });
 }
 
-/** 上传项目参考文件（网页用文件选择，桌面走原生对话框） */
-async function uploadProjectFiles(docId) {
+/** 上传项目参考文件（网页用文件选择，桌面走原生对话框；可传入拖拽文件） */
+async function uploadProjectFiles(docId, droppedFiles) {
+  const list = droppedFiles?.length ? [...droppedFiles] : null;
+  if (list?.length) {
+    if (!isWeb() && window.desk?.pathForFile) {
+      const filePaths = list
+        .map((f) => window.desk.pathForFile(f))
+        .filter(Boolean);
+      if (filePaths.length)
+        return api("project-upload", { id: docId, filePaths });
+    }
+    const files = await Promise.all(
+      list.map(async (f) => ({
+        name: f.name,
+        bytes: [...new Uint8Array(await f.arrayBuffer())],
+      })),
+    );
+    return api("project-upload", { id: docId, files });
+  }
   if (!isWeb()) return api("project-upload", docId);
-  const files = await pickFiles({ multiple: true });
-  if (!files.length) return null;
-  const payload = await Promise.all(
-    files.map(async (f) => ({
+  const picked = await pickFiles({ multiple: true });
+  if (!picked.length) return null;
+  const files = await Promise.all(
+    picked.map(async (f) => ({
       name: f.name,
       bytes: [...new Uint8Array(await f.arrayBuffer())],
     })),
   );
-  return api("project-upload", { id: docId, files: payload });
+  return api("project-upload", { id: docId, files });
 }
 
 /** 选择一张图片并返回 bytes 与 MIME */
@@ -318,10 +335,25 @@ function materialDrawerBodyHTML(r) {
     return `<pre id="reference-text" class="material-preview is-code">${esc(text)}</pre>`;
   return `<p class="muted">已保留原文件，当前格式暂不支持内嵌预览。</p><pre id="reference-text" class="material-preview is-code">${esc(text)}</pre>`;
 }
-function toast(t) {
-  $("#toast").textContent = t;
-  $("#toast").classList.add("show");
-  setTimeout(() => $("#toast").classList.remove("show"), 3800);
+let toastTimer = 0;
+/**
+ * 顶部轻提示。
+ * @param {string} t 文案
+ * @param {{ sticky?: boolean }} [opts] sticky 时不自动消失（拖拽悬停用）
+ */
+function toast(t, opts) {
+  const el = $("#toast");
+  if (!el) return;
+  el.textContent = t;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  if (opts?.sticky) return;
+  toastTimer = setTimeout(() => el.classList.remove("show"), 3800);
+}
+/** 立刻收起顶部提示 */
+function hideToast() {
+  clearTimeout(toastTimer);
+  $("#toast")?.classList.remove("show");
 }
 async function persist() {
   clearTimeout(saveTimer);
@@ -1391,11 +1423,12 @@ function renderAssistantRail() {
 }
 
 /**
- * 绑定本文素材侧栏：列表、上传、预览。
+ * 绑定本文素材侧栏：列表、上传、预览、拖拽导入。
  */
 function bindArticleMaterialsPanel() {
   const listEl = $("#article-material-list");
   const uploadBtn = $("#upload-article-material");
+  const panel = $("#panel.article-materials-panel") || $(".article-materials-panel");
   const doc = current;
   if (!listEl || !doc) return;
 
@@ -1414,7 +1447,7 @@ function bindArticleMaterialsPanel() {
       if (!listEl.isConnected) return;
       listEl.innerHTML =
         refs.map((r) => materialPreviewCardHTML(r)).join("") ||
-        '<p class="empty-data">还没有素材。上传后可在对话中引用。</p>';
+        '<p class="empty-data">拖拽文件到此处，或点击上方上传</p>';
       $$("#article-material-list [data-ref-preview]").forEach(
         (b) =>
           (b.onclick = async () => {
@@ -1460,6 +1493,25 @@ function bindArticleMaterialsPanel() {
     }
   };
 
+  /** 导入一批文件（按钮选择或拖拽） */
+  const importFiles = async (files) => {
+    if (!files?.length) return;
+    toast("正在导入 " + files.length + " 个文件…");
+    if (uploadBtn) uploadBtn.disabled = true;
+    panel?.classList.add("is-uploading");
+    try {
+      if (!(await persist())) return;
+      await uploadProjectFiles(doc.id, files);
+      await draw();
+      toast("已导入 " + files.length + " 个文件");
+    } catch (e) {
+      toast(e.message);
+    } finally {
+      if (uploadBtn?.isConnected) uploadBtn.disabled = false;
+      panel?.classList.remove("is-uploading");
+    }
+  };
+
   uploadBtn.onclick = async () => {
     uploadBtn.disabled = true;
     try {
@@ -1472,6 +1524,39 @@ function bindArticleMaterialsPanel() {
       if (uploadBtn.isConnected) uploadBtn.disabled = false;
     }
   };
+
+  if (panel && !panel.dataset.dropBound) {
+    panel.dataset.dropBound = "1";
+    let dragDepth = 0;
+    /** 是否为从系统拖入的文件 */
+    const isFileDrag = (dt) =>
+      !!dt && [...(dt.types || [])].includes("Files");
+    panel.addEventListener("dragenter", (e) => {
+      if (!isFileDrag(e.dataTransfer)) return;
+      e.preventDefault();
+      dragDepth += 1;
+      if (dragDepth === 1) toast("松开即可导入到素材", { sticky: true });
+    });
+    panel.addEventListener("dragover", (e) => {
+      if (!isFileDrag(e.dataTransfer)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    });
+    panel.addEventListener("dragleave", () => {
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) hideToast();
+    });
+    panel.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dragDepth = 0;
+      const files = [...(e.dataTransfer?.files || [])].filter(
+        (f) => f && f.size > 0,
+      );
+      if (!files.length) return toast("没有可导入的文件");
+      importFiles(files);
+    });
+  }
+
   draw();
 }
 
