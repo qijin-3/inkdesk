@@ -101,6 +101,8 @@ let previewDocId = null;
 let socialPreviewCtl = null;
 /** 写作伙伴侧栏是否展开；仅草稿写作可用，默认收起 */
 let assistantOpen = false;
+/** 文章大纲是否固定展开 */
+let outlinePinned = false;
 function conversation(doc = current) {
   doc.conversations ||= [];
   if (!doc.conversations.length)
@@ -228,6 +230,10 @@ function render() {
   saveProfileEditor = null;
   $("#reference-drawer")?.remove();
   $("#published-drawer")?.remove();
+  $("#outline-popover")?.remove();
+  const outline = $("#article-outline");
+  outline?._teardown?.();
+  outline?.remove();
   if (composer) {
     composer.destroy();
     composer = null;
@@ -1044,6 +1050,7 @@ function syncRailVisibility() {
     toggle.classList.toggle("primary", assistantOpen);
     toggle.setAttribute("aria-pressed", assistantOpen ? "true" : "false");
   }
+  requestAnimationFrame(() => $("#article-outline")?._place?.());
 }
 
 /**
@@ -1173,7 +1180,7 @@ function renderWrite() {
     return;
   }
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><span id="saved">已保存到本地</span><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><button id="layout">预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><button id="outline" title="大纲">${I.outline()} 大纲</button><button id="focus" title="专注">${I.focus()} 专注</button></div><div id="outline-list" hidden></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">项目参考文件</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button><button data-task="review">${I.eye()} 看稿</button><button data-task="rewrite">${I.wand()} 润色选段</button><button data-task="check">${I.check()} 核查</button></div></section></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><span id="saved">已保存到本地</span><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><button id="layout">预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><button id="focus" title="专注">${I.focus()} 专注</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">项目参考文件</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button><button data-task="review">${I.eye()} 看稿</button><button data-task="rewrite">${I.wand()} 润色选段</button><button data-task="check">${I.check()} 核查</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [StarterKit, Image, TableKit],
@@ -1302,24 +1309,6 @@ function renderWrite() {
     if (assistantOpen) renderAssistantRail();
     else syncRailVisibility();
   };
-  $("#outline").onclick = () => {
-    const n = $("#outline-list");
-    n.hidden = !n.hidden;
-    n.innerHTML =
-      $$("#editor h1,#editor h2,#editor h3")
-        .map(
-          (x, i) =>
-            `<button data-heading="${i}">${esc(x.textContent)}</button>`,
-        )
-        .join("") || "<p>添加标题后，这里会显示文章结构。</p>";
-    $$("[data-heading]").forEach(
-      (b) =>
-        (b.onclick = () =>
-          $$("#editor h1,#editor h2,#editor h3")[
-            +b.dataset.heading
-          ].scrollIntoView({ behavior: "smooth" })),
-    );
-  };
   bindArticleHeader();
   bindFinalize();
   $$("[data-task]").forEach((b) => {
@@ -1334,7 +1323,83 @@ function renderWrite() {
     openAssistant();
     tagSelection();
   };
+  mountArticleOutline();
   renderAssistantRail();
+}
+
+/**
+ * 在正文右侧挂载锚点大纲：悬停展开、离开收起，可固定。
+ */
+function mountArticleOutline() {
+  const wrap = $(".paper-wrap");
+  if (!wrap || !editor) return;
+  const prev = $("#article-outline");
+  prev?._teardown?.();
+  prev?.remove();
+  const nav = document.createElement("aside");
+  nav.id = "article-outline";
+  nav.className = "article-outline" + (outlinePinned ? " is-pinned" : "");
+  document.body.appendChild(nav);
+
+  /** 贴在正文区右侧并垂直居中 */
+  const place = () => {
+    const box = $(".paper-wrap")?.getBoundingClientRect();
+    if (!box) return;
+    nav.style.top = box.top + box.height / 2 + "px";
+    nav.style.transform = "translateY(-50%)";
+    nav.style.right = Math.max(8, window.innerWidth - box.right + 6) + "px";
+  };
+  nav._place = place;
+
+  /** 根据编辑器标题刷新锚点 */
+  const refresh = () => {
+    const root = $("#editor");
+    if (!root) return;
+    const headings = [...root.querySelectorAll("h1, h2, h3")];
+    if (!headings.length) {
+      nav.hidden = true;
+      nav.innerHTML = "";
+      return;
+    }
+    nav.hidden = false;
+    nav.classList.toggle("is-pinned", outlinePinned);
+    nav.innerHTML = `<button type="button" class="outline-pin" title="${outlinePinned ? "取消固定" : "固定大纲"}" aria-label="${outlinePinned ? "取消固定" : "固定大纲"}">${outlinePinned ? I.pinOff({ size: 14 }) : I.pin({ size: 14 })}</button><div class="outline-track">${headings
+      .map((el, i) => {
+        const level = el.tagName === "H1" ? 1 : el.tagName === "H2" ? 2 : 3;
+        const text = el.textContent.trim() || "（空标题）";
+        return `<button type="button" class="outline-row level-${level}" data-heading="${i}" title="${esc(text)}"><span class="outline-bar" aria-hidden="true"></span><span class="outline-label">${esc(text)}</span></button>`;
+      })
+      .join("")}</div>`;
+
+    nav.querySelector(".outline-pin").onclick = (e) => {
+      e.stopPropagation();
+      outlinePinned = !outlinePinned;
+      nav.classList.toggle("is-pinned", outlinePinned);
+      refresh();
+    };
+
+    nav.querySelectorAll("[data-heading]").forEach((b) => {
+      b.onclick = (e) => {
+        e.stopPropagation();
+        headings[+b.dataset.heading]?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      };
+    });
+    place();
+  };
+
+  const onScroll = () => place();
+  wrap.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("resize", onScroll);
+  nav._teardown = () => {
+    wrap.removeEventListener("scroll", onScroll);
+    window.removeEventListener("resize", onScroll);
+  };
+
+  editor.on("update", refresh);
+  refresh();
 }
 
 /**

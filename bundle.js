@@ -23491,6 +23491,25 @@ var PanelRightOpen = [
   ["path", { d: "m10 15-3-3 3-3" }]
 ];
 
+// node_modules/lucide/dist/esm/icons/pin-off.mjs
+var PinOff = [
+  ["path", { d: "M12 17v5" }],
+  ["path", { d: "M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89" }],
+  ["path", { d: "m2 2 20 20" }],
+  ["path", { d: "M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11" }]
+];
+
+// node_modules/lucide/dist/esm/icons/pin.mjs
+var Pin = [
+  ["path", { d: "M12 17v5" }],
+  [
+    "path",
+    {
+      d: "M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"
+    }
+  ]
+];
+
 // node_modules/lucide/dist/esm/icons/plus.mjs
 var Plus = [
   ["path", { d: "M5 12h14" }],
@@ -23631,6 +23650,8 @@ var I = {
   list: (o) => icon(List, o),
   quote: (o) => icon(Quote, o),
   outline: (o) => icon(ListTree, o),
+  pin: (o) => icon(Pin, o),
+  pinOff: (o) => icon(PinOff, o),
   focus: (o) => icon(Focus2, o),
   refresh: (o) => icon(RefreshCw, o),
   folder: (o) => icon(FolderOpen, o),
@@ -29630,6 +29651,7 @@ var previewMode = false;
 var previewDocId = null;
 var socialPreviewCtl = null;
 var assistantOpen = false;
+var outlinePinned = false;
 function conversation(doc3 = current) {
   doc3.conversations ||= [];
   if (!doc3.conversations.length)
@@ -29740,6 +29762,10 @@ function render2() {
   saveProfileEditor = null;
   $("#reference-drawer")?.remove();
   $("#published-drawer")?.remove();
+  $("#outline-popover")?.remove();
+  const outline = $("#article-outline");
+  outline?._teardown?.();
+  outline?.remove();
   if (composer) {
     composer.destroy();
     composer = null;
@@ -30386,6 +30412,7 @@ function syncRailVisibility() {
     toggle.classList.toggle("primary", assistantOpen);
     toggle.setAttribute("aria-pressed", assistantOpen ? "true" : "false");
   }
+  requestAnimationFrame(() => $("#article-outline")?._place?.());
 }
 function openAssistant() {
   if (page !== "write" || !current || previewMode) return;
@@ -30489,7 +30516,7 @@ function renderWrite() {
     renderPreview();
     return;
   }
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button type="button" id="toggle-assistant">${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</button><button id="layout">\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><button id="outline" title="\u5927\u7EB2">${I.outline()} \u5927\u7EB2</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button></div><div id="outline-list" hidden></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">\u9879\u76EE\u53C2\u8003\u6587\u4EF6</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button><button data-task="review">${I.eye()} \u770B\u7A3F</button><button data-task="rewrite">${I.wand()} \u6DA6\u8272\u9009\u6BB5</button><button data-task="check">${I.check()} \u6838\u67E5</button></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button type="button" id="toggle-assistant">${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</button><button id="layout">\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">\u9879\u76EE\u53C2\u8003\u6587\u4EF6</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button><button data-task="review">${I.eye()} \u770B\u7A3F</button><button data-task="rewrite">${I.wand()} \u6DA6\u8272\u9009\u6BB5</button><button data-task="check">${I.check()} \u6838\u67E5</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [src_default, src_default2, TableKit],
@@ -30612,16 +30639,6 @@ function renderWrite() {
     if (assistantOpen) renderAssistantRail();
     else syncRailVisibility();
   };
-  $("#outline").onclick = () => {
-    const n = $("#outline-list");
-    n.hidden = !n.hidden;
-    n.innerHTML = $$("#editor h1,#editor h2,#editor h3").map(
-      (x, i) => `<button data-heading="${i}">${esc(x.textContent)}</button>`
-    ).join("") || "<p>\u6DFB\u52A0\u6807\u9898\u540E\uFF0C\u8FD9\u91CC\u4F1A\u663E\u793A\u6587\u7AE0\u7ED3\u6784\u3002</p>";
-    $$("[data-heading]").forEach(
-      (b) => b.onclick = () => $$("#editor h1,#editor h2,#editor h3")[+b.dataset.heading].scrollIntoView({ behavior: "smooth" })
-    );
-  };
   bindArticleHeader();
   bindFinalize();
   $$("[data-task]").forEach((b) => {
@@ -30636,7 +30653,69 @@ function renderWrite() {
     openAssistant();
     tagSelection();
   };
+  mountArticleOutline();
   renderAssistantRail();
+}
+function mountArticleOutline() {
+  const wrap2 = $(".paper-wrap");
+  if (!wrap2 || !editor) return;
+  const prev = $("#article-outline");
+  prev?._teardown?.();
+  prev?.remove();
+  const nav2 = document.createElement("aside");
+  nav2.id = "article-outline";
+  nav2.className = "article-outline" + (outlinePinned ? " is-pinned" : "");
+  document.body.appendChild(nav2);
+  const place = () => {
+    const box = $(".paper-wrap")?.getBoundingClientRect();
+    if (!box) return;
+    nav2.style.top = box.top + box.height / 2 + "px";
+    nav2.style.transform = "translateY(-50%)";
+    nav2.style.right = Math.max(8, window.innerWidth - box.right + 6) + "px";
+  };
+  nav2._place = place;
+  const refresh = () => {
+    const root2 = $("#editor");
+    if (!root2) return;
+    const headings = [...root2.querySelectorAll("h1, h2, h3")];
+    if (!headings.length) {
+      nav2.hidden = true;
+      nav2.innerHTML = "";
+      return;
+    }
+    nav2.hidden = false;
+    nav2.classList.toggle("is-pinned", outlinePinned);
+    nav2.innerHTML = `<button type="button" class="outline-pin" title="${outlinePinned ? "\u53D6\u6D88\u56FA\u5B9A" : "\u56FA\u5B9A\u5927\u7EB2"}" aria-label="${outlinePinned ? "\u53D6\u6D88\u56FA\u5B9A" : "\u56FA\u5B9A\u5927\u7EB2"}">${outlinePinned ? I.pinOff({ size: 14 }) : I.pin({ size: 14 })}</button><div class="outline-track">${headings.map((el, i) => {
+      const level = el.tagName === "H1" ? 1 : el.tagName === "H2" ? 2 : 3;
+      const text = el.textContent.trim() || "\uFF08\u7A7A\u6807\u9898\uFF09";
+      return `<button type="button" class="outline-row level-${level}" data-heading="${i}" title="${esc(text)}"><span class="outline-bar" aria-hidden="true"></span><span class="outline-label">${esc(text)}</span></button>`;
+    }).join("")}</div>`;
+    nav2.querySelector(".outline-pin").onclick = (e) => {
+      e.stopPropagation();
+      outlinePinned = !outlinePinned;
+      nav2.classList.toggle("is-pinned", outlinePinned);
+      refresh();
+    };
+    nav2.querySelectorAll("[data-heading]").forEach((b) => {
+      b.onclick = (e) => {
+        e.stopPropagation();
+        headings[+b.dataset.heading]?.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+      };
+    });
+    place();
+  };
+  const onScroll = () => place();
+  wrap2.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("resize", onScroll);
+  nav2._teardown = () => {
+    wrap2.removeEventListener("scroll", onScroll);
+    window.removeEventListener("resize", onScroll);
+  };
+  editor.on("update", refresh);
+  refresh();
 }
 function bindWorkspaceResize() {
   const resizer = $("#workspace-resizer");
@@ -31822,6 +31901,8 @@ lucide/dist/esm/icons/list-tree.mjs:
 lucide/dist/esm/icons/list.mjs:
 lucide/dist/esm/icons/panel-right-close.mjs:
 lucide/dist/esm/icons/panel-right-open.mjs:
+lucide/dist/esm/icons/pin-off.mjs:
+lucide/dist/esm/icons/pin.mjs:
 lucide/dist/esm/icons/plus.mjs:
 lucide/dist/esm/icons/quote.mjs:
 lucide/dist/esm/icons/refresh-cw.mjs:

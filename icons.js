@@ -30,6 +30,8 @@ import {
   Eye,
   WandSparkles,
   SearchCheck,
+  Pin,
+  PinOff,
   FileText,
 } from "lucide";
 
@@ -69,6 +71,8 @@ export const I = {
   list: (o) => icon(List, o),
   quote: (o) => icon(Quote, o),
   outline: (o) => icon(ListTree, o),
+  pin: (o) => icon(Pin, o),
+  pinOff: (o) => icon(PinOff, o),
   focus: (o) => icon(Focus, o),
   refresh: (o) => icon(RefreshCw, o),
   folder: (o) => icon(FolderOpen, o),
