@@ -295,14 +295,85 @@ class Knowledge {
   libraryDir() {
     return `${this.v.meta}/library`;
   }
+  /** 素材原文件的内部存放目录（不依赖外部/ wiki 路径） */
+  libraryFilesDir() {
+    return `${this.libraryDir()}/files`;
+  }
   /** 读取共享素材列表 */
   materials() {
     this.migrateLibrary();
+    this.migrateInternalFiles();
     return this.v.json(`${this.libraryDir()}/materials.json`, []);
   }
   /** 写入共享素材列表 */
   saveMaterials(list) {
     this.v.writeJSON(`${this.libraryDir()}/materials.json`, list);
+  }
+  /**
+   * 将仍落在 wiki / projects 下的素材原文件迁入内部 library/files，并清理 wiki 残留。
+   */
+  migrateInternalFiles() {
+    const libPath = `${this.libraryDir()}/materials.json`;
+    const library = this.v.json(libPath, []);
+    const prefix = this.libraryFilesDir() + "/";
+    let changed = false;
+    for (const m of library) {
+      if (!m?.id) continue;
+      const destRel =
+        prefix + m.id + "/" + (m.name || path.basename(m.path || "file"));
+      const destAbs = this.v.p(destRel);
+      const alreadyInternal =
+        m.path &&
+        m.path.startsWith(prefix) &&
+        fs.existsSync(this.v.p(m.path));
+      if (alreadyInternal) continue;
+
+      const oldRel = m.path || "";
+      const srcAbs =
+        oldRel && fs.existsSync(this.v.p(oldRel)) ? this.v.p(oldRel) : null;
+      if (!srcAbs) continue;
+
+      fs.mkdirSync(path.dirname(destAbs), { recursive: true });
+      if (!fs.existsSync(destAbs)) fs.copyFileSync(srcAbs, destAbs);
+      m.path = destRel;
+      changed = true;
+
+      // 素材不得占用 00_wiki：迁出后删除旧副本
+      if (
+        oldRel.startsWith("00_wiki/") ||
+        oldRel.includes("/_data/raw/library/") ||
+        oldRel.includes("/_data/raw/projects/")
+      ) {
+        try {
+          if (fs.existsSync(srcAbs) && srcAbs !== destAbs) fs.unlinkSync(srcAbs);
+          const oldDir = path.dirname(srcAbs);
+          if (
+            fs.existsSync(oldDir) &&
+            !fs.readdirSync(oldDir).filter((n) => n !== ".DS_Store").length
+          )
+            fs.rmSync(oldDir, { recursive: true, force: true });
+        } catch {
+          /* 清理失败不影响使用 */
+        }
+      }
+    }
+    if (changed) this.v.writeJSON(libPath, library);
+
+    // 清空遗留的 wiki library 空壳目录
+    try {
+      const wikiLib = this.v.p("00_wiki/_data/raw/library");
+      if (fs.existsSync(wikiLib)) {
+        for (const name of fs.readdirSync(wikiLib)) {
+          if (name === ".DS_Store") continue;
+          const p = path.join(wikiLib, name);
+          if (!fs.statSync(p).isDirectory()) continue;
+          if (!fs.readdirSync(p).filter((n) => n !== ".DS_Store").length)
+            fs.rmSync(p, { recursive: true, force: true });
+        }
+      }
+    } catch {
+      /* ignore */
+    }
   }
   /** 读取某篇文章的素材链接（仅 id + enabled） */
   links(id) {
@@ -476,8 +547,8 @@ class Knowledge {
         name =
           clean(path.basename(src, path.extname(src))) +
           path.extname(src).toLowerCase(),
-        // 一律落入共享 library，不再写入 projects/.../files 或仅做引用映射
-        rel = "00_wiki/_data/raw/library/" + rid + "/" + name;
+        // 拷贝进 inkdesk 内部目录，不依赖外部原路径
+        rel = this.libraryFilesDir() + "/" + rid + "/" + name;
       fs.mkdirSync(path.dirname(this.v.p(rel)), { recursive: true });
       fs.writeFileSync(this.v.p(rel), bytes);
       const kind = materialKind(name);

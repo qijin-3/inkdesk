@@ -1340,7 +1340,7 @@ function renderAssistantRail() {
 
   if (railMode === "materials") {
     rail.dataset.railMode = "materials";
-    rail.innerHTML = `<div class="assistant-head"><span>${I.library()} 本文素材</span><div class="assistant-head-actions"><button type="button" id="upload-article-material">${I.upload()} 上传</button><button type="button" id="close-assistant" title="收起">${I.panelClose()} 收起</button></div></div><div id="panel" data-ready="1" class="article-materials-panel"><div id="article-material-list" class="material-cards"></div></div>`;
+    rail.innerHTML = `<div class="assistant-head"><span>${I.library()} 素材</span><div class="assistant-head-actions"><button type="button" id="upload-article-material" class="ghost icon-btn" title="上传" aria-label="上传">${I.upload({ size: 18 })}</button><button type="button" id="close-assistant" class="ghost icon-btn" title="收起" aria-label="收起">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1" class="article-materials-panel"><div id="article-material-list" class="material-cards"></div></div>`;
     $("#close-assistant").onclick = () => {
       assistantOpen = false;
       syncRailVisibility();
@@ -1462,8 +1462,6 @@ function bindArticleMaterialsPanel() {
 
   uploadBtn.onclick = async () => {
     uploadBtn.disabled = true;
-    const label = uploadBtn.innerHTML;
-    uploadBtn.textContent = "上传中…";
     try {
       if (!(await persist())) return;
       await uploadProjectFiles(doc.id);
@@ -1471,10 +1469,7 @@ function bindArticleMaterialsPanel() {
     } catch (e) {
       toast(e.message);
     } finally {
-      if (uploadBtn.isConnected) {
-        uploadBtn.disabled = false;
-        uploadBtn.innerHTML = label;
-      }
+      if (uploadBtn.isConnected) uploadBtn.disabled = false;
     }
   };
   draw();

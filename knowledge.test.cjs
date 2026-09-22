@@ -78,7 +78,7 @@ test("project files are copied, fully extracted, isolated and persisted with AI 
   const refsB = await k.upload("b", [src]);
   assert.equal(k.refs("b").length, 1);
   assert.notEqual(refsB[0].id, refs[0].id);
-  assert.match(refsB[0].path, /00_wiki\/_data\/raw\/library\//);
+  assert.match(refsB[0].path, /_system\/inkdesk\/library\/files\//);
   assert.equal(k.allMaterials().filter((m) => m.hash === refs[0].hash).length, 2);
 });
 test("binary originals retained; not enabled for AI until toggled", async (t) => {
@@ -94,6 +94,16 @@ test("binary originals retained; not enabled for AI until toggled", async (t) =>
   assert.equal(r.textPath || "", "");
   k.toggle("a", r.id, true);
   assert.match(k.projectContext("a"), /文件素材/);
+});
+test("upload copies into internal library files dir independent of source", async (t) => {
+  const { root, k } = setup(t);
+  const external = path.join(root, "outside-source.md");
+  fs.writeFileSync(external, "# 外部文件\n内容应被拷贝");
+  const [r] = await k.upload("a", [external]);
+  assert.match(r.path, /_system\/inkdesk\/library\/files\//);
+  assert.ok(fs.existsSync(k.v.p(r.path)));
+  fs.unlinkSync(external);
+  assert.match(k.refText("a", r.id).text, /内容应被拷贝/);
 });
 test("markdown kept as original file without txt extract", async (t) => {
   const { root, k } = setup(t);

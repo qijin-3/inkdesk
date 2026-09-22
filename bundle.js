@@ -30617,7 +30617,7 @@ function renderAssistantRail() {
   }
   if (railMode === "materials") {
     rail.dataset.railMode = "materials";
-    rail.innerHTML = `<div class="assistant-head"><span>${I.library()} \u672C\u6587\u7D20\u6750</span><div class="assistant-head-actions"><button type="button" id="upload-article-material">${I.upload()} \u4E0A\u4F20</button><button type="button" id="close-assistant" title="\u6536\u8D77">${I.panelClose()} \u6536\u8D77</button></div></div><div id="panel" data-ready="1" class="article-materials-panel"><div id="article-material-list" class="material-cards"></div></div>`;
+    rail.innerHTML = `<div class="assistant-head"><span>${I.library()} \u7D20\u6750</span><div class="assistant-head-actions"><button type="button" id="upload-article-material" class="ghost icon-btn" title="\u4E0A\u4F20" aria-label="\u4E0A\u4F20">${I.upload({ size: 18 })}</button><button type="button" id="close-assistant" class="ghost icon-btn" title="\u6536\u8D77" aria-label="\u6536\u8D77">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1" class="article-materials-panel"><div id="article-material-list" class="material-cards"></div></div>`;
     $("#close-assistant").onclick = () => {
       assistantOpen = false;
       syncRailVisibility();
@@ -30718,8 +30718,6 @@ function bindArticleMaterialsPanel() {
   };
   uploadBtn.onclick = async () => {
     uploadBtn.disabled = true;
-    const label = uploadBtn.innerHTML;
-    uploadBtn.textContent = "\u4E0A\u4F20\u4E2D\u2026";
     try {
       if (!await persist()) return;
       await uploadProjectFiles(doc3.id);
@@ -30727,10 +30725,7 @@ function bindArticleMaterialsPanel() {
     } catch (e) {
       toast(e.message);
     } finally {
-      if (uploadBtn.isConnected) {
-        uploadBtn.disabled = false;
-        uploadBtn.innerHTML = label;
-      }
+      if (uploadBtn.isConnected) uploadBtn.disabled = false;
     }
   };
   draw();
