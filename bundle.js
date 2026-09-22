@@ -29588,6 +29588,155 @@ function splitWechatH1(h1) {
   wrap2.append(zh, en);
   h1.replaceChildren(wrap2);
 }
+var WECHAT_BLOCK_W = 360;
+var WECHAT_BLOCK_SCALE = 4;
+function wechatWrapLines(ctx, text, maxW) {
+  const lines = [];
+  for (const para of String(text || "").split(/\n/)) {
+    let line = "";
+    for (const ch of Array.from(para)) {
+      if (line && ctx.measureText(line + ch).width > maxW) {
+        lines.push(line);
+        line = ch;
+      } else line += ch;
+    }
+    lines.push(line);
+  }
+  return lines.length ? lines : [""];
+}
+function wechatBlockCanvas(cssW, cssH) {
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.ceil(cssW * WECHAT_BLOCK_SCALE));
+  c.height = Math.max(1, Math.ceil(cssH * WECHAT_BLOCK_SCALE));
+  const ctx = c.getContext("2d");
+  ctx.scale(WECHAT_BLOCK_SCALE, WECHAT_BLOCK_SCALE);
+  ctx.textBaseline = "top";
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  return { c, ctx };
+}
+function renderWechatH1Png(raw, num) {
+  const text = String(raw || "").replace(/\s+/g, " ").trim();
+  const m = text.match(
+    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/
+  );
+  const zh = m ? m[1].trim() : text;
+  const en = m ? m[2].trim() : "";
+  const badge = 48;
+  const gap = 10;
+  const textW = WECHAT_BLOCK_W - badge - gap;
+  const fontSize = 40;
+  const lineH = 44;
+  const measure = wechatBlockCanvas(1, 1).ctx;
+  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  const zhLines = wechatWrapLines(measure, zh, textW);
+  const enLines = en ? wechatWrapLines(measure, en, textW) : [];
+  const textH = Math.max(
+    badge,
+    zhLines.length * lineH + enLines.length * lineH
+  );
+  const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, textH);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, WECHAT_BLOCK_W, textH);
+  ctx.fillStyle = WECHAT_BLUE;
+  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  let y = textH - zhLines.length * lineH - enLines.length * lineH;
+  for (const line of zhLines) {
+    ctx.fillText(line, 0, y);
+    y += lineH;
+  }
+  for (const line of enLines) {
+    ctx.fillText(line, 0, y);
+    y += lineH;
+  }
+  const bx = WECHAT_BLOCK_W - badge;
+  const by = textH - badge;
+  ctx.fillStyle = WECHAT_BLUE_SOFT;
+  ctx.fillRect(bx, by, badge, badge);
+  ctx.fillStyle = WECHAT_BLUE;
+  const numSize = 36;
+  ctx.font = `800 ${numSize}px ${WECHAT_SERIF}`;
+  const nw = ctx.measureText(num).width;
+  ctx.fillText(num, bx + (badge - nw) / 2, by + (badge - numSize) / 2);
+  return c.toDataURL("image/png");
+}
+function renderWechatH2Png(raw) {
+  const text = String(raw || "").replace(/\s+/g, " ").trim();
+  const padX = 10;
+  const padY = 8;
+  const fontSize = 20;
+  const lineH = 25;
+  const maxInner = WECHAT_BLOCK_W - padX * 2;
+  const measure = wechatBlockCanvas(1, 1).ctx;
+  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  const lines = wechatWrapLines(measure, text, maxInner);
+  const innerW = Math.min(
+    maxInner,
+    Math.ceil(Math.max(...lines.map((l) => measure.measureText(l).width), 1))
+  );
+  const boxW = Math.min(WECHAT_BLOCK_W, innerW + padX * 2);
+  const boxH = lines.length * lineH + padY * 2;
+  const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, boxH);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
+  ctx.fillStyle = WECHAT_BLUE;
+  ctx.fillRect(0, 0, boxW, boxH);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  let y = padY;
+  for (const line of lines) {
+    ctx.fillText(line, padX, y);
+    y += lineH;
+  }
+  return c.toDataURL("image/png");
+}
+function renderWechatQuotePng(raw) {
+  const text = String(raw || "").replace(/\s+/g, " ").trim();
+  const pad = 8;
+  const markSize = 23;
+  const fontSize = 15;
+  const lineH = 26;
+  const markW = 20;
+  const gap = 8;
+  const textW = WECHAT_BLOCK_W - pad * 2 - markW - gap;
+  const measure = wechatBlockCanvas(1, 1).ctx;
+  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  const lines = wechatWrapLines(measure, text, textW);
+  const boxH = Math.max(markSize + pad * 2, lines.length * lineH + pad * 2);
+  const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, boxH);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
+  ctx.fillStyle = WECHAT_BLUE_SOFT;
+  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
+  ctx.fillStyle = WECHAT_BLUE;
+  ctx.font = `800 ${markSize}px ${WECHAT_SERIF}`;
+  ctx.fillText("\u201C", pad, pad);
+  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  let y = pad + 4;
+  const tx = pad + markW + gap;
+  for (const line of lines) {
+    ctx.fillText(line, tx, y);
+    y += lineH;
+  }
+  return c.toDataURL("image/png");
+}
+function replaceWithWechatBlockImage(d, el, dataUrl, alt, margin) {
+  const wrap2 = d.createElement("section");
+  wrap2.setAttribute(
+    "style",
+    `margin:${margin};padding:0;max-width:100%;box-sizing:border-box;`
+  );
+  const img = d.createElement("img");
+  img.setAttribute("src", dataUrl);
+  img.setAttribute("alt", alt);
+  img.setAttribute("width", String(WECHAT_BLOCK_W));
+  img.setAttribute(
+    "style",
+    "width:100% !important;max-width:100% !important;height:auto !important;display:block !important;margin:0 !important;border:0;vertical-align:top;"
+  );
+  wrap2.appendChild(img);
+  el.replaceWith(wrap2);
+}
 function enhanceWechatPreview(root2 = $("#article-preview")) {
   if (!root2) return;
   root2.querySelectorAll("h1").forEach(splitWechatH1);
@@ -29624,7 +29773,7 @@ function enhanceWechatPreview(root2 = $("#article-preview")) {
     });
   });
 }
-function publishHTML(md, opts = {}) {
+async function publishHTML(md, opts = {}) {
   const serif = WECHAT_SERIF_PUBLISH;
   const d = new DOMParser().parseFromString(safeHTML(md), "text/html");
   if (opts.keepImages) {
@@ -29641,51 +29790,84 @@ function publishHTML(md, opts = {}) {
       img.replaceWith(p);
     });
   }
-  d.querySelectorAll("h1").forEach((h1, i) => {
-    splitWechatH1(h1);
-    const num = String(i + 1).padStart(2, "0");
-    const text = h1.innerHTML;
-    h1.innerHTML = `<span style="flex:1;min-width:0;color:${WECHAT_BLUE};font-family:${serif};font-size:40px;font-weight:800;">${text}</span><span style="flex-shrink:0;display:inline-block;width:80px;height:80px;line-height:80px;text-align:center;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:64px;font-weight:800;">${num}</span>`;
-  });
-  d.querySelectorAll("h2").forEach((h2) => {
-    const wrap2 = d.createElement("section");
-    wrap2.setAttribute("data-wechat-h2", "1");
-    wrap2.setAttribute(
-      "style",
-      "margin:16px 0 14px;padding:0;max-width:100%;"
-    );
-    const bar = d.createElement("section");
-    bar.setAttribute(
-      "style",
-      `display:inline-block;max-width:100%;box-sizing:border-box;padding:8px 10px;background-color:${WECHAT_BLUE};`
-    );
-    const label = d.createElement("span");
-    label.setAttribute(
-      "style",
-      `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};line-height:1.25;`
-    );
-    while (h2.firstChild) label.appendChild(h2.firstChild);
-    label.querySelectorAll("*").forEach((el) => {
-      el.setAttribute(
-        "style",
-        `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};`
+  if (opts.blockImages) {
+    await document.fonts.ready;
+    let h1i = 0;
+    for (const h1 of [...d.querySelectorAll("h1")]) {
+      const num = String(++h1i).padStart(2, "0");
+      replaceWithWechatBlockImage(
+        d,
+        h1,
+        renderWechatH1Png(h1.textContent, num),
+        "\u4E00\u7EA7\u6807\u9898",
+        "56px 0 20px"
       );
+    }
+    for (const h2 of [...d.querySelectorAll("h2")]) {
+      replaceWithWechatBlockImage(
+        d,
+        h2,
+        renderWechatH2Png(h2.textContent),
+        "\u4E8C\u7EA7\u6807\u9898",
+        "16px 0 14px"
+      );
+    }
+    for (const bq of [...d.querySelectorAll("blockquote")]) {
+      replaceWithWechatBlockImage(
+        d,
+        bq,
+        renderWechatQuotePng(bq.textContent),
+        "\u5F15\u7528",
+        "20px 0"
+      );
+    }
+  } else {
+    d.querySelectorAll("h1").forEach((h1, i) => {
+      splitWechatH1(h1);
+      const num = String(i + 1).padStart(2, "0");
+      const text = h1.innerHTML;
+      h1.innerHTML = `<span style="flex:1;min-width:0;color:${WECHAT_BLUE};font-family:${serif};font-size:40px;font-weight:800;">${text}</span><span style="flex-shrink:0;display:inline-block;width:80px;height:80px;line-height:80px;text-align:center;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:64px;font-weight:800;">${num}</span>`;
     });
-    bar.appendChild(label);
-    wrap2.appendChild(bar);
-    h2.replaceWith(wrap2);
-  });
-  d.querySelectorAll("blockquote").forEach((bq) => {
-    if (bq.querySelector(".wechat-quote-mark")) return;
-    const mark = d.createElement("span");
-    mark.className = "wechat-quote-mark";
-    mark.textContent = "\u201C";
-    mark.setAttribute(
-      "style",
-      `flex-shrink:0;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`
-    );
-    bq.prepend(mark);
-  });
+    d.querySelectorAll("h2").forEach((h2) => {
+      const wrap2 = d.createElement("section");
+      wrap2.setAttribute("data-wechat-h2", "1");
+      wrap2.setAttribute(
+        "style",
+        "margin:16px 0 14px;padding:0;max-width:100%;"
+      );
+      const bar = d.createElement("section");
+      bar.setAttribute(
+        "style",
+        `display:inline-block;max-width:100%;box-sizing:border-box;padding:8px 10px;background-color:${WECHAT_BLUE};`
+      );
+      const label = d.createElement("span");
+      label.setAttribute(
+        "style",
+        `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};line-height:1.25;`
+      );
+      while (h2.firstChild) label.appendChild(h2.firstChild);
+      label.querySelectorAll("*").forEach((el) => {
+        el.setAttribute(
+          "style",
+          `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};`
+        );
+      });
+      bar.appendChild(label);
+      wrap2.appendChild(bar);
+      h2.replaceWith(wrap2);
+    });
+    d.querySelectorAll("blockquote").forEach((bq) => {
+      if (bq.querySelector(".wechat-quote-mark")) return;
+      const mark = d.createElement("span");
+      mark.className = "wechat-quote-mark";
+      mark.textContent = "\u201C";
+      mark.setAttribute(
+        "style",
+        `flex-shrink:0;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`
+      );
+      bq.prepend(mark);
+    });
+  }
   const styles = {
     p: `margin:0 0 16px;line-height:1.75;font-size:15px;color:#111;font-family:${WECHAT_SANS};font-weight:400;`,
     h1: `display:flex;align-items:flex-end;justify-content:space-between;gap:12px;font-size:40px;line-height:1.1;margin:56px 0 20px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
@@ -29695,6 +29877,10 @@ function publishHTML(md, opts = {}) {
   };
   Object.entries(styles).forEach(
     ([tag2, style2]) => d.querySelectorAll(tag2).forEach((n) => {
+      if (tag2 === "p" && n.querySelector(
+        'img[alt="\u4E00\u7EA7\u6807\u9898"], img[alt="\u4E8C\u7EA7\u6807\u9898"], img[alt="\u5F15\u7528"]'
+      ))
+        return;
       const prev = n.getAttribute("style") || "";
       n.setAttribute("style", prev ? `${prev};${style2}` : style2);
     })
@@ -29706,43 +29892,45 @@ function publishHTML(md, opts = {}) {
       `font-weight:600;color:#111;font-family:${WECHAT_SANS};`
     );
   });
-  d.querySelectorAll("blockquote > *").forEach((el) => {
-    if (el.classList?.contains("wechat-quote-mark")) {
-      el.setAttribute(
+  if (!opts.blockImages) {
+    d.querySelectorAll("blockquote > *").forEach((el) => {
+      if (el.classList?.contains("wechat-quote-mark")) {
+        el.setAttribute(
+          "style",
+          `grid-column:1;grid-row:1;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`
+        );
+        return;
+      }
+      const prev = el.getAttribute("style") || "";
+      el.setAttribute("style", `${prev};grid-column:2;`.replace(/^;/, ""));
+    });
+    d.querySelectorAll("blockquote p").forEach(
+      (p) => p.setAttribute(
         "style",
-        `grid-column:1;grid-row:1;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`
-      );
-      return;
-    }
-    const prev = el.getAttribute("style") || "";
-    el.setAttribute("style", `${prev};grid-column:2;`.replace(/^;/, ""));
-  });
-  d.querySelectorAll("blockquote p").forEach(
-    (p) => p.setAttribute(
-      "style",
-      `margin:0;grid-column:2;color:${WECHAT_BLUE};font-family:${serif};font-size:15px;font-weight:800;line-height:1.7;`
-    )
-  );
-  d.querySelectorAll("blockquote strong").forEach(
-    (el) => el.setAttribute(
-      "style",
-      `font-family:${serif};font-weight:800;color:${WECHAT_BLUE};`
-    )
-  );
-  d.querySelectorAll("h1 .h1-zh, h1 .h1-en, h1 span").forEach((el) => {
-    const prev = el.getAttribute("style") || "";
-    if (!/font-family/.test(prev))
-      el.setAttribute(
+        `margin:0;grid-column:2;color:${WECHAT_BLUE};font-family:${serif};font-size:15px;font-weight:800;line-height:1.7;`
+      )
+    );
+    d.querySelectorAll("blockquote strong").forEach(
+      (el) => el.setAttribute(
         "style",
-        `${prev};font-family:${serif};color:${WECHAT_BLUE};`.replace(/^;/, "")
-      );
-  });
-  d.querySelectorAll("h1 .h1-zh, h1 .h1-en").forEach(
-    (el) => el.setAttribute(
-      "style",
-      `display:block;font-size:40px;font-weight:800;line-height:1.1;color:${WECHAT_BLUE};font-family:${serif};`
-    )
-  );
+        `font-family:${serif};font-weight:800;color:${WECHAT_BLUE};`
+      )
+    );
+    d.querySelectorAll("h1 .h1-zh, h1 .h1-en, h1 span").forEach((el) => {
+      const prev = el.getAttribute("style") || "";
+      if (!/font-family/.test(prev))
+        el.setAttribute(
+          "style",
+          `${prev};font-family:${serif};color:${WECHAT_BLUE};`.replace(/^;/, "")
+        );
+    });
+    d.querySelectorAll("h1 .h1-zh, h1 .h1-en").forEach(
+      (el) => el.setAttribute(
+        "style",
+        `display:block;font-size:40px;font-weight:800;line-height:1.1;color:${WECHAT_BLUE};font-family:${serif};`
+      )
+    );
+  }
   return `<section style="font-family:${WECHAT_SANS};padding:8px;color:#111;max-width:768px;">${d.body.innerHTML}</section>`;
 }
 function socialSourceHTML() {
@@ -30376,7 +30564,7 @@ async function copyPublish(doc3) {
   if (!doc3) doc3 = current;
   if (doc3 === current) sync();
   if (!doc3) return;
-  const html2 = publishHTML(doc3.body);
+  const html2 = await publishHTML(doc3.body);
   const d = new DOMParser().parseFromString(html2, "text/html");
   await api("copy", { html: html2, text: d.body.textContent });
   toast("\u6392\u7248\u5DF2\u590D\u5236\uFF1B\u672C\u5730\u56FE\u7247\u8BF7\u5728\u516C\u4F17\u53F7\u8865\u5165");
@@ -30389,9 +30577,13 @@ async function pushWechatDraft(doc3) {
   const btn = $("#push-wechat");
   if (btn) btn.disabled = true;
   try {
+    toast("\u6B63\u5728\u751F\u6210\u6807\u9898\u56FE\u5E76\u63A8\u9001\u2026");
     const result = await api("wechat-draft-push", {
       title: doc3.title || "\u672A\u547D\u540D\u6587\u7AE0",
-      html: publishHTML(doc3.body, { keepImages: true })
+      html: await publishHTML(doc3.body, {
+        keepImages: true,
+        blockImages: true
+      })
     });
     toast(
       `\u5DF2\u63A8\u9001\u5230\u8349\u7A3F\u7BB1\u300C${result.title}\u300D` + (result.imageCount ? `\uFF08\u4E0A\u4F20 ${result.imageCount} \u5F20\u56FE\uFF09` : "")

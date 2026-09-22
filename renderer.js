@@ -439,6 +439,208 @@ function splitWechatH1(h1) {
 }
 
 /**
+ * 推送用标题/引用图。
+ * 逻辑宽取手机微信正文区约 360px（非整页 677）：图会按栏宽 100% 显示，
+ * 若按 677 画 15px 字，缩到 ~360 后只剩约 8px，会远小于正文。
+ * 4x → 约 1440px，Retina 仍清晰。
+ */
+const WECHAT_BLOCK_W = 360;
+const WECHAT_BLOCK_SCALE = 4;
+
+/**
+ * 按中文字符换行。
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {string} text
+ * @param {number} maxW
+ */
+function wechatWrapLines(ctx, text, maxW) {
+  const lines = [];
+  for (const para of String(text || "").split(/\n/)) {
+    let line = "";
+    for (const ch of Array.from(para)) {
+      if (line && ctx.measureText(line + ch).width > maxW) {
+        lines.push(line);
+        line = ch;
+      } else line += ch;
+    }
+    lines.push(line);
+  }
+  return lines.length ? lines : [""];
+}
+
+/**
+ * 创建高清画布（逻辑像素 × scale）。
+ * @param {number} cssW
+ * @param {number} cssH
+ */
+function wechatBlockCanvas(cssW, cssH) {
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.ceil(cssW * WECHAT_BLOCK_SCALE));
+  c.height = Math.max(1, Math.ceil(cssH * WECHAT_BLOCK_SCALE));
+  const ctx = c.getContext("2d");
+  ctx.scale(WECHAT_BLOCK_SCALE, WECHAT_BLOCK_SCALE);
+  ctx.textBaseline = "top";
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  return { c, ctx };
+}
+
+/**
+ * 画一级标题图（蓝字 + 序号方块）。
+ * @param {string} raw
+ * @param {string} num
+ */
+function renderWechatH1Png(raw, num) {
+  const text = String(raw || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const m = text.match(
+    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/,
+  );
+  const zh = m ? m[1].trim() : text;
+  const en = m ? m[2].trim() : "";
+  const badge = 48;
+  const gap = 10;
+  const textW = WECHAT_BLOCK_W - badge - gap;
+  const fontSize = 40;
+  const lineH = 44;
+  const measure = wechatBlockCanvas(1, 1).ctx;
+  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  const zhLines = wechatWrapLines(measure, zh, textW);
+  const enLines = en ? wechatWrapLines(measure, en, textW) : [];
+  const textH = Math.max(
+    badge,
+    zhLines.length * lineH + enLines.length * lineH,
+  );
+  const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, textH);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, WECHAT_BLOCK_W, textH);
+  ctx.fillStyle = WECHAT_BLUE;
+  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  // 与序号底对齐
+  let y = textH - zhLines.length * lineH - enLines.length * lineH;
+  for (const line of zhLines) {
+    ctx.fillText(line, 0, y);
+    y += lineH;
+  }
+  for (const line of enLines) {
+    ctx.fillText(line, 0, y);
+    y += lineH;
+  }
+  const bx = WECHAT_BLOCK_W - badge;
+  const by = textH - badge;
+  ctx.fillStyle = WECHAT_BLUE_SOFT;
+  ctx.fillRect(bx, by, badge, badge);
+  ctx.fillStyle = WECHAT_BLUE;
+  const numSize = 36;
+  ctx.font = `800 ${numSize}px ${WECHAT_SERIF}`;
+  const nw = ctx.measureText(num).width;
+  ctx.fillText(num, bx + (badge - nw) / 2, by + (badge - numSize) / 2);
+  return c.toDataURL("image/png");
+}
+
+/**
+ * 画二级标题：整行定宽画布，蓝条按文字真实宽度左对齐，避免短标题被拉大。
+ * @param {string} raw
+ */
+function renderWechatH2Png(raw) {
+  const text = String(raw || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const padX = 10;
+  const padY = 8;
+  const fontSize = 20;
+  const lineH = 25;
+  const maxInner = WECHAT_BLOCK_W - padX * 2;
+  const measure = wechatBlockCanvas(1, 1).ctx;
+  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  const lines = wechatWrapLines(measure, text, maxInner);
+  const innerW = Math.min(
+    maxInner,
+    Math.ceil(Math.max(...lines.map((l) => measure.measureText(l).width), 1)),
+  );
+  const boxW = Math.min(WECHAT_BLOCK_W, innerW + padX * 2);
+  const boxH = lines.length * lineH + padY * 2;
+  const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, boxH);
+  // 白底占满行宽；蓝条仅覆盖文字所需宽度
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
+  ctx.fillStyle = WECHAT_BLUE;
+  ctx.fillRect(0, 0, boxW, boxH);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  let y = padY;
+  for (const line of lines) {
+    ctx.fillText(line, padX, y);
+    y += lineH;
+  }
+  return c.toDataURL("image/png");
+}
+
+/**
+ * 画引用块图。
+ * @param {string} raw
+ */
+function renderWechatQuotePng(raw) {
+  const text = String(raw || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const pad = 8;
+  const markSize = 23;
+  const fontSize = 15;
+  const lineH = 26;
+  const markW = 20;
+  const gap = 8;
+  const textW = WECHAT_BLOCK_W - pad * 2 - markW - gap;
+  const measure = wechatBlockCanvas(1, 1).ctx;
+  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  const lines = wechatWrapLines(measure, text, textW);
+  const boxH = Math.max(markSize + pad * 2, lines.length * lineH + pad * 2);
+  const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, boxH);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
+  ctx.fillStyle = WECHAT_BLUE_SOFT;
+  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
+  ctx.fillStyle = WECHAT_BLUE;
+  ctx.font = `800 ${markSize}px ${WECHAT_SERIF}`;
+  ctx.fillText("“", pad, pad);
+  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  let y = pad + 4;
+  const tx = pad + markW + gap;
+  for (const line of lines) {
+    ctx.fillText(line, tx, y);
+    y += lineH;
+  }
+  return c.toDataURL("image/png");
+}
+
+/**
+ * 用图片节点替换块级元素：按栏宽 100% 铺满，字号与正文同尺度。
+ * @param {Document} d
+ * @param {Element} el
+ * @param {string} dataUrl
+ * @param {string} alt
+ * @param {string} margin
+ */
+function replaceWithWechatBlockImage(d, el, dataUrl, alt, margin) {
+  const wrap = d.createElement("section");
+  wrap.setAttribute(
+    "style",
+    `margin:${margin};padding:0;max-width:100%;box-sizing:border-box;`,
+  );
+  const img = d.createElement("img");
+  img.setAttribute("src", dataUrl);
+  img.setAttribute("alt", alt);
+  img.setAttribute("width", String(WECHAT_BLOCK_W));
+  img.setAttribute(
+    "style",
+    "width:100% !important;max-width:100% !important;height:auto !important;display:block !important;margin:0 !important;border:0;vertical-align:top;",
+  );
+  wrap.appendChild(img);
+  el.replaceWith(wrap);
+}
+
+/**
  * 增强公众号预览 DOM：中英标题拆分，并写入关键元素内联样式（避免 CSS 缓存/继承干扰）。
  */
 function enhanceWechatPreview(root = $("#article-preview")) {
@@ -485,9 +687,10 @@ function enhanceWechatPreview(root = $("#article-preview")) {
  * 二级标题不用 h2 着色（微信会重置标题色），改为 section + span。
  * 宋体栈不含寒蝉，避免微信丢弃整段 font-family 后退化成黑体。
  * @param {string} md
- * @param {{ keepImages?: boolean }} [opts] keepImages 为 true 时保留 img（草稿 API 上传用）
+ * @param {{ keepImages?: boolean, blockImages?: boolean }} [opts]
+ *   keepImages：保留正文图；blockImages：H1/H2/引用渲染为图片（草稿推送）
  */
-function publishHTML(md, opts = {}) {
+async function publishHTML(md, opts = {}) {
   const serif = WECHAT_SERIF_PUBLISH;
   const d = new DOMParser().parseFromString(safeHTML(md), "text/html");
   if (opts.keepImages) {
@@ -507,52 +710,87 @@ function publishHTML(md, opts = {}) {
       img.replaceWith(p);
     });
   }
-  d.querySelectorAll("h1").forEach((h1, i) => {
-    splitWechatH1(h1);
-    const num = String(i + 1).padStart(2, "0");
-    const text = h1.innerHTML;
-    h1.innerHTML = `<span style="flex:1;min-width:0;color:${WECHAT_BLUE};font-family:${serif};font-size:40px;font-weight:800;">${text}</span><span style="flex-shrink:0;display:inline-block;width:80px;height:80px;line-height:80px;text-align:center;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:64px;font-weight:800;">${num}</span>`;
-  });
-  // 二级标题：微信会重置 h1–h6 的 color，必须把白字写在 span 上
-  d.querySelectorAll("h2").forEach((h2) => {
-    const wrap = d.createElement("section");
-    wrap.setAttribute("data-wechat-h2", "1");
-    wrap.setAttribute(
-      "style",
-      "margin:16px 0 14px;padding:0;max-width:100%;",
-    );
-    const bar = d.createElement("section");
-    bar.setAttribute(
-      "style",
-      `display:inline-block;max-width:100%;box-sizing:border-box;padding:8px 10px;background-color:${WECHAT_BLUE};`,
-    );
-    const label = d.createElement("span");
-    label.setAttribute(
-      "style",
-      `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};line-height:1.25;`,
-    );
-    while (h2.firstChild) label.appendChild(h2.firstChild);
-    label.querySelectorAll("*").forEach((el) => {
-      el.setAttribute(
-        "style",
-        `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};`,
+
+  if (opts.blockImages) {
+    await document.fonts.ready;
+    let h1i = 0;
+    for (const h1 of [...d.querySelectorAll("h1")]) {
+      const num = String(++h1i).padStart(2, "0");
+      replaceWithWechatBlockImage(
+        d,
+        h1,
+        renderWechatH1Png(h1.textContent, num),
+        "一级标题",
+        "56px 0 20px",
       );
+    }
+    for (const h2 of [...d.querySelectorAll("h2")]) {
+      replaceWithWechatBlockImage(
+        d,
+        h2,
+        renderWechatH2Png(h2.textContent),
+        "二级标题",
+        "16px 0 14px",
+      );
+    }
+    for (const bq of [...d.querySelectorAll("blockquote")]) {
+      replaceWithWechatBlockImage(
+        d,
+        bq,
+        renderWechatQuotePng(bq.textContent),
+        "引用",
+        "20px 0",
+      );
+    }
+  } else {
+    d.querySelectorAll("h1").forEach((h1, i) => {
+      splitWechatH1(h1);
+      const num = String(i + 1).padStart(2, "0");
+      const text = h1.innerHTML;
+      h1.innerHTML = `<span style="flex:1;min-width:0;color:${WECHAT_BLUE};font-family:${serif};font-size:40px;font-weight:800;">${text}</span><span style="flex-shrink:0;display:inline-block;width:80px;height:80px;line-height:80px;text-align:center;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:64px;font-weight:800;">${num}</span>`;
     });
-    bar.appendChild(label);
-    wrap.appendChild(bar);
-    h2.replaceWith(wrap);
-  });
-  d.querySelectorAll("blockquote").forEach((bq) => {
-    if (bq.querySelector(".wechat-quote-mark")) return;
-    const mark = d.createElement("span");
-    mark.className = "wechat-quote-mark";
-    mark.textContent = "“";
-    mark.setAttribute(
-      "style",
-      `flex-shrink:0;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`,
-    );
-    bq.prepend(mark);
-  });
+    // 二级标题：微信会重置 h1–h6 的 color，必须把白字写在 span 上
+    d.querySelectorAll("h2").forEach((h2) => {
+      const wrap = d.createElement("section");
+      wrap.setAttribute("data-wechat-h2", "1");
+      wrap.setAttribute(
+        "style",
+        "margin:16px 0 14px;padding:0;max-width:100%;",
+      );
+      const bar = d.createElement("section");
+      bar.setAttribute(
+        "style",
+        `display:inline-block;max-width:100%;box-sizing:border-box;padding:8px 10px;background-color:${WECHAT_BLUE};`,
+      );
+      const label = d.createElement("span");
+      label.setAttribute(
+        "style",
+        `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};line-height:1.25;`,
+      );
+      while (h2.firstChild) label.appendChild(h2.firstChild);
+      label.querySelectorAll("*").forEach((el) => {
+        el.setAttribute(
+          "style",
+          `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};`,
+        );
+      });
+      bar.appendChild(label);
+      wrap.appendChild(bar);
+      h2.replaceWith(wrap);
+    });
+    d.querySelectorAll("blockquote").forEach((bq) => {
+      if (bq.querySelector(".wechat-quote-mark")) return;
+      const mark = d.createElement("span");
+      mark.className = "wechat-quote-mark";
+      mark.textContent = "“";
+      mark.setAttribute(
+        "style",
+        `flex-shrink:0;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`,
+      );
+      bq.prepend(mark);
+    });
+  }
+
   const styles = {
     p: `margin:0 0 16px;line-height:1.75;font-size:15px;color:#111;font-family:${WECHAT_SANS};font-weight:400;`,
     h1: `display:flex;align-items:flex-end;justify-content:space-between;gap:12px;font-size:40px;line-height:1.1;margin:56px 0 20px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
@@ -562,6 +800,14 @@ function publishHTML(md, opts = {}) {
   };
   Object.entries(styles).forEach(([tag, style]) =>
     d.querySelectorAll(tag).forEach((n) => {
+      // 图片块外包的 p 已带 margin，勿覆盖
+      if (
+        tag === "p" &&
+        n.querySelector(
+          'img[alt="一级标题"], img[alt="二级标题"], img[alt="引用"]',
+        )
+      )
+        return;
       const prev = n.getAttribute("style") || "";
       n.setAttribute("style", prev ? `${prev};${style}` : style);
     }),
@@ -574,43 +820,45 @@ function publishHTML(md, opts = {}) {
       `font-weight:600;color:#111;font-family:${WECHAT_SANS};`,
     );
   });
-  d.querySelectorAll("blockquote > *").forEach((el) => {
-    if (el.classList?.contains("wechat-quote-mark")) {
+  if (!opts.blockImages) {
+    d.querySelectorAll("blockquote > *").forEach((el) => {
+      if (el.classList?.contains("wechat-quote-mark")) {
+        el.setAttribute(
+          "style",
+          `grid-column:1;grid-row:1;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`,
+        );
+        return;
+      }
+      const prev = el.getAttribute("style") || "";
+      el.setAttribute("style", `${prev};grid-column:2;`.replace(/^;/, ""));
+    });
+    d.querySelectorAll("blockquote p").forEach((p) =>
+      p.setAttribute(
+        "style",
+        `margin:0;grid-column:2;color:${WECHAT_BLUE};font-family:${serif};font-size:15px;font-weight:800;line-height:1.7;`,
+      ),
+    );
+    d.querySelectorAll("blockquote strong").forEach((el) =>
       el.setAttribute(
         "style",
-        `grid-column:1;grid-row:1;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`,
-      );
-      return;
-    }
-    const prev = el.getAttribute("style") || "";
-    el.setAttribute("style", `${prev};grid-column:2;`.replace(/^;/, ""));
-  });
-  d.querySelectorAll("blockquote p").forEach((p) =>
-    p.setAttribute(
-      "style",
-      `margin:0;grid-column:2;color:${WECHAT_BLUE};font-family:${serif};font-size:15px;font-weight:800;line-height:1.7;`,
-    ),
-  );
-  d.querySelectorAll("blockquote strong").forEach((el) =>
-    el.setAttribute(
-      "style",
-      `font-family:${serif};font-weight:800;color:${WECHAT_BLUE};`,
-    ),
-  );
-  d.querySelectorAll("h1 .h1-zh, h1 .h1-en, h1 span").forEach((el) => {
-    const prev = el.getAttribute("style") || "";
-    if (!/font-family/.test(prev))
+        `font-family:${serif};font-weight:800;color:${WECHAT_BLUE};`,
+      ),
+    );
+    d.querySelectorAll("h1 .h1-zh, h1 .h1-en, h1 span").forEach((el) => {
+      const prev = el.getAttribute("style") || "";
+      if (!/font-family/.test(prev))
+        el.setAttribute(
+          "style",
+          `${prev};font-family:${serif};color:${WECHAT_BLUE};`.replace(/^;/, ""),
+        );
+    });
+    d.querySelectorAll("h1 .h1-zh, h1 .h1-en").forEach((el) =>
       el.setAttribute(
         "style",
-        `${prev};font-family:${serif};color:${WECHAT_BLUE};`.replace(/^;/, ""),
-      );
-  });
-  d.querySelectorAll("h1 .h1-zh, h1 .h1-en").forEach((el) =>
-    el.setAttribute(
-      "style",
-      `display:block;font-size:40px;font-weight:800;line-height:1.1;color:${WECHAT_BLUE};font-family:${serif};`,
-    ),
-  );
+        `display:block;font-size:40px;font-weight:800;line-height:1.1;color:${WECHAT_BLUE};font-family:${serif};`,
+      ),
+    );
+  }
   return `<section style="font-family:${WECHAT_SANS};padding:8px;color:#111;max-width:768px;">${d.body.innerHTML}</section>`;
 }
 
@@ -1363,7 +1611,7 @@ async function copyPublish(doc) {
   if (!doc) doc = current;
   if (doc === current) sync();
   if (!doc) return;
-  const html = publishHTML(doc.body);
+  const html = await publishHTML(doc.body);
   const d = new DOMParser().parseFromString(html, "text/html");
   await api("copy", { html, text: d.body.textContent });
   toast("排版已复制；本地图片请在公众号补入");
@@ -1371,6 +1619,7 @@ async function copyPublish(doc) {
 
 /**
  * 推送当前文章到微信公众号草稿箱（上传正文图与封面后 draft/add）。
+ * H1/H2/引用会先画成图片再上传，保证公众号样式一致。
  * @param {object} [doc]
  */
 async function pushWechatDraft(doc) {
@@ -1381,9 +1630,13 @@ async function pushWechatDraft(doc) {
   const btn = $("#push-wechat");
   if (btn) btn.disabled = true;
   try {
+    toast("正在生成标题图并推送…");
     const result = await api("wechat-draft-push", {
       title: doc.title || "未命名文章",
-      html: publishHTML(doc.body, { keepImages: true }),
+      html: await publishHTML(doc.body, {
+        keepImages: true,
+        blockImages: true,
+      }),
     });
     toast(
       `已推送到草稿箱「${result.title}」` +

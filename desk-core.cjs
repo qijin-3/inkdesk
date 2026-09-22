@@ -903,7 +903,6 @@ class DeskCore {
     );
     let html = String(payload.html || "");
     if (!html.trim()) throw Error("正文为空");
-    if (html.length > 20000) throw Error("正文超过 2 万字符，请精简后再推送");
 
     const srcs = [
       ...new Set(
@@ -913,23 +912,28 @@ class DeskCore {
       ),
     ];
     const uploadedFiles = [];
+    let blockImageCount = 0;
     for (const src of srcs) {
-      const filePath = this.resolveWechatImageSrc(src);
-      if (!filePath) {
-        html = html.replaceAll(src, "");
+      const loaded = this.loadWechatImageBuffer(src);
+      if (!loaded) {
+        // 去掉无法解析的 src，避免残留超长 data URL
+        html = html.split(src).join("");
         continue;
       }
-      const buf = wechatMp.readImageFile(filePath);
       const url = await wechatMp.uploadContentImage(
         token,
-        buf,
-        path.basename(filePath),
+        loaded.buf,
+        loaded.name,
       );
       html = html.split(src).join(url);
-      uploadedFiles.push(filePath);
+      if (loaded.filePath) uploadedFiles.push(loaded.filePath);
+      else blockImageCount++;
     }
     // 去掉上传失败留下的空 img
     html = html.replace(/<img\b[^>]*\bsrc=["']\s*["'][^>]*>/gi, "");
+
+    if (html.length > 20000)
+      throw Error("正文超过 2 万字符，请精简后再推送");
 
     let coverPath =
       payload.coverPath || cfg.coverPath || uploadedFiles[0] || "";
@@ -961,7 +965,38 @@ class DeskCore {
       content: html,
       thumb_media_id: thumb,
     });
-    return { media_id: mediaId, title, imageCount: uploadedFiles.length };
+    return {
+      media_id: mediaId,
+      title,
+      imageCount: uploadedFiles.length + blockImageCount,
+    };
+  }
+
+  /**
+   * 把 img src 读成上传缓冲：支持 data URL 与本地路径。
+   * @param {string} src
+   * @returns {{ buf: Buffer, name: string, filePath?: string }|null}
+   */
+  loadWechatImageBuffer(src) {
+    if (!src) return null;
+    if (src.startsWith("data:image/")) {
+      const comma = src.indexOf(",");
+      if (comma < 0) return null;
+      const meta = src.slice(0, comma);
+      const buf = Buffer.from(src.slice(comma + 1), "base64");
+      if (!buf.length) return null;
+      if (buf.length > 1024 * 1024)
+        throw Error("标题/引用图片超过 1MB，请精简文字后重试");
+      const ext = /image\/(png|jpe?g|gif|webp)/i.exec(meta)?.[1] || "png";
+      return { buf, name: `block.${ext === "jpeg" ? "jpg" : ext}` };
+    }
+    const filePath = this.resolveWechatImageSrc(src);
+    if (!filePath) return null;
+    return {
+      buf: wechatMp.readImageFile(filePath),
+      name: path.basename(filePath),
+      filePath,
+    };
   }
 
   /**
