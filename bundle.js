@@ -86,56 +86,254 @@ var require_calendar = __commonJS({
 });
 
 // social-layout.js
-async function socialPages(html2, title, size = 30) {
+var BLUE = "#0f3ff7";
+var BLUE_SOFT = "rgba(15, 63, 247, 0.2)";
+var BLACK = "#111111";
+var WHITE = "#ffffff";
+var SERIF = '"\u5BD2\u8749\u9526\u4E66\u5B8BCompact", "Songti SC", "Noto Serif SC", serif';
+var SANS = '"OPPO Sans 4.0", "PingFang SC", "Helvetica Neue", sans-serif';
+var DESIGN_W = 768;
+var CANVAS_W = 1200;
+var SCALE = CANVAS_W / DESIGN_W;
+function splitTitle(raw) {
+  const text = String(raw || "").replace(/\s+/g, " ").trim();
+  const m = text.match(
+    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/
+  );
+  if (!m) return { zh: text, en: "" };
+  return { zh: m[1].trim(), en: m[2].trim() };
+}
+function collectRuns(node, bold = false) {
+  const runs = [];
+  function walk(n, b) {
+    if (n.nodeType === 3) runs.push({ text: n.textContent, bold: b });
+    else if (n.nodeName === "BR") runs.push({ text: "\n", bold: b });
+    else
+      for (const c of n.childNodes)
+        walk(c, b || ["STRONG", "B"].includes(n.nodeName));
+  }
+  walk(node, bold);
+  return runs;
+}
+async function socialPages(html2, title, size = 36) {
   await document.fonts.ready;
   const root2 = new DOMParser().parseFromString(html2, "text/html").body;
   const pages = [];
-  let ctx, y;
-  const W = 1200, H = 1600, pad = 100, bottom = H - pad;
+  let ctx;
+  let y;
+  const W = CANVAS_W;
+  const H = Math.round(1024 * SCALE);
+  const pad = Math.round(40 * SCALE);
+  const contentW = W - pad * 2;
+  const bottom = H - pad;
+  const bodySize = size;
+  const h1Size = Math.round(bodySize * (60 / 24));
+  const h1Line = Math.round(bodySize * (72 / 24));
+  const numSize = Math.round(96 * SCALE);
+  const badge = Math.round(112 * SCALE);
+  const h2Size = Math.round(bodySize * (36 / 24));
+  const h2BarH = Math.round(bodySize * (56 / 24));
+  const quoteMarkSize = Math.round(bodySize * (36 / 24));
+  const bodyLine = bodySize * 1.7;
+  const continueY = Math.round(180 * SCALE);
+  function font(family, weight, px) {
+    ctx.font = `${weight} ${px}px ${family}`;
+  }
+  function drawPageNumber() {
+    const i = pages.length;
+    const num = String(i).padStart(2, "0");
+    const bgX = Math.round(607 * SCALE);
+    const bgY = Math.round(67 * SCALE);
+    const numX = Math.round(619 * SCALE);
+    const numY = Math.round(52 * SCALE);
+    ctx.fillStyle = BLUE_SOFT;
+    ctx.fillRect(bgX, bgY, badge, badge);
+    font(SERIF, 800, numSize);
+    ctx.fillStyle = BLUE;
+    ctx.textBaseline = "top";
+    ctx.fillText(num, numX, numY);
+  }
   function page2() {
-    if (pages.length >= 17) throw Error("\u5185\u5BB9\u8D85\u8FC7 17 \u5F20\uFF0C\u8BF7\u7F29\u5C0F\u5B57\u53F7\u6216\u7CBE\u7B80\u6B63\u6587\u540E\u91CD\u8BD5\u3002\u672A\u5BFC\u51FA\u622A\u65AD\u5185\u5BB9\u3002");
+    if (pages.length >= 17)
+      throw Error(
+        "\u5185\u5BB9\u8D85\u8FC7 17 \u5F20\uFF0C\u8BF7\u7F29\u5C0F\u5B57\u53F7\u6216\u7CBE\u7B80\u6B63\u6587\u540E\u91CD\u8BD5\u3002\u672A\u5BFC\u51FA\u622A\u65AD\u5185\u5BB9\u3002"
+      );
     const canvas = document.createElement("canvas");
     canvas.width = W;
     canvas.height = H;
     ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = WHITE;
     ctx.fillRect(0, 0, W, H);
     ctx.textBaseline = "top";
-    y = pad;
     pages.push(canvas);
+    drawPageNumber();
+    y = pad;
   }
-  function font(n, bold) {
-    ctx.font = `${bold ? 800 : 400} ${n}px "PingFang SC", sans-serif`;
-  }
-  function text(runs, n, heading2 = false) {
-    const line = n * 1.55;
-    let x = pad;
-    if (y + line > bottom) page2();
-    for (const run3 of runs) for (const ch of Array.from(run3.text)) {
-      font(n, heading2 || run3.bold);
-      const width = ctx.measureText(ch).width;
-      if (ch === "\n" || x + width > W - pad) {
-        x = pad;
-        y += line;
-        if (y + line > bottom) page2();
-        font(n, heading2 || run3.bold);
-      }
-      if (ch === "\n") continue;
-      ctx.fillStyle = !heading2 && run3.bold ? "#1647ff" : "#111";
-      ctx.fillText(ch, x, y);
-      x += width;
+  function ensure(need) {
+    if (y + need > bottom) {
+      page2();
+      y = continueY;
     }
-    y += line + (heading2 ? 26 : 22);
+  }
+  function drawH1(raw) {
+    const { zh, en } = splitTitle(raw);
+    const lines = en ? [zh, en] : [zh];
+    const blockH = lines.length * h1Line + Math.round(24 * SCALE);
+    ensure(blockH);
+    font(SERIF, 800, h1Size);
+    ctx.fillStyle = BLUE;
+    for (const line of lines) {
+      let x = pad;
+      for (const ch of Array.from(line)) {
+        const w = ctx.measureText(ch).width;
+        if (x + w > pad + contentW - badge) {
+          x = pad;
+          y += h1Line;
+          ensure(h1Line);
+          font(SERIF, 800, h1Size);
+          ctx.fillStyle = BLUE;
+        }
+        ctx.fillText(ch, x, y);
+        x += w;
+      }
+      y += h1Line;
+    }
+    y += Math.round(24 * SCALE);
+  }
+  function drawH2(raw) {
+    const text = String(raw || "").trim();
+    if (!text) return;
+    font(SERIF, 800, h2Size);
+    const padX = Math.round(8 * SCALE);
+    const padY = Math.round(10 * SCALE);
+    const maxTextW = contentW - padX * 2;
+    const lines = [];
+    let line = "";
+    let lineW = 0;
+    for (const ch of Array.from(text)) {
+      const w = ctx.measureText(ch).width;
+      if (lineW + w > maxTextW && line) {
+        lines.push(line);
+        line = ch;
+        lineW = w;
+      } else {
+        line += ch;
+        lineW += w;
+      }
+    }
+    if (line) lines.push(line);
+    const textBlockH = lines.length * h2Size * 1.2;
+    const barH = Math.max(h2BarH, textBlockH + padY * 2);
+    const longest = Math.max(
+      ...lines.map(
+        (l) => Array.from(l).reduce((s, ch) => s + ctx.measureText(ch).width, 0)
+      )
+    );
+    const barW = Math.min(contentW, longest + padX * 2);
+    ensure(barH + Math.round(28 * SCALE));
+    y += Math.round(12 * SCALE);
+    ctx.fillStyle = BLUE;
+    ctx.fillRect(pad, y, barW, barH);
+    ctx.fillStyle = WHITE;
+    font(SERIF, 800, h2Size);
+    let ty = y + (barH - textBlockH) / 2;
+    for (const l of lines) {
+      let x = pad + padX;
+      for (const ch of Array.from(l)) {
+        ctx.fillText(ch, x, ty);
+        x += ctx.measureText(ch).width;
+      }
+      ty += h2Size * 1.2;
+    }
+    y += barH + Math.round(18 * SCALE);
+  }
+  function drawText(runs, opt = {}) {
+    const n = opt.size ?? bodySize;
+    const line = opt.line ?? n * 1.7;
+    const family = opt.family ?? SANS;
+    const color = opt.color ?? BLACK;
+    const baseWeight = opt.weight ?? 400;
+    let x = pad;
+    ensure(line);
+    for (const run3 of runs) {
+      for (const ch of Array.from(run3.text)) {
+        const weight = run3.bold ? 600 : baseWeight;
+        font(family, weight, n);
+        const width = ctx.measureText(ch).width;
+        if (ch === "\n" || x + width > pad + contentW) {
+          x = pad;
+          y += line;
+          ensure(line);
+          font(family, weight, n);
+        }
+        if (ch === "\n") continue;
+        ctx.fillStyle = color;
+        ctx.fillText(ch, x, y);
+        x += width;
+      }
+    }
+    y += line + (opt.after ?? Math.round(16 * SCALE));
+  }
+  function drawQuote(node) {
+    const runs = collectRuns(node).filter((r) => r.text.trim() || r.text === "\n");
+    if (!runs.some((r) => r.text.trim())) return;
+    const plain = runs.map((r) => r.text).join("");
+    font(SERIF, 800, bodySize);
+    const line = bodySize * 1.7;
+    const markW = Math.round(28 * SCALE);
+    const innerPad = Math.round(16 * SCALE);
+    const textMax = contentW - markW - innerPad * 2;
+    let lines = 1;
+    let x = 0;
+    for (const ch of Array.from(plain.replace(/\n+/g, " ").trim())) {
+      const w = ctx.measureText(ch).width;
+      if (x + w > textMax) {
+        lines++;
+        x = w;
+      } else x += w;
+    }
+    const boxH = Math.max(
+      Math.round(96 * SCALE),
+      innerPad * 2 + quoteMarkSize * 0.3 + lines * line
+    );
+    ensure(boxH + Math.round(24 * SCALE));
+    y += Math.round(8 * SCALE);
+    ctx.fillStyle = BLUE_SOFT;
+    ctx.fillRect(pad, y, contentW, boxH);
+    font(SANS, 700, quoteMarkSize);
+    ctx.fillStyle = BLUE;
+    ctx.fillText("\u201C", pad + Math.round(16 * SCALE), y + innerPad);
+    let tx = pad + markW + Math.round(8 * SCALE);
+    let ty = y + innerPad + Math.round(4 * SCALE);
+    font(SERIF, 800, bodySize);
+    for (const ch of Array.from(plain.replace(/\n+/g, " ").trim())) {
+      const w = ctx.measureText(ch).width;
+      if (tx + w > pad + contentW - innerPad) {
+        tx = pad + markW + Math.round(8 * SCALE);
+        ty += line;
+      }
+      ctx.fillStyle = BLUE;
+      ctx.fillText(ch, tx, ty);
+      tx += w;
+    }
+    y += boxH + Math.round(20 * SCALE);
   }
   async function picture(src) {
     const img = new Image();
     if (/^https?:/.test(src)) img.crossOrigin = "anonymous";
     img.src = src;
-    await Promise.race([img.decode(), new Promise((_, r) => setTimeout(() => r(Error("\u56FE\u7247\u52A0\u8F7D\u8D85\u65F6")), 12e3))]);
-    const scale = Math.min((W - pad * 2) / img.naturalWidth, 620 / img.naturalHeight);
-    const w = img.naturalWidth * scale, h2 = img.naturalHeight * scale;
-    if (y + h2 > bottom) page2();
-    ctx.drawImage(img, (W - w) / 2, y, w, h2);
+    await Promise.race([
+      img.decode(),
+      new Promise((_, r) => setTimeout(() => r(Error("\u56FE\u7247\u52A0\u8F7D\u8D85\u65F6")), 12e3))
+    ]);
+    const scale = Math.min(
+      contentW / img.naturalWidth,
+      Math.round(620 * SCALE) / img.naturalHeight
+    );
+    const w = img.naturalWidth * scale;
+    const h2 = img.naturalHeight * scale;
+    ensure(h2 + 26);
+    ctx.drawImage(img, pad + (contentW - w) / 2, y, w, h2);
     y += h2 + 26;
   }
   async function block2(node) {
@@ -144,30 +342,52 @@ async function socialPages(html2, title, size = 30) {
       return;
     }
     if (node.nodeName === "HR") {
-      if (y !== pad) page2();
+      if (y > continueY) page2();
+      return;
+    }
+    if (node.nodeName === "BLOCKQUOTE") {
+      drawQuote(node);
       return;
     }
     if (node.querySelector?.("img")) {
       for (const child of node.childNodes) await block2(child);
       return;
     }
-    if (["UL", "OL", "BLOCKQUOTE", "TABLE", "TBODY", "THEAD"].includes(node.nodeName)) {
+    if (["UL", "OL", "TABLE", "TBODY", "THEAD"].includes(node.nodeName)) {
       for (const child of node.children) await block2(child);
       return;
     }
-    const runs = [];
-    function collect(n, bold = false) {
-      if (n.nodeType === 3) runs.push({ text: n.textContent, bold });
-      else if (n.nodeName === "BR") runs.push({ text: "\n", bold });
-      else for (const c of n.childNodes) collect(c, bold || ["STRONG", "B"].includes(n.nodeName));
+    if (node.nodeName === "H1") {
+      drawH1(node.textContent);
+      return;
     }
-    collect(node);
+    if (node.nodeName === "H2") {
+      drawH2(node.textContent);
+      return;
+    }
+    if (/^H[3-6]$/.test(node.nodeName)) {
+      drawText(collectRuns(node), {
+        family: SERIF,
+        weight: 800,
+        size: Math.round(bodySize * 1.15),
+        color: BLUE,
+        after: Math.round(14 * SCALE)
+      });
+      return;
+    }
+    const runs = collectRuns(node);
     if (!runs.some((r) => r.text.trim())) return;
     if (node.nodeName === "LI") runs.unshift({ text: "\u2022 ", bold: false });
-    text(runs, /^H[1-6]$/.test(node.nodeName) ? size * 1.8 : size, /^H[1-6]$/.test(node.nodeName));
+    drawText(runs, { line: bodyLine, after: Math.round(14 * SCALE) });
   }
   page2();
-  if (title) text([{ text: title }], size * 2, true);
+  if (title) {
+    y = Math.round(43 * SCALE);
+    drawH1(title);
+    y = Math.max(y, Math.round(200 * SCALE));
+  } else {
+    y = Math.round(200 * SCALE);
+  }
   for (const node of root2.childNodes) await block2(node);
   for (const c of pages) c.toDataURL("image/png");
   return pages;
@@ -29312,26 +29532,178 @@ async function deleteDraft(id) {
 function $$(s) {
   return [...document.querySelectorAll(s)];
 }
+var WECHAT_BLUE = "#0f3ff7";
+var WECHAT_BLUE_SOFT = "rgba(15, 63, 247, 0.2)";
+var WECHAT_SERIF = "'\u5BD2\u8749\u9526\u4E66\u5B8BCompact','Songti SC','STSong','\u534E\u6587\u5B8B\u4F53','\u5B8B\u4F53',SimSun,serif";
+var WECHAT_SERIF_PUBLISH = "Songti SC,STSong,\u534E\u6587\u5B8B\u4F53,\u5B8B\u4F53,SimSun,serif";
+var WECHAT_SANS = "'OPPO Sans 4.0','PingFang SC','Helvetica Neue',Arial,sans-serif";
+function splitWechatH1(h1) {
+  if (h1.querySelector(".h1-en")) return;
+  const text = h1.textContent.replace(/\s+/g, " ").trim();
+  const m = text.match(
+    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/
+  );
+  if (!m) return;
+  const doc3 = h1.ownerDocument;
+  const zh = doc3.createElement("span");
+  zh.className = "h1-zh";
+  zh.textContent = m[1].trim();
+  const en = doc3.createElement("span");
+  en.className = "h1-en";
+  en.lang = "en";
+  en.textContent = m[2].trim();
+  const wrap2 = doc3.createElement("span");
+  wrap2.className = "h1-text";
+  wrap2.append(zh, en);
+  h1.replaceChildren(wrap2);
+}
+function enhanceWechatPreview(root2 = $("#article-preview")) {
+  if (!root2) return;
+  root2.querySelectorAll("h1").forEach(splitWechatH1);
+  const h2Style = `display:inline-block;max-width:100%;box-sizing:border-box;margin:16px 0 14px;padding:8px 10px;background:${WECHAT_BLUE};color:#ffffff;font-family:${WECHAT_SERIF};font-size:20px;font-weight:800;line-height:1.25;`;
+  root2.querySelectorAll("h2").forEach((h2) => {
+    h2.setAttribute("style", h2Style);
+    h2.querySelectorAll("*").forEach((el) => {
+      el.setAttribute(
+        "style",
+        `color:#ffffff;font-family:${WECHAT_SERIF};font-size:20px;font-weight:800;`
+      );
+    });
+  });
+  root2.querySelectorAll("blockquote").forEach((bq) => {
+    bq.setAttribute(
+      "style",
+      `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:20px 0;padding:8px;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${WECHAT_SERIF};font-size:15px;font-weight:800;line-height:1.7;`
+    );
+    if (!bq.querySelector(".wechat-quote-mark")) {
+      const mark = document.createElement("span");
+      mark.className = "wechat-quote-mark";
+      mark.textContent = "\u201C";
+      mark.setAttribute(
+        "style",
+        `grid-column:1;grid-row:1;font-family:${WECHAT_SERIF};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`
+      );
+      bq.prepend(mark);
+    }
+    bq.querySelectorAll("p, strong").forEach((el) => {
+      el.style.fontFamily = "\u5BD2\u8749\u9526\u4E66\u5B8BCompact, Songti SC, STSong, \u534E\u6587\u5B8B\u4F53, \u5B8B\u4F53, SimSun, serif";
+      el.style.fontWeight = "800";
+      el.style.color = WECHAT_BLUE;
+      if (el.tagName === "P") el.style.gridColumn = "2";
+    });
+  });
+}
 function publishHTML(md) {
+  const serif = WECHAT_SERIF_PUBLISH;
   const d = new DOMParser().parseFromString(safeHTML(md), "text/html");
   d.querySelectorAll("img").forEach((img) => {
     const p = d.createElement("p");
     p.textContent = "\u3010\u8BF7\u4E0A\u4F20\u56FE\u7247\uFF1A" + (img.alt || "\u6B63\u6587\u914D\u56FE") + "\u3011";
     img.replaceWith(p);
   });
+  d.querySelectorAll("h1").forEach((h1, i) => {
+    splitWechatH1(h1);
+    const num = String(i + 1).padStart(2, "0");
+    const text = h1.innerHTML;
+    h1.innerHTML = `<span style="flex:1;min-width:0;color:${WECHAT_BLUE};font-family:${serif};font-size:40px;font-weight:800;">${text}</span><span style="flex-shrink:0;display:inline-block;width:80px;height:80px;line-height:80px;text-align:center;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:64px;font-weight:800;">${num}</span>`;
+  });
+  d.querySelectorAll("h2").forEach((h2) => {
+    const wrap2 = d.createElement("section");
+    wrap2.setAttribute("data-wechat-h2", "1");
+    wrap2.setAttribute(
+      "style",
+      "margin:16px 0 14px;padding:0;max-width:100%;"
+    );
+    const bar = d.createElement("section");
+    bar.setAttribute(
+      "style",
+      `display:inline-block;max-width:100%;box-sizing:border-box;padding:8px 10px;background-color:${WECHAT_BLUE};`
+    );
+    const label = d.createElement("span");
+    label.setAttribute(
+      "style",
+      `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};line-height:1.25;`
+    );
+    while (h2.firstChild) label.appendChild(h2.firstChild);
+    label.querySelectorAll("*").forEach((el) => {
+      el.setAttribute(
+        "style",
+        `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};`
+      );
+    });
+    bar.appendChild(label);
+    wrap2.appendChild(bar);
+    h2.replaceWith(wrap2);
+  });
+  d.querySelectorAll("blockquote").forEach((bq) => {
+    if (bq.querySelector(".wechat-quote-mark")) return;
+    const mark = d.createElement("span");
+    mark.className = "wechat-quote-mark";
+    mark.textContent = "\u201C";
+    mark.setAttribute(
+      "style",
+      `flex-shrink:0;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`
+    );
+    bq.prepend(mark);
+  });
   const styles = {
-    p: "margin:0 0 20px;line-height:1.9;font-size:16px;color:#333;",
-    h1: "font-size:25px;line-height:1.5;margin:28px 0 18px;",
-    h2: "font-size:21px;line-height:1.5;margin:28px 0 16px;color:#214f45;",
-    h3: "font-size:18px;margin:24px 0 12px;",
-    blockquote: "border-left:3px solid #648779;padding:8px 16px;margin:20px 0;color:#666;",
-    li: "line-height:1.9;margin:8px 0;",
-    strong: "font-weight:bold;color:#214f45;"
+    p: `margin:0 0 16px;line-height:1.75;font-size:15px;color:#111;font-family:${WECHAT_SANS};font-weight:400;`,
+    h1: `display:flex;align-items:flex-end;justify-content:space-between;gap:12px;font-size:40px;line-height:1.1;margin:56px 0 20px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
+    h3: `font-size:18px;margin:20px 0 12px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
+    blockquote: `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:20px 0;padding:8px;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:15px;font-weight:800;line-height:1.7;`,
+    li: `line-height:1.75;margin:6px 0;font-size:15px;font-family:${WECHAT_SANS};`
   };
   Object.entries(styles).forEach(
-    ([tag2, style2]) => d.querySelectorAll(tag2).forEach((n) => n.setAttribute("style", style2))
+    ([tag2, style2]) => d.querySelectorAll(tag2).forEach((n) => {
+      const prev = n.getAttribute("style") || "";
+      n.setAttribute("style", prev ? `${prev};${style2}` : style2);
+    })
   );
-  return `<section style="font-family:PingFang SC,Arial,sans-serif;padding:8px;">${d.body.innerHTML}</section>`;
+  d.querySelectorAll("strong").forEach((n) => {
+    if (n.closest("h1, blockquote, [data-wechat-h2]")) return;
+    n.setAttribute(
+      "style",
+      `font-weight:600;color:#111;font-family:${WECHAT_SANS};`
+    );
+  });
+  d.querySelectorAll("blockquote > *").forEach((el) => {
+    if (el.classList?.contains("wechat-quote-mark")) {
+      el.setAttribute(
+        "style",
+        `grid-column:1;grid-row:1;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`
+      );
+      return;
+    }
+    const prev = el.getAttribute("style") || "";
+    el.setAttribute("style", `${prev};grid-column:2;`.replace(/^;/, ""));
+  });
+  d.querySelectorAll("blockquote p").forEach(
+    (p) => p.setAttribute(
+      "style",
+      `margin:0;grid-column:2;color:${WECHAT_BLUE};font-family:${serif};font-size:15px;font-weight:800;line-height:1.7;`
+    )
+  );
+  d.querySelectorAll("blockquote strong").forEach(
+    (el) => el.setAttribute(
+      "style",
+      `font-family:${serif};font-weight:800;color:${WECHAT_BLUE};`
+    )
+  );
+  d.querySelectorAll("h1 .h1-zh, h1 .h1-en, h1 span").forEach((el) => {
+    const prev = el.getAttribute("style") || "";
+    if (!/font-family/.test(prev))
+      el.setAttribute(
+        "style",
+        `${prev};font-family:${serif};color:${WECHAT_BLUE};`.replace(/^;/, "")
+      );
+  });
+  d.querySelectorAll("h1 .h1-zh, h1 .h1-en").forEach(
+    (el) => el.setAttribute(
+      "style",
+      `display:block;font-size:40px;font-weight:800;line-height:1.1;color:${WECHAT_BLUE};font-family:${serif};`
+    )
+  );
+  return `<section style="font-family:${WECHAT_SANS};padding:8px;color:#111;max-width:768px;">${d.body.innerHTML}</section>`;
 }
 function socialSourceHTML() {
   const html2 = editor ? editor.getHTML() : safeHTML(current.body);
@@ -29451,8 +29823,9 @@ function bindArticleHeader() {
 }
 function renderPreview() {
   previewDocId = current.id;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><span class="eyebrow">${account === "AI" ? "AI \u5B9E\u8DF5\u4E0E\u601D\u8003" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize">\u5B9A\u7A3F</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="article-preview">${safeHTML(current.body)}</div></article></section><div class="workspace-resizer" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant"><div class="assistant-head"><span>\u5C0F\u7EA2\u4E66\u5206\u9875</span><label class="social-size-label">\u5B57\u53F7 <select id="social-size"><option value="30">\u6807\u51C6</option><option value="36">\u5927\u5B57</option><option value="26">\u7D27\u51D1</option></select></label></div><div class="preview-actions"><button id="social-export" class="primary wide" disabled>\u5BFC\u51FA\u56FE\u7247</button><button id="copy-publish" class="wide">\u590D\u5236\u6392\u7248\uFF08\u516C\u4F17\u53F7\uFF09</button><p id="social-status" class="notice">\u6B63\u5728\u6392\u7248\u2026</p></div><div id="panel"><div id="social-pages"></div></div></aside></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><span class="eyebrow">${account === "AI" ? "AI \u5B9E\u8DF5\u4E0E\u601D\u8003" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize">\u5B9A\u7A3F</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="article-preview">${safeHTML(current.body)}</div></article></section><div class="workspace-resizer" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant"><div class="assistant-head"><span>\u5C0F\u7EA2\u4E66\u5206\u9875</span><label class="social-size-label">\u5B57\u53F7 <select id="social-size"><option value="36">\u6807\u51C6</option><option value="42">\u5927\u5B57</option><option value="30">\u7D27\u51D1</option></select></label></div><div class="preview-actions"><button id="social-export" class="primary wide" disabled>\u5BFC\u51FA\u56FE\u7247</button><button id="copy-publish" class="wide">\u590D\u5236\u6392\u7248\uFF08\u516C\u4F17\u53F7\uFF09</button><p id="social-status" class="notice">\u6B63\u5728\u6392\u7248\u2026</p></div><div id="panel"><div id="social-pages"></div></div></aside></div>`;
   bindArticleHeader();
+  enhanceWechatPreview();
   $("#copy-publish").onclick = () => copyPublish(current);
   socialPreviewCtl = bindSocialPreview($(".assistant"), {
     html: socialSourceHTML(),
@@ -29475,7 +29848,7 @@ function renderWrite() {
     renderPreview();
     return;
   }
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><span class="eyebrow">${account === "AI" ? "AI \u5B9E\u8DF5\u4E0E\u601D\u8003" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout">\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold"><b>B</b></button><button data-fmt="italic"><i>I</i></button><button data-fmt="heading">H2</button><button data-fmt="bulletList">\u2637</button><button data-fmt="blockquote">\u275D</button><span></span><button id="image">\uFF0B \u56FE\u7247</button><button id="outline">\u5927\u7EB2</button><button id="focus">\u4E13\u6CE8</button></div><div id="outline-list" hidden></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">\u9879\u76EE\u53C2\u8003\u6587\u4EF6</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">\u5F15\u7528\u9009\u6BB5</button><button data-task="review">\u770B\u7A3F</button><button data-task="rewrite">\u6DA6\u8272\u9009\u6BB5</button><button data-task="check">\u6838\u67E5</button></div></section><div class="workspace-resizer" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant"><div class="assistant-head"><span>\u2727 \u5199\u4F5C\u4F19\u4F34</span><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select></div><div class="tabs">${[
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><span class="eyebrow">${account === "AI" ? "AI \u5B9E\u8DF5\u4E0E\u601D\u8003" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout">\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold"><b>B</b></button><button data-fmt="italic"><i>I</i></button><button data-fmt="heading1">H1</button><button data-fmt="heading">H2</button><button data-fmt="bulletList">\u2637</button><button data-fmt="blockquote">\u275D</button><span></span><button id="image">\uFF0B \u56FE\u7247</button><button id="outline">\u5927\u7EB2</button><button id="focus">\u4E13\u6CE8</button></div><div id="outline-list" hidden></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">\u9879\u76EE\u53C2\u8003\u6587\u4EF6</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">\u91D1\u5947 \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">\u5F15\u7528\u9009\u6BB5</button><button data-task="review">\u770B\u7A3F</button><button data-task="rewrite">\u6DA6\u8272\u9009\u6BB5</button><button data-task="check">\u6838\u67E5</button></div></section><div class="workspace-resizer" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant"><div class="assistant-head"><span>\u2727 \u5199\u4F5C\u4F19\u4F34</span><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select></div><div class="tabs">${[
     ["chat", "\u5BF9\u8BDD"],
     ["topics", "\u601D\u8DEF"],
     ["titles", "\u6807\u9898"],
@@ -29581,7 +29954,8 @@ function renderWrite() {
     (b) => b.onclick = () => {
       const c = editor.chain().focus();
       const f = b.dataset.fmt;
-      if (f === "heading") c.toggleHeading({ level: 2 }).run();
+      if (f === "heading1") c.toggleHeading({ level: 1 }).run();
+      else if (f === "heading") c.toggleHeading({ level: 2 }).run();
       else c["toggle" + f[0].toUpperCase() + f.slice(1)]().run();
     }
   );

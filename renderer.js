@@ -389,30 +389,204 @@ function $$(s) {
   return [...document.querySelectorAll(s)];
 }
 
+const WECHAT_BLUE = "#0f3ff7";
+const WECHAT_BLUE_SOFT = "rgba(15, 63, 247, 0.2)";
+/** 本地预览：寒蝉优先，回退到系统宋体（勿用无衬线，避免退化成黑体） */
+const WECHAT_SERIF =
+  "'寒蝉锦书宋Compact','Songti SC','STSong','华文宋体','宋体',SimSun,serif";
+/**
+ * 公众号粘贴专用：不含自定义字体。
+ * 微信遇到未知字体名常会丢弃整段 font-family，从而退化成黑体。
+ */
+const WECHAT_SERIF_PUBLISH =
+  "Songti SC,STSong,华文宋体,宋体,SimSun,serif";
+const WECHAT_SANS =
+  "'OPPO Sans 4.0','PingFang SC','Helvetica Neue',Arial,sans-serif";
+
+/**
+ * 将一级标题拆成中文主标题 + 英文副标题（若存在）。
+ */
+function splitWechatH1(h1) {
+  if (h1.querySelector(".h1-en")) return;
+  const text = h1.textContent.replace(/\s+/g, " ").trim();
+  const m = text.match(
+    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/,
+  );
+  if (!m) return;
+  const doc = h1.ownerDocument;
+  const zh = doc.createElement("span");
+  zh.className = "h1-zh";
+  zh.textContent = m[1].trim();
+  const en = doc.createElement("span");
+  en.className = "h1-en";
+  en.lang = "en";
+  en.textContent = m[2].trim();
+  const wrap = doc.createElement("span");
+  wrap.className = "h1-text";
+  wrap.append(zh, en);
+  h1.replaceChildren(wrap);
+}
+
+/**
+ * 增强公众号预览 DOM：中英标题拆分，并写入关键元素内联样式（避免 CSS 缓存/继承干扰）。
+ */
+function enhanceWechatPreview(root = $("#article-preview")) {
+  if (!root) return;
+  root.querySelectorAll("h1").forEach(splitWechatH1);
+  const h2Style = `display:inline-block;max-width:100%;box-sizing:border-box;margin:16px 0 14px;padding:8px 10px;background:${WECHAT_BLUE};color:#ffffff;font-family:${WECHAT_SERIF};font-size:20px;font-weight:800;line-height:1.25;`;
+  root.querySelectorAll("h2").forEach((h2) => {
+    h2.setAttribute("style", h2Style);
+    // 子节点（如 strong）不得继承正文黑字/无衬线，否则看起来像「二级标题没变」
+    h2.querySelectorAll("*").forEach((el) => {
+      el.setAttribute(
+        "style",
+        `color:#ffffff;font-family:${WECHAT_SERIF};font-size:20px;font-weight:800;`,
+      );
+    });
+  });
+  root.querySelectorAll("blockquote").forEach((bq) => {
+    bq.setAttribute(
+      "style",
+      `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:20px 0;padding:8px;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${WECHAT_SERIF};font-size:15px;font-weight:800;line-height:1.7;`,
+    );
+    if (!bq.querySelector(".wechat-quote-mark")) {
+      const mark = document.createElement("span");
+      mark.className = "wechat-quote-mark";
+      mark.textContent = "“";
+      mark.setAttribute(
+        "style",
+        `grid-column:1;grid-row:1;font-family:${WECHAT_SERIF};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`,
+      );
+      bq.prepend(mark);
+    }
+    bq.querySelectorAll("p, strong").forEach((el) => {
+      el.style.fontFamily =
+        "寒蝉锦书宋Compact, Songti SC, STSong, 华文宋体, 宋体, SimSun, serif";
+      el.style.fontWeight = "800";
+      el.style.color = WECHAT_BLUE;
+      if (el.tagName === "P") el.style.gridColumn = "2";
+    });
+  });
+}
+
 /**
  * 将 Markdown 转为公众号剪贴板 HTML，本地图片替换为上传占位。
+ * 二级标题不用 h2 着色（微信会重置标题色），改为 section + span。
+ * 宋体栈不含寒蝉，避免微信丢弃整段 font-family 后退化成黑体。
  */
 function publishHTML(md) {
+  const serif = WECHAT_SERIF_PUBLISH;
   const d = new DOMParser().parseFromString(safeHTML(md), "text/html");
   d.querySelectorAll("img").forEach((img) => {
     const p = d.createElement("p");
     p.textContent = "【请上传图片：" + (img.alt || "正文配图") + "】";
     img.replaceWith(p);
   });
+  d.querySelectorAll("h1").forEach((h1, i) => {
+    splitWechatH1(h1);
+    const num = String(i + 1).padStart(2, "0");
+    const text = h1.innerHTML;
+    h1.innerHTML = `<span style="flex:1;min-width:0;color:${WECHAT_BLUE};font-family:${serif};font-size:40px;font-weight:800;">${text}</span><span style="flex-shrink:0;display:inline-block;width:80px;height:80px;line-height:80px;text-align:center;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:64px;font-weight:800;">${num}</span>`;
+  });
+  // 二级标题：微信会重置 h1–h6 的 color，必须把白字写在 span 上
+  d.querySelectorAll("h2").forEach((h2) => {
+    const wrap = d.createElement("section");
+    wrap.setAttribute("data-wechat-h2", "1");
+    wrap.setAttribute(
+      "style",
+      "margin:16px 0 14px;padding:0;max-width:100%;",
+    );
+    const bar = d.createElement("section");
+    bar.setAttribute(
+      "style",
+      `display:inline-block;max-width:100%;box-sizing:border-box;padding:8px 10px;background-color:${WECHAT_BLUE};`,
+    );
+    const label = d.createElement("span");
+    label.setAttribute(
+      "style",
+      `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};line-height:1.25;`,
+    );
+    while (h2.firstChild) label.appendChild(h2.firstChild);
+    label.querySelectorAll("*").forEach((el) => {
+      el.setAttribute(
+        "style",
+        `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};`,
+      );
+    });
+    bar.appendChild(label);
+    wrap.appendChild(bar);
+    h2.replaceWith(wrap);
+  });
+  d.querySelectorAll("blockquote").forEach((bq) => {
+    if (bq.querySelector(".wechat-quote-mark")) return;
+    const mark = d.createElement("span");
+    mark.className = "wechat-quote-mark";
+    mark.textContent = "“";
+    mark.setAttribute(
+      "style",
+      `flex-shrink:0;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`,
+    );
+    bq.prepend(mark);
+  });
   const styles = {
-    p: "margin:0 0 20px;line-height:1.9;font-size:16px;color:#333;",
-    h1: "font-size:25px;line-height:1.5;margin:28px 0 18px;",
-    h2: "font-size:21px;line-height:1.5;margin:28px 0 16px;color:#214f45;",
-    h3: "font-size:18px;margin:24px 0 12px;",
-    blockquote:
-      "border-left:3px solid #648779;padding:8px 16px;margin:20px 0;color:#666;",
-    li: "line-height:1.9;margin:8px 0;",
-    strong: "font-weight:bold;color:#214f45;",
+    p: `margin:0 0 16px;line-height:1.75;font-size:15px;color:#111;font-family:${WECHAT_SANS};font-weight:400;`,
+    h1: `display:flex;align-items:flex-end;justify-content:space-between;gap:12px;font-size:40px;line-height:1.1;margin:56px 0 20px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
+    h3: `font-size:18px;margin:20px 0 12px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
+    blockquote: `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:20px 0;padding:8px;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:15px;font-weight:800;line-height:1.7;`,
+    li: `line-height:1.75;margin:6px 0;font-size:15px;font-family:${WECHAT_SANS};`,
   };
   Object.entries(styles).forEach(([tag, style]) =>
-    d.querySelectorAll(tag).forEach((n) => n.setAttribute("style", style)),
+    d.querySelectorAll(tag).forEach((n) => {
+      const prev = n.getAttribute("style") || "";
+      n.setAttribute("style", prev ? `${prev};${style}` : style);
+    }),
   );
-  return `<section style="font-family:PingFang SC,Arial,sans-serif;padding:8px;">${d.body.innerHTML}</section>`;
+  // 正文加粗：跳过标题 / 引用 / 二级标题条，避免盖成黑字
+  d.querySelectorAll("strong").forEach((n) => {
+    if (n.closest("h1, blockquote, [data-wechat-h2]")) return;
+    n.setAttribute(
+      "style",
+      `font-weight:600;color:#111;font-family:${WECHAT_SANS};`,
+    );
+  });
+  d.querySelectorAll("blockquote > *").forEach((el) => {
+    if (el.classList?.contains("wechat-quote-mark")) {
+      el.setAttribute(
+        "style",
+        `grid-column:1;grid-row:1;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`,
+      );
+      return;
+    }
+    const prev = el.getAttribute("style") || "";
+    el.setAttribute("style", `${prev};grid-column:2;`.replace(/^;/, ""));
+  });
+  d.querySelectorAll("blockquote p").forEach((p) =>
+    p.setAttribute(
+      "style",
+      `margin:0;grid-column:2;color:${WECHAT_BLUE};font-family:${serif};font-size:15px;font-weight:800;line-height:1.7;`,
+    ),
+  );
+  d.querySelectorAll("blockquote strong").forEach((el) =>
+    el.setAttribute(
+      "style",
+      `font-family:${serif};font-weight:800;color:${WECHAT_BLUE};`,
+    ),
+  );
+  d.querySelectorAll("h1 .h1-zh, h1 .h1-en, h1 span").forEach((el) => {
+    const prev = el.getAttribute("style") || "";
+    if (!/font-family/.test(prev))
+      el.setAttribute(
+        "style",
+        `${prev};font-family:${serif};color:${WECHAT_BLUE};`.replace(/^;/, ""),
+      );
+  });
+  d.querySelectorAll("h1 .h1-zh, h1 .h1-en").forEach((el) =>
+    el.setAttribute(
+      "style",
+      `display:block;font-size:40px;font-weight:800;line-height:1.1;color:${WECHAT_BLUE};font-family:${serif};`,
+    ),
+  );
+  return `<section style="font-family:${WECHAT_SANS};padding:8px;color:#111;max-width:768px;">${d.body.innerHTML}</section>`;
 }
 
 /**
@@ -563,8 +737,9 @@ function bindArticleHeader() {
  */
 function renderPreview() {
   previewDocId = current.id;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><span class="eyebrow">${account === "AI" ? "AI 实践与思考" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout" class="primary">退出预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize">定稿</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="article-preview">${safeHTML(current.body)}</div></article></section><div class="workspace-resizer" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant"><div class="assistant-head"><span>小红书分页</span><label class="social-size-label">字号 <select id="social-size"><option value="30">标准</option><option value="36">大字</option><option value="26">紧凑</option></select></label></div><div class="preview-actions"><button id="social-export" class="primary wide" disabled>导出图片</button><button id="copy-publish" class="wide">复制排版（公众号）</button><p id="social-status" class="notice">正在排版…</p></div><div id="panel"><div id="social-pages"></div></div></aside></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><span class="eyebrow">${account === "AI" ? "AI 实践与思考" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout" class="primary">退出预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize">定稿</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="article-preview">${safeHTML(current.body)}</div></article></section><div class="workspace-resizer" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant"><div class="assistant-head"><span>小红书分页</span><label class="social-size-label">字号 <select id="social-size"><option value="36">标准</option><option value="42">大字</option><option value="30">紧凑</option></select></label></div><div class="preview-actions"><button id="social-export" class="primary wide" disabled>导出图片</button><button id="copy-publish" class="wide">复制排版（公众号）</button><p id="social-status" class="notice">正在排版…</p></div><div id="panel"><div id="social-pages"></div></div></aside></div>`;
   bindArticleHeader();
+  enhanceWechatPreview();
   $("#copy-publish").onclick = () => copyPublish(current);
   socialPreviewCtl = bindSocialPreview($(".assistant"), {
     html: socialSourceHTML(),
@@ -590,7 +765,7 @@ function renderWrite() {
     return;
   }
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><span class="eyebrow">${account === "AI" ? "AI 实践与思考" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout">预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold"><b>B</b></button><button data-fmt="italic"><i>I</i></button><button data-fmt="heading">H2</button><button data-fmt="bulletList">☷</button><button data-fmt="blockquote">❝</button><span></span><button id="image">＋ 图片</button><button id="outline">大纲</button><button id="focus">专注</button></div><div id="outline-list" hidden></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">项目参考文件</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">引用选段</button><button data-task="review">看稿</button><button data-task="rewrite">润色选段</button><button data-task="check">核查</button></div></section><div class="workspace-resizer" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant"><div class="assistant-head"><span>✧ 写作伙伴</span><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select></div><div class="tabs">${[
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><span class="eyebrow">${account === "AI" ? "AI 实践与思考" : "BUILD IN PUBLIC"}</span></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout">预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold"><b>B</b></button><button data-fmt="italic"><i>I</i></button><button data-fmt="heading1">H1</button><button data-fmt="heading">H2</button><button data-fmt="bulletList">☷</button><button data-fmt="blockquote">❝</button><span></span><button id="image">＋ 图片</button><button id="outline">大纲</button><button id="focus">专注</button></div><div id="outline-list" hidden></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div class="article-materials"><button id="article-materials">项目参考文件</button>${(current.materials || []).map((p) => `<button data-related="${esc(p)}">${esc(p.split("/").pop().replace(/\.md$/, ""))}</button>`).join("")}</div><div class="byline">金奇 · ${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div><div id="editor"></div></article><div class="selection-bar"><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">引用选段</button><button data-task="review">看稿</button><button data-task="rewrite">润色选段</button><button data-task="check">核查</button></div></section><div class="workspace-resizer" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant"><div class="assistant-head"><span>✧ 写作伙伴</span><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select></div><div class="tabs">${[
       ["chat", "对话"],
       ["topics", "思路"],
       ["titles", "标题"],
@@ -705,7 +880,8 @@ function renderWrite() {
       (b.onclick = () => {
         const c = editor.chain().focus();
         const f = b.dataset.fmt;
-        if (f === "heading") c.toggleHeading({ level: 2 }).run();
+        if (f === "heading1") c.toggleHeading({ level: 1 }).run();
+        else if (f === "heading") c.toggleHeading({ level: 2 }).run();
         else c["toggle" + f[0].toUpperCase() + f.slice(1)]().run();
       }),
   );
