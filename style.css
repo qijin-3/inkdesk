@@ -973,6 +973,38 @@ th {
 .settings {
   max-width: 950px;
 }
+.settings-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.settings-card-head h3 {
+  margin: 0;
+}
+.settings-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.settings-path-field .settings-path-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.settings-path-field .settings-path-row input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  margin-top: 0;
+}
+.settings-path-field .settings-path-row button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
 .settings label {
   display: block;
   margin: 18px 0;

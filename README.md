@@ -1,6 +1,6 @@
 # Inkdesk 0.4 · 写作工作台
 
-独立的 Apple Silicon macOS 开发应用。项目在 `/Users/jin/Documents/Dev/inkdesk`，运行时读写 `/Users/jin/Documents/Dev/Content_OS-dev`。正式的 Content_OS 不变，开发版会拒绝使用正式目录或它的子目录。
+独立的 Apple Silicon macOS 应用。项目在 `/Users/jin/Documents/Dev/inkdesk`。内容仓库（Content_OS）可在设置中选择；也可用 `vault.json` 或 `INKDESK_VAULT` 指定。开发时指向测试目录即可。
 
 打开 `dist-v4/Inkdesk-darwin-arm64/Inkdesk.app`。左侧选择账号和草稿，正文自动保存，右侧按需调用 Cursor 或 Codex。无需另购 API。
 
@@ -39,7 +39,7 @@ AI 只可建议替换现有模块内容，不能增加模块或文件。每次�
 ## 存储结构
 
 ```text
-Content_OS-dev/
+Content_OS/
   金奇_AI/                           # 金奇_Dev 同结构
     00_Profile/
       Persona_Doc.md                 # 原人设，保留
@@ -57,14 +57,14 @@ Content_OS-dev/
     conversations/文章ID/*.json      # 分对话保存，含文章 ID
     profile-history/*.md            # 约定修改前备份
     recovery/*.json                 # 用户选择恢复刷新时的未保存副本
-    repairs/                        # 开发数据格式修复前原文
+    repairs/                        # 数据格式修复前原文
 ```
 
-开发目录由 `development-vault.json` 指定；测试使用 `INKDESK_DATA` 和可选的 `INKDESK_VAULT` 临时目录。上线时再调整正式目录配置及开发保护，不在本版提前切换。
+Content_OS 路径优先取自设置中用户选择的仓库（写入 `workspace.json` 的 `vaultPath`）；也可用 `vault.json` 或环境变量 `INKDESK_VAULT` / `INKDESK_DATA`。测试常用临时目录。
 
-打包版设置在 macOS Application Support 的 `inkdesk/workspace-v2` 下。第一次运行会从旧 `workspace` 复制旧 JSON 与图片，迁移前保留 `.v1-backup`；旧应用数据保留。实际设置和副本路径可在「连接与存储」查看。
+打包版工作区设置在 macOS Application Support 的 `inkdesk/workspace-v2` 下。第一次运行会从旧 `workspace` 复制旧 JSON 与图片，迁移前保留 `.v1-backup`；旧应用数据保留。实际路径可在「设置 → 本地数据」查看。
 
-外部修改与编辑器内容冲突时停止覆盖。点击「刷新开发副本」后，可以把未保存内容备份到 recovery，再读取磁盘版本。无法解析的 YAML 文件在设置页列出错误，不会自动覆盖。
+外部修改与编辑器内容冲突时停止覆盖。点击「刷新本地数据」后，可以把未保存内容备份到 recovery，再读取磁盘版本。无法解析的 YAML 文件在设置页列出错误，不会自动覆盖。
 
 ## 写作闭环
 
@@ -74,7 +74,7 @@ Content_OS-dev/
 
 核查没有真实检索来源时必须标为待核实。本版未增加自动联网检索或历史修改样例外发。Cursor / Codex 需要先在 CLI 登录；编辑、版本、素材与归档不依赖 AI 登录。
 
-常见 Markdown、表格、Obsidian 图片和笔记链接可以使用。插件专属语法不保证视觉渲染；只打开或切页不会重写原文。应用是未签名、公证的本地开发版。
+常见 Markdown、表格、Obsidian 图片和笔记链接可以使用。插件专属语法不保证视觉渲染；只打开或切页不会重写原文。
 
 ## 开发与验证
 
@@ -89,6 +89,6 @@ npm run package:mac
 
 `npm test` 覆盖 YAML 保留、空值、图片路径、改名、版本、对话、归档冲突、外部修改保护、素材和约定；`npm run test:ui` 覆盖富文本保存与复制、润色接受/拒绝、过期建议保护，以及项目素材上传和实际请求隔离、人设文件编辑、精简/迭代采纳、归档表格与热力图。测试使用本地模拟 Agent，不调用真实 AI。
 
-`node real-vault-smoke.cjs` 在开发副本上浏览页面并比对现有 Markdown 哈希；生成页面截图。`node live-agent.cjs` 会实际调用 Agent，不属于默认测试。
+`node real-vault-smoke.cjs` 在指定 Content_OS 目录上浏览页面并比对现有 Markdown 哈希；生成页面截图。`node live-agent.cjs` 会实际调用 Agent，不属于默认测试。
 
 原生素材读取器源码：`ReferenceReader.swift`。重新编译命令：`xcrun swiftc ReferenceReader.swift -o assets/reference-reader -framework AppKit -framework Vision -framework PDFKit`。打包时作为独立资源携带，不需要用户安装 Swift。

@@ -27,6 +27,8 @@ const defaults = {
     author: "金奇",
     coverPath: "",
   },
+  /** 用户选定的 Content_OS 仓库路径 */
+  vaultPath: "",
 };
 
 /** 与 preload 一致的 API 通道名 */
@@ -75,6 +77,7 @@ const API_CHANNELS = [
   "materials-link",
   "wechat-draft-push",
   "wechat-test-token",
+  "set-vault",
 ];
 
 /**
@@ -84,6 +87,8 @@ class DeskCore {
   constructor() {
     this.active = null;
     this.data = null;
+    this.projectDir = null;
+    this.readerPath = null;
     this.store = null;
     this.vault = null;
     this.knowledge = null;
@@ -94,12 +99,15 @@ class DeskCore {
   }
 
   /**
-   * 初始化数据目录与 Content_OS 开发副本。
+   * 初始化应用数据目录与 Content_OS 仓库。
+   * 仓库路径：INKDESK_VAULT > INKDESK_DATA/Content_OS > workspace.json vaultPath > vault.json。
    * @param {{ dataDir: string, projectDir: string, readerPath: string }} options
    */
   init(options) {
     const { dataDir, projectDir, readerPath } = options;
     this.data = dataDir;
+    this.projectDir = projectDir;
+    this.readerPath = readerPath;
     fs.mkdirSync(path.join(this.data, "assets"), { recursive: true });
     try {
       const loaded = JSON.parse(
@@ -125,27 +133,9 @@ class DeskCore {
       if (fs.existsSync(path.join(this.data, "workspace.json"))) throw e;
       this.store = structuredClone(defaults);
     }
-    const configFile = path.join(projectDir, "development-vault.json");
-    const config = fs.existsSync(configFile)
-      ? JSON.parse(fs.readFileSync(configFile, "utf8"))
-      : {};
-    const root =
-      process.env.INKDESK_VAULT ||
-      (process.env.INKDESK_DATA
-        ? path.join(this.data, "Content_OS")
-        : config.developmentVault);
-    if (!root) throw Error("请配置独立开发副本路径");
-    const original =
-      config.source || "/Users/jin/SynologyDrive/Working/Content_OS";
-    const realRoot = fs.existsSync(root)
-      ? fs.realpathSync(root)
-      : path.resolve(root);
-    const realSource = fs.existsSync(original)
-      ? fs.realpathSync(original)
-      : path.resolve(original);
-    if (realRoot === realSource || realRoot.startsWith(realSource + path.sep))
-      throw Error("开发版本禁止写入正式 Content_OS");
-    this.vault = new Vault(root, path.join(this.data, "assets"));
+    const root = this.resolveVaultRoot();
+    if (!root) throw Error("请先在设置中选择内容仓库，或配置 vault.json / INKDESK_VAULT");
+    this.bindVault(root);
     if (this.store.documents?.length) {
       const old = path.join(this.data, "workspace.json");
       if (fs.existsSync(old) && !fs.existsSync(old + ".v1-backup"))
@@ -161,18 +151,100 @@ class DeskCore {
         this.vault.saveDoc(doc);
       }
     }
-    this.knowledge = new Knowledge(this.vault, readerPath);
-    this.accountModel = new AccountModel(this.vault, this.knowledge);
     this.reload();
     this.save();
     return this;
   }
 
-  /** 持久化 workspace 与各文档 */
+  /**
+   * 绑定 Content_OS 仓库并重建依赖它的服务。
+   * @param {string} root
+   */
+  bindVault(root) {
+    this.vault = new Vault(root, path.join(this.data, "assets"));
+    this.knowledge = new Knowledge(this.vault, this.readerPath);
+    this.accountModel = new AccountModel(this.vault, this.knowledge);
+  }
+
+  /**
+   * 解析 Content_OS 根目录：环境变量 > 用户选择 > 项目默认配置。
+   * @returns {string|undefined}
+   */
+  resolveVaultRoot() {
+    if (process.env.INKDESK_VAULT) return process.env.INKDESK_VAULT;
+    if (process.env.INKDESK_DATA) return path.join(this.data, "Content_OS");
+    if (this.store?.vaultPath) return this.store.vaultPath;
+    const vaultFile = path.join(this.projectDir, "vault.json");
+    if (fs.existsSync(vaultFile)) {
+      const config = JSON.parse(fs.readFileSync(vaultFile, "utf8"));
+      if (config.vaultPath) return config.vaultPath;
+    }
+    const legacyFile = path.join(this.projectDir, "development-vault.json");
+    if (fs.existsSync(legacyFile)) {
+      const config = JSON.parse(fs.readFileSync(legacyFile, "utf8"));
+      return config.vaultPath || config.developmentVault;
+    }
+  }
+
+  /**
+   * 当前仓库是否由环境变量锁定（测试/CI）。
+   * @returns {boolean}
+   */
+  vaultLockedByEnv() {
+    return !!(process.env.INKDESK_VAULT || process.env.INKDESK_DATA);
+  }
+
+  /**
+   * 切换用户选定的内容仓库并重新加载。
+   * @param {string} root 文件夹绝对路径
+   */
+  setVault(root) {
+    if (this.vaultLockedByEnv())
+      throw Error("当前仓库由环境变量指定，无法在设置中更改");
+    if (!root || typeof root !== "string") throw Error("请选择有效的文件夹");
+    if (!fs.existsSync(root) || !fs.statSync(root).isDirectory())
+      throw Error("请选择有效的文件夹");
+    if (this.active) throw Error("请等待 AI 完成后再切换仓库");
+    const real = fs.realpathSync(root);
+    if (this.vault) this.save();
+    this.store.vaultPath = real;
+    this.bindVault(real);
+    this.reload();
+    this.save();
+    return this.publicState();
+  }
+
+  /**
+   * 返回前端可用的完整状态快照。
+   */
+  publicState() {
+    return {
+      ...this.store,
+      followers: this.store.followers || { AI: null, Dev: null },
+      metricDeltas: this.store.metricDeltas || { AI: null, Dev: null },
+      wechat: {
+        appId: this.store.wechat?.appId || "",
+        appSecret: this.store.wechat?.appSecret || "",
+        author: this.store.wechat?.author || "金奇",
+        coverPath: this.store.wechat?.coverPath || "",
+      },
+      dataPath: this.data,
+      vaultPath: this.vault?.root || this.store.vaultPath || "",
+      source: this.vault?.root || this.store.source || "",
+      vaultLocked: this.vaultLockedByEnv(),
+      agents: {
+        cursor: !!this.executable("cursor"),
+        codex: !!this.executable("codex"),
+      },
+    };
+  }
+
+  /** 持久化 workspace 设置与各文档 */
   save() {
     for (const doc of this.store.documents || []) this.vault.saveDoc(doc);
     const settings = {
       version: 2,
+      vaultPath: this.store.vaultPath || this.vault?.root || "",
       provider: this.store.provider,
       model: this.store.model,
       followers: this.store.followers || { AI: null, Dev: null },
@@ -238,28 +310,15 @@ class DeskCore {
     if (!API_CHANNELS.includes(name)) throw Error("Invalid channel");
     switch (name) {
       case "load":
-        return {
-          ...this.store,
-          followers: this.store.followers || { AI: null, Dev: null },
-          metricDeltas: this.store.metricDeltas || { AI: null, Dev: null },
-          wechat: {
-            appId: this.store.wechat?.appId || "",
-            appSecret: this.store.wechat?.appSecret || "",
-            author: this.store.wechat?.author || "金奇",
-            coverPath: this.store.wechat?.coverPath || "",
-          },
-          dataPath: this.data,
-          agents: {
-            cursor: !!this.executable("cursor"),
-            codex: !!this.executable("codex"),
-          },
-        };
+        return this.publicState();
       case "save":
         if (!Array.isArray(data.documents) || !Array.isArray(data.metrics))
           throw Error("数据格式错误");
         this.store = { ...this.store, ...data };
         this.save();
         return true;
+      case "set-vault":
+        return this.setVault(data);
       case "source":
       case "scan":
         return { root: this.vault.root, files: scan(this.vault.root) };
@@ -268,10 +327,11 @@ class DeskCore {
           this.vault.meta + "/recovery/" + Date.now() + ".json",
           data,
         );
-        return { ...this.reload(), dataPath: this.data };
+        return this.publicState();
       case "refresh":
         this.save();
-        return { ...this.reload(), dataPath: this.data };
+        this.reload();
+        return this.publicState();
       case "import": {
         const p = within(this.vault.root, data),
           rel = path.relative(this.vault.root, p);
@@ -675,7 +735,7 @@ class DeskCore {
           item.path +
           "\n移至：" +
           target +
-          "\n\n保留版本、素材关系和对话。仅在开发副本内移动；不会自动发布到公众号，也不会填写平台发布时间。",
+          "\n\n保留版本、素材关系和对话。仅在本地 Content_OS 内移动；不会自动发布到公众号，也不会填写平台发布时间。",
       };
     }
     if (snapshot !== undefined && fs.readFileSync(this.vault.p(item.path), "utf8") !== snapshot)

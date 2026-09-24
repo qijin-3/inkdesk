@@ -139,6 +139,7 @@ const passthrough = new Set([
   "materials-link",
   "wechat-draft-push",
   "wechat-test-token",
+  "set-vault",
 ]);
 
 for (const name of passthrough) {
@@ -155,6 +156,19 @@ ipcMain.handle("wechat-pick-cover", async () => {
   });
   if (result.canceled) return null;
   return result.filePaths[0] || null;
+});
+
+/**
+ * 弹出文件夹选择，切换 Content_OS 内容仓库。
+ */
+ipcMain.handle("pick-vault", async () => {
+  const result = await dialog.showOpenDialog({
+    title: "选择内容仓库",
+    defaultPath: desk.vault?.root || undefined,
+    properties: ["openDirectory"],
+  });
+  if (result.canceled) return null;
+  return desk.setVault(result.filePaths[0]);
 });
 
 ipcMain.handle("project-upload", async (_, data) => {

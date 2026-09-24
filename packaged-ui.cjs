@@ -26,13 +26,13 @@ const { _electron: electron } = require("@playwright/test"),
         path.resolve(
           "dist-v4/Inkdesk-darwin-arm64/Inkdesk.app/Contents/Resources/app.asar",
         ),
-        "development-vault.json",
+        "vault.json",
       ).toString(),
     );
     assert.equal(info.packaged, true);
     assert.equal(info.version, "0.4.0");
     assert.equal(
-      info.config.developmentVault,
+      info.config.vaultPath,
       "/Users/jin/Documents/Dev/Content_OS-dev",
     );
     await w.locator("#start").click();

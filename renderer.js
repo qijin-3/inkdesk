@@ -525,7 +525,7 @@ async function persist() {
     await api("save", state);
     if (before === JSON.stringify(state)) dirty = false;
     const n = $("#saved");
-    if (n) n.textContent = "已保存到开发副本";
+    if (n) n.textContent = "已保存到本地";
     return true;
   } catch (e) {
     const msg = e.message || String(e);
@@ -2720,7 +2720,7 @@ async function openPublishedPreview(rel) {
   };
 }
 
-/** 仪表盘刷新：重新读取开发副本，同步外部改动的 YAML / 归档 */
+/** 仪表盘刷新：重新读取 Content_OS，同步外部改动的 YAML / 归档 */
 async function refreshDashboardData() {
   if (busy) return toast("AI 正在回复，请结束后再刷新");
   sync();
@@ -2783,7 +2783,7 @@ function renderTopics() {
 function renderSettings() {
   const wx = state.wechat || {};
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">设置</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><div class="dashboard-card"><h3>Agent 连接</h3><label>默认 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "· 已找到 CLI" : "· 未安装"}</option><option value="codex">Codex ${state.agents.codex ? "· 已找到 CLI" : "· 未安装"}</option></select></label><label>模型（留空沿用 CLI 默认）<input id="model" value="${esc(state.model)}" placeholder="可选模型 ID"></label><p>复用 CLI 登录。若未登录，请先在终端执行 agent login 或 codex login。此版本不保存账号凭据。</p><button class="primary" id="save-settings">保存设置</button></div><div class="dashboard-card"><h3>微信公众号</h3><p>用于一键推送到草稿箱。AppSecret 仅保存在本机 workspace.json。</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx…" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="密钥" autocomplete="off"></label><label>默认作者<input id="wechat-author" value="${esc(wx.author || "金奇")}" placeholder="金奇"></label><label>默认封面路径<input id="wechat-cover" value="${esc(wx.coverPath || "")}" placeholder="可选；也可依赖正文首图" readonly><button type="button" id="wechat-pick-cover">选择封面</button></label><div class="row"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存公众号设置</button></div></div><div class="dashboard-card"><h3>本地数据</h3>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<p>${esc(state.dataPath)}</p><h3>Content_OS 来源</h3><p>${esc(state.source || "尚未选择")}</p><p>开发阶段直接读写独立副本；正文在 02_Drafts，定稿后移动到 03_Archive，图片在 Attachment/文章名，素材在 00_wiki，版本和对话在 _system/inkdesk。上线后再配置正式目录。</p><button type="button" id="refresh-vault">${I.refresh()} 刷新开发副本</button></div></section>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">设置</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><div class="dashboard-card"><div class="settings-card-head"><h3>Agent 连接</h3><div class="settings-card-actions"><button class="primary" id="save-settings">保存设置</button></div></div><label>默认 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "· 已找到 CLI" : "· 未安装"}</option><option value="codex">Codex ${state.agents.codex ? "· 已找到 CLI" : "· 未安装"}</option></select></label><label>模型（留空沿用 CLI 默认）<input id="model" value="${esc(state.model)}" placeholder="可选模型 ID"></label><p>复用 CLI 登录。若未登录，请先在终端执行 agent login 或 codex login。此版本不保存账号凭据。</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>微信公众号</h3><div class="settings-card-actions"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存公众号设置</button></div></div><p>用于一键推送到草稿箱。AppSecret 仅保存在本机 workspace.json。</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx…" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="密钥" autocomplete="off"></label><label>默认作者<input id="wechat-author" value="${esc(wx.author || "金奇")}" placeholder="金奇"></label></div><div class="dashboard-card"><div class="settings-card-head"><h3>内容仓库</h3><div class="settings-card-actions"><button type="button" id="refresh-vault">${I.refresh()} 刷新</button></div></div>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<label class="settings-path-field">仓库路径<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="选择 Content_OS 目录" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} 选择文件夹</button></span></label></div></section>`;
   $("#setting-provider").value = state.provider;
   $("#save-settings").onclick = () => {
     state.provider = $("#setting-provider").value;
@@ -2791,23 +2791,14 @@ function renderSettings() {
     persist();
     toast("设置已保存");
   };
-  /** 把表单写回 state.wechat */
+  /** 把表单写回 state.wechat（封面沿用正文首图，不再在设置中指定） */
   const readWechatForm = () => {
     state.wechat = {
       appId: $("#wechat-appid").value.trim(),
       appSecret: $("#wechat-secret").value.trim(),
       author: $("#wechat-author").value.trim() || "金奇",
-      coverPath: $("#wechat-cover").value.trim(),
+      coverPath: state.wechat?.coverPath || "",
     };
-  };
-  $("#wechat-pick-cover").onclick = async () => {
-    if (isWeb()) return toast("封面选择仅支持桌面端");
-    try {
-      const p = await api("wechat-pick-cover");
-      if (p) $("#wechat-cover").value = p;
-    } catch (e) {
-      toast(e.message);
-    }
   };
   $("#wechat-test").onclick = async () => {
     readWechatForm();
@@ -2823,6 +2814,27 @@ function renderSettings() {
     readWechatForm();
     persist();
     toast("公众号设置已保存");
+  };
+  $("#pick-vault").onclick = async () => {
+    if (isWeb()) return toast("选择仓库仅支持桌面端");
+    if (state.vaultLocked) return toast("当前仓库由环境变量指定，无法更改");
+    if (busy) return toast("AI 正在回复，请结束后再切换");
+    try {
+      const result = await api("pick-vault");
+      if (!result) return;
+      const id = current?.id;
+      Object.assign(state, result);
+      current =
+        state.documents.find((d) => d.id === id) ||
+        state.documents.find((d) => d.account === account) ||
+        null;
+      dirty = false;
+      pending = null;
+      render();
+      toast("已切换内容仓库");
+    } catch (e) {
+      toast(e.message || "切换失败");
+    }
   };
   $("#refresh-vault").onclick = () => refreshVault();
 }
@@ -2841,7 +2853,7 @@ async function refreshVault() {
     toast(
       state.warnings?.length
         ? "部分文件未读取，请在存储设置查看错误"
-        : "已读取开发副本",
+        : "已刷新内容仓库",
     );
   };
   if (!(await persist())) {
