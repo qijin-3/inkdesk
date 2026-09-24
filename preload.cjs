@@ -60,6 +60,11 @@ const channels = [
   "account-folder-candidates",
   "account-set-avatar",
   "account-set-backup-path",
+  "app-info",
+  "update-check",
+  "update-install",
+  "update-open-releases",
+  "set-github-token",
 ];
 contextBridge.exposeInMainWorld("desk", {
   web: false,
@@ -80,5 +85,10 @@ contextBridge.exposeInMainWorld("desk", {
     const listener = (_, text) => fn(text);
     ipcRenderer.on("agent-progress", listener);
     return () => ipcRenderer.removeListener("agent-progress", listener);
+  },
+  updateProgress: (fn) => {
+    const listener = (_, text) => fn(text);
+    ipcRenderer.on("update-progress", listener);
+    return () => ipcRenderer.removeListener("update-progress", listener);
   },
 });

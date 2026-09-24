@@ -30,7 +30,7 @@ const { _electron: electron } = require("@playwright/test"),
       ).toString(),
     );
     assert.equal(info.packaged, true);
-    assert.equal(info.version, "0.4.0");
+    assert.equal(info.version, "0.1.0");
     assert.equal(
       info.config.vaultPath,
       "/Users/jin/Documents/Dev/Content_OS-dev",
@@ -58,7 +58,7 @@ const { _electron: electron } = require("@playwright/test"),
       /6789/,
     );
     console.log(
-      "PASS packaged 0.4.0: embedded dev config, launch, edit, Markdown save",
+      "PASS packaged 0.1.0: embedded dev config, launch, edit, Markdown save",
     );
   } finally {
     await app.close();

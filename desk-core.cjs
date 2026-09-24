@@ -23,6 +23,8 @@ const defaults = {
   metricDeltas: {},
   /** 各账号已发布文章的本地备份默认目录 */
   backupPaths: {},
+  /** 私有仓库检测更新时使用的 GitHub Token（Contents 读权限） */
+  githubToken: "",
   wechat: {
     appId: "",
     appSecret: "",
@@ -268,6 +270,7 @@ class DeskCore {
       followers: this.store.followers || { AI: null, Dev: null },
       metricDeltas: this.store.metricDeltas || { AI: null, Dev: null },
       backupPaths: this.store.backupPaths || {},
+      githubToken: this.store.githubToken || "",
       wechat: {
         appId: this.store.wechat?.appId || "",
         appSecret: this.store.wechat?.appSecret || "",
@@ -333,7 +336,16 @@ class DeskCore {
       case "save":
         if (!Array.isArray(data.documents) || !Array.isArray(data.metrics))
           throw Error("数据格式错误");
-        this.store = { ...this.store, ...data };
+        {
+          const next = { ...data };
+          delete next._update;
+          delete next._appVersion;
+          delete next.agents;
+          delete next.warnings;
+          delete next.dataPath;
+          delete next.vaultLocked;
+          this.store = { ...this.store, ...next };
+        }
         this.save();
         return true;
       case "set-vault":

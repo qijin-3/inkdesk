@@ -32270,7 +32270,8 @@ function renderSettings() {
     { id: "config", title: "\u914D\u7F6E" },
     { id: "accounts", title: "\u8D26\u53F7" }
   ];
-  const configBody = `<div class="dashboard-card"><div class="settings-card-head"><h3>Agent \u8FDE\u63A5</h3><div class="settings-card-actions"><button class="primary" id="save-settings">\u4FDD\u5B58\u8BBE\u7F6E</button></div></div><label>\u9ED8\u8BA4 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option><option value="codex">Codex ${state.agents.codex ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option></select></label><label>\u6A21\u578B\uFF08\u7559\u7A7A\u6CBF\u7528 CLI \u9ED8\u8BA4\uFF09<input id="model" value="${esc(state.model)}" placeholder="\u53EF\u9009\u6A21\u578B ID"></label><p>\u590D\u7528 CLI \u767B\u5F55\u3002\u82E5\u672A\u767B\u5F55\uFF0C\u8BF7\u5148\u5728\u7EC8\u7AEF\u6267\u884C agent login \u6216 codex login\u3002\u6B64\u7248\u672C\u4E0D\u4FDD\u5B58\u8D26\u53F7\u51ED\u636E\u3002</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>\u5FAE\u4FE1\u516C\u4F17\u53F7</h3><div class="settings-card-actions"><button type="button" id="wechat-test">\u6D4B\u8BD5\u8FDE\u63A5</button><button type="button" class="primary" id="save-wechat">\u4FDD\u5B58\u516C\u4F17\u53F7\u8BBE\u7F6E</button></div></div><p>\u7528\u4E8E\u4E00\u952E\u63A8\u9001\u5230\u8349\u7A3F\u7BB1\u3002AppSecret \u4EC5\u4FDD\u5B58\u5728\u672C\u673A workspace.json\u3002</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx\u2026" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="\u5BC6\u94A5" autocomplete="off"></label><label>\u9ED8\u8BA4\u4F5C\u8005<input id="wechat-author" value="${esc(wx.author || "\u91D1\u5947")}" placeholder="\u91D1\u5947"></label></div><div class="dashboard-card"><div class="settings-card-head"><h3>\u5185\u5BB9\u4ED3\u5E93</h3><div class="settings-card-actions"><button type="button" id="refresh-vault">${I.refresh()} \u5237\u65B0</button></div></div>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<label class="settings-path-field">\u4ED3\u5E93\u8DEF\u5F84<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="\u9009\u62E9 Content_OS \u76EE\u5F55" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} \u9009\u62E9\u6587\u4EF6\u5939</button></span></label></div>`;
+  const updateStatus = state._update?.available ? `\u53D1\u73B0\u65B0\u7248\u672C ${esc(state._update.latest)}` : state._update?.latest ? `\u5DF2\u662F\u6700\u65B0\uFF08GitHub ${esc(state._update.latest)}\uFF09` : "\u70B9\u51FB\u68C0\u6D4B GitHub Release";
+  const configBody = `<div class="dashboard-card"><div class="settings-card-head"><h3>\u5E94\u7528\u66F4\u65B0</h3><div class="settings-card-actions"><button type="button" id="open-releases">${I.external()} \u53D1\u5E03\u9875</button><button type="button" id="check-update">${I.refresh()} \u68C0\u6D4B\u66F4\u65B0</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">\u4E0B\u8F7D\u5E76\u5B89\u88C5</button>` : ""}</div></div><p class="update-version-line">\u5F53\u524D\u7248\u672C <strong>${esc(state._appVersion || "\u2026")}</strong> \xB7 <span id="update-status">${updateStatus}</span></p><label>GitHub Token\uFF08\u79C1\u6709\u4ED3\u5E93\u9700\u8981\uFF1B\u516C\u5F00\u4ED3\u5E93\u53EF\u7559\u7A7A\uFF09<input id="github-token" type="password" value="${esc(state.githubToken || "")}" placeholder="ghp_\u2026 \u6216 fine-grained token" autocomplete="off"></label><div class="settings-card-actions" style="margin-top:10px;justify-content:flex-end"><button type="button" id="save-github-token">\u4FDD\u5B58 Token</button></div><p class="muted">\u68C0\u6D4B qijin-3/inkdesk \u7684\u6700\u65B0 Release\uFF0C\u4E0B\u8F7D macOS \u5B89\u88C5\u5305\u540E\u81EA\u52A8\u66FF\u6362\u5E76\u91CD\u542F\u3002</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>Agent \u8FDE\u63A5</h3><div class="settings-card-actions"><button class="primary" id="save-settings">\u4FDD\u5B58\u8BBE\u7F6E</button></div></div><label>\u9ED8\u8BA4 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option><option value="codex">Codex ${state.agents.codex ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option></select></label><label>\u6A21\u578B\uFF08\u7559\u7A7A\u6CBF\u7528 CLI \u9ED8\u8BA4\uFF09<input id="model" value="${esc(state.model)}" placeholder="\u53EF\u9009\u6A21\u578B ID"></label><p>\u590D\u7528 CLI \u767B\u5F55\u3002\u82E5\u672A\u767B\u5F55\uFF0C\u8BF7\u5148\u5728\u7EC8\u7AEF\u6267\u884C agent login \u6216 codex login\u3002\u6B64\u7248\u672C\u4E0D\u4FDD\u5B58\u8D26\u53F7\u51ED\u636E\u3002</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>\u5FAE\u4FE1\u516C\u4F17\u53F7</h3><div class="settings-card-actions"><button type="button" id="wechat-test">\u6D4B\u8BD5\u8FDE\u63A5</button><button type="button" class="primary" id="save-wechat">\u4FDD\u5B58\u516C\u4F17\u53F7\u8BBE\u7F6E</button></div></div><p>\u7528\u4E8E\u4E00\u952E\u63A8\u9001\u5230\u8349\u7A3F\u7BB1\u3002AppSecret \u4EC5\u4FDD\u5B58\u5728\u672C\u673A workspace.json\u3002</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx\u2026" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="\u5BC6\u94A5" autocomplete="off"></label><label>\u9ED8\u8BA4\u4F5C\u8005<input id="wechat-author" value="${esc(wx.author || "\u91D1\u5947")}" placeholder="\u91D1\u5947"></label></div><div class="dashboard-card"><div class="settings-card-head"><h3>\u5185\u5BB9\u4ED3\u5E93</h3><div class="settings-card-actions"><button type="button" id="refresh-vault">${I.refresh()} \u5237\u65B0</button></div></div>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<label class="settings-path-field">\u4ED3\u5E93\u8DEF\u5F84<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="\u9009\u62E9 Content_OS \u76EE\u5F55" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} \u9009\u62E9\u6587\u4EF6\u5939</button></span></label></div>`;
   const accountsBody = `<div class="settings-card-head accounts-toolbar"><h3>\u8D26\u53F7</h3><div class="settings-card-actions"><button type="button" id="register-account">${I.folder()} \u9009\u62E9\u6587\u4EF6\u5939</button><button type="button" class="primary" id="create-account">${I.plus()} \u65B0\u5EFA\u8D26\u53F7</button></div></div>${accountList().length ? `<div class="account-card-grid">${accountList().map((a) => {
     const backup = state.backupPaths?.[a.id] || "";
     return `<div class="dashboard-card account-card"><div class="account-card-top"><button type="button" class="account-avatar-btn account-avatar-lg" data-set-avatar="${esc(a.id)}" title="${a.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}" aria-label="\u4E3A ${esc(a.label)} ${a.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}">${accountAvatarHtml(a, "lg")}</button><div class="account-card-info"><h3>${esc(a.label)}</h3></div></div><div class="account-stat-meta"><span>${a.drafts ?? 0} \u8349\u7A3F</span><span>${a.archives ?? 0} \u5F52\u6863</span><span>${a.files ?? 0} \u6587\u4EF6</span><span>${formatBytes(a.bytes)}</span></div><label class="settings-path-field account-backup-field">\u672C\u5730\u5907\u4EFD\u8DEF\u5F84<span class="settings-path-row"><input type="text" value="${esc(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9" readonly><button type="button" data-pick-backup="${esc(a.id)}">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" data-clear-backup="${esc(a.id)}">\u6E05\u9664</button>` : ""}</span></label><button type="button" class="ghost account-card-remove" data-unregister-account="${esc(a.id)}">\u79FB\u9664</button></div>`;
@@ -32292,6 +32293,27 @@ function renderSettings() {
       persist();
       toast("\u8BBE\u7F6E\u5DF2\u4FDD\u5B58");
     };
+    $("#open-releases").onclick = async () => {
+      try {
+        await api("update-open-releases");
+      } catch (e) {
+        toast(e.message || "\u65E0\u6CD5\u6253\u5F00\u53D1\u5E03\u9875");
+      }
+    };
+    $("#check-update").onclick = () => checkForAppUpdate({ manual: true });
+    $("#save-github-token").onclick = async () => {
+      const token = $("#github-token").value.trim();
+      try {
+        await api("set-github-token", token);
+        state.githubToken = token;
+        toast("Token \u5DF2\u4FDD\u5B58");
+      } catch (e) {
+        toast(e.message || "\u4FDD\u5B58\u5931\u8D25");
+      }
+    };
+    const installBtn = $("#install-update");
+    if (installBtn)
+      installBtn.onclick = () => installAppUpdate();
     const readWechatForm = () => {
       state.wechat = {
         appId: $("#wechat-appid").value.trim(),
@@ -32985,10 +33007,62 @@ window.addEventListener("beforeunload", () => {
   sync();
   if (dirty) window.desk.flush(state);
 });
+async function checkForAppUpdate(opts = {}) {
+  if (isWeb()) {
+    if (opts.manual) toast("\u7F51\u9875\u9884\u89C8\u4E0D\u652F\u6301\u5E94\u7528\u66F4\u65B0");
+    return null;
+  }
+  try {
+    const info = await api("update-check");
+    state._update = info;
+    state._appVersion = info.current;
+    if (opts.manual || page === "settings") {
+      const status = $("#update-status");
+      if (status) {
+        status.textContent = info.available ? `\u53D1\u73B0\u65B0\u7248\u672C ${info.latest}` : `\u5DF2\u662F\u6700\u65B0\uFF08GitHub ${info.latest}\uFF09`;
+      }
+      if (opts.manual && page === "settings") render2();
+    }
+    if (info.available) {
+      toast(`\u53D1\u73B0\u65B0\u7248\u672C ${info.latest}\uFF0C\u53EF\u5728\u8BBE\u7F6E\u4E2D\u66F4\u65B0`);
+    } else if (opts.manual) {
+      toast(`\u5DF2\u662F\u6700\u65B0\u7248\u672C ${info.current}`);
+    }
+    return info;
+  } catch (e) {
+    if (opts.manual) toast(e.message || "\u68C0\u6D4B\u66F4\u65B0\u5931\u8D25");
+    return null;
+  }
+}
+async function installAppUpdate() {
+  if (isWeb()) return toast("\u7F51\u9875\u9884\u89C8\u4E0D\u652F\u6301\u5E94\u7528\u66F4\u65B0");
+  const stop = typeof window.desk?.updateProgress === "function" ? window.desk.updateProgress((t) => toast(t, { sticky: true })) : () => {
+  };
+  try {
+    toast("\u5F00\u59CB\u66F4\u65B0\u2026", { sticky: true });
+    await api("update-install");
+    toast("\u6B63\u5728\u91CD\u542F\u4EE5\u5B8C\u6210\u5B89\u88C5\u2026", { sticky: true });
+  } catch (e) {
+    hideToast();
+    toast(e.message || "\u66F4\u65B0\u5931\u8D25");
+  } finally {
+    stop();
+  }
+}
 state = await api("load");
 ensureAccount();
 current = state.documents.find((d) => sameAccount(d.account, account));
+if (!isWeb()) {
+  try {
+    const info = await api("app-info");
+    state._appVersion = info.version;
+  } catch {
+  }
+}
 render2();
+if (!isWeb()) {
+  setTimeout(() => checkForAppUpdate({ manual: false }), 2500);
+}
 /*! Bundled license information:
 
 lucide/dist/esm/icons/at-sign.mjs:

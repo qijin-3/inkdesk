@@ -3115,7 +3115,12 @@ function renderSettings() {
     { id: "config", title: "配置" },
     { id: "accounts", title: "账号" },
   ];
-  const configBody = `<div class="dashboard-card"><div class="settings-card-head"><h3>Agent 连接</h3><div class="settings-card-actions"><button class="primary" id="save-settings">保存设置</button></div></div><label>默认 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "· 已找到 CLI" : "· 未安装"}</option><option value="codex">Codex ${state.agents.codex ? "· 已找到 CLI" : "· 未安装"}</option></select></label><label>模型（留空沿用 CLI 默认）<input id="model" value="${esc(state.model)}" placeholder="可选模型 ID"></label><p>复用 CLI 登录。若未登录，请先在终端执行 agent login 或 codex login。此版本不保存账号凭据。</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>微信公众号</h3><div class="settings-card-actions"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存公众号设置</button></div></div><p>用于一键推送到草稿箱。AppSecret 仅保存在本机 workspace.json。</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx…" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="密钥" autocomplete="off"></label><label>默认作者<input id="wechat-author" value="${esc(wx.author || "金奇")}" placeholder="金奇"></label></div><div class="dashboard-card"><div class="settings-card-head"><h3>内容仓库</h3><div class="settings-card-actions"><button type="button" id="refresh-vault">${I.refresh()} 刷新</button></div></div>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<label class="settings-path-field">仓库路径<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="选择 Content_OS 目录" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} 选择文件夹</button></span></label></div>`;
+  const updateStatus = state._update?.available
+    ? `发现新版本 ${esc(state._update.latest)}`
+    : state._update?.latest
+      ? `已是最新（GitHub ${esc(state._update.latest)}）`
+      : "点击检测 GitHub Release";
+  const configBody = `<div class="dashboard-card"><div class="settings-card-head"><h3>应用更新</h3><div class="settings-card-actions"><button type="button" id="open-releases">${I.external()} 发布页</button><button type="button" id="check-update">${I.refresh()} 检测更新</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">下载并安装</button>` : ""}</div></div><p class="update-version-line">当前版本 <strong>${esc(state._appVersion || "…")}</strong> · <span id="update-status">${updateStatus}</span></p><label>GitHub Token（私有仓库需要；公开仓库可留空）<input id="github-token" type="password" value="${esc(state.githubToken || "")}" placeholder="ghp_… 或 fine-grained token" autocomplete="off"></label><div class="settings-card-actions" style="margin-top:10px;justify-content:flex-end"><button type="button" id="save-github-token">保存 Token</button></div><p class="muted">检测 qijin-3/inkdesk 的最新 Release，下载 macOS 安装包后自动替换并重启。</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>Agent 连接</h3><div class="settings-card-actions"><button class="primary" id="save-settings">保存设置</button></div></div><label>默认 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "· 已找到 CLI" : "· 未安装"}</option><option value="codex">Codex ${state.agents.codex ? "· 已找到 CLI" : "· 未安装"}</option></select></label><label>模型（留空沿用 CLI 默认）<input id="model" value="${esc(state.model)}" placeholder="可选模型 ID"></label><p>复用 CLI 登录。若未登录，请先在终端执行 agent login 或 codex login。此版本不保存账号凭据。</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>微信公众号</h3><div class="settings-card-actions"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存公众号设置</button></div></div><p>用于一键推送到草稿箱。AppSecret 仅保存在本机 workspace.json。</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx…" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="密钥" autocomplete="off"></label><label>默认作者<input id="wechat-author" value="${esc(wx.author || "金奇")}" placeholder="金奇"></label></div><div class="dashboard-card"><div class="settings-card-head"><h3>内容仓库</h3><div class="settings-card-actions"><button type="button" id="refresh-vault">${I.refresh()} 刷新</button></div></div>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<label class="settings-path-field">仓库路径<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="选择 Content_OS 目录" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} 选择文件夹</button></span></label></div>`;
   const accountsBody = `<div class="settings-card-head accounts-toolbar"><h3>账号</h3><div class="settings-card-actions"><button type="button" id="register-account">${I.folder()} 选择文件夹</button><button type="button" class="primary" id="create-account">${I.plus()} 新建账号</button></div></div>${
     accountList().length
       ? `<div class="account-card-grid">${accountList()
@@ -3147,6 +3152,27 @@ function renderSettings() {
       persist();
       toast("设置已保存");
     };
+    $("#open-releases").onclick = async () => {
+      try {
+        await api("update-open-releases");
+      } catch (e) {
+        toast(e.message || "无法打开发布页");
+      }
+    };
+    $("#check-update").onclick = () => checkForAppUpdate({ manual: true });
+    $("#save-github-token").onclick = async () => {
+      const token = $("#github-token").value.trim();
+      try {
+        await api("set-github-token", token);
+        state.githubToken = token;
+        toast("Token 已保存");
+      } catch (e) {
+        toast(e.message || "保存失败");
+      }
+    };
+    const installBtn = $("#install-update");
+    if (installBtn)
+      installBtn.onclick = () => installAppUpdate();
     /** 把表单写回 state.wechat */
     const readWechatForm = () => {
       state.wechat = {
@@ -4003,7 +4029,72 @@ window.addEventListener("beforeunload", () => {
   sync();
   if (dirty) window.desk.flush(state);
 });
+
+/**
+ * 检测 GitHub 是否有新版本；手动触发时给出提示。
+ * @param {{ manual?: boolean }} [opts]
+ */
+async function checkForAppUpdate(opts = {}) {
+  if (isWeb()) {
+    if (opts.manual) toast("网页预览不支持应用更新");
+    return null;
+  }
+  try {
+    const info = await api("update-check");
+    state._update = info;
+    state._appVersion = info.current;
+    if (opts.manual || page === "settings") {
+      const status = $("#update-status");
+      if (status) {
+        status.textContent = info.available
+          ? `发现新版本 ${info.latest}`
+          : `已是最新（GitHub ${info.latest}）`;
+      }
+      if (opts.manual && page === "settings") render();
+    }
+    if (info.available) {
+      toast(`发现新版本 ${info.latest}，可在设置中更新`);
+    } else if (opts.manual) {
+      toast(`已是最新版本 ${info.current}`);
+    }
+    return info;
+  } catch (e) {
+    if (opts.manual) toast(e.message || "检测更新失败");
+    return null;
+  }
+}
+
+/** 下载 GitHub Release 安装包并替换当前应用。 */
+async function installAppUpdate() {
+  if (isWeb()) return toast("网页预览不支持应用更新");
+  const stop =
+    typeof window.desk?.updateProgress === "function"
+      ? window.desk.updateProgress((t) => toast(t, { sticky: true }))
+      : () => {};
+  try {
+    toast("开始更新…", { sticky: true });
+    await api("update-install");
+    toast("正在重启以完成安装…", { sticky: true });
+  } catch (e) {
+    hideToast();
+    toast(e.message || "更新失败");
+  } finally {
+    stop();
+  }
+}
+
 state = await api("load");
 ensureAccount();
 current = state.documents.find((d) => sameAccount(d.account, account));
+if (!isWeb()) {
+  try {
+    const info = await api("app-info");
+    state._appVersion = info.version;
+  } catch {
+    /* ignore */
+  }
+}
 render();
+if (!isWeb()) {
+  setTimeout(() => checkForAppUpdate({ manual: false }), 2500);
+}

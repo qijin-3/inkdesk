@@ -77,6 +77,8 @@ Content_OS 路径优先取自设置中用户选择的仓库（写入 `workspace.
 
 ## 开发与验证
 
+`npm run package:mac` 产出 `dist-v4/Inkdesk-darwin-arm64/Inkdesk.app`。生产包启动后会检测 GitHub Release；设置页可手动检测、下载并替换安装。仓库若为私有，需在设置中填写具有 Contents 读权限的 Token。
+
 ```sh
 npm ci
 npm run build

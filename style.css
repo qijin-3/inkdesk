@@ -1338,6 +1338,11 @@ th {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.update-version-line {
+  margin: 4px 0 12px;
 }
 .settings-path-field .settings-path-row {
   display: flex;
