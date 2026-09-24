@@ -658,7 +658,11 @@ header select {
 }
 #saved {
   font-size: 10px;
-  color: #aaaaaa;
+  color: #3b82f6;
+  letter-spacing: 0.5px;
+}
+#saved[hidden] {
+  display: none;
 }
 .crumb {
   font-size: 11px;

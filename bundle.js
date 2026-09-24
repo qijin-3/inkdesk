@@ -30215,8 +30215,7 @@ async function persist() {
     const before = JSON.stringify(state);
     await api("save", state);
     if (before === JSON.stringify(state)) dirty = false;
-    const n = $("#saved");
-    if (n) n.textContent = "\u5DF2\u4FDD\u5B58\u5230\u672C\u5730";
+    setSavedStatus("");
     return true;
   } catch (e) {
     const msg = e.message || String(e);
@@ -30228,11 +30227,16 @@ async function persist() {
     return false;
   }
 }
+function setSavedStatus(text) {
+  const n = $("#saved");
+  if (!n) return;
+  n.textContent = text;
+  n.hidden = !text;
+}
 function showSaveConflictDialog(msg) {
   if (saveConflict) return;
   saveConflict = true;
-  const n = $("#saved");
-  if (n) n.textContent = "\u4FDD\u5B58\u5DF2\u6682\u505C";
+  setSavedStatus("\u4FDD\u5B58\u5DF2\u6682\u505C");
   toast("\u4FDD\u5B58\u5931\u8D25\uFF1A" + msg);
   if ($("#save-conflict-modal")) return;
   const m = document.createElement("div");
@@ -30266,8 +30270,7 @@ function changed() {
   }
   dirty = true;
   current.updated = (/* @__PURE__ */ new Date()).toISOString();
-  const n = $("#saved");
-  if (n) n.textContent = "\u4FDD\u5B58\u4E2D\u2026";
+  setSavedStatus("\u4FDD\u5B58\u4E2D\u2026");
   clearTimeout(saveTimer);
   saveTimer = setTimeout(persist, 500);
 }
@@ -31217,7 +31220,7 @@ function setPreviewPane(pane) {
 function renderPreview() {
   previewDocId = current.id;
   if (previewPane !== "social") previewPane = "wechat";
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
   bindArticleHeader();
   bindFinalize();
   enhanceWechatPreview();
@@ -31248,7 +31251,7 @@ function renderWrite() {
     renderPreview();
     return;
   }
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button type="button" id="toggle-assistant">${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</button><button id="layout">\u9884\u89C8</button><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button><button data-task="review">${I.eye()} \u770B\u7A3F</button><button data-task="rewrite">${I.wand()} \u6DA6\u8272\u9009\u6BB5</button><button data-task="check">${I.check()} \u6838\u67E5</button></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</button><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button><button data-task="review">${I.eye()} \u770B\u7A3F</button><button data-task="rewrite">${I.wand()} \u6DA6\u8272\u9009\u6BB5</button><button data-task="check">${I.check()} \u6838\u67E5</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [src_default, src_default2, TableKit],

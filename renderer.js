@@ -592,8 +592,7 @@ async function persist() {
     const before = JSON.stringify(state);
     await api("save", state);
     if (before === JSON.stringify(state)) dirty = false;
-    const n = $("#saved");
-    if (n) n.textContent = "已保存到本地";
+    setSavedStatus("");
     return true;
   } catch (e) {
     const msg = e.message || String(e);
@@ -607,14 +606,24 @@ async function persist() {
 }
 
 /**
+ * 在 byline 字数旁显示保存状态；空字符串时隐藏。
+ * @param {string} text
+ */
+function setSavedStatus(text) {
+  const n = $("#saved");
+  if (!n) return;
+  n.textContent = text;
+  n.hidden = !text;
+}
+
+/**
  * 磁盘与编辑器内容冲突时，只提示一次并引导刷新。
  * @param {string} msg
  */
 function showSaveConflictDialog(msg) {
   if (saveConflict) return;
   saveConflict = true;
-  const n = $("#saved");
-  if (n) n.textContent = "保存已暂停";
+  setSavedStatus("保存已暂停");
   toast("保存失败：" + msg);
   if ($("#save-conflict-modal")) return;
   const m = document.createElement("div");
@@ -655,8 +664,7 @@ function changed() {
   }
   dirty = true;
   current.updated = new Date().toISOString();
-  const n = $("#saved");
-  if (n) n.textContent = "保存中…";
+  setSavedStatus("保存中…");
   clearTimeout(saveTimer);
   saveTimer = setTimeout(persist, 500);
 }
@@ -1840,7 +1848,7 @@ function setPreviewPane(pane) {
 function renderPreview() {
   previewDocId = current.id;
   if (previewPane !== "social") previewPane = "wechat";
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout" class="primary">退出预览</button><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="finalize" class="primary">已发布</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} 导出图片</button><button type="button" id="copy-publish">${I.copy()} 复制排版</button><button type="button" id="push-wechat">${I.send()} 推送到公众号</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">正在排版…</p><div id="social-pages"></div></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">退出预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} 导出图片</button><button type="button" id="copy-publish">${I.copy()} 复制排版</button><button type="button" id="push-wechat">${I.send()} 推送到公众号</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">正在排版…</p><div id="social-pages"></div></div></section></div>`;
   bindArticleHeader();
   bindFinalize();
   enhanceWechatPreview();
@@ -1875,7 +1883,7 @@ function renderWrite() {
     return;
   }
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div></div><div class="header-actions"><span id="saved">已保存到本地</span><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><button id="layout">预览</button><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button><button data-task="review">${I.eye()} 看稿</button><button data-task="rewrite">${I.wand()} 润色选段</button><button data-task="check">${I.check()} 核查</button></div></section></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button><button data-task="review">${I.eye()} 看稿</button><button data-task="rewrite">${I.wand()} 润色选段</button><button data-task="check">${I.check()} 核查</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [StarterKit, Image, TableKit],
