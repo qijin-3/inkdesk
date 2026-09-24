@@ -98,9 +98,9 @@ var SCALE = CANVAS_W / DESIGN_W;
 var T = {
   padX: 40,
   padY: 40,
-  /** 正文 24 / 行高 1.7 / 段后 20 / 字距 0.5 */
-  body: 24,
-  bodyLine: 24 * 1.7,
+  /** 正文 20 / 行高 1.7 / 段后 20 / 字距 0.5 */
+  body: 20,
+  bodyLine: 20 * 1.7,
   bodyAfter: 20,
   bodyTracking: 0.5,
   /** 一级标题 64 / 行高 72 / 序号 96 / 色块 112 */
@@ -126,12 +126,12 @@ var T = {
   h3MarginTop: 24,
   h3MarginBottom: 14,
   h3Tracking: 0.8,
-  quote: 24,
-  quoteLine: 24 * 1.7,
-  quoteMark: 36,
+  quote: 20,
+  quoteLine: 20 * 1.7,
+  quoteMark: 30,
   quotePad: 12,
   quoteGap: 10,
-  quoteMarkW: 28,
+  quoteMarkW: 24,
   quoteMargin: 24,
   continueY: 56
 };
@@ -23563,6 +23563,12 @@ var CircleUser = [
   ["path", { d: "M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662" }]
 ];
 
+// node_modules/lucide/dist/esm/icons/copy.mjs
+var Copy = [
+  ["rect", { width: "14", height: "14", x: "8", y: "8", rx: "2", ry: "2" }],
+  ["path", { d: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" }]
+];
+
 // node_modules/lucide/dist/esm/icons/external-link.mjs
 var ExternalLink = [
   ["path", { d: "M15 3h6v6" }],
@@ -23628,6 +23634,19 @@ var Heading2 = [
   ["path", { d: "M4 18V6" }],
   ["path", { d: "M12 18V6" }],
   ["path", { d: "M21 18h-4c0-4 4-3 4-6 0-1.5-2-2.5-4-1" }]
+];
+
+// node_modules/lucide/dist/esm/icons/image-down.mjs
+var ImageDown = [
+  [
+    "path",
+    {
+      d: "M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1-3.1a2 2 0 0 0-2.814.014L6 21"
+    }
+  ],
+  ["path", { d: "m14 19 3 3v-5.5" }],
+  ["path", { d: "m17 22 3-3" }],
+  ["circle", { cx: "9", cy: "9", r: "2" }]
 ];
 
 // node_modules/lucide/dist/esm/icons/image-plus.mjs
@@ -23878,7 +23897,9 @@ var I = {
   wand: (o) => icon(WandSparkles, o),
   check: (o) => icon(SearchCheck, o),
   file: (o) => icon(FileText, o),
-  link: (o) => icon(Link2, o)
+  link: (o) => icon(Link2, o),
+  copy: (o) => icon(Copy, o),
+  imageDown: (o) => icon(ImageDown, o)
 };
 
 // node_modules/@tiptap/extension-image/dist/index.js
@@ -31116,15 +31137,11 @@ function setPreviewPane(pane) {
   wrap2.querySelectorAll("[data-pane]").forEach((el) => {
     el.hidden = el.dataset.pane !== previewPane;
   });
-  const exportBtn = $("#social-export");
-  const status = $("#social-status");
-  if (exportBtn) exportBtn.hidden = previewPane !== "social";
-  if (status) status.hidden = previewPane !== "social";
 }
 function renderPreview() {
   previewDocId = current.id;
   if (previewPane !== "social") previewPane = "wechat";
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><button type="button" id="social-export" class="primary" disabled ${previewPane !== "social" ? "hidden" : ""}>${I.upload()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">\u590D\u5236\u6392\u7248\uFF08\u516C\u4F17\u53F7\uFF09</button><button type="button" id="push-wechat">\u63A8\u9001\u5230\u8349\u7A3F\u7BB1</button><span></span><span id="social-status" class="preview-toolbar-status" ${previewPane !== "social" ? "hidden" : ""}>\u6B63\u5728\u6392\u7248\u2026</span></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p class="social-pane-hint">\u70B9\u51FB\u5206\u9875\u9884\u89C8\uFF0C\u5DE6\u53F3\u952E\u53EF\u7FFB\u9875</p><div id="social-pages"></div></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
   bindArticleHeader();
   bindFinalize();
   enhanceWechatPreview();
@@ -32499,6 +32516,7 @@ render2();
 lucide/dist/esm/icons/at-sign.mjs:
 lucide/dist/esm/icons/bold.mjs:
 lucide/dist/esm/icons/circle-user.mjs:
+lucide/dist/esm/icons/copy.mjs:
 lucide/dist/esm/icons/external-link.mjs:
 lucide/dist/esm/icons/eye.mjs:
 lucide/dist/esm/icons/file-text.mjs:
@@ -32506,6 +32524,7 @@ lucide/dist/esm/icons/focus.mjs:
 lucide/dist/esm/icons/folder-open.mjs:
 lucide/dist/esm/icons/heading-1.mjs:
 lucide/dist/esm/icons/heading-2.mjs:
+lucide/dist/esm/icons/image-down.mjs:
 lucide/dist/esm/icons/image-plus.mjs:
 lucide/dist/esm/icons/italic.mjs:
 lucide/dist/esm/icons/layout-dashboard.mjs:

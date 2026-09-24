@@ -20,9 +20,9 @@ const SCALE = CANVAS_W / DESIGN_W;
 const T = {
   padX: 40,
   padY: 40,
-  /** 正文 24 / 行高 1.7 / 段后 20 / 字距 0.5 */
-  body: 24,
-  bodyLine: 24 * 1.7,
+  /** 正文 20 / 行高 1.7 / 段后 20 / 字距 0.5 */
+  body: 20,
+  bodyLine: 20 * 1.7,
   bodyAfter: 20,
   bodyTracking: 0.5,
   /** 一级标题 64 / 行高 72 / 序号 96 / 色块 112 */
@@ -48,12 +48,12 @@ const T = {
   h3MarginTop: 24,
   h3MarginBottom: 14,
   h3Tracking: 0.8,
-  quote: 24,
-  quoteLine: 24 * 1.7,
-  quoteMark: 36,
+  quote: 20,
+  quoteLine: 20 * 1.7,
+  quoteMark: 30,
   quotePad: 12,
   quoteGap: 10,
-  quoteMarkW: 28,
+  quoteMarkW: 24,
   quoteMargin: 24,
   continueY: 56,
 };

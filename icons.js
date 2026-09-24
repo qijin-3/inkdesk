@@ -34,6 +34,8 @@ import {
   PinOff,
   FileText,
   Link2,
+  Copy,
+  ImageDown,
 } from "lucide";
 
 /**
@@ -90,4 +92,6 @@ export const I = {
   check: (o) => icon(SearchCheck, o),
   file: (o) => icon(FileText, o),
   link: (o) => icon(Link2, o),
+  copy: (o) => icon(Copy, o),
+  imageDown: (o) => icon(ImageDown, o),
 };
