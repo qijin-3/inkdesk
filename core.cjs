@@ -24,7 +24,13 @@ function scan(root) {
         out.push({
           path: p,
           name: e.name.replace(/\.md$/i, ""),
-          account: p.includes("金奇_Dev") ? "Dev" : "AI",
+          account: (() => {
+            const rel = path.relative(root, p);
+            const top = rel.split(path.sep)[0];
+            return top && !["00_wiki", "Attachment", "_system"].includes(top)
+              ? top
+              : "";
+          })(),
         });
     }
   }

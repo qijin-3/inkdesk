@@ -41,8 +41,35 @@ function files(root) {
           : [path.join(root, e.name)],
     );
 }
+const ACCOUNT_SUBDIRS = ["00_Profile", "01_Topics", "02_Drafts", "03_Archive"];
+const RESERVED_ROOTS = new Set(["00_wiki", "Attachment", "_system"]);
+/** 旧版逻辑 ID → 文件夹名 */
+const LEGACY_ACCOUNT = { AI: "金奇_AI", Dev: "金奇_Dev" };
+
+/**
+ * 将用户输入规范为 vault 下一级账号文件夹名。
+ * @param {string} name
+ */
+function accountFolderName(name) {
+  const s = String(name || "")
+    .trim()
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, "")
+    .replace(/\s+/g, "_");
+  if (!s || s.startsWith(".") || RESERVED_ROOTS.has(s))
+    throw Error("账号名称无效");
+  return s.slice(0, 80);
+}
+
+/**
+ * 账号展示名：下划线转空格。
+ * @param {string} folder
+ */
+function accountLabel(folder) {
+  return String(folder || "").replace(/_/g, " ");
+}
+
 const compact = (account) =>
-  `# 金奇_${account} · 写作约定\n\n## 我是谁\n${account === "Dev" ? "正在做产品的独立开发者，分享开发过程、真实取舍和踩坑。" : "持续实践 AI 的普通学习者，把亲自试过的方法和理解讲清楚。"}\n\n## 怎么表达\n- 像与朋友聊天，具体、坦诚；保留自己的判断和不确定性。\n- 从真实问题或经历出发，有用时给出例子；不强制套结构、金句或行动清单。\n- 不编造经历、效果、引用和数据；避免焦虑营销与夸张承诺。\n\n## 怎么协作\n- 我写、我决定；AI 只处理本次按钮或对话的要求，改稿先预览。\n- 核查区分事实、观点和推测；没有来源的关键事实标为待核实。\n- 定稿前由我确认，保存版本后移入本账号 Archive；平台数据来自文章 YAML。\n- 接受/拒绝的修改留在本机。复盘时主动提炼一条经验，经我修改后写入本约定，不自动堆积规则。\n`;
+  `# ${accountLabel(account)} · 写作约定\n\n## 我是谁\n持续记录自己的判断与实践，写给关心同类问题的读者。\n\n## 怎么表达\n- 像与朋友聊天，具体、坦诚；保留自己的判断和不确定性。\n- 从真实问题或经历出发，有用时给出例子；不强制套结构、金句或行动清单。\n- 不编造经历、效果、引用和数据；避免焦虑营销与夸张承诺。\n\n## 怎么协作\n- 我写、我决定；AI 只处理本次按钮或对话的要求，改稿先预览。\n- 核查区分事实、观点和推测；没有来源的关键事实标为待核实。\n- 定稿前由我确认，保存版本后移入本账号 Archive；平台数据来自文章 YAML。\n`;
 class Vault {
   constructor(root, legacyAssets) {
     this.root = path.resolve(root);
@@ -51,9 +78,7 @@ class Vault {
     this.cache = new Map();
     this.index = {};
     this.warnings = [];
-    for (const a of ["AI", "Dev"])
-      for (const d of ["00_Profile", "01_Topics", "02_Drafts", "03_Archive"])
-        fs.mkdirSync(this.p(`金奇_${a}/${d}`), { recursive: true });
+    this.accounts = [];
     fs.mkdirSync(this.p("00_wiki/_data/raw/inbox"), { recursive: true });
     this.meta = "_system/inkdesk";
     fs.mkdirSync(this.p(this.meta), { recursive: true });
@@ -63,6 +88,7 @@ class Vault {
     this.assetList = files(this.p("Attachment")).filter((p) =>
       /\.(png|jpe?g|gif|webp)$/i.test(p),
     );
+    this.refreshAccounts();
   }
   p(rel) {
     const p = path.resolve(this.root, rel);
@@ -75,6 +101,305 @@ class Vault {
     if (real !== root && !real.startsWith(root + path.sep))
       throw Error("拒绝写入指向其他目录的软链接");
     return p;
+  }
+
+  /**
+   * 从 accounts.json 刷新账号列表；仅首次无配置时从磁盘发现一次。
+   * 已移除的账号不会因文件夹仍在磁盘而自动加回。
+   */
+  refreshAccounts() {
+    const rel = this.meta + "/accounts.json";
+    const stored = this.json(rel, null);
+    if (stored && Array.isArray(stored.accounts)) {
+      this.accounts = stored.accounts
+        .filter((a) => a?.folder)
+        .map((a) => ({
+          id: a.folder,
+          folder: a.folder,
+          label: a.label || accountLabel(a.folder),
+          avatar: a.avatar || "",
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label, "zh"));
+      return this.accounts;
+    }
+    const byId = new Map();
+    if (fs.existsSync(this.root)) {
+      for (const e of fs.readdirSync(this.root, { withFileTypes: true })) {
+        if (
+          !e.isDirectory() ||
+          e.name.startsWith(".") ||
+          RESERVED_ROOTS.has(e.name)
+        )
+          continue;
+        if (this.looksLikeAccount(e.name))
+          byId.set(e.name, {
+            id: e.name,
+            folder: e.name,
+            label: accountLabel(e.name),
+            avatar: "",
+          });
+      }
+    }
+    this.accounts = [...byId.values()].sort((a, b) =>
+      a.label.localeCompare(b.label, "zh"),
+    );
+    this.writeJSON(rel, { accounts: this.accounts });
+    return this.accounts;
+  }
+
+  /**
+   * 目录是否像账号仓库（含四个标准子目录之一，或历史金奇_ 前缀）。
+   * @param {string} folder
+   */
+  looksLikeAccount(folder) {
+    if (folder.startsWith("金奇_")) return true;
+    return ACCOUNT_SUBDIRS.some((d) =>
+      fs.existsSync(path.join(this.root, folder, d)),
+    );
+  }
+
+  /**
+   * 确保账号下四个标准文件夹存在。
+   * @param {string} folder
+   */
+  ensureAccountDirs(folder) {
+    for (const d of ACCOUNT_SUBDIRS)
+      fs.mkdirSync(this.p(`${folder}/${d}`), { recursive: true });
+  }
+
+  /**
+   * 解析账号 ID：支持文件夹名，以及旧版 AI/Dev。
+   * @param {string} id
+   */
+  resolveAccountId(id) {
+    const raw = String(id || "").trim();
+    if (!raw) throw Error("未知账号");
+    if (this.accounts.some((a) => a.id === raw)) return raw;
+    const mapped = LEGACY_ACCOUNT[raw];
+    if (mapped) {
+      this.ensureAccountDirs(mapped);
+      if (!this.accounts.some((a) => a.id === mapped)) {
+        this.accounts.push({
+          id: mapped,
+          folder: mapped,
+          label: accountLabel(mapped),
+          avatar: "",
+        });
+        this.writeJSON(this.meta + "/accounts.json", { accounts: this.accounts });
+      }
+      return mapped;
+    }
+    throw Error("未知账号：" + raw);
+  }
+
+  /**
+   * 当前账号 ID 列表。
+   */
+  listAccountIds() {
+    return this.accounts.map((a) => a.id);
+  }
+
+  /**
+   * 新建账号：创建文件夹与四个标准子目录。
+   * @param {string} name
+   */
+  createAccount(name) {
+    const folder = accountFolderName(name);
+    if (fs.existsSync(this.p(folder)) && this.accounts.some((a) => a.id === folder))
+      throw Error("账号已存在");
+    this.ensureAccountDirs(folder);
+    const entry = { id: folder, folder, label: accountLabel(folder), avatar: "" };
+    this.accounts = this.accounts.filter((a) => a.id !== folder).concat(entry);
+    this.accounts.sort((a, b) => a.label.localeCompare(b.label, "zh"));
+    this.writeJSON(this.meta + "/accounts.json", { accounts: this.accounts });
+    return entry;
+  }
+
+  /**
+   * 将 vault 内已有文件夹注册为账号（并补齐四个标准子目录）。
+   * @param {string} folderOrAbs 相对 vault 的文件夹名，或绝对路径
+   */
+  registerAccount(folderOrAbs) {
+    let folder = String(folderOrAbs || "").trim();
+    if (path.isAbsolute(folder)) {
+      const abs = fs.realpathSync(folder);
+      const root = fs.realpathSync(this.root);
+      if (abs === root || !abs.startsWith(root + path.sep))
+        throw Error("请选择当前内容仓库内的文件夹");
+      folder = path.relative(root, abs);
+    }
+    folder = folder.replace(/\\/g, "/").split("/")[0];
+    folder = accountFolderName(folder);
+    this.ensureAccountDirs(folder);
+    const prev = this.accounts.find((a) => a.id === folder);
+    const entry = {
+      id: folder,
+      folder,
+      label: accountLabel(folder),
+      avatar: prev?.avatar || "",
+    };
+    this.accounts = this.accounts.filter((a) => a.id !== folder).concat(entry);
+    this.accounts.sort((a, b) => a.label.localeCompare(b.label, "zh"));
+    this.writeJSON(this.meta + "/accounts.json", { accounts: this.accounts });
+    return entry;
+  }
+
+  /**
+   * 从注册表移除账号（不删除磁盘文件）。
+   * @param {string} id
+   */
+  unregisterAccount(id) {
+    const folder = this.resolveAccountId(id);
+    this.accounts = this.accounts.filter((a) => a.id !== folder);
+    this.writeJSON(this.meta + "/accounts.json", { accounts: this.accounts });
+    return this.accounts;
+  }
+
+  /**
+   * 统计账号目录占用与文件数。
+   * @param {string} id
+   */
+  accountStats(id) {
+    const folder = this.resolveAccountId(id);
+    const base = this.p(folder);
+    let bytes = 0,
+      filesCount = 0;
+    const walk = (dir) => {
+      if (!fs.existsSync(dir)) return;
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (e.name.startsWith(".") || e.isSymbolicLink()) continue;
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) walk(p);
+        else {
+          filesCount++;
+          try {
+            bytes += fs.statSync(p).size;
+          } catch {}
+        }
+      }
+    };
+    walk(base);
+    const drafts = files(this.p(`${folder}/02_Drafts`)).filter((p) =>
+      p.endsWith(".md"),
+    ).length;
+    const archives = files(this.p(`${folder}/03_Archive`)).filter((p) =>
+      p.endsWith(".md"),
+    ).length;
+    const acc = this.accounts.find((a) => a.id === folder);
+    return {
+      id: folder,
+      folder,
+      label: acc?.label || accountLabel(folder),
+      avatar: acc?.avatar || "",
+      path: base,
+      bytes,
+      files: filesCount,
+      drafts,
+      archives,
+    };
+  }
+
+  /**
+   * 设置账号头像；图片存于 _system/inkdesk/avatars/。
+   * @param {string} id
+   * @param {{ bytes?: number[], type?: string, filePath?: string }} payload
+   */
+  setAccountAvatar(id, payload = {}) {
+    const folder = this.resolveAccountId(id);
+    let bytes;
+    let ext = ".png";
+    if (payload.filePath) {
+      bytes = fs.readFileSync(payload.filePath);
+      ext = path.extname(payload.filePath).toLowerCase() || ".png";
+    } else if (payload.bytesBase64) {
+      bytes = Buffer.from(String(payload.bytesBase64), "base64");
+      const t = String(payload.type || "");
+      if (t.includes("jpeg") || t.includes("jpg")) ext = ".jpg";
+      else if (t.includes("webp")) ext = ".webp";
+      else if (t.includes("gif")) ext = ".gif";
+      else ext = ".png";
+    } else if (payload.bytes) {
+      bytes = Buffer.from(payload.bytes);
+      const t = String(payload.type || "");
+      if (t.includes("jpeg") || t.includes("jpg")) ext = ".jpg";
+      else if (t.includes("webp")) ext = ".webp";
+      else if (t.includes("gif")) ext = ".gif";
+      else ext = ".png";
+    } else throw Error("请选择图片");
+    if (ext === ".jpeg") ext = ".jpg";
+    if (![".png", ".jpg", ".gif", ".webp"].includes(ext))
+      throw Error("仅支持 PNG / JPG / GIF / WebP");
+    if (bytes.length > 2 * 1024 * 1024) throw Error("头像需小于 2MB");
+    const dir = this.meta + "/avatars";
+    fs.mkdirSync(this.p(dir), { recursive: true });
+    const safe = Buffer.from(folder, "utf8")
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+    for (const old of [".png", ".jpg", ".gif", ".webp"]) {
+      const p = this.p(`${dir}/${safe}${old}`);
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    }
+    const rel = `${dir}/${safe}${ext}`;
+    fs.writeFileSync(this.p(rel), bytes);
+    const acc = this.accounts.find((a) => a.id === folder);
+    if (acc) acc.avatar = rel;
+    else {
+      this.accounts.push({
+        id: folder,
+        folder,
+        label: accountLabel(folder),
+        avatar: rel,
+      });
+    }
+    this.writeJSON(this.meta + "/accounts.json", { accounts: this.accounts });
+    return this.accountStats(folder);
+  }
+
+  /**
+   * 列出内容仓库下可注册为账号的一级文件夹（未注册）。
+   */
+  listAccountFolderCandidates() {
+    this.refreshAccounts();
+    const registered = new Set(this.listAccountIds());
+    if (!fs.existsSync(this.root)) return [];
+    return fs
+      .readdirSync(this.root, { withFileTypes: true })
+      .filter(
+        (e) =>
+          e.isDirectory() &&
+          !e.name.startsWith(".") &&
+          !RESERVED_ROOTS.has(e.name) &&
+          !registered.has(e.name),
+      )
+      .map((e) => ({
+        name: e.name,
+        label: accountLabel(e.name),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, "zh"));
+  }
+
+  /**
+   * 全部账号及其统计。
+   */
+  listAccountsWithStats() {
+    this.refreshAccounts();
+    return this.accounts.map((a) => this.accountStats(a.id));
+  }
+
+  /**
+   * 从相对路径推断账号文件夹名。
+   * @param {string} rel
+   */
+  accountFromPath(rel) {
+    const top = String(rel || "").replace(/\\/g, "/").split("/")[0];
+    if (!top || RESERVED_ROOTS.has(top)) return "";
+    try {
+      return this.resolveAccountId(top);
+    } catch {
+      return top;
+    }
   }
   json(rel, fallback) {
     const p = this.p(rel);
@@ -139,15 +464,16 @@ class Vault {
   }
   load() {
     this.warnings = [];
+    this.refreshAccounts();
     const documents = [],
       metrics = [],
       archives = [];
     const byPath = Object.fromEntries(
       Object.entries(this.index).map(([id, v]) => [v.path, id]),
     );
-    for (const account of ["AI", "Dev"])
+    for (const account of this.listAccountIds())
       for (const folder of ["02_Drafts", "03_Archive"])
-        for (const file of files(this.p(`金奇_${account}/${folder}`)).filter(
+        for (const file of files(this.p(`${account}/${folder}`)).filter(
           (p) => p.endsWith(".md"),
         )) {
           const rel = path.relative(this.root, file);
@@ -270,11 +596,13 @@ class Vault {
       warnings: this.warnings,
       vaultPath: this.root,
       source: this.root,
+      accounts: this.listAccountsWithStats(),
     };
   }
   saveDoc(doc) {
-    if (!/^[a-zA-Z0-9-]+$/.test(doc.id) || !["AI", "Dev"].includes(doc.account))
-      throw Error("文章标识无效");
+    const account = this.resolveAccountId(doc.account);
+    doc.account = account;
+    if (!/^[a-zA-Z0-9-]+$/.test(doc.id)) throw Error("文章标识无效");
     if (this.index[doc.id]?.status === "archive") return;
     const cached = this.cache.get(doc.id);
     if (cached?.doc === JSON.stringify(doc)) return;
@@ -315,7 +643,7 @@ class Vault {
         "标题候选",
         doc.titles.map((x) => x.text.split("\n")[0]),
       );
-    const dir = old ? path.posix.dirname(old) : `金奇_${doc.account}/02_Drafts`;
+    const dir = old ? path.posix.dirname(old) : `${account}/02_Drafts`;
     let dest = dir + "/" + clean(doc.title) + ".md";
     if (dest !== old && fs.existsSync(this.p(dest)))
       dest = dir + "/" + clean(doc.title) + " " + doc.id.slice(0, 8) + ".md";
@@ -536,8 +864,8 @@ class Vault {
     return this.materials();
   }
   profile(account) {
-    if (!["AI", "Dev"].includes(account)) throw Error("未知账号");
-    const base = `金奇_${account}/00_Profile/`;
+    const id = this.resolveAccountId(account);
+    const base = `${id}/00_Profile/`;
     const original = this.p(base + "Persona_Doc.md"),
       effective = this.p(base + "Writing_Contract.md");
     return {
@@ -546,7 +874,7 @@ class Vault {
         : "尚无人设文档",
       contract: fs.existsSync(effective)
         ? fs.readFileSync(effective, "utf8")
-        : compact(account),
+        : compact(id),
       path: base + "Writing_Contract.md",
       applied: fs.existsSync(effective),
     };

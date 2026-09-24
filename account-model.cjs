@@ -17,9 +17,10 @@ class AccountModel {
     return this.k.profileBase(a) + "Account_Model.md";
   }
   format(a, modules) {
+    const id = this.v.resolveAccountId(a);
     return (
-      "# 金奇_" +
-      a +
+      "# " +
+      id.replace(/_/g, " ") +
       " · 账号模型\n\n" +
       defs
         .map((d) => "## " + d.title + "\n\n" + modules[d.id].trim())
@@ -63,9 +64,7 @@ class AccountModel {
     const custom = this.k.readProfile(a, "Writing_Contract.md").text;
     const modules = {
       identity:
-        a === "AI"
-          ? "我用设计师的判断力，向普通学习者讲清楚 AI 能做什么、边界在哪里。从自己的实际体验出发，不预设技术背景。\n\n读者看完能理解一个问题或作出更好的选择；不强制每篇给行动清单，不按栏目配额写作。"
-          : "我用设计师的眼光做独立开发，记录从想法到产品、用户反馈和试错的真实过程。\n\n写给也在做东西的人，分享具体取舍和还没解决的问题，不把个人号变成产品公告栏。",
+        "我持续记录自己的判断与实践，写给关心同类问题的读者。\n\n读者看完能理解一个问题或作出更好的选择；不强制每篇给行动清单，不按栏目配额写作。",
       voice:
         "像把刚想清楚的事讲给朋友：自然、具体，有自己的判断。用场景和细节解释观点，术语第一次出现时说人话。\n\n保留克制的情绪、自嘲和不确定性。范文只学叙述方法，不复制句子。结构、开头和结尾按这篇内容决定。\n\n不编造经历、引用、来源和效果；事实缺证据则待核实。不恐吓或贬低读者，少用宏观套话、机械排比、说教结尾和反复的「不是……而是……」。" +
         (custom

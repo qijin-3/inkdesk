@@ -103,7 +103,9 @@ let state,
   editor,
   page = "dashboard",
   tab = "chat",
-  account = "AI",
+  account = "",
+  /** 设置页子 Tab：配置 | 账号 */
+  settingsTab = "config",
   current,
   saveTimer,
   busy = false,
@@ -126,6 +128,72 @@ let railMode = "assistant";
 let outlinePinned = false;
 /** 磁盘冲突中：抑制重复 toast，直到用户刷新或放弃 */
 let saveConflict = false;
+
+/**
+ * 当前仓库已注册账号列表。
+ */
+function accountList() {
+  return state?.accounts || [];
+}
+
+/**
+ * 账号展示名。
+ * @param {string} id
+ */
+function accountLabelOf(id) {
+  return (
+    accountList().find((a) => a.id === id)?.label ||
+    String(id || "").replace(/_/g, " ")
+  );
+}
+
+/**
+ * 兼容旧 AI/Dev 与文件夹名的账号比较。
+ * @param {string} a
+ * @param {string} b
+ */
+function sameAccount(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const map = { AI: "金奇_AI", Dev: "金奇_Dev" };
+  return (map[a] || a) === (map[b] || b);
+}
+
+/**
+ * 账号展示名首字（无头像时用作占位）。
+ * @param {string} label
+ */
+function accountInitial(label) {
+  const s = String(label || "?").trim();
+  return Array.from(s)[0] || "?";
+}
+
+/**
+ * 账号头像 HTML：有图用图，否则显示首字。
+ * @param {{ label?: string, avatar?: string }} a
+ * @param {string} [extraClass]
+ */
+function accountAvatarHtml(a, extraClass = "") {
+  if (a.avatar) {
+    const src = assetUrl("inkasset://vault/" + encodeURIComponent(a.avatar));
+    return `<img class="account-avatar-img ${extraClass}" src="${esc(src)}" alt="" draggable="false">`;
+  }
+  return `<span class="account-avatar-fallback ${extraClass}" aria-hidden="true">${esc(accountInitial(a.label))}</span>`;
+}
+
+/**
+ * 保证当前选中账号仍在列表中。
+ */
+function ensureAccount() {
+  const list = accountList();
+  if (!list.length) {
+    account = "";
+    return;
+  }
+  const hit = list.find((a) => sameAccount(a.id, account));
+  account = hit ? hit.id : list[0].id;
+}
+
 function conversation(doc = current) {
   doc.conversations ||= [];
   if (!doc.conversations.length)
@@ -563,7 +631,7 @@ function showSaveConflictDialog(msg) {
       Object.assign(state, result);
       current =
         state.documents.find((d) => d.id === id) ||
-        state.documents.find((d) => d.account === account);
+        state.documents.find((d) => sameAccount(d.account, account));
       dirty = false;
       saveConflict = false;
       pending = null;
@@ -593,6 +661,7 @@ function changed() {
   saveTimer = setTimeout(persist, 500);
 }
 function newDoc() {
+  if (!account) return toast("请先在设置中添加账号");
   const d = {
     id: crypto.randomUUID(),
     title: "未命名文章",
@@ -646,11 +715,19 @@ function render() {
     previewDocId = null;
   }
   $("#app").innerHTML =
-    `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk</div><button type="button" data-page="settings" class="icon-btn brand-settings" title="设置" aria-label="设置">${I.settings({ size: 18 })}</button></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">金奇 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">金奇 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>选题与灵感</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="profile">${I.user()} <span>账号人设</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></div><div class="docs">${
+    `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk</div><button type="button" data-page="settings" class="icon-btn brand-settings" title="设置" aria-label="设置">${I.settings({ size: 18 })}</button></div><div class="account">${
+      accountList()
+        .map(
+          (a) =>
+            `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc(a.id)}" title="${esc(a.label)}" aria-label="${esc(a.label)}">${accountAvatarHtml(a)}</button>`,
+        )
+        .join("") ||
+      `<p class="account-empty">请在设置中添加账号</p>`
+    }</div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>选题与灵感</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="profile" class="${page === "profile" ? "chosen" : ""}">${I.user()} <span>账号人设</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></div><div class="docs">${
       state.documents
         .filter(
           (d) =>
-            d.account === account &&
+            sameAccount(d.account, account) &&
             d.status !== "final" &&
             d.status !== "archive",
         )
@@ -695,7 +772,7 @@ function render() {
         sync();
         persist();
         account = b.dataset.account;
-        current = state.documents.find((d) => d.account === account);
+        current = state.documents.find((d) => sameAccount(d.account, account));
         pending = null;
         render();
       }),
@@ -789,7 +866,7 @@ async function deleteDraft(id) {
     Object.assign(state, result);
     if (current?.id === id) {
       current =
-        state.documents.find((d) => d.account === account) ||
+        state.documents.find((d) => sameAccount(d.account, account)) ||
         state.documents[0] ||
         null;
       page = current ? "write" : "dashboard";
@@ -1413,7 +1490,7 @@ function bindFinalize() {
       }
       if (!result || result.needsConfirmation) return;
       Object.assign(state, result);
-      current = state.documents.find((d) => d.account === account);
+      current = state.documents.find((d) => sameAccount(d.account, account));
       pending = null;
       page = "dashboard";
       render();
@@ -2608,9 +2685,7 @@ async function runNoteImport() {
 }
 
 function renderDashboard() {
-  const rows = state.metrics.filter(
-    (r) => r["账号"] === account || r["账号"] === "金奇_" + account,
-  );
+  const rows = state.metrics.filter((r) => sameAccount(r["账号"], account));
   const deltas = state.metricDeltas?.[account] || null;
   const sum = (k) =>
     rows.some((r) => r[k] !== null)
@@ -2729,7 +2804,7 @@ async function refreshDashboardData() {
     Object.assign(state, result);
     current =
       state.documents.find((d) => d.id === id) ||
-      state.documents.find((d) => d.account === account);
+      state.documents.find((d) => sameAccount(d.account, account));
     dirty = false;
     pending = null;
     page = "dashboard";
@@ -2766,7 +2841,7 @@ async function refreshDashboardData() {
 
 function renderTopics() {
   const docs = state.documents.filter(
-    (d) => d.account === account && d.topics?.length,
+    (d) => sameAccount(d.account, account) && d.topics?.length,
   );
   $("#main").innerHTML =
     `<header><div class="header-lead"><h1 class="dashboard-tagline">值得继续聊的想法。</h1><span class="eyebrow">IDEAS TO COME BACK TO</span></div></header><section class="dashboard"><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc(d.title)}</h3><div>${esc(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">继续这篇文章 →</button></div>`).join("") || '<div class="empty-data">打开一篇文章，在「思路」面板生成或讨论选题。</div>'}</div></section>`;
@@ -2782,74 +2857,325 @@ function renderTopics() {
 }
 function renderSettings() {
   const wx = state.wechat || {};
-  $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">设置</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><div class="dashboard-card"><div class="settings-card-head"><h3>Agent 连接</h3><div class="settings-card-actions"><button class="primary" id="save-settings">保存设置</button></div></div><label>默认 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "· 已找到 CLI" : "· 未安装"}</option><option value="codex">Codex ${state.agents.codex ? "· 已找到 CLI" : "· 未安装"}</option></select></label><label>模型（留空沿用 CLI 默认）<input id="model" value="${esc(state.model)}" placeholder="可选模型 ID"></label><p>复用 CLI 登录。若未登录，请先在终端执行 agent login 或 codex login。此版本不保存账号凭据。</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>微信公众号</h3><div class="settings-card-actions"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存公众号设置</button></div></div><p>用于一键推送到草稿箱。AppSecret 仅保存在本机 workspace.json。</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx…" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="密钥" autocomplete="off"></label><label>默认作者<input id="wechat-author" value="${esc(wx.author || "金奇")}" placeholder="金奇"></label></div><div class="dashboard-card"><div class="settings-card-head"><h3>内容仓库</h3><div class="settings-card-actions"><button type="button" id="refresh-vault">${I.refresh()} 刷新</button></div></div>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<label class="settings-path-field">仓库路径<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="选择 Content_OS 目录" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} 选择文件夹</button></span></label></div></section>`;
-  $("#setting-provider").value = state.provider;
-  $("#save-settings").onclick = () => {
-    state.provider = $("#setting-provider").value;
-    state.model = $("#model").value.trim();
-    persist();
-    toast("设置已保存");
-  };
-  /** 把表单写回 state.wechat（封面沿用正文首图，不再在设置中指定） */
-  const readWechatForm = () => {
-    state.wechat = {
-      appId: $("#wechat-appid").value.trim(),
-      appSecret: $("#wechat-secret").value.trim(),
-      author: $("#wechat-author").value.trim() || "金奇",
-      coverPath: state.wechat?.coverPath || "",
+  if (settingsTab !== "config" && settingsTab !== "accounts")
+    settingsTab = "config";
+  const tabs = [
+    { id: "config", title: "配置" },
+    { id: "accounts", title: "账号" },
+  ];
+  const configBody = `<div class="dashboard-card"><div class="settings-card-head"><h3>Agent 连接</h3><div class="settings-card-actions"><button class="primary" id="save-settings">保存设置</button></div></div><label>默认 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "· 已找到 CLI" : "· 未安装"}</option><option value="codex">Codex ${state.agents.codex ? "· 已找到 CLI" : "· 未安装"}</option></select></label><label>模型（留空沿用 CLI 默认）<input id="model" value="${esc(state.model)}" placeholder="可选模型 ID"></label><p>复用 CLI 登录。若未登录，请先在终端执行 agent login 或 codex login。此版本不保存账号凭据。</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>微信公众号</h3><div class="settings-card-actions"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存公众号设置</button></div></div><p>用于一键推送到草稿箱。AppSecret 仅保存在本机 workspace.json。</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx…" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="密钥" autocomplete="off"></label><label>默认作者<input id="wechat-author" value="${esc(wx.author || "金奇")}" placeholder="金奇"></label></div><div class="dashboard-card"><div class="settings-card-head"><h3>内容仓库</h3><div class="settings-card-actions"><button type="button" id="refresh-vault">${I.refresh()} 刷新</button></div></div>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<label class="settings-path-field">仓库路径<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="选择 Content_OS 目录" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} 选择文件夹</button></span></label></div>`;
+  const accountsBody = `<div class="settings-card-head accounts-toolbar"><h3>账号</h3><div class="settings-card-actions"><button type="button" id="register-account">${I.folder()} 选择文件夹</button><button type="button" class="primary" id="create-account">${I.plus()} 新建账号</button></div></div>${
+    accountList()
+      .map(
+        (a) =>
+          `<div class="dashboard-card account-card"><div class="account-card-top"><button type="button" class="account-avatar-btn account-avatar-lg" data-set-avatar="${esc(a.id)}" title="更换头像" aria-label="为 ${esc(a.label)} 更换头像">${accountAvatarHtml(a, "lg")}</button><div class="account-card-info"><h3>${esc(a.label)}</h3><p class="account-card-path">${esc(a.folder)}</p></div><button type="button" class="ghost" data-unregister-account="${esc(a.id)}">移除</button></div><div class="account-stat-meta"><span>${a.drafts ?? 0} 草稿</span><span>${a.archives ?? 0} 归档</span><span>${a.files ?? 0} 文件</span><span>${formatBytes(a.bytes)}</span></div><button type="button" class="ghost account-avatar-action" data-set-avatar="${esc(a.id)}">${a.avatar ? "更换头像" : "添加头像"}</button></div>`,
+      )
+      .join("") ||
+    '<p class="muted">尚未添加账号。可选择仓库内已有文件夹，或新建账号。</p>'
+  }`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">设置</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><nav class="settings-tabs">${tabs
+    .map(
+      (t) =>
+        `<button type="button" data-settings-tab="${t.id}" class="${settingsTab === t.id ? "active" : ""}">${t.title}</button>`,
+    )
+    .join("")}</nav>${settingsTab === "config" ? configBody : accountsBody}</section>`;
+  $$("[data-settings-tab]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        settingsTab = b.dataset.settingsTab;
+        render();
+      }),
+  );
+  if (settingsTab === "config") {
+    $("#setting-provider").value = state.provider;
+    $("#save-settings").onclick = () => {
+      state.provider = $("#setting-provider").value;
+      state.model = $("#model").value.trim();
+      persist();
+      toast("设置已保存");
     };
-  };
-  $("#wechat-test").onclick = async () => {
-    readWechatForm();
-    await persist();
-    try {
-      await api("wechat-test-token");
-      toast("公众号凭证有效");
-    } catch (e) {
-      toast(e.message || "连接失败");
-    }
-  };
-  $("#save-wechat").onclick = () => {
-    readWechatForm();
-    persist();
-    toast("公众号设置已保存");
-  };
-  $("#pick-vault").onclick = async () => {
-    if (isWeb()) return toast("选择仓库仅支持桌面端");
-    if (state.vaultLocked) return toast("当前仓库由环境变量指定，无法更改");
-    if (busy) return toast("AI 正在回复，请结束后再切换");
-    try {
-      const result = await api("pick-vault");
+    /** 把表单写回 state.wechat */
+    const readWechatForm = () => {
+      state.wechat = {
+        appId: $("#wechat-appid").value.trim(),
+        appSecret: $("#wechat-secret").value.trim(),
+        author: $("#wechat-author").value.trim() || "金奇",
+        coverPath: state.wechat?.coverPath || "",
+      };
+    };
+    $("#wechat-test").onclick = async () => {
+      readWechatForm();
+      await persist();
+      try {
+        await api("wechat-test-token");
+        toast("公众号凭证有效");
+      } catch (e) {
+        toast(e.message || "连接失败");
+      }
+    };
+    $("#save-wechat").onclick = () => {
+      readWechatForm();
+      persist();
+      toast("公众号设置已保存");
+    };
+    $("#pick-vault").onclick = async () => {
+      if (isWeb()) return toast("选择仓库仅支持桌面端");
+      if (state.vaultLocked) return toast("当前仓库由环境变量指定，无法更改");
+      if (busy) return toast("AI 正在回复，请结束后再切换");
+      try {
+        const result = await api("pick-vault");
+        if (!result) return;
+        applyAccountState(result);
+        toast("已切换内容仓库");
+      } catch (e) {
+        toast(e.message || "切换失败");
+      }
+    };
+    $("#refresh-vault").onclick = () => refreshVault();
+  } else {
+    const createBtn = $("#create-account");
+    const registerBtn = $("#register-account");
+    if (createBtn)
+      createBtn.onclick = async () => {
+        const name = await askText(
+          "新建账号",
+          "输入账号名称（将作为仓库内文件夹名）",
+          "",
+        );
+        if (!name?.trim()) return;
+        try {
+          applyAccountState(
+            await api("account-create", { name: name.trim() }),
+          );
+          toast("已创建账号");
+        } catch (e) {
+          toast(e.message || "创建失败");
+        }
+      };
+    if (registerBtn)
+      registerBtn.onclick = () => pickAndRegisterAccountFolder();
+    $$("[data-unregister-account]").forEach((b) => {
+      b.onclick = async () => {
+        const ok = await askConfirm(
+          "移除账号",
+          "仅从列表移除，不会删除磁盘文件夹。继续？",
+        );
+        if (!ok) return;
+        try {
+          applyAccountState(
+            await api("account-unregister", {
+              id: b.dataset.unregisterAccount,
+            }),
+          );
+          toast("已移除账号");
+        } catch (e) {
+          toast(e.message || "移除失败");
+        }
+      };
+    });
+    $$("[data-set-avatar]").forEach((b) => {
+      b.onclick = () => pickAndSetAccountAvatar(b.dataset.setAvatar);
+    });
+  }
+}
+
+/**
+ * Uint8Array 转 Base64（分块，避免大图撑爆调用栈）。
+ * @param {Uint8Array} buf
+ */
+function uint8ToBase64(buf) {
+  let s = "";
+  const step = 0x8000;
+  for (let i = 0; i < buf.length; i += step) {
+    s += String.fromCharCode(...buf.subarray(i, i + step));
+  }
+  return btoa(s);
+}
+
+/**
+ * 网页端弹出图片文件选择。
+ * @returns {Promise<File|null>}
+ */
+function pickImageFile() {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept =
+      "image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp";
+    input.style.cssText =
+      "position:fixed;left:-100px;top:0;width:1px;height:1px;opacity:0;";
+    document.body.append(input);
+    let settled = false;
+    /** @param {File|null} f */
+    const done = (f) => {
+      if (settled) return;
+      settled = true;
+      input.remove();
+      resolve(f);
+    };
+    input.addEventListener("change", () => done(input.files?.[0] || null));
+    input.addEventListener("cancel", () => done(null));
+    input.click();
+  });
+}
+
+/**
+ * 选择图片并设为账号头像。
+ * @param {string} accountId
+ */
+async function pickAndSetAccountAvatar(accountId) {
+  if (!accountId) return toast("账号无效");
+  try {
+    let result;
+    if (!isWeb()) {
+      result = await api("pick-account-avatar", { id: accountId });
       if (!result) return;
-      const id = current?.id;
-      Object.assign(state, result);
-      current =
-        state.documents.find((d) => d.id === id) ||
-        state.documents.find((d) => d.account === account) ||
-        null;
-      dirty = false;
-      pending = null;
-      render();
-      toast("已切换内容仓库");
-    } catch (e) {
-      toast(e.message || "切换失败");
+    } else {
+      const file = await pickImageFile();
+      if (!file) return;
+      const buf = new Uint8Array(await file.arrayBuffer());
+      result = await api("account-set-avatar", {
+        id: accountId,
+        bytesBase64: uint8ToBase64(buf),
+        type: file.type || "image/png",
+      });
     }
-  };
-  $("#refresh-vault").onclick = () => refreshVault();
+    applyAccountState(result);
+    toast("头像已更新");
+  } catch (e) {
+    toast(e.message || "头像更新失败");
+  }
+}
+
+/**
+ * 文本输入对话框（替代 prompt，网页端更可靠）。
+ * @param {string} title
+ * @param {string} hint
+ * @param {string} [value]
+ * @returns {Promise<string|null>}
+ */
+function askText(title, hint, value = "") {
+  return new Promise((resolve) => {
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog"><h2>${esc(title)}</h2><p>${esc(hint)}</p><input id="ask-text-input" value="${esc(value)}" autocomplete="off"><div class="row"><button type="button" id="ask-text-cancel">取消</button><button type="button" class="primary" id="ask-text-ok">确定</button></div></div>`;
+    document.body.append(m);
+    const input = $("#ask-text-input");
+    input?.focus();
+    input?.select();
+    const done = (v) => {
+      m.remove();
+      resolve(v);
+    };
+    $("#ask-text-cancel").onclick = () => done(null);
+    $("#ask-text-ok").onclick = () => done(input.value);
+    input?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") done(input.value);
+      if (e.key === "Escape") done(null);
+    });
+  });
+}
+
+/**
+ * 确认对话框（替代 confirm，网页端更可靠）。
+ * @param {string} title
+ * @param {string} message
+ * @returns {Promise<boolean>}
+ */
+function askConfirm(title, message) {
+  return new Promise((resolve) => {
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog"><h2>${esc(title)}</h2><p>${esc(message)}</p><div class="row"><button type="button" id="ask-confirm-cancel">取消</button><button type="button" class="primary" id="ask-confirm-ok">确定</button></div></div>`;
+    document.body.append(m);
+    $("#ask-confirm-cancel").onclick = () => {
+      m.remove();
+      resolve(false);
+    };
+    $("#ask-confirm-ok").onclick = () => {
+      m.remove();
+      resolve(true);
+    };
+  });
+}
+
+/**
+ * 选择仓库内文件夹并注册为账号（桌面弹系统对话框，网页列出可选目录）。
+ */
+async function pickAndRegisterAccountFolder() {
+  try {
+    let result = null;
+    if (!isWeb()) {
+      result = await api("pick-account-folder");
+    } else {
+      const folder = await pickAccountFolderOnWeb();
+      if (!folder) return;
+      result = await api("account-register", { folder });
+    }
+    if (!result) return;
+    applyAccountState(result);
+    toast("已添加账号");
+  } catch (e) {
+    toast(e.message || "添加失败");
+  }
+}
+
+/**
+ * 网页端：列出内容仓库一级目录供选择注册。
+ * @returns {Promise<string|null>}
+ */
+async function pickAccountFolderOnWeb() {
+  const folders = await api("account-folder-candidates");
+  if (!folders?.length) {
+    toast("仓库内暂无未注册的文件夹，请先新建账号");
+    return null;
+  }
+  return new Promise((resolve) => {
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog"><h2>选择账号文件夹</h2><p>以下为当前内容仓库内尚未注册的一级目录。</p><div class="folder-pick-list">${folders
+      .map(
+        (f) =>
+          `<button type="button" class="folder-pick-item" data-folder="${esc(f.name)}"><strong>${esc(f.label)}</strong><small>${esc(f.name)}</small></button>`,
+      )
+      .join("")}</div><div class="row"><button type="button" id="cancel-folder-pick">取消</button></div></div>`;
+    document.body.append(m);
+    $("#cancel-folder-pick").onclick = () => {
+      m.remove();
+      resolve(null);
+    };
+    $$(".folder-pick-item").forEach(
+      (b) =>
+        (b.onclick = () => {
+          const name = b.dataset.folder;
+          m.remove();
+          resolve(name);
+        }),
+    );
+  });
+}
+
+/**
+ * 应用含账号列表的状态快照并重绘。
+ * @param {object} result
+ */
+function applyAccountState(result) {
+  const id = current?.id;
+  Object.assign(state, result);
+  ensureAccount();
+  current =
+    state.documents.find((d) => d.id === id) ||
+    state.documents.find((d) => sameAccount(d.account, account)) ||
+    null;
+  dirty = false;
+  pending = null;
+  render();
 }
 async function refreshVault() {
   if (busy) return toast("AI 正在回复，请结束后刷新");
   sync();
   const apply = (result) => {
-    const id = current?.id;
-    Object.assign(state, result);
-    current =
-      state.documents.find((d) => d.id === id) ||
-      state.documents.find((d) => d.account === account);
-    dirty = false;
-    pending = null;
-    render();
+    applyAccountState(result);
     toast(
       state.warnings?.length
         ? "部分文件未读取，请在存储设置查看错误"
@@ -3060,7 +3386,7 @@ function openPreview({
   }
 }
 async function renderMaterials() {
-  const drafts = state.documents.filter((d) => d.account === account);
+  const drafts = state.documents.filter((d) => sameAccount(d.account, account));
   if (
     materialsFilter !== "all" &&
     !drafts.some((d) => d.id === materialsFilter)
@@ -3069,7 +3395,7 @@ async function renderMaterials() {
   const uploadTarget =
     materialsFilter !== "all"
       ? drafts.find((d) => d.id === materialsFilter)
-      : current?.account === account
+      : sameAccount(current?.account, account)
         ? current
         : drafts[0];
   $("#main").innerHTML =
@@ -3191,7 +3517,7 @@ async function renderProfile() {
     const draw = () => {
       const definition = model.definitions.find((d) => d.id === profileTab);
       $("#main").innerHTML =
-        `<header><div class="header-lead"><h1 class="dashboard-tagline">保持自己的声音，逐步验证有效的表达。</h1><span class="eyebrow">金奇 ${a} · 账号模型</span></div></header><section class="dashboard profile-manager"><nav class="model-tabs">${[...model.definitions, { id: "history", title: "迭代记录" }].map((d) => `<button data-model-tab="${d.id}" class="${profileTab === d.id ? "active" : ""}">${d.title}</button>`).join("")}</nav><div id="model-content">${
+        `<header><div class="header-lead"><h1 class="dashboard-tagline">保持自己的声音，逐步验证有效的表达。</h1><span class="eyebrow">${esc(accountLabelOf(a))} · 账号模型</span></div></header><section class="dashboard profile-manager"><nav class="model-tabs">${[...model.definitions, { id: "history", title: "迭代记录" }].map((d) => `<button data-model-tab="${d.id}" class="${profileTab === d.id ? "active" : ""}">${d.title}</button>`).join("")}</nav><div id="model-content">${
           definition
             ? `<h2>${definition.title}</h2><p>${{ identity: "只维护我是谁、写给谁、希望提供什么价值。", voice: "维护自然的表达偏好与必要边界，避免把每篇文章写成规则检查表。", examples: "保留我认可的真实经历和范文片段，并写清出处与为什么像我。", learning: "用有来源的数据观察指导下一次小实验；最多保留三个，过时就替换。" }[profileTab]}</p><textarea id="model-text" rows="15" maxlength="${definition.limit}">${esc(model.modules[profileTab])}</textarea><div class="row"><button id="save-model" class="primary">保存当前模块</button><small>${definition.limit} 字以内</small></div>${profileTab === "learning" ? `<p class="notice">当前账号有 ${state.metrics.filter((r) => r["账号"] === a).length} 篇归档数据。单篇波动不代表表达方式的因果效果。</p>` : ""}${
                 profileTab === "examples"
@@ -3386,5 +3712,6 @@ window.addEventListener("beforeunload", () => {
   if (dirty) window.desk.flush(state);
 });
 state = await api("load");
-current = state.documents.find((d) => d.account === account);
+ensureAccount();
+current = state.documents.find((d) => sameAccount(d.account, account));
 render();

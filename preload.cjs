@@ -47,7 +47,15 @@ const channels = [
   "wechat-test-token",
   "wechat-pick-cover",
   "pick-vault",
+  "pick-account-folder",
+  "pick-account-avatar",
   "set-vault",
+  "accounts-list",
+  "account-create",
+  "account-register",
+  "account-unregister",
+  "account-folder-candidates",
+  "account-set-avatar",
 ];
 contextBridge.exposeInMainWorld("desk", {
   web: false,

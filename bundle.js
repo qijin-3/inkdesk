@@ -29886,7 +29886,8 @@ var state;
 var editor;
 var page = "dashboard";
 var tab = "chat";
-var account = "AI";
+var account = "";
+var settingsTab = "config";
 var current;
 var saveTimer;
 var busy = false;
@@ -29903,6 +29904,38 @@ var assistantOpen = false;
 var railMode = "assistant";
 var outlinePinned = false;
 var saveConflict = false;
+function accountList() {
+  return state?.accounts || [];
+}
+function accountLabelOf(id) {
+  return accountList().find((a) => a.id === id)?.label || String(id || "").replace(/_/g, " ");
+}
+function sameAccount(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const map2 = { AI: "\u91D1\u5947_AI", Dev: "\u91D1\u5947_Dev" };
+  return (map2[a] || a) === (map2[b] || b);
+}
+function accountInitial(label) {
+  const s = String(label || "?").trim();
+  return Array.from(s)[0] || "?";
+}
+function accountAvatarHtml(a, extraClass = "") {
+  if (a.avatar) {
+    const src = assetUrl("inkasset://vault/" + encodeURIComponent(a.avatar));
+    return `<img class="account-avatar-img ${extraClass}" src="${esc(src)}" alt="" draggable="false">`;
+  }
+  return `<span class="account-avatar-fallback ${extraClass}" aria-hidden="true">${esc(accountInitial(a.label))}</span>`;
+}
+function ensureAccount() {
+  const list2 = accountList();
+  if (!list2.length) {
+    account = "";
+    return;
+  }
+  const hit = list2.find((a) => sameAccount(a.id, account));
+  account = hit ? hit.id : list2[0].id;
+}
 function conversation(doc3 = current) {
   doc3.conversations ||= [];
   if (!doc3.conversations.length)
@@ -30091,6 +30124,12 @@ function inferMaterialKind(name) {
     return "text";
   return "binary";
 }
+function formatBytes(n) {
+  const v = Number(n) || 0;
+  if (v < 1024) return v + " B";
+  if (v < 1024 * 1024) return (v / 1024).toFixed(1) + " KB";
+  return (v / (1024 * 1024)).toFixed(1) + " MB";
+}
 async function hydrateMaterialPreview(r) {
   const kind = r.kind || inferMaterialKind(r.name);
   const asset = r.asset || (kind === "image" && r.path ? "inkasset://vault/" + encodeURIComponent(r.path) : "");
@@ -30203,7 +30242,7 @@ function showSaveConflictDialog(msg) {
       const id = current?.id;
       const result = await api("recover-refresh", state);
       Object.assign(state, result);
-      current = state.documents.find((d) => d.id === id) || state.documents.find((d) => d.account === account);
+      current = state.documents.find((d) => d.id === id) || state.documents.find((d) => sameAccount(d.account, account));
       dirty = false;
       saveConflict = false;
       pending = null;
@@ -30229,6 +30268,7 @@ function changed() {
   saveTimer = setTimeout(persist, 500);
 }
 function newDoc() {
+  if (!account) return toast("\u8BF7\u5148\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7");
   const d = {
     id: crypto.randomUUID(),
     title: "\u672A\u547D\u540D\u6587\u7AE0",
@@ -30281,8 +30321,10 @@ function render2() {
     previewMode = false;
     previewDocId = null;
   }
-  $("#app").innerHTML = `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk</div><button type="button" data-page="settings" class="icon-btn brand-settings" title="\u8BBE\u7F6E" aria-label="\u8BBE\u7F6E">${I.settings({ size: 18 })}</button></div><div class="account"><button data-account="AI" class="${account === "AI" ? "active" : ""}">\u91D1\u5947 AI</button><button data-account="Dev" class="${account === "Dev" ? "active" : ""}">\u91D1\u5947 Dev</button></div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>\u9009\u9898\u4E0E\u7075\u611F</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button><button data-page="profile">${I.user()} <span>\u8D26\u53F7\u4EBA\u8BBE</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></div><div class="docs">${state.documents.filter(
-    (d) => d.account === account && d.status !== "final" && d.status !== "archive"
+  $("#app").innerHTML = `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk</div><button type="button" data-page="settings" class="icon-btn brand-settings" title="\u8BBE\u7F6E" aria-label="\u8BBE\u7F6E">${I.settings({ size: 18 })}</button></div><div class="account">${accountList().map(
+    (a) => `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc(a.id)}" title="${esc(a.label)}" aria-label="${esc(a.label)}">${accountAvatarHtml(a)}</button>`
+  ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>\u9009\u9898\u4E0E\u7075\u611F</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button><button data-page="profile" class="${page === "profile" ? "chosen" : ""}">${I.user()} <span>\u8D26\u53F7\u4EBA\u8BBE</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></div><div class="docs">${state.documents.filter(
+    (d) => sameAccount(d.account, account) && d.status !== "final" && d.status !== "archive"
   ).map(
     (d) => `<button class="doc ${current?.id === d.id ? "selected" : ""}" data-id="${d.id}"><span>${esc(d.title)}</span><small>${new Date(d.updated).toLocaleDateString("zh-CN")} \xB7 ${d.body.length} \u5B57</small></button>`
   ).join("") || '<p class="muted">\u4ECE\u4E00\u4E2A\u60F3\u6CD5\u5F00\u59CB\u3002</p>'}</div></aside><main id="main"></main><div class="workspace-resizer hidden" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant hidden" id="rail"></aside>`;
@@ -30311,7 +30353,7 @@ function render2() {
       sync();
       persist();
       account = b.dataset.account;
-      current = state.documents.find((d) => d.account === account);
+      current = state.documents.find((d) => sameAccount(d.account, account));
       pending = null;
       render2();
     }
@@ -30384,7 +30426,7 @@ async function deleteDraft(id) {
     const result = await api("draft-delete", id);
     Object.assign(state, result);
     if (current?.id === id) {
-      current = state.documents.find((d) => d.account === account) || state.documents[0] || null;
+      current = state.documents.find((d) => sameAccount(d.account, account)) || state.documents[0] || null;
       page = current ? "write" : "dashboard";
     }
     dirty = false;
@@ -30882,7 +30924,7 @@ function bindFinalize() {
       }
       if (!result || result.needsConfirmation) return;
       Object.assign(state, result);
-      current = state.documents.find((d) => d.account === account);
+      current = state.documents.find((d) => sameAccount(d.account, account));
       pending = null;
       page = "dashboard";
       render2();
@@ -31885,9 +31927,7 @@ async function runNoteImport() {
   }
 }
 function renderDashboard() {
-  const rows = state.metrics.filter(
-    (r) => r["\u8D26\u53F7"] === account || r["\u8D26\u53F7"] === "\u91D1\u5947_" + account
-  );
+  const rows = state.metrics.filter((r) => sameAccount(r["\u8D26\u53F7"], account));
   const deltas = state.metricDeltas?.[account] || null;
   const sum = (k) => rows.some((r) => r[k] !== null) ? rows.reduce((s, r) => s + (r[k] || 0), 0).toLocaleString() : "\u2014";
   const deltaMark = (key) => {
@@ -31977,7 +32017,7 @@ async function refreshDashboardData() {
   const apply2 = (result) => {
     const id = current?.id;
     Object.assign(state, result);
-    current = state.documents.find((d) => d.id === id) || state.documents.find((d) => d.account === account);
+    current = state.documents.find((d) => d.id === id) || state.documents.find((d) => sameAccount(d.account, account));
     dirty = false;
     pending = null;
     page = "dashboard";
@@ -32010,7 +32050,7 @@ async function refreshDashboardData() {
 }
 function renderTopics() {
   const docs = state.documents.filter(
-    (d) => d.account === account && d.topics?.length
+    (d) => sameAccount(d.account, account) && d.topics?.length
   );
   $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u503C\u5F97\u7EE7\u7EED\u804A\u7684\u60F3\u6CD5\u3002</h1><span class="eyebrow">IDEAS TO COME BACK TO</span></div></header><section class="dashboard"><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc(d.title)}</h3><div>${esc(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">\u7EE7\u7EED\u8FD9\u7BC7\u6587\u7AE0 \u2192</button></div>`).join("") || '<div class="empty-data">\u6253\u5F00\u4E00\u7BC7\u6587\u7AE0\uFF0C\u5728\u300C\u601D\u8DEF\u300D\u9762\u677F\u751F\u6210\u6216\u8BA8\u8BBA\u9009\u9898\u3002</div>'}</div></section>`;
   $$("[data-open]").forEach(
@@ -32024,67 +32064,260 @@ function renderTopics() {
 }
 function renderSettings() {
   const wx = state.wechat || {};
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BBE\u7F6E</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><div class="dashboard-card"><div class="settings-card-head"><h3>Agent \u8FDE\u63A5</h3><div class="settings-card-actions"><button class="primary" id="save-settings">\u4FDD\u5B58\u8BBE\u7F6E</button></div></div><label>\u9ED8\u8BA4 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option><option value="codex">Codex ${state.agents.codex ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option></select></label><label>\u6A21\u578B\uFF08\u7559\u7A7A\u6CBF\u7528 CLI \u9ED8\u8BA4\uFF09<input id="model" value="${esc(state.model)}" placeholder="\u53EF\u9009\u6A21\u578B ID"></label><p>\u590D\u7528 CLI \u767B\u5F55\u3002\u82E5\u672A\u767B\u5F55\uFF0C\u8BF7\u5148\u5728\u7EC8\u7AEF\u6267\u884C agent login \u6216 codex login\u3002\u6B64\u7248\u672C\u4E0D\u4FDD\u5B58\u8D26\u53F7\u51ED\u636E\u3002</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>\u5FAE\u4FE1\u516C\u4F17\u53F7</h3><div class="settings-card-actions"><button type="button" id="wechat-test">\u6D4B\u8BD5\u8FDE\u63A5</button><button type="button" class="primary" id="save-wechat">\u4FDD\u5B58\u516C\u4F17\u53F7\u8BBE\u7F6E</button></div></div><p>\u7528\u4E8E\u4E00\u952E\u63A8\u9001\u5230\u8349\u7A3F\u7BB1\u3002AppSecret \u4EC5\u4FDD\u5B58\u5728\u672C\u673A workspace.json\u3002</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx\u2026" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="\u5BC6\u94A5" autocomplete="off"></label><label>\u9ED8\u8BA4\u4F5C\u8005<input id="wechat-author" value="${esc(wx.author || "\u91D1\u5947")}" placeholder="\u91D1\u5947"></label></div><div class="dashboard-card"><div class="settings-card-head"><h3>\u5185\u5BB9\u4ED3\u5E93</h3><div class="settings-card-actions"><button type="button" id="refresh-vault">${I.refresh()} \u5237\u65B0</button></div></div>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<label class="settings-path-field">\u4ED3\u5E93\u8DEF\u5F84<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="\u9009\u62E9 Content_OS \u76EE\u5F55" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} \u9009\u62E9\u6587\u4EF6\u5939</button></span></label></div></section>`;
-  $("#setting-provider").value = state.provider;
-  $("#save-settings").onclick = () => {
-    state.provider = $("#setting-provider").value;
-    state.model = $("#model").value.trim();
-    persist();
-    toast("\u8BBE\u7F6E\u5DF2\u4FDD\u5B58");
-  };
-  const readWechatForm = () => {
-    state.wechat = {
-      appId: $("#wechat-appid").value.trim(),
-      appSecret: $("#wechat-secret").value.trim(),
-      author: $("#wechat-author").value.trim() || "\u91D1\u5947",
-      coverPath: state.wechat?.coverPath || ""
-    };
-  };
-  $("#wechat-test").onclick = async () => {
-    readWechatForm();
-    await persist();
-    try {
-      await api("wechat-test-token");
-      toast("\u516C\u4F17\u53F7\u51ED\u8BC1\u6709\u6548");
-    } catch (e) {
-      toast(e.message || "\u8FDE\u63A5\u5931\u8D25");
-    }
-  };
-  $("#save-wechat").onclick = () => {
-    readWechatForm();
-    persist();
-    toast("\u516C\u4F17\u53F7\u8BBE\u7F6E\u5DF2\u4FDD\u5B58");
-  };
-  $("#pick-vault").onclick = async () => {
-    if (isWeb()) return toast("\u9009\u62E9\u4ED3\u5E93\u4EC5\u652F\u6301\u684C\u9762\u7AEF");
-    if (state.vaultLocked) return toast("\u5F53\u524D\u4ED3\u5E93\u7531\u73AF\u5883\u53D8\u91CF\u6307\u5B9A\uFF0C\u65E0\u6CD5\u66F4\u6539");
-    if (busy) return toast("AI \u6B63\u5728\u56DE\u590D\uFF0C\u8BF7\u7ED3\u675F\u540E\u518D\u5207\u6362");
-    try {
-      const result = await api("pick-vault");
-      if (!result) return;
-      const id = current?.id;
-      Object.assign(state, result);
-      current = state.documents.find((d) => d.id === id) || state.documents.find((d) => d.account === account) || null;
-      dirty = false;
-      pending = null;
+  if (settingsTab !== "config" && settingsTab !== "accounts")
+    settingsTab = "config";
+  const tabs = [
+    { id: "config", title: "\u914D\u7F6E" },
+    { id: "accounts", title: "\u8D26\u53F7" }
+  ];
+  const configBody = `<div class="dashboard-card"><div class="settings-card-head"><h3>Agent \u8FDE\u63A5</h3><div class="settings-card-actions"><button class="primary" id="save-settings">\u4FDD\u5B58\u8BBE\u7F6E</button></div></div><label>\u9ED8\u8BA4 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option><option value="codex">Codex ${state.agents.codex ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option></select></label><label>\u6A21\u578B\uFF08\u7559\u7A7A\u6CBF\u7528 CLI \u9ED8\u8BA4\uFF09<input id="model" value="${esc(state.model)}" placeholder="\u53EF\u9009\u6A21\u578B ID"></label><p>\u590D\u7528 CLI \u767B\u5F55\u3002\u82E5\u672A\u767B\u5F55\uFF0C\u8BF7\u5148\u5728\u7EC8\u7AEF\u6267\u884C agent login \u6216 codex login\u3002\u6B64\u7248\u672C\u4E0D\u4FDD\u5B58\u8D26\u53F7\u51ED\u636E\u3002</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>\u5FAE\u4FE1\u516C\u4F17\u53F7</h3><div class="settings-card-actions"><button type="button" id="wechat-test">\u6D4B\u8BD5\u8FDE\u63A5</button><button type="button" class="primary" id="save-wechat">\u4FDD\u5B58\u516C\u4F17\u53F7\u8BBE\u7F6E</button></div></div><p>\u7528\u4E8E\u4E00\u952E\u63A8\u9001\u5230\u8349\u7A3F\u7BB1\u3002AppSecret \u4EC5\u4FDD\u5B58\u5728\u672C\u673A workspace.json\u3002</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx\u2026" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="\u5BC6\u94A5" autocomplete="off"></label><label>\u9ED8\u8BA4\u4F5C\u8005<input id="wechat-author" value="${esc(wx.author || "\u91D1\u5947")}" placeholder="\u91D1\u5947"></label></div><div class="dashboard-card"><div class="settings-card-head"><h3>\u5185\u5BB9\u4ED3\u5E93</h3><div class="settings-card-actions"><button type="button" id="refresh-vault">${I.refresh()} \u5237\u65B0</button></div></div>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<label class="settings-path-field">\u4ED3\u5E93\u8DEF\u5F84<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="\u9009\u62E9 Content_OS \u76EE\u5F55" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} \u9009\u62E9\u6587\u4EF6\u5939</button></span></label></div>`;
+  const accountsBody = `<div class="settings-card-head accounts-toolbar"><h3>\u8D26\u53F7</h3><div class="settings-card-actions"><button type="button" id="register-account">${I.folder()} \u9009\u62E9\u6587\u4EF6\u5939</button><button type="button" class="primary" id="create-account">${I.plus()} \u65B0\u5EFA\u8D26\u53F7</button></div></div>${accountList().map(
+    (a) => `<div class="dashboard-card account-card"><div class="account-card-top"><button type="button" class="account-avatar-btn account-avatar-lg" data-set-avatar="${esc(a.id)}" title="\u66F4\u6362\u5934\u50CF" aria-label="\u4E3A ${esc(a.label)} \u66F4\u6362\u5934\u50CF">${accountAvatarHtml(a, "lg")}</button><div class="account-card-info"><h3>${esc(a.label)}</h3><p class="account-card-path">${esc(a.folder)}</p></div><button type="button" class="ghost" data-unregister-account="${esc(a.id)}">\u79FB\u9664</button></div><div class="account-stat-meta"><span>${a.drafts ?? 0} \u8349\u7A3F</span><span>${a.archives ?? 0} \u5F52\u6863</span><span>${a.files ?? 0} \u6587\u4EF6</span><span>${formatBytes(a.bytes)}</span></div><button type="button" class="ghost account-avatar-action" data-set-avatar="${esc(a.id)}">${a.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}</button></div>`
+  ).join("") || '<p class="muted">\u5C1A\u672A\u6DFB\u52A0\u8D26\u53F7\u3002\u53EF\u9009\u62E9\u4ED3\u5E93\u5185\u5DF2\u6709\u6587\u4EF6\u5939\uFF0C\u6216\u65B0\u5EFA\u8D26\u53F7\u3002</p>'}`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BBE\u7F6E</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><nav class="settings-tabs">${tabs.map(
+    (t) => `<button type="button" data-settings-tab="${t.id}" class="${settingsTab === t.id ? "active" : ""}">${t.title}</button>`
+  ).join("")}</nav>${settingsTab === "config" ? configBody : accountsBody}</section>`;
+  $$("[data-settings-tab]").forEach(
+    (b) => b.onclick = () => {
+      settingsTab = b.dataset.settingsTab;
       render2();
-      toast("\u5DF2\u5207\u6362\u5185\u5BB9\u4ED3\u5E93");
-    } catch (e) {
-      toast(e.message || "\u5207\u6362\u5931\u8D25");
     }
-  };
-  $("#refresh-vault").onclick = () => refreshVault();
+  );
+  if (settingsTab === "config") {
+    $("#setting-provider").value = state.provider;
+    $("#save-settings").onclick = () => {
+      state.provider = $("#setting-provider").value;
+      state.model = $("#model").value.trim();
+      persist();
+      toast("\u8BBE\u7F6E\u5DF2\u4FDD\u5B58");
+    };
+    const readWechatForm = () => {
+      state.wechat = {
+        appId: $("#wechat-appid").value.trim(),
+        appSecret: $("#wechat-secret").value.trim(),
+        author: $("#wechat-author").value.trim() || "\u91D1\u5947",
+        coverPath: state.wechat?.coverPath || ""
+      };
+    };
+    $("#wechat-test").onclick = async () => {
+      readWechatForm();
+      await persist();
+      try {
+        await api("wechat-test-token");
+        toast("\u516C\u4F17\u53F7\u51ED\u8BC1\u6709\u6548");
+      } catch (e) {
+        toast(e.message || "\u8FDE\u63A5\u5931\u8D25");
+      }
+    };
+    $("#save-wechat").onclick = () => {
+      readWechatForm();
+      persist();
+      toast("\u516C\u4F17\u53F7\u8BBE\u7F6E\u5DF2\u4FDD\u5B58");
+    };
+    $("#pick-vault").onclick = async () => {
+      if (isWeb()) return toast("\u9009\u62E9\u4ED3\u5E93\u4EC5\u652F\u6301\u684C\u9762\u7AEF");
+      if (state.vaultLocked) return toast("\u5F53\u524D\u4ED3\u5E93\u7531\u73AF\u5883\u53D8\u91CF\u6307\u5B9A\uFF0C\u65E0\u6CD5\u66F4\u6539");
+      if (busy) return toast("AI \u6B63\u5728\u56DE\u590D\uFF0C\u8BF7\u7ED3\u675F\u540E\u518D\u5207\u6362");
+      try {
+        const result = await api("pick-vault");
+        if (!result) return;
+        applyAccountState(result);
+        toast("\u5DF2\u5207\u6362\u5185\u5BB9\u4ED3\u5E93");
+      } catch (e) {
+        toast(e.message || "\u5207\u6362\u5931\u8D25");
+      }
+    };
+    $("#refresh-vault").onclick = () => refreshVault();
+  } else {
+    const createBtn = $("#create-account");
+    const registerBtn = $("#register-account");
+    if (createBtn)
+      createBtn.onclick = async () => {
+        const name = await askText(
+          "\u65B0\u5EFA\u8D26\u53F7",
+          "\u8F93\u5165\u8D26\u53F7\u540D\u79F0\uFF08\u5C06\u4F5C\u4E3A\u4ED3\u5E93\u5185\u6587\u4EF6\u5939\u540D\uFF09",
+          ""
+        );
+        if (!name?.trim()) return;
+        try {
+          applyAccountState(
+            await api("account-create", { name: name.trim() })
+          );
+          toast("\u5DF2\u521B\u5EFA\u8D26\u53F7");
+        } catch (e) {
+          toast(e.message || "\u521B\u5EFA\u5931\u8D25");
+        }
+      };
+    if (registerBtn)
+      registerBtn.onclick = () => pickAndRegisterAccountFolder();
+    $$("[data-unregister-account]").forEach((b) => {
+      b.onclick = async () => {
+        const ok = await askConfirm(
+          "\u79FB\u9664\u8D26\u53F7",
+          "\u4EC5\u4ECE\u5217\u8868\u79FB\u9664\uFF0C\u4E0D\u4F1A\u5220\u9664\u78C1\u76D8\u6587\u4EF6\u5939\u3002\u7EE7\u7EED\uFF1F"
+        );
+        if (!ok) return;
+        try {
+          applyAccountState(
+            await api("account-unregister", {
+              id: b.dataset.unregisterAccount
+            })
+          );
+          toast("\u5DF2\u79FB\u9664\u8D26\u53F7");
+        } catch (e) {
+          toast(e.message || "\u79FB\u9664\u5931\u8D25");
+        }
+      };
+    });
+    $$("[data-set-avatar]").forEach((b) => {
+      b.onclick = () => pickAndSetAccountAvatar(b.dataset.setAvatar);
+    });
+  }
+}
+function uint8ToBase64(buf) {
+  let s = "";
+  const step = 32768;
+  for (let i = 0; i < buf.length; i += step) {
+    s += String.fromCharCode(...buf.subarray(i, i + step));
+  }
+  return btoa(s);
+}
+function pickImageFile() {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp";
+    input.style.cssText = "position:fixed;left:-100px;top:0;width:1px;height:1px;opacity:0;";
+    document.body.append(input);
+    let settled = false;
+    const done = (f) => {
+      if (settled) return;
+      settled = true;
+      input.remove();
+      resolve(f);
+    };
+    input.addEventListener("change", () => done(input.files?.[0] || null));
+    input.addEventListener("cancel", () => done(null));
+    input.click();
+  });
+}
+async function pickAndSetAccountAvatar(accountId) {
+  if (!accountId) return toast("\u8D26\u53F7\u65E0\u6548");
+  try {
+    let result;
+    if (!isWeb()) {
+      result = await api("pick-account-avatar", { id: accountId });
+      if (!result) return;
+    } else {
+      const file = await pickImageFile();
+      if (!file) return;
+      const buf = new Uint8Array(await file.arrayBuffer());
+      result = await api("account-set-avatar", {
+        id: accountId,
+        bytesBase64: uint8ToBase64(buf),
+        type: file.type || "image/png"
+      });
+    }
+    applyAccountState(result);
+    toast("\u5934\u50CF\u5DF2\u66F4\u65B0");
+  } catch (e) {
+    toast(e.message || "\u5934\u50CF\u66F4\u65B0\u5931\u8D25");
+  }
+}
+function askText(title, hint, value = "") {
+  return new Promise((resolve) => {
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog"><h2>${esc(title)}</h2><p>${esc(hint)}</p><input id="ask-text-input" value="${esc(value)}" autocomplete="off"><div class="row"><button type="button" id="ask-text-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="ask-text-ok">\u786E\u5B9A</button></div></div>`;
+    document.body.append(m);
+    const input = $("#ask-text-input");
+    input?.focus();
+    input?.select();
+    const done = (v) => {
+      m.remove();
+      resolve(v);
+    };
+    $("#ask-text-cancel").onclick = () => done(null);
+    $("#ask-text-ok").onclick = () => done(input.value);
+    input?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") done(input.value);
+      if (e.key === "Escape") done(null);
+    });
+  });
+}
+function askConfirm(title, message) {
+  return new Promise((resolve) => {
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog"><h2>${esc(title)}</h2><p>${esc(message)}</p><div class="row"><button type="button" id="ask-confirm-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="ask-confirm-ok">\u786E\u5B9A</button></div></div>`;
+    document.body.append(m);
+    $("#ask-confirm-cancel").onclick = () => {
+      m.remove();
+      resolve(false);
+    };
+    $("#ask-confirm-ok").onclick = () => {
+      m.remove();
+      resolve(true);
+    };
+  });
+}
+async function pickAndRegisterAccountFolder() {
+  try {
+    let result = null;
+    if (!isWeb()) {
+      result = await api("pick-account-folder");
+    } else {
+      const folder = await pickAccountFolderOnWeb();
+      if (!folder) return;
+      result = await api("account-register", { folder });
+    }
+    if (!result) return;
+    applyAccountState(result);
+    toast("\u5DF2\u6DFB\u52A0\u8D26\u53F7");
+  } catch (e) {
+    toast(e.message || "\u6DFB\u52A0\u5931\u8D25");
+  }
+}
+async function pickAccountFolderOnWeb() {
+  const folders = await api("account-folder-candidates");
+  if (!folders?.length) {
+    toast("\u4ED3\u5E93\u5185\u6682\u65E0\u672A\u6CE8\u518C\u7684\u6587\u4EF6\u5939\uFF0C\u8BF7\u5148\u65B0\u5EFA\u8D26\u53F7");
+    return null;
+  }
+  return new Promise((resolve) => {
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog"><h2>\u9009\u62E9\u8D26\u53F7\u6587\u4EF6\u5939</h2><p>\u4EE5\u4E0B\u4E3A\u5F53\u524D\u5185\u5BB9\u4ED3\u5E93\u5185\u5C1A\u672A\u6CE8\u518C\u7684\u4E00\u7EA7\u76EE\u5F55\u3002</p><div class="folder-pick-list">${folders.map(
+      (f) => `<button type="button" class="folder-pick-item" data-folder="${esc(f.name)}"><strong>${esc(f.label)}</strong><small>${esc(f.name)}</small></button>`
+    ).join("")}</div><div class="row"><button type="button" id="cancel-folder-pick">\u53D6\u6D88</button></div></div>`;
+    document.body.append(m);
+    $("#cancel-folder-pick").onclick = () => {
+      m.remove();
+      resolve(null);
+    };
+    $$(".folder-pick-item").forEach(
+      (b) => b.onclick = () => {
+        const name = b.dataset.folder;
+        m.remove();
+        resolve(name);
+      }
+    );
+  });
+}
+function applyAccountState(result) {
+  const id = current?.id;
+  Object.assign(state, result);
+  ensureAccount();
+  current = state.documents.find((d) => d.id === id) || state.documents.find((d) => sameAccount(d.account, account)) || null;
+  dirty = false;
+  pending = null;
+  render2();
 }
 async function refreshVault() {
   if (busy) return toast("AI \u6B63\u5728\u56DE\u590D\uFF0C\u8BF7\u7ED3\u675F\u540E\u5237\u65B0");
   sync();
   const apply2 = (result) => {
-    const id = current?.id;
-    Object.assign(state, result);
-    current = state.documents.find((d) => d.id === id) || state.documents.find((d) => d.account === account);
-    dirty = false;
-    pending = null;
-    render2();
+    applyAccountState(result);
     toast(
       state.warnings?.length ? "\u90E8\u5206\u6587\u4EF6\u672A\u8BFB\u53D6\uFF0C\u8BF7\u5728\u5B58\u50A8\u8BBE\u7F6E\u67E5\u770B\u9519\u8BEF" : "\u5DF2\u5237\u65B0\u5185\u5BB9\u4ED3\u5E93"
     );
@@ -32245,10 +32478,10 @@ function openPreview({
   }
 }
 async function renderMaterials() {
-  const drafts = state.documents.filter((d) => d.account === account);
+  const drafts = state.documents.filter((d) => sameAccount(d.account, account));
   if (materialsFilter !== "all" && !drafts.some((d) => d.id === materialsFilter))
     materialsFilter = "all";
-  const uploadTarget = materialsFilter !== "all" ? drafts.find((d) => d.id === materialsFilter) : current?.account === account ? current : drafts[0];
+  const uploadTarget = materialsFilter !== "all" ? drafts.find((d) => d.id === materialsFilter) : sameAccount(current?.account, account) ? current : drafts[0];
   $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7D20\u6750\u5E93</h1><span class="eyebrow">WRITING MATERIALS</span></div><div class="header-actions"><select id="material-filter" aria-label="\u6309\u6587\u7AE0\u7B5B\u9009\u7D20\u6750"><option value="all">\u5168\u90E8\u7D20\u6750</option>${drafts.map((d) => `<option value="${d.id}">${esc(d.title)}</option>`).join("")}</select><button id="upload-reference" class="primary" ${uploadTarget ? "" : "disabled"}>${I.upload()} \u4E0A\u4F20\u6587\u4EF6</button></div></header><section class="dashboard"><div id="project-files" class="material-cards"></div></section>`;
   $("#material-filter").value = materialsFilter;
   $("#material-filter").onchange = (e) => {
@@ -32355,7 +32588,7 @@ async function renderProfile() {
     if (page !== "profile" || account !== a) return;
     const draw = () => {
       const definition = model.definitions.find((d) => d.id === profileTab);
-      $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u4FDD\u6301\u81EA\u5DF1\u7684\u58F0\u97F3\uFF0C\u9010\u6B65\u9A8C\u8BC1\u6709\u6548\u7684\u8868\u8FBE\u3002</h1><span class="eyebrow">\u91D1\u5947 ${a} \xB7 \u8D26\u53F7\u6A21\u578B</span></div></header><section class="dashboard profile-manager"><nav class="model-tabs">${[...model.definitions, { id: "history", title: "\u8FED\u4EE3\u8BB0\u5F55" }].map((d) => `<button data-model-tab="${d.id}" class="${profileTab === d.id ? "active" : ""}">${d.title}</button>`).join("")}</nav><div id="model-content">${definition ? `<h2>${definition.title}</h2><p>${{ identity: "\u53EA\u7EF4\u62A4\u6211\u662F\u8C01\u3001\u5199\u7ED9\u8C01\u3001\u5E0C\u671B\u63D0\u4F9B\u4EC0\u4E48\u4EF7\u503C\u3002", voice: "\u7EF4\u62A4\u81EA\u7136\u7684\u8868\u8FBE\u504F\u597D\u4E0E\u5FC5\u8981\u8FB9\u754C\uFF0C\u907F\u514D\u628A\u6BCF\u7BC7\u6587\u7AE0\u5199\u6210\u89C4\u5219\u68C0\u67E5\u8868\u3002", examples: "\u4FDD\u7559\u6211\u8BA4\u53EF\u7684\u771F\u5B9E\u7ECF\u5386\u548C\u8303\u6587\u7247\u6BB5\uFF0C\u5E76\u5199\u6E05\u51FA\u5904\u4E0E\u4E3A\u4EC0\u4E48\u50CF\u6211\u3002", learning: "\u7528\u6709\u6765\u6E90\u7684\u6570\u636E\u89C2\u5BDF\u6307\u5BFC\u4E0B\u4E00\u6B21\u5C0F\u5B9E\u9A8C\uFF1B\u6700\u591A\u4FDD\u7559\u4E09\u4E2A\uFF0C\u8FC7\u65F6\u5C31\u66FF\u6362\u3002" }[profileTab]}</p><textarea id="model-text" rows="15" maxlength="${definition.limit}">${esc(model.modules[profileTab])}</textarea><div class="row"><button id="save-model" class="primary">\u4FDD\u5B58\u5F53\u524D\u6A21\u5757</button><small>${definition.limit} \u5B57\u4EE5\u5185</small></div>${profileTab === "learning" ? `<p class="notice">\u5F53\u524D\u8D26\u53F7\u6709 ${state.metrics.filter((r) => r["\u8D26\u53F7"] === a).length} \u7BC7\u5F52\u6863\u6570\u636E\u3002\u5355\u7BC7\u6CE2\u52A8\u4E0D\u4EE3\u8868\u8868\u8FBE\u65B9\u5F0F\u7684\u56E0\u679C\u6548\u679C\u3002</p>` : ""}${profileTab === "examples" ? `<details><summary>\u67E5\u770B\u65E7 Profile \u8D44\u6599\uFF08\u53EA\u8BFB\uFF09</summary><div class="material-cards">${model.legacy.filter((f) => f.editable).map(
+      $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u4FDD\u6301\u81EA\u5DF1\u7684\u58F0\u97F3\uFF0C\u9010\u6B65\u9A8C\u8BC1\u6709\u6548\u7684\u8868\u8FBE\u3002</h1><span class="eyebrow">${esc(accountLabelOf(a))} \xB7 \u8D26\u53F7\u6A21\u578B</span></div></header><section class="dashboard profile-manager"><nav class="model-tabs">${[...model.definitions, { id: "history", title: "\u8FED\u4EE3\u8BB0\u5F55" }].map((d) => `<button data-model-tab="${d.id}" class="${profileTab === d.id ? "active" : ""}">${d.title}</button>`).join("")}</nav><div id="model-content">${definition ? `<h2>${definition.title}</h2><p>${{ identity: "\u53EA\u7EF4\u62A4\u6211\u662F\u8C01\u3001\u5199\u7ED9\u8C01\u3001\u5E0C\u671B\u63D0\u4F9B\u4EC0\u4E48\u4EF7\u503C\u3002", voice: "\u7EF4\u62A4\u81EA\u7136\u7684\u8868\u8FBE\u504F\u597D\u4E0E\u5FC5\u8981\u8FB9\u754C\uFF0C\u907F\u514D\u628A\u6BCF\u7BC7\u6587\u7AE0\u5199\u6210\u89C4\u5219\u68C0\u67E5\u8868\u3002", examples: "\u4FDD\u7559\u6211\u8BA4\u53EF\u7684\u771F\u5B9E\u7ECF\u5386\u548C\u8303\u6587\u7247\u6BB5\uFF0C\u5E76\u5199\u6E05\u51FA\u5904\u4E0E\u4E3A\u4EC0\u4E48\u50CF\u6211\u3002", learning: "\u7528\u6709\u6765\u6E90\u7684\u6570\u636E\u89C2\u5BDF\u6307\u5BFC\u4E0B\u4E00\u6B21\u5C0F\u5B9E\u9A8C\uFF1B\u6700\u591A\u4FDD\u7559\u4E09\u4E2A\uFF0C\u8FC7\u65F6\u5C31\u66FF\u6362\u3002" }[profileTab]}</p><textarea id="model-text" rows="15" maxlength="${definition.limit}">${esc(model.modules[profileTab])}</textarea><div class="row"><button id="save-model" class="primary">\u4FDD\u5B58\u5F53\u524D\u6A21\u5757</button><small>${definition.limit} \u5B57\u4EE5\u5185</small></div>${profileTab === "learning" ? `<p class="notice">\u5F53\u524D\u8D26\u53F7\u6709 ${state.metrics.filter((r) => r["\u8D26\u53F7"] === a).length} \u7BC7\u5F52\u6863\u6570\u636E\u3002\u5355\u7BC7\u6CE2\u52A8\u4E0D\u4EE3\u8868\u8868\u8FBE\u65B9\u5F0F\u7684\u56E0\u679C\u6548\u679C\u3002</p>` : ""}${profileTab === "examples" ? `<details><summary>\u67E5\u770B\u65E7 Profile \u8D44\u6599\uFF08\u53EA\u8BFB\uFF09</summary><div class="material-cards">${model.legacy.filter((f) => f.editable).map(
         (f) => `<button class="material-card" data-model-legacy="${esc(f.path)}"><strong>${esc(f.path)}</strong></button>`
       ).join("")}</div></details>` : ""}` : `<button id="iterate-model" class="primary">${I.sparkles()} \u6839\u636E\u65B0\u6587\u7AE0\u548C\u6570\u636E\u63D0\u51FA\u8C03\u6574</button><p>\u5411\u5F53\u524D ${esc(state.provider)} \u63D0\u4F9B\u672C\u8D26\u53F7\u6A21\u578B\u3001\u6700\u8FD1 12 \u7BC7\u6587\u7AE0\u53CA YAML\uFF1B\u957F\u6587\u6BCF\u7BC7\u524D 3000 \u5B57\u3002\u53EA\u5EFA\u8BAE\u66FF\u6362\u73B0\u6709\u6A21\u5757\u5185\u5BB9\u3002</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} \xB7 ${p.status === "pending" ? "\u5F85\u5BA1\u9605" : p.status === "applied" ? "\u5DF2\u91C7\u7EB3" : "\u5DF2\u4FDD\u7559\u539F\u8BBE\u5B9A"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("\u3001")}</p><button data-model-proposal="${p.id}">\u67E5\u770B\u5EFA\u8BAE</button></div>`).join("") || "<p>\u8FD8\u6CA1\u6709 AI \u8C03\u6574\u5EFA\u8BAE\u3002</p>"}</div><h3>\u5386\u53F2\u7248\u672C</h3>${model.history.map((h2) => `<div class="result-card"><small>${esc(h2.at)} \xB7 ${esc(h2.reason)}</small><details><summary>\u67E5\u770B\u5F53\u65F6\u7684\u8BBE\u5B9A</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h2.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h2.id}">\u6062\u590D\u6B64\u7248\u672C</button></div>`).join("")}`}</div></section>`;
       const save = async () => {
@@ -32518,7 +32751,8 @@ window.addEventListener("beforeunload", () => {
   if (dirty) window.desk.flush(state);
 });
 state = await api("load");
-current = state.documents.find((d) => d.account === account);
+ensureAccount();
+current = state.documents.find((d) => sameAccount(d.account, account));
 render2();
 /*! Bundled license information:
 

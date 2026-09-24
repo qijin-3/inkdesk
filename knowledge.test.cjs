@@ -10,6 +10,8 @@ function setup(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ink-knowledge-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const v = new Vault(root);
+  v.createAccount("金奇_AI");
+  v.createAccount("金奇_Dev");
   v.load();
   for (const id of ["a", "b"])
     v.saveDoc({
@@ -134,7 +136,7 @@ test("whole Profile is managed; proposals keep evidence, backups, rejection and 
   assert.equal(k.readProfile("AI", "Persona_Doc.md").text, "原始定位");
   const accepted = k.simple("AI", state);
   k.decide("AI", accepted.id, "apply");
-  assert.match(k.activeContext("AI"), /设计师/);
+  assert.match(k.activeContext("AI"), /持续记录/);
   assert(
     fs.existsSync(
       v.p("_system/inkdesk/profile-history/AI/" + accepted.id + ".json"),

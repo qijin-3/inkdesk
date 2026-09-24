@@ -8,6 +8,8 @@ function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ink-vault-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const v = new Vault(root);
+  v.createAccount("金奇_AI");
+  v.createAccount("金奇_Dev");
   return v;
 }
 function draft() {

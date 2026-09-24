@@ -40,25 +40,24 @@ AI 只可建议替换现有模块内容，不能增加模块或文件。每次�
 
 ```text
 Content_OS/
-  金奇_AI/                           # 金奇_Dev 同结构
+  <账号文件夹>/                     # 设置中选择或新建；侧边栏按此切换
     00_Profile/
-      Persona_Doc.md                 # 原人设，保留
-      Writing_Contract.md            # 在界面保存后的简化约定
+      Persona_Doc.md
+      Writing_Contract.md
+      Account_Model.md
     01_Topics/
-    02_Drafts/**/*.md                # 正文及 YAML
-    03_Archive/**/*.md               # 最终文章及平台数据
+    02_Drafts/**/*.md
+    03_Archive/**/*.md
   00_wiki/
-    _data/raw/inbox/                 # 新建素材
+    _data/raw/inbox/
   Attachment/文章名/file-时间戳.ext
   _system/inkdesk/
-    index.json                      # 稳定文章 ID 与路径
-    articles/文章ID.json             # 选题、标题、提示词、核查、关联素材
-    versions/文章ID/*.md             # 可独立阅读的版本
-    conversations/文章ID/*.json      # 分对话保存，含文章 ID
-    profile-history/*.md            # 约定修改前备份
-    recovery/*.json                 # 用户选择恢复刷新时的未保存副本
-    repairs/                        # 数据格式修复前原文
+    accounts.json                   # 已注册账号列表
+    index.json
+    ...
 ```
+
+内容仓库在设置中选择。账号对应仓库内文件夹：可「选择文件夹」注册，或「新建账号」自动创建 Profile / Topics / Drafts / Archive 四个目录。旧版 `金奇_AI` / `金奇_Dev` 会被自动识别。
 
 Content_OS 路径优先取自设置中用户选择的仓库（写入 `workspace.json` 的 `vaultPath`）；也可用 `vault.json` 或环境变量 `INKDESK_VAULT` / `INKDESK_DATA`。测试常用临时目录。
 

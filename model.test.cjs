@@ -10,6 +10,8 @@ function setup(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ink-model-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const v = new Vault(root);
+  v.createAccount("金奇_AI");
+  v.createAccount("金奇_Dev");
   v.load();
   const k = new Knowledge(v, "");
   const m = new AccountModel(v, k);

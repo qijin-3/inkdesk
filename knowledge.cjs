@@ -60,8 +60,8 @@ class Knowledge {
     this.reader = reader;
   }
   profileBase(a) {
-    if (!["AI", "Dev"].includes(a)) throw Error("未知账号");
-    return `金奇_${a}/00_Profile/`;
+    const id = this.v.resolveAccountId(a);
+    return `${id}/00_Profile/`;
   }
   profileFile(a, rel) {
     if (!rel.endsWith(".md") || rel.includes("..") || path.isAbsolute(rel))
@@ -222,7 +222,7 @@ class Knowledge {
       e.entries.find((f) => f.path === "Author_DNA/禁止规则.md")?.text || "";
     const existing = bans.split("## 禁用结构套路")[0].split("## 禁用词")[1];
     const texts = [
-      `# 金奇_${a} · 账号定位\n\n${a === "AI" ? "用设计师的判断力，给普通人讲清楚 AI 能做什么、边界在哪里。以自己的实践为起点，不预设技术背景。" : "用设计师的眼光做独立开发，记录从想法、原型到用户反馈的真实过程，分享取舍与试错。"}\n\n- 写具体问题、经历和判断，不靠焦虑吸引关注。\n- 读者看完能理解一个问题或作出更好的选择，不强制每篇给行动清单。\n- 内容题材和结构按本篇需要选择，不设栏目配额。\n`,
+      `# ${this.v.resolveAccountId(a).replace(/_/g, " ")} · 账号定位\n\n持续记录自己的判断与实践，写给关心同类问题的读者。\n\n- 写具体问题、经历和判断，不靠焦虑吸引关注。\n- 读者看完能理解一个问题或作出更好的选择，不强制每篇给行动清单。\n- 内容题材和结构按本篇需要选择，不设栏目配额。\n`,
       "# 语言风格\n\n- 像刚想清楚一件事、讲给朋友听。口语自然，有个人判断，不端着。\n- 用真实场景和细节解释观点；专业术语第一次出现时用人话解释。\n- 情绪克制，允许自嘲和保留不确定性，不制造夸张金句。\n- 开头、结构、结尾按内容选择，不强制套模板、轮换结构或升华。\n- 范文只学叙述方法，不复制句子或借用别人的经历。\n",
       "# 表达边界\n\n- 不编造经历、数据、引语和来源；无法核实的关键事实明确待核实。\n- 不恐吓读者、不贬低受众、不用术语堆砌掩盖解释。\n- 少用宏观套话、说教结尾、机械排比和反复的「不是……而是……」。\n- 尊重用户明确提出的表达偏好。历史禁止项保留在版本中，按实际需要补回，不把一次低数据表现变成永久禁令。\n",
       "# 迭代观察\n\n当前尚无经过本轮确认的新结论。\n\n每次最多保留三条有用观察：观察是什么 → 哪篇文章或哪项 YAML 数据支持 → 样本与不确定性 → 下次如何验证。\n\n数据只作为反馈；缺失值不补零，单篇结果不推断因果，不因短期波动改掉自己的表达。经确认的新发现替换旧观察，不持续叠加规则。\n",
@@ -450,10 +450,17 @@ class Knowledge {
       .filter(([, v]) => v.status === "draft")
       .map(([id, v]) => {
         const title = path.basename(v.path || "", ".md") || id;
-        const acc = String(v.path || "").includes("金奇_Dev") ? "Dev" : "AI";
+        const acc = this.v.accountFromPath(v.path || "");
         return { id, title, account: acc };
       })
-      .filter((d) => !account || d.account === account);
+      .filter((d) => {
+        if (!account) return true;
+        try {
+          return d.account === this.v.resolveAccountId(account);
+        } catch {
+          return d.account === account;
+        }
+      });
     const usage = new Map();
     for (const d of docs) {
       try {

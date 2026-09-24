@@ -140,6 +140,12 @@ const passthrough = new Set([
   "wechat-draft-push",
   "wechat-test-token",
   "set-vault",
+  "accounts-list",
+  "account-create",
+  "account-register",
+  "account-unregister",
+  "account-folder-candidates",
+  "account-set-avatar",
 ]);
 
 for (const name of passthrough) {
@@ -169,6 +175,39 @@ ipcMain.handle("pick-vault", async () => {
   });
   if (result.canceled) return null;
   return desk.setVault(result.filePaths[0]);
+});
+
+/**
+ * 在当前内容仓库内选择文件夹注册为账号。
+ */
+ipcMain.handle("pick-account-folder", async () => {
+  const result = await dialog.showOpenDialog({
+    title: "选择账号文件夹",
+    defaultPath: desk.vault?.root || undefined,
+    properties: ["openDirectory"],
+  });
+  if (result.canceled) return null;
+  return desk.invoke("account-register", { folder: result.filePaths[0] });
+});
+
+/**
+ * 为账号选择头像图片并写入仓库。
+ */
+ipcMain.handle("pick-account-avatar", async (_, data) => {
+  const id = typeof data === "string" ? data : data?.id;
+  if (!id) throw Error("账号无效");
+  const result = await dialog.showOpenDialog({
+    title: "选择账号头像",
+    properties: ["openFile"],
+    filters: [
+      { name: "图片", extensions: ["png", "jpg", "jpeg", "gif", "webp"] },
+    ],
+  });
+  if (result.canceled) return null;
+  return desk.invoke("account-set-avatar", {
+    id,
+    filePath: result.filePaths[0],
+  });
 });
 
 ipcMain.handle("project-upload", async (_, data) => {
