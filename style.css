@@ -220,18 +220,15 @@ p {
   min-width: 0;
 }
 .account-card-info h3 {
-  margin: 0 0 4px;
-}
-.account-card .account-card-path {
   margin: 0;
-  font-size: 12px;
-  color: #888;
 }
 .account-card .account-stat-meta {
   margin: 0 0 12px;
 }
-.account-avatar-action {
-  padding-left: 0;
+.account-card-remove {
+  padding: 6px 0;
+  color: #999;
+  font-size: 12px;
 }
 .settings-tabs {
   display: inline-flex;
@@ -267,8 +264,17 @@ p {
   box-shadow: 0 1px 2px #00000014;
   font-weight: 600;
 }
-.accounts-toolbar {
-  margin-bottom: 8px;
+.settings-card-head.accounts-toolbar {
+  margin-bottom: 34px;
+}
+.account-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+.account-card-grid .account-card {
+  margin-bottom: 0;
 }
 .account-stats {
   display: flex;
@@ -1830,19 +1836,19 @@ pre {
   border-radius: 3px;
 }
 .level-0 {
-  background: #e9ece3;
+  background: #eaedfb;
 }
 .level-1 {
-  background: #cadbc1;
+  background: #c3cdfb;
 }
 .level-2 {
-  background: #95b897;
+  background: #8ba0f8;
 }
 .level-3 {
-  background: #5b916e;
+  background: #0f3ff7;
 }
 .level-4 {
-  background: #315d4e;
+  background: #0a29ad;
 }
 .heatmap-day:focus-visible {
   outline: 2px solid #333;
@@ -1852,7 +1858,7 @@ pre {
   opacity: 0.4;
 }
 .heatmap-day.is-today {
-  outline: 2px solid #172f25;
+  outline: 2px solid #0f3ff7;
   outline-offset: 2px;
 }
 .row {
