@@ -173,6 +173,10 @@ const passthrough = new Set([
   "account-folder-candidates",
   "account-set-avatar",
   "account-set-backup-path",
+  "group-upsert",
+  "group-delete",
+  "group-set-backup-path",
+  "article-set-group",
 ]);
 
 for (const name of passthrough) {

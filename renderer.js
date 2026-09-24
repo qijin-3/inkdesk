@@ -589,6 +589,52 @@ function hideToast() {
   clearTimeout(toastTimer);
   $("#toast")?.classList.remove("show");
 }
+
+/**
+ * Electron 无 window.prompt，用本地弹窗收集单行文本。
+ * @param {string} title
+ * @param {{ value?: string, placeholder?: string, okLabel?: string }} [opts]
+ * @returns {Promise<string|null>} 确认返回 trim 后文本，取消返回 null
+ */
+function promptText(title, opts = {}) {
+  return new Promise((resolve) => {
+    $("#text-prompt-modal")?.remove();
+    const m = document.createElement("div");
+    m.id = "text-prompt-modal";
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog" style="width:min(420px,92vw)"><h2>${esc(title)}</h2><input id="text-prompt-input" type="text" value="${esc(opts.value || "")}" placeholder="${esc(opts.placeholder || "")}" autocomplete="off"><div class="row"><button type="button" id="text-prompt-cancel">取消</button><button type="button" class="primary" id="text-prompt-ok">${esc(opts.okLabel || "确定")}</button></div></div>`;
+    document.body.append(m);
+    const input = $("#text-prompt-input");
+    const done = (value) => {
+      m.remove();
+      resolve(value);
+    };
+    $("#text-prompt-cancel").onclick = () => done(null);
+    m.addEventListener("click", (e) => {
+      if (e.target === m) done(null);
+    });
+    const submit = () => {
+      const v = input.value.trim();
+      done(v || null);
+    };
+    $("#text-prompt-ok").onclick = submit;
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submit();
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        done(null);
+      }
+    });
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+  });
+}
+
 async function persist() {
   clearTimeout(saveTimer);
   if (saveConflict) return false;
@@ -728,7 +774,7 @@ function render() {
   }
   if (page !== "published-preview") publishedPreview = null;
   $("#app").innerHTML =
-    `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk</div><button type="button" data-page="settings" class="icon-btn brand-settings" title="设置" aria-label="设置">${I.settings({ size: 18 })}</button></div><div class="account">${
+    `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk</div><button type="button" data-page="settings" class="ghost icon-btn brand-settings" title="设置" aria-label="设置">${I.settings({ size: 18 })}</button></div><div class="account">${
       accountList()
         .map(
           (a) =>
@@ -1948,7 +1994,7 @@ function renderWrite() {
     return;
   }
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button><button data-task="review">${I.eye()} 看稿</button><button data-task="rewrite">${I.wand()} 润色选段</button><button data-task="check">${I.check()} 核查</button></div></section></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button><button data-task="review">${I.eye()} 看稿</button><button data-task="rewrite">${I.wand()} 润色选段</button><button data-task="check">${I.check()} 核查</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [StarterKit, Image, TableKit],
@@ -2024,6 +2070,47 @@ function renderWrite() {
     current.title = e.target.value;
     changed();
   };
+  $("#article-group").onchange = async (e) => {
+    const value = e.target.value.trim();
+    if (value === "__new__") {
+      e.target.value = current.group || "";
+      const name = await promptText("新建分组", {
+        placeholder: "例如：公众号、小红书",
+        okLabel: "创建",
+      });
+      if (!name) return;
+      try {
+        const result = await api("group-upsert", { name });
+        state.groups = result.groups || state.groups;
+        current.group = name;
+        changed();
+        await persist();
+        const sel = $("#article-group");
+        if (sel) {
+          sel.innerHTML =
+            groupOptionsHtml(current.group) +
+            `<option value="__new__">＋ 新建分组…</option>`;
+          sel.value = current.group;
+        }
+        toast(`已创建并选用「${name}」`);
+      } catch (err) {
+        toast(err.message || "创建失败");
+      }
+      return;
+    }
+    current.group = value || null;
+    changed();
+  };
+  // 在下拉末尾追加「新建分组」
+  {
+    const sel = $("#article-group");
+    if (sel) {
+      const opt = document.createElement("option");
+      opt.value = "__new__";
+      opt.textContent = "＋ 新建分组…";
+      sel.append(opt);
+    }
+  }
   $$("[data-fmt]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -2846,12 +2933,16 @@ function renderDashboard() {
       )
       .join(
         "",
-      )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>已发布</h3><div id="published-bulk" class="published-bulk" ${selectedCount ? "" : "hidden"}><span class="published-bulk-count">已选 ${selectedCount}</span><button type="button" id="bulk-backup">${I.folder()} 本地同步</button><button type="button" id="bulk-to-draft">移回草稿</button><button type="button" class="ghost" id="bulk-clear">取消选择</button></div><select id="metrics-sort" aria-label="文章排序方式">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${
+      )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>已发布</h3><div id="published-bulk" class="published-bulk" ${selectedCount ? "" : "hidden"}><span class="published-bulk-count">已选 ${selectedCount}</span><button type="button" id="bulk-group">${I.tags()} 设置分组</button><button type="button" id="bulk-backup">${I.folder()} 本地同步</button><button type="button" id="bulk-to-draft">移回草稿</button><button type="button" class="ghost" id="bulk-clear">取消选择</button></div><select id="metrics-sort" aria-label="文章排序方式">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${
       rows.length
-        ? `<table class="published-table"><thead><tr><th class="published-check"><input type="checkbox" id="published-select-all" aria-label="全选" ${allSelected ? "checked" : ""} ${selectedCount && !allSelected ? "data-indeterminate=\"1\"" : ""}></th><th>文章</th><th>日期</th><th>阅读</th><th>点赞</th><th>收藏</th><th>涨粉</th></tr></thead><tbody>${sorted
+        ? `<table class="published-table"><thead><tr><th class="published-check"><input type="checkbox" id="published-select-all" aria-label="全选" ${allSelected ? "checked" : ""} ${selectedCount && !allSelected ? "data-indeterminate=\"1\"" : ""}></th><th>文章</th><th>分组</th><th>日期</th><th>阅读</th><th>点赞</th><th>收藏</th><th>涨粉</th></tr></thead><tbody>${sorted
             .map((r) => {
               const on = publishedSelection.has(r.path);
-              return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc(r.path)}" aria-label="选择 ${esc(r["标题"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc(r.path)}">${esc(r["标题"])}</button></td><td>${esc(r["日期"])}</td><td>${r["阅读"] ?? "—"}${cellDelta(r.path, "阅读")}</td><td>${r["点赞"] ?? "—"}${cellDelta(r.path, "点赞")}</td><td>${r["收藏"] ?? "—"}${cellDelta(r.path, "收藏")}</td><td>${r["涨粉"] ?? "—"}${cellDelta(r.path, "涨粉")}</td></tr>`;
+              const g =
+                typeof r["分组"] === "string" && r["分组"].trim()
+                  ? r["分组"].trim()
+                  : "";
+              return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc(r.path)}" aria-label="选择 ${esc(r["标题"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc(r.path)}">${esc(r["标题"])}</button></td><td class="published-group">${g ? `<span class="group-chip">${esc(g)}</span>` : "—"}</td><td>${esc(r["日期"])}</td><td>${r["阅读"] ?? "—"}${cellDelta(r.path, "阅读")}</td><td>${r["点赞"] ?? "—"}${cellDelta(r.path, "点赞")}</td><td>${r["收藏"] ?? "—"}${cellDelta(r.path, "收藏")}</td><td>${r["涨粉"] ?? "—"}${cellDelta(r.path, "涨粉")}</td></tr>`;
             })
             .join("")}</tbody></table>`
         : '<div class="empty-data">还没有数据。<p>文章归档后，在 YAML 中填写平台数据即可查看。</p></div>'
@@ -2884,6 +2975,9 @@ function renderDashboard() {
     publishedSelection.clear();
     renderDashboard();
   });
+  $("#bulk-group")?.addEventListener("click", () =>
+    setPublishedGroups([...publishedSelection]),
+  );
   $("#bulk-backup")?.addEventListener("click", () =>
     backupPublishedArticle([...publishedSelection]),
   );
@@ -2897,11 +2991,50 @@ function renderDashboard() {
       const rel = b.dataset.published;
       showContextMenu(e.clientX, e.clientY, [
         { label: "预览", run: () => openPublishedPreview(rel) },
+        { label: "设置分组", run: () => setPublishedGroups([rel]) },
         { label: "本地同步", run: () => backupPublishedArticle(rel) },
         { label: "移回草稿", run: () => movePublishedToDraft(rel) },
       ]);
     };
   });
+}
+
+/**
+ * 为已发布文章设置分组（单篇或批量）。
+ * @param {string|string[]} paths
+ */
+async function setPublishedGroups(paths) {
+  const list = (Array.isArray(paths) ? paths : [paths]).filter(Boolean);
+  if (!list.length) return;
+  const currentGroups = [
+    ...new Set(list.map((rel) => publishedGroup(rel) || "")),
+  ];
+  const selected =
+    currentGroups.length === 1 ? currentGroups[0] || "" : "";
+  $("#group-set-modal")?.remove();
+  const m = document.createElement("div");
+  m.id = "group-set-modal";
+  m.className = "modal";
+  m.innerHTML = `<div class="dialog"><h2>设置分组</h2><p>${list.length === 1 ? "为这篇文章指定分组标签。" : `为选中的 ${list.length} 篇文章指定分组。`}</p><p class="muted">分组决定本地同步的默认路径，可在设置 · 分组中配置。</p><label>分组<select id="group-set-select">${groupOptionsHtml(selected)}</select></label><label>或新建分组<input id="group-set-new" placeholder="输入新分组名称" autocomplete="off"></label><div class="row"><button type="button" id="group-set-cancel">取消</button><button type="button" class="primary" id="group-set-ok">保存</button></div></div>`;
+  document.body.append(m);
+  $("#group-set-cancel").onclick = () => m.remove();
+  $("#group-set-ok").onclick = async () => {
+    const created = $("#group-set-new")?.value.trim() || "";
+    const picked = $("#group-set-select")?.value || "";
+    const group = created || picked || null;
+    try {
+      if (created) {
+        applyAccountState(await api("group-upsert", { name: created }));
+      }
+      applyAccountState(
+        await api("article-set-group", { paths: list, group }),
+      );
+      m.remove();
+      toast(group ? `已设为分组「${group}」` : "已清除分组");
+    } catch (e) {
+      toast(e.message || "设置失败");
+    }
+  };
 }
 
 /**
@@ -2925,6 +3058,7 @@ async function openPublishedPreview(rel) {
 
 /**
  * 将已发布文章同步备份到本地目录（支持单篇或多选）。
+ * 默认路径优先取文章分组的本地路径，无分组路径时回退账号路径。
  * @param {string|string[]} paths vault 相对路径
  */
 async function backupPublishedArticle(paths) {
@@ -2936,7 +3070,18 @@ async function backupPublishedArticle(paths) {
     (state.archives || []).find((a) => a.path === first)?.account ||
     first.split("/")[0] ||
     account;
-  const defaultPath = state.backupPaths?.[accountId] || "";
+  const groups = [...new Set(list.map((rel) => publishedGroup(rel) || ""))];
+  const singleGroup = groups.length === 1 ? groups[0] || null : null;
+  const mixedGroups = groups.length > 1;
+  const defaultPath = singleGroup
+    ? backupPathFor(singleGroup, accountId)
+    : "";
+  const perPathDefaults = list.map((rel) => ({
+    rel,
+    group: publishedGroup(rel),
+    dest: backupPathFor(publishedGroup(rel), accountId),
+  }));
+  const allHaveDefault = perPathDefaults.every((x) => x.dest);
   const label =
     list.length === 1
       ? `「${
@@ -2947,6 +3092,21 @@ async function backupPublishedArticle(paths) {
               "文章"
         }」`
       : `选中的 ${list.length} 篇文章`;
+  const rememberTarget =
+    singleGroup
+      ? `分组「${singleGroup}」`
+      : mixedGroups
+        ? "（多分组时请分别设置）"
+        : "该账号";
+  const defaultHint = mixedGroups
+    ? allHaveDefault
+      ? "各分组已配置默认路径，可按分组分别同步"
+      : "选中文章分组不同或未配置路径，请选择统一路径，或先设置分组"
+    : defaultPath
+      ? defaultPath
+      : singleGroup
+        ? `分组「${singleGroup}」未设置（可在设置 · 分组中配置）`
+        : "未设置（可先为文章指定分组，或在设置 · 账号中配置）";
 
   /** @param {string} destDir @param {boolean} [remember] */
   const runBackup = async (destDir, remember) => {
@@ -2955,7 +3115,14 @@ async function backupPublishedArticle(paths) {
       await api("published-backup", { rel, destDir });
       ok += 1;
     }
-    if (remember && destDir !== defaultPath) {
+    if (remember && singleGroup && destDir !== defaultPath) {
+      applyAccountState(
+        await api("group-set-backup-path", {
+          name: singleGroup,
+          path: destDir,
+        }),
+      );
+    } else if (remember && !singleGroup && !mixedGroups && destDir !== defaultPath) {
       applyAccountState(
         await api("account-set-backup-path", {
           id: accountId,
@@ -2966,18 +3133,31 @@ async function backupPublishedArticle(paths) {
     toast(`已同步 ${ok} 篇到 ${destDir}`);
   };
 
+  /** 按各文章分组默认路径分别同步 */
+  const runBackupByGroup = async () => {
+    let ok = 0;
+    for (const item of perPathDefaults) {
+      if (!item.dest) throw Error("部分文章缺少默认同步路径");
+      await api("published-backup", { rel: item.rel, destDir: item.dest });
+      ok += 1;
+    }
+    toast(`已按分组同步 ${ok} 篇`);
+  };
+
   $("#backup-sync-modal")?.remove();
   const m = document.createElement("div");
   m.id = "backup-sync-modal";
   m.className = "modal";
-  m.innerHTML = `<div class="dialog"><h2>本地同步</h2><p>将${label}备份为 Markdown 到本机文件夹。</p><p class="muted">默认路径：${defaultPath ? esc(defaultPath) : "未设置（可在设置 · 账号中配置）"}</p><label class="backup-remember"><input type="checkbox" id="backup-remember" ${defaultPath ? "" : "checked"}> 将本次选择的路径设为该账号默认</label><div class="row"><button type="button" id="backup-cancel">取消</button>${defaultPath ? `<button type="button" id="backup-pick">${I.folder()} 选择其他路径</button><button type="button" class="primary" id="backup-default">同步到默认</button>` : `<button type="button" class="primary" id="backup-pick">${I.folder()} 选择并同步</button>`}</div></div>`;
+  const canRemember = !mixedGroups;
+  const showDefaultBtn = mixedGroups ? allHaveDefault : !!defaultPath;
+  m.innerHTML = `<div class="dialog"><h2>本地同步</h2><p>将${label}备份为 Markdown 到本机文件夹。</p><p class="muted">默认路径：${esc(defaultHint)}</p>${canRemember ? `<label class="backup-remember"><input type="checkbox" id="backup-remember" ${defaultPath ? "" : "checked"}> 将本次选择的路径设为${esc(rememberTarget)}默认</label>` : ""}<div class="row"><button type="button" id="backup-cancel">取消</button>${showDefaultBtn ? `<button type="button" id="backup-pick">${I.folder()} 选择其他路径</button><button type="button" class="primary" id="backup-default">${mixedGroups ? "按分组同步到默认" : "同步到默认"}</button>` : `<button type="button" class="primary" id="backup-pick">${I.folder()} 选择并同步</button>`}</div></div>`;
   document.body.append(m);
   const remember = () => !!$("#backup-remember")?.checked;
   $("#backup-cancel").onclick = () => m.remove();
   const pickAndSync = async () => {
     try {
       const folder = await api("pick-backup-folder", {
-        defaultPath: defaultPath || "",
+        defaultPath: defaultPath || perPathDefaults.find((x) => x.dest)?.dest || "",
       });
       if (!folder) return;
       await runBackup(folder, remember());
@@ -2989,7 +3169,8 @@ async function backupPublishedArticle(paths) {
   $("#backup-pick")?.addEventListener("click", pickAndSync);
   $("#backup-default")?.addEventListener("click", async () => {
     try {
-      await runBackup(defaultPath, false);
+      if (mixedGroups) await runBackupByGroup();
+      else await runBackup(defaultPath, false);
       m.remove();
     } catch (e) {
       toast(e.message || "同步失败");
@@ -3109,11 +3290,16 @@ function renderTopics() {
 }
 function renderSettings() {
   const wx = state.wechat || {};
-  if (settingsTab !== "config" && settingsTab !== "accounts")
+  if (
+    settingsTab !== "config" &&
+    settingsTab !== "accounts" &&
+    settingsTab !== "groups"
+  )
     settingsTab = "config";
   const tabs = [
     { id: "config", title: "配置" },
     { id: "accounts", title: "账号" },
+    { id: "groups", title: "分组" },
   ];
   const updateStatus = state._update?.available
     ? `发现新版本 ${esc(state._update.latest)}`
@@ -3126,17 +3312,28 @@ function renderSettings() {
       ? `<div class="account-card-grid">${accountList()
           .map((a) => {
             const backup = state.backupPaths?.[a.id] || "";
-            return `<div class="dashboard-card account-card"><div class="account-card-top"><button type="button" class="account-avatar-btn account-avatar-lg" data-set-avatar="${esc(a.id)}" title="${a.avatar ? "更换头像" : "添加头像"}" aria-label="为 ${esc(a.label)} ${a.avatar ? "更换头像" : "添加头像"}">${accountAvatarHtml(a, "lg")}</button><div class="account-card-info"><h3>${esc(a.label)}</h3></div></div><div class="account-stat-meta"><span>${a.drafts ?? 0} 草稿</span><span>${a.archives ?? 0} 归档</span><span>${a.files ?? 0} 文件</span><span>${formatBytes(a.bytes)}</span></div><label class="settings-path-field account-backup-field">本地备份路径<span class="settings-path-row"><input type="text" value="${esc(backup)}" placeholder="未设置，同步时可选择" readonly><button type="button" data-pick-backup="${esc(a.id)}">${I.folder()} 选择</button>${backup ? `<button type="button" class="ghost" data-clear-backup="${esc(a.id)}">清除</button>` : ""}</span></label><button type="button" class="ghost account-card-remove" data-unregister-account="${esc(a.id)}">移除</button></div>`;
+            return `<div class="dashboard-card account-card"><div class="account-card-top"><button type="button" class="account-avatar-btn account-avatar-lg" data-set-avatar="${esc(a.id)}" title="${a.avatar ? "更换头像" : "添加头像"}" aria-label="为 ${esc(a.label)} ${a.avatar ? "更换头像" : "添加头像"}">${accountAvatarHtml(a, "lg")}</button><div class="account-card-info"><h3>${esc(a.label)}</h3></div></div><div class="account-stat-meta"><span>${a.drafts ?? 0} 草稿</span><span>${a.archives ?? 0} 归档</span><span>${a.files ?? 0} 文件</span><span>${formatBytes(a.bytes)}</span></div><label class="settings-path-field account-backup-field">本地备份路径（无分组时回退）<span class="settings-path-row"><input type="text" value="${esc(backup)}" placeholder="未设置，同步时可选择" readonly><button type="button" data-pick-backup="${esc(a.id)}">${I.folder()} 选择</button>${backup ? `<button type="button" class="ghost" data-clear-backup="${esc(a.id)}">清除</button>` : ""}</span></label><button type="button" class="ghost account-card-remove" data-unregister-account="${esc(a.id)}">移除</button></div>`;
           })
           .join("")}</div>`
       : '<p class="muted">尚未添加账号。可选择仓库内已有文件夹，或新建账号。</p>'
+  }`;
+  const groups = groupNames();
+  const groupsBody = `<div class="settings-card-head accounts-toolbar"><h3>文章分组</h3><div class="settings-card-actions"><button type="button" class="primary" id="create-group">${I.plus()} 新建分组</button></div></div><p class="muted">为不同分组配置本地同步默认路径。文章可在写稿页或已发布列表中指定分组。</p>${
+    groups.length
+      ? `<div class="dashboard-card groups-table-wrap"><table class="groups-table"><thead><tr><th>分组</th><th>本地同步默认路径</th><th class="groups-actions-col">操作</th></tr></thead><tbody>${groups
+          .map((name) => {
+            const backup = state.groups?.[name]?.backupPath || "";
+            return `<tr><td><span class="group-chip">${esc(name)}</span></td><td><span class="settings-path-row groups-path-row"><input type="text" value="${esc(backup)}" placeholder="未设置，同步时可选择并记住" readonly><button type="button" data-pick-group-backup="${esc(name)}">${I.folder()} 选择</button>${backup ? `<button type="button" class="ghost" data-clear-group-backup="${esc(name)}">清除</button>` : ""}</span></td><td class="groups-actions-col"><button type="button" class="ghost" data-rename-group="${esc(name)}">重命名</button><button type="button" class="ghost" data-delete-group="${esc(name)}">删除</button></td></tr>`;
+          })
+          .join("")}</tbody></table></div>`
+      : '<p class="muted">还没有分组。新建后即可在文章中选用，并为每个分组设置默认同步路径。</p>'
   }`;
   $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">设置</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><nav class="settings-tabs">${tabs
     .map(
       (t) =>
         `<button type="button" data-settings-tab="${t.id}" class="${settingsTab === t.id ? "active" : ""}">${t.title}</button>`,
     )
-    .join("")}</nav>${settingsTab === "config" ? configBody : accountsBody}</section>`;
+    .join("")}</nav>${settingsTab === "config" ? configBody : settingsTab === "accounts" ? accountsBody : groupsBody}</section>`;
   $$("[data-settings-tab]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -3274,6 +3471,151 @@ function renderSettings() {
       };
     });
   }
+  if (settingsTab === "groups") {
+    $("#create-group").onclick = async () => {
+      const name = await promptText("新建分组", {
+        placeholder: "例如：公众号、小红书",
+        okLabel: "创建",
+      });
+      if (!name) return;
+      try {
+        applyAccountState(await api("group-upsert", { name }));
+        toast("分组已创建");
+      } catch (e) {
+        toast(e.message || "创建失败");
+      }
+    };
+    $$("[data-rename-group]").forEach((b) => {
+      b.onclick = async () => {
+        const oldName = b.dataset.renameGroup;
+        const name = await promptText("重命名分组", {
+          value: oldName,
+          okLabel: "保存",
+        });
+        if (!name || name === oldName) return;
+        try {
+          applyAccountState(
+            await api("group-upsert", {
+              name,
+              oldName,
+            }),
+          );
+          toast("已重命名");
+        } catch (e) {
+          toast(e.message || "重命名失败");
+        }
+      };
+    });
+    $$("[data-delete-group]").forEach((b) => {
+      b.onclick = async () => {
+        const name = b.dataset.deleteGroup;
+        if (!confirm(`删除分组「${name}」？文章上的分组标签会保留，但不再有默认同步路径。`))
+          return;
+        try {
+          applyAccountState(await api("group-delete", { name }));
+          toast("已删除分组");
+        } catch (e) {
+          toast(e.message || "删除失败");
+        }
+      };
+    });
+    $$("[data-pick-group-backup]").forEach((b) => {
+      b.onclick = () => pickGroupBackupPath(b.dataset.pickGroupBackup);
+    });
+    $$("[data-clear-group-backup]").forEach((b) => {
+      b.onclick = async () => {
+        try {
+          applyAccountState(
+            await api("group-set-backup-path", {
+              name: b.dataset.clearGroupBackup,
+              path: "",
+            }),
+          );
+          toast("已清除分组默认同步路径");
+        } catch (e) {
+          toast(e.message || "清除失败");
+        }
+      };
+    });
+  }
+}
+
+/**
+ * 为分组选择并保存本地同步默认目录。
+ * @param {string} name
+ */
+async function pickGroupBackupPath(name) {
+  if (isWeb()) return toast("选择备份路径仅支持桌面端");
+  if (!name) return toast("分组无效");
+  try {
+    const folder = await api("pick-backup-folder", {
+      defaultPath: state.groups?.[name]?.backupPath || "",
+    });
+    if (!folder) return;
+    applyAccountState(
+      await api("group-set-backup-path", { name, path: folder }),
+    );
+    toast("分组默认同步路径已保存");
+  } catch (e) {
+    toast(e.message || "设置失败");
+  }
+}
+
+/**
+ * 已注册的分组名称（按中文排序）。
+ * @returns {string[]}
+ */
+function groupNames() {
+  return Object.keys(state.groups || {}).sort((a, b) =>
+    a.localeCompare(b, "zh"),
+  );
+}
+
+/**
+ * 读取已发布文章的分组标签。
+ * @param {string} rel
+ * @returns {string|null}
+ */
+function publishedGroup(rel) {
+  const row = (state.metrics || []).find((r) => r.path === rel);
+  const fromMetrics =
+    typeof row?.["分组"] === "string" && row["分组"].trim()
+      ? row["分组"].trim()
+      : null;
+  if (fromMetrics) return fromMetrics;
+  const arch = (state.archives || []).find((a) => a.path === rel);
+  return arch?.group || null;
+}
+
+/**
+ * 按分组解析本地同步默认路径；无分组路径时回退到账号路径。
+ * @param {string|null|undefined} group
+ * @param {string} accountId
+ */
+function backupPathFor(group, accountId) {
+  const g = typeof group === "string" ? group.trim() : "";
+  if (g && state.groups?.[g]?.backupPath) return state.groups[g].backupPath;
+  return state.backupPaths?.[accountId] || "";
+}
+
+/**
+ * 分组下拉选项 HTML。
+ * @param {string|null|undefined} selected
+ * @param {{ allowEmpty?: boolean, emptyLabel?: string }} [opts]
+ */
+function groupOptionsHtml(selected, opts = {}) {
+  const allowEmpty = opts.allowEmpty !== false;
+  const emptyLabel = opts.emptyLabel || "无分组";
+  const cur = typeof selected === "string" ? selected.trim() : "";
+  const names = new Set(groupNames());
+  if (cur) names.add(cur);
+  return `${allowEmpty ? `<option value="">${esc(emptyLabel)}</option>` : ""}${[...names]
+    .sort((a, b) => a.localeCompare(b, "zh"))
+    .map(
+      (n) =>
+        `<option value="${esc(n)}" ${n === cur ? "selected" : ""}>${esc(n)}</option>`,
+    )
+    .join("")}`;
 }
 
 /**

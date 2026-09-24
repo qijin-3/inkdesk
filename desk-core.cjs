@@ -21,8 +21,13 @@ const defaults = {
   model: "",
   followers: {},
   metricDeltas: {},
-  /** 各账号已发布文章的本地备份默认目录 */
+  /** 各账号已发布文章的本地备份默认目录（无分组时回退） */
   backupPaths: {},
+  /**
+   * 文章分组：名称 → { backupPath? }
+   * 本地同步默认路径优先按文章「分组」字段解析。
+   */
+  groups: {},
   /** 私有仓库检测更新时使用的 GitHub Token（Contents 读权限） */
   githubToken: "",
   wechat: {
@@ -91,6 +96,10 @@ const API_CHANNELS = [
   "account-folder-candidates",
   "account-set-avatar",
   "account-set-backup-path",
+  "group-upsert",
+  "group-delete",
+  "group-set-backup-path",
+  "article-set-group",
 ];
 
 /**
@@ -140,6 +149,10 @@ class DeskCore {
         backupPaths: {
           ...defaults.backupPaths,
           ...(loaded.backupPaths || {}),
+        },
+        groups: {
+          ...defaults.groups,
+          ...(loaded.groups || {}),
         },
         wechat: {
           ...defaults.wechat,
@@ -241,6 +254,7 @@ class DeskCore {
       followers: this.store.followers || {},
       metricDeltas: this.store.metricDeltas || {},
       backupPaths: this.store.backupPaths || {},
+      groups: this.store.groups || {},
       wechat: {
         appId: this.store.wechat?.appId || "",
         appSecret: this.store.wechat?.appSecret || "",
@@ -270,6 +284,7 @@ class DeskCore {
       followers: this.store.followers || { AI: null, Dev: null },
       metricDeltas: this.store.metricDeltas || { AI: null, Dev: null },
       backupPaths: this.store.backupPaths || {},
+      groups: this.store.groups || {},
       githubToken: this.store.githubToken || "",
       wechat: {
         appId: this.store.wechat?.appId || "",
@@ -376,6 +391,14 @@ class DeskCore {
       }
       case "account-set-backup-path":
         return this.setAccountBackupPath(data?.id, data?.path);
+      case "group-upsert":
+        return this.upsertGroup(data);
+      case "group-delete":
+        return this.deleteGroup(data?.name || data);
+      case "group-set-backup-path":
+        return this.setGroupBackupPath(data?.name, data?.path);
+      case "article-set-group":
+        return this.setArticleGroup(data);
       case "published-backup":
         return this.backupPublished(data?.rel || data, data?.destDir);
       case "source":
@@ -699,6 +722,122 @@ class DeskCore {
       this.store.backupPaths[accountId] = fs.realpathSync(dirPath);
     }
     this.save();
+    return this.publicState();
+  }
+
+  /**
+   * 规范化分组名称。
+   * @param {unknown} name
+   * @returns {string}
+   */
+  normalizeGroupName(name) {
+    const n = typeof name === "string" ? name.trim() : "";
+    if (!n) throw Error("请填写分组名称");
+    if (n.length > 40) throw Error("分组名称过长");
+    if (/[/\\]/.test(n)) throw Error("分组名称不能包含路径分隔符");
+    return n;
+  }
+
+  /**
+   * 新建或重命名分组；可同时写入备份路径。
+   * @param {{ name: string, oldName?: string, backupPath?: string }} data
+   */
+  upsertGroup(data) {
+    const name = this.normalizeGroupName(data?.name);
+    if (!this.store.groups) this.store.groups = {};
+    const oldName =
+      typeof data?.oldName === "string" && data.oldName.trim()
+        ? data.oldName.trim()
+        : "";
+    let entry = { backupPath: "" };
+    if (oldName && oldName !== name) {
+      if (!this.store.groups[oldName]) throw Error("原分组不存在");
+      if (this.store.groups[name]) throw Error("目标分组名称已存在");
+      entry = { ...this.store.groups[oldName] };
+      delete this.store.groups[oldName];
+      this.vault.renameArticleGroup(oldName, name);
+    } else if (this.store.groups[name]) {
+      entry = { ...this.store.groups[name] };
+    }
+    if (data?.backupPath != null) {
+      const dirPath = String(data.backupPath || "").trim();
+      if (!dirPath) entry.backupPath = "";
+      else {
+        if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory())
+          throw Error("请选择有效的文件夹");
+        entry.backupPath = fs.realpathSync(dirPath);
+      }
+    }
+    this.store.groups[name] = {
+      backupPath: entry.backupPath || "",
+    };
+    this.save();
+    this.reload();
+    return this.publicState();
+  }
+
+  /**
+   * 删除分组定义（文章上的分组标签保留为普通文本）。
+   * @param {string} name
+   */
+  deleteGroup(name) {
+    const n = this.normalizeGroupName(name);
+    if (!this.store.groups?.[n]) throw Error("分组不存在");
+    delete this.store.groups[n];
+    this.save();
+    return this.publicState();
+  }
+
+  /**
+   * 设置或清除分组的本地同步默认目录。
+   * @param {string} name
+   * @param {string} [dirPath] 空则清除
+   */
+  setGroupBackupPath(name, dirPath) {
+    const n = this.normalizeGroupName(name);
+    if (!this.store.groups) this.store.groups = {};
+    if (!this.store.groups[n]) this.store.groups[n] = { backupPath: "" };
+    if (!dirPath) {
+      this.store.groups[n].backupPath = "";
+    } else {
+      if (typeof dirPath !== "string") throw Error("请选择有效的文件夹");
+      if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory())
+        throw Error("请选择有效的文件夹");
+      this.store.groups[n].backupPath = fs.realpathSync(dirPath);
+    }
+    this.save();
+    return this.publicState();
+  }
+
+  /**
+   * 为草稿或已发布文章设置分组标签。
+   * @param {{ id?: string, paths?: string|string[], group?: string|null }} data
+   */
+  setArticleGroup(data) {
+    const group =
+      data?.group == null || data.group === ""
+        ? null
+        : this.normalizeGroupName(data.group);
+    if (group && !this.store.groups?.[group]) {
+      if (!this.store.groups) this.store.groups = {};
+      this.store.groups[group] = { backupPath: "" };
+    }
+    const paths = (
+      Array.isArray(data?.paths)
+        ? data.paths
+        : data?.paths
+          ? [data.paths]
+          : []
+    ).filter((p) => typeof p === "string" && p);
+    if (data?.id) {
+      const doc = (this.store.documents || []).find((d) => d.id === data.id);
+      if (!doc) throw Error("草稿不存在");
+      doc.group = group;
+      this.vault.saveDoc(doc);
+    }
+    for (const rel of paths) this.vault.setMarkdownGroup(rel, group);
+    this.save();
+    this.reload();
     return this.publicState();
   }
 

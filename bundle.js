@@ -30210,6 +30210,44 @@ function hideToast() {
   clearTimeout(toastTimer);
   $("#toast")?.classList.remove("show");
 }
+function promptText(title, opts = {}) {
+  return new Promise((resolve) => {
+    $("#text-prompt-modal")?.remove();
+    const m = document.createElement("div");
+    m.id = "text-prompt-modal";
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog" style="width:min(420px,92vw)"><h2>${esc(title)}</h2><input id="text-prompt-input" type="text" value="${esc(opts.value || "")}" placeholder="${esc(opts.placeholder || "")}" autocomplete="off"><div class="row"><button type="button" id="text-prompt-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="text-prompt-ok">${esc(opts.okLabel || "\u786E\u5B9A")}</button></div></div>`;
+    document.body.append(m);
+    const input = $("#text-prompt-input");
+    const done = (value) => {
+      m.remove();
+      resolve(value);
+    };
+    $("#text-prompt-cancel").onclick = () => done(null);
+    m.addEventListener("click", (e) => {
+      if (e.target === m) done(null);
+    });
+    const submit = () => {
+      const v = input.value.trim();
+      done(v || null);
+    };
+    $("#text-prompt-ok").onclick = submit;
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submit();
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        done(null);
+      }
+    });
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+  });
+}
 async function persist() {
   clearTimeout(saveTimer);
   if (saveConflict) return false;
@@ -30331,7 +30369,7 @@ function render2() {
     previewDocId = null;
   }
   if (page !== "published-preview") publishedPreview = null;
-  $("#app").innerHTML = `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk</div><button type="button" data-page="settings" class="icon-btn brand-settings" title="\u8BBE\u7F6E" aria-label="\u8BBE\u7F6E">${I.settings({ size: 18 })}</button></div><div class="account">${accountList().map(
+  $("#app").innerHTML = `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk</div><button type="button" data-page="settings" class="ghost icon-btn brand-settings" title="\u8BBE\u7F6E" aria-label="\u8BBE\u7F6E">${I.settings({ size: 18 })}</button></div><div class="account">${accountList().map(
     (a) => `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc(a.id)}" title="${esc(a.label)}" aria-label="${esc(a.label)}">${accountAvatarHtml(a)}</button>`
   ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>\u9009\u9898\u4E0E\u7075\u611F</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button><button data-page="profile" class="${page === "profile" ? "chosen" : ""}">${I.user()} <span>\u8D26\u53F7\u4EBA\u8BBE</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></div><div class="docs">${state.documents.filter(
     (d) => sameAccount(d.account, account) && d.status !== "final" && d.status !== "archive"
@@ -31300,7 +31338,7 @@ function renderWrite() {
     renderPreview();
     return;
   }
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</button><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button><button data-task="review">${I.eye()} \u770B\u7A3F</button><button data-task="rewrite">${I.wand()} \u6DA6\u8272\u9009\u6BB5</button><button data-task="check">${I.check()} \u6838\u67E5</button></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</button><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button><button data-task="review">${I.eye()} \u770B\u7A3F</button><button data-task="rewrite">${I.wand()} \u6DA6\u8272\u9009\u6BB5</button><button data-task="check">${I.check()} \u6838\u67E5</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [src_default, src_default2, TableKit],
@@ -31371,6 +31409,44 @@ function renderWrite() {
     current.title = e.target.value;
     changed();
   };
+  $("#article-group").onchange = async (e) => {
+    const value = e.target.value.trim();
+    if (value === "__new__") {
+      e.target.value = current.group || "";
+      const name = await promptText("\u65B0\u5EFA\u5206\u7EC4", {
+        placeholder: "\u4F8B\u5982\uFF1A\u516C\u4F17\u53F7\u3001\u5C0F\u7EA2\u4E66",
+        okLabel: "\u521B\u5EFA"
+      });
+      if (!name) return;
+      try {
+        const result = await api("group-upsert", { name });
+        state.groups = result.groups || state.groups;
+        current.group = name;
+        changed();
+        await persist();
+        const sel = $("#article-group");
+        if (sel) {
+          sel.innerHTML = groupOptionsHtml(current.group) + `<option value="__new__">\uFF0B \u65B0\u5EFA\u5206\u7EC4\u2026</option>`;
+          sel.value = current.group;
+        }
+        toast(`\u5DF2\u521B\u5EFA\u5E76\u9009\u7528\u300C${name}\u300D`);
+      } catch (err) {
+        toast(err.message || "\u521B\u5EFA\u5931\u8D25");
+      }
+      return;
+    }
+    current.group = value || null;
+    changed();
+  };
+  {
+    const sel = $("#article-group");
+    if (sel) {
+      const opt = document.createElement("option");
+      opt.value = "__new__";
+      opt.textContent = "\uFF0B \u65B0\u5EFA\u5206\u7EC4\u2026";
+      sel.append(opt);
+    }
+  }
   $$("[data-fmt]").forEach(
     (b) => b.onclick = () => {
       const c = editor.chain().focus();
@@ -32058,9 +32134,10 @@ function renderDashboard() {
     ([k, l]) => `<div><small>${l}</small><strong title="${k === "\u6DA8\u7C89" ? "\u6C47\u603B\u6587\u7AE0 YAML \u7684\u6DA8\u7C89\u5B57\u6BB5\uFF0C\u4E0D\u662F\u8D26\u53F7\u51C0\u589E\u7C89\u4E1D\uFF0C\u4E5F\u4E0D\u662F\u5DE5\u4F5C\u53F0\u4F30\u7B97" : k === "\u7C89\u4E1D\u91CF" ? "\u5BFC\u5165\u6570\u636E\u65F6\u586B\u5199\u7684\u5F53\u524D\u7C89\u4E1D\u91CF" : ""}">${k === "\u6587\u7AE0" ? rows.length.toLocaleString() : k === "\u7C89\u4E1D\u91CF" ? state.followers?.[account] != null ? Number(state.followers[account]).toLocaleString() : "\u2014" : sum(k)}${deltaMark(k)}</strong></div>`
   ).join(
     ""
-  )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>\u5DF2\u53D1\u5E03</h3><div id="published-bulk" class="published-bulk" ${selectedCount ? "" : "hidden"}><span class="published-bulk-count">\u5DF2\u9009 ${selectedCount}</span><button type="button" id="bulk-backup">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" id="bulk-to-draft">\u79FB\u56DE\u8349\u7A3F</button><button type="button" class="ghost" id="bulk-clear">\u53D6\u6D88\u9009\u62E9</button></div><select id="metrics-sort" aria-label="\u6587\u7AE0\u6392\u5E8F\u65B9\u5F0F">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${rows.length ? `<table class="published-table"><thead><tr><th class="published-check"><input type="checkbox" id="published-select-all" aria-label="\u5168\u9009" ${allSelected ? "checked" : ""} ${selectedCount && !allSelected ? 'data-indeterminate="1"' : ""}></th><th>\u6587\u7AE0</th><th>\u65E5\u671F</th><th>\u9605\u8BFB</th><th>\u70B9\u8D5E</th><th>\u6536\u85CF</th><th>\u6DA8\u7C89</th></tr></thead><tbody>${sorted.map((r) => {
+  )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>\u5DF2\u53D1\u5E03</h3><div id="published-bulk" class="published-bulk" ${selectedCount ? "" : "hidden"}><span class="published-bulk-count">\u5DF2\u9009 ${selectedCount}</span><button type="button" id="bulk-group">${I.tags()} \u8BBE\u7F6E\u5206\u7EC4</button><button type="button" id="bulk-backup">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" id="bulk-to-draft">\u79FB\u56DE\u8349\u7A3F</button><button type="button" class="ghost" id="bulk-clear">\u53D6\u6D88\u9009\u62E9</button></div><select id="metrics-sort" aria-label="\u6587\u7AE0\u6392\u5E8F\u65B9\u5F0F">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${rows.length ? `<table class="published-table"><thead><tr><th class="published-check"><input type="checkbox" id="published-select-all" aria-label="\u5168\u9009" ${allSelected ? "checked" : ""} ${selectedCount && !allSelected ? 'data-indeterminate="1"' : ""}></th><th>\u6587\u7AE0</th><th>\u5206\u7EC4</th><th>\u65E5\u671F</th><th>\u9605\u8BFB</th><th>\u70B9\u8D5E</th><th>\u6536\u85CF</th><th>\u6DA8\u7C89</th></tr></thead><tbody>${sorted.map((r) => {
     const on = publishedSelection.has(r.path);
-    return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc(r.path)}" aria-label="\u9009\u62E9 ${esc(r["\u6807\u9898"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc(r.path)}">${esc(r["\u6807\u9898"])}</button></td><td>${esc(r["\u65E5\u671F"])}</td><td>${r["\u9605\u8BFB"] ?? "\u2014"}${cellDelta(r.path, "\u9605\u8BFB")}</td><td>${r["\u70B9\u8D5E"] ?? "\u2014"}${cellDelta(r.path, "\u70B9\u8D5E")}</td><td>${r["\u6536\u85CF"] ?? "\u2014"}${cellDelta(r.path, "\u6536\u85CF")}</td><td>${r["\u6DA8\u7C89"] ?? "\u2014"}${cellDelta(r.path, "\u6DA8\u7C89")}</td></tr>`;
+    const g = typeof r["\u5206\u7EC4"] === "string" && r["\u5206\u7EC4"].trim() ? r["\u5206\u7EC4"].trim() : "";
+    return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc(r.path)}" aria-label="\u9009\u62E9 ${esc(r["\u6807\u9898"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc(r.path)}">${esc(r["\u6807\u9898"])}</button></td><td class="published-group">${g ? `<span class="group-chip">${esc(g)}</span>` : "\u2014"}</td><td>${esc(r["\u65E5\u671F"])}</td><td>${r["\u9605\u8BFB"] ?? "\u2014"}${cellDelta(r.path, "\u9605\u8BFB")}</td><td>${r["\u70B9\u8D5E"] ?? "\u2014"}${cellDelta(r.path, "\u70B9\u8D5E")}</td><td>${r["\u6536\u85CF"] ?? "\u2014"}${cellDelta(r.path, "\u6536\u85CF")}</td><td>${r["\u6DA8\u7C89"] ?? "\u2014"}${cellDelta(r.path, "\u6DA8\u7C89")}</td></tr>`;
   }).join("")}</tbody></table>` : '<div class="empty-data">\u8FD8\u6CA1\u6709\u6570\u636E\u3002<p>\u6587\u7AE0\u5F52\u6863\u540E\uFF0C\u5728 YAML \u4E2D\u586B\u5199\u5E73\u53F0\u6570\u636E\u5373\u53EF\u67E5\u770B\u3002</p></div>'}</div></section>`;
   renderCalendar(rows);
   $("#metrics-sort").onchange = (e) => {
@@ -32090,6 +32167,10 @@ function renderDashboard() {
     publishedSelection.clear();
     renderDashboard();
   });
+  $("#bulk-group")?.addEventListener(
+    "click",
+    () => setPublishedGroups([...publishedSelection])
+  );
   $("#bulk-backup")?.addEventListener(
     "click",
     () => backupPublishedArticle([...publishedSelection])
@@ -32105,11 +32186,44 @@ function renderDashboard() {
       const rel = b.dataset.published;
       showContextMenu(e.clientX, e.clientY, [
         { label: "\u9884\u89C8", run: () => openPublishedPreview(rel) },
+        { label: "\u8BBE\u7F6E\u5206\u7EC4", run: () => setPublishedGroups([rel]) },
         { label: "\u672C\u5730\u540C\u6B65", run: () => backupPublishedArticle(rel) },
         { label: "\u79FB\u56DE\u8349\u7A3F", run: () => movePublishedToDraft(rel) }
       ]);
     };
   });
+}
+async function setPublishedGroups(paths) {
+  const list2 = (Array.isArray(paths) ? paths : [paths]).filter(Boolean);
+  if (!list2.length) return;
+  const currentGroups = [
+    ...new Set(list2.map((rel) => publishedGroup(rel) || ""))
+  ];
+  const selected = currentGroups.length === 1 ? currentGroups[0] || "" : "";
+  $("#group-set-modal")?.remove();
+  const m = document.createElement("div");
+  m.id = "group-set-modal";
+  m.className = "modal";
+  m.innerHTML = `<div class="dialog"><h2>\u8BBE\u7F6E\u5206\u7EC4</h2><p>${list2.length === 1 ? "\u4E3A\u8FD9\u7BC7\u6587\u7AE0\u6307\u5B9A\u5206\u7EC4\u6807\u7B7E\u3002" : `\u4E3A\u9009\u4E2D\u7684 ${list2.length} \u7BC7\u6587\u7AE0\u6307\u5B9A\u5206\u7EC4\u3002`}</p><p class="muted">\u5206\u7EC4\u51B3\u5B9A\u672C\u5730\u540C\u6B65\u7684\u9ED8\u8BA4\u8DEF\u5F84\uFF0C\u53EF\u5728\u8BBE\u7F6E \xB7 \u5206\u7EC4\u4E2D\u914D\u7F6E\u3002</p><label>\u5206\u7EC4<select id="group-set-select">${groupOptionsHtml(selected)}</select></label><label>\u6216\u65B0\u5EFA\u5206\u7EC4<input id="group-set-new" placeholder="\u8F93\u5165\u65B0\u5206\u7EC4\u540D\u79F0" autocomplete="off"></label><div class="row"><button type="button" id="group-set-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="group-set-ok">\u4FDD\u5B58</button></div></div>`;
+  document.body.append(m);
+  $("#group-set-cancel").onclick = () => m.remove();
+  $("#group-set-ok").onclick = async () => {
+    const created = $("#group-set-new")?.value.trim() || "";
+    const picked = $("#group-set-select")?.value || "";
+    const group = created || picked || null;
+    try {
+      if (created) {
+        applyAccountState(await api("group-upsert", { name: created }));
+      }
+      applyAccountState(
+        await api("article-set-group", { paths: list2, group })
+      );
+      m.remove();
+      toast(group ? `\u5DF2\u8BBE\u4E3A\u5206\u7EC4\u300C${group}\u300D` : "\u5DF2\u6E05\u9664\u5206\u7EC4");
+    } catch (e) {
+      toast(e.message || "\u8BBE\u7F6E\u5931\u8D25");
+    }
+  };
 }
 async function openPublishedPreview(rel) {
   const row = (state.archives || []).find((a) => a.path === rel);
@@ -32130,15 +32244,33 @@ async function backupPublishedArticle(paths) {
   if (!list2.length) return;
   const first2 = list2[0];
   const accountId = (state.archives || []).find((a) => a.path === first2)?.account || first2.split("/")[0] || account;
-  const defaultPath = state.backupPaths?.[accountId] || "";
+  const groups = [...new Set(list2.map((rel) => publishedGroup(rel) || ""))];
+  const singleGroup = groups.length === 1 ? groups[0] || null : null;
+  const mixedGroups = groups.length > 1;
+  const defaultPath = singleGroup ? backupPathFor(singleGroup, accountId) : "";
+  const perPathDefaults = list2.map((rel) => ({
+    rel,
+    group: publishedGroup(rel),
+    dest: backupPathFor(publishedGroup(rel), accountId)
+  }));
+  const allHaveDefault = perPathDefaults.every((x) => x.dest);
   const label = list2.length === 1 ? `\u300C${publishedPreview?.path === first2 ? publishedPreview.title : (state.archives || []).find((a) => a.path === first2)?.title || first2.split("/").pop().replace(/\.md$/, "") || "\u6587\u7AE0"}\u300D` : `\u9009\u4E2D\u7684 ${list2.length} \u7BC7\u6587\u7AE0`;
+  const rememberTarget = singleGroup ? `\u5206\u7EC4\u300C${singleGroup}\u300D` : mixedGroups ? "\uFF08\u591A\u5206\u7EC4\u65F6\u8BF7\u5206\u522B\u8BBE\u7F6E\uFF09" : "\u8BE5\u8D26\u53F7";
+  const defaultHint = mixedGroups ? allHaveDefault ? "\u5404\u5206\u7EC4\u5DF2\u914D\u7F6E\u9ED8\u8BA4\u8DEF\u5F84\uFF0C\u53EF\u6309\u5206\u7EC4\u5206\u522B\u540C\u6B65" : "\u9009\u4E2D\u6587\u7AE0\u5206\u7EC4\u4E0D\u540C\u6216\u672A\u914D\u7F6E\u8DEF\u5F84\uFF0C\u8BF7\u9009\u62E9\u7EDF\u4E00\u8DEF\u5F84\uFF0C\u6216\u5148\u8BBE\u7F6E\u5206\u7EC4" : defaultPath ? defaultPath : singleGroup ? `\u5206\u7EC4\u300C${singleGroup}\u300D\u672A\u8BBE\u7F6E\uFF08\u53EF\u5728\u8BBE\u7F6E \xB7 \u5206\u7EC4\u4E2D\u914D\u7F6E\uFF09` : "\u672A\u8BBE\u7F6E\uFF08\u53EF\u5148\u4E3A\u6587\u7AE0\u6307\u5B9A\u5206\u7EC4\uFF0C\u6216\u5728\u8BBE\u7F6E \xB7 \u8D26\u53F7\u4E2D\u914D\u7F6E\uFF09";
   const runBackup = async (destDir, remember2) => {
     let ok = 0;
     for (const rel of list2) {
       await api("published-backup", { rel, destDir });
       ok += 1;
     }
-    if (remember2 && destDir !== defaultPath) {
+    if (remember2 && singleGroup && destDir !== defaultPath) {
+      applyAccountState(
+        await api("group-set-backup-path", {
+          name: singleGroup,
+          path: destDir
+        })
+      );
+    } else if (remember2 && !singleGroup && !mixedGroups && destDir !== defaultPath) {
       applyAccountState(
         await api("account-set-backup-path", {
           id: accountId,
@@ -32148,18 +32280,29 @@ async function backupPublishedArticle(paths) {
     }
     toast(`\u5DF2\u540C\u6B65 ${ok} \u7BC7\u5230 ${destDir}`);
   };
+  const runBackupByGroup = async () => {
+    let ok = 0;
+    for (const item of perPathDefaults) {
+      if (!item.dest) throw Error("\u90E8\u5206\u6587\u7AE0\u7F3A\u5C11\u9ED8\u8BA4\u540C\u6B65\u8DEF\u5F84");
+      await api("published-backup", { rel: item.rel, destDir: item.dest });
+      ok += 1;
+    }
+    toast(`\u5DF2\u6309\u5206\u7EC4\u540C\u6B65 ${ok} \u7BC7`);
+  };
   $("#backup-sync-modal")?.remove();
   const m = document.createElement("div");
   m.id = "backup-sync-modal";
   m.className = "modal";
-  m.innerHTML = `<div class="dialog"><h2>\u672C\u5730\u540C\u6B65</h2><p>\u5C06${label}\u5907\u4EFD\u4E3A Markdown \u5230\u672C\u673A\u6587\u4EF6\u5939\u3002</p><p class="muted">\u9ED8\u8BA4\u8DEF\u5F84\uFF1A${defaultPath ? esc(defaultPath) : "\u672A\u8BBE\u7F6E\uFF08\u53EF\u5728\u8BBE\u7F6E \xB7 \u8D26\u53F7\u4E2D\u914D\u7F6E\uFF09"}</p><label class="backup-remember"><input type="checkbox" id="backup-remember" ${defaultPath ? "" : "checked"}> \u5C06\u672C\u6B21\u9009\u62E9\u7684\u8DEF\u5F84\u8BBE\u4E3A\u8BE5\u8D26\u53F7\u9ED8\u8BA4</label><div class="row"><button type="button" id="backup-cancel">\u53D6\u6D88</button>${defaultPath ? `<button type="button" id="backup-pick">${I.folder()} \u9009\u62E9\u5176\u4ED6\u8DEF\u5F84</button><button type="button" class="primary" id="backup-default">\u540C\u6B65\u5230\u9ED8\u8BA4</button>` : `<button type="button" class="primary" id="backup-pick">${I.folder()} \u9009\u62E9\u5E76\u540C\u6B65</button>`}</div></div>`;
+  const canRemember = !mixedGroups;
+  const showDefaultBtn = mixedGroups ? allHaveDefault : !!defaultPath;
+  m.innerHTML = `<div class="dialog"><h2>\u672C\u5730\u540C\u6B65</h2><p>\u5C06${label}\u5907\u4EFD\u4E3A Markdown \u5230\u672C\u673A\u6587\u4EF6\u5939\u3002</p><p class="muted">\u9ED8\u8BA4\u8DEF\u5F84\uFF1A${esc(defaultHint)}</p>${canRemember ? `<label class="backup-remember"><input type="checkbox" id="backup-remember" ${defaultPath ? "" : "checked"}> \u5C06\u672C\u6B21\u9009\u62E9\u7684\u8DEF\u5F84\u8BBE\u4E3A${esc(rememberTarget)}\u9ED8\u8BA4</label>` : ""}<div class="row"><button type="button" id="backup-cancel">\u53D6\u6D88</button>${showDefaultBtn ? `<button type="button" id="backup-pick">${I.folder()} \u9009\u62E9\u5176\u4ED6\u8DEF\u5F84</button><button type="button" class="primary" id="backup-default">${mixedGroups ? "\u6309\u5206\u7EC4\u540C\u6B65\u5230\u9ED8\u8BA4" : "\u540C\u6B65\u5230\u9ED8\u8BA4"}</button>` : `<button type="button" class="primary" id="backup-pick">${I.folder()} \u9009\u62E9\u5E76\u540C\u6B65</button>`}</div></div>`;
   document.body.append(m);
   const remember = () => !!$("#backup-remember")?.checked;
   $("#backup-cancel").onclick = () => m.remove();
   const pickAndSync = async () => {
     try {
       const folder = await api("pick-backup-folder", {
-        defaultPath: defaultPath || ""
+        defaultPath: defaultPath || perPathDefaults.find((x) => x.dest)?.dest || ""
       });
       if (!folder) return;
       await runBackup(folder, remember());
@@ -32171,7 +32314,8 @@ async function backupPublishedArticle(paths) {
   $("#backup-pick")?.addEventListener("click", pickAndSync);
   $("#backup-default")?.addEventListener("click", async () => {
     try {
-      await runBackup(defaultPath, false);
+      if (mixedGroups) await runBackupByGroup();
+      else await runBackup(defaultPath, false);
       m.remove();
     } catch (e) {
       toast(e.message || "\u540C\u6B65\u5931\u8D25");
@@ -32264,21 +32408,27 @@ function renderTopics() {
 }
 function renderSettings() {
   const wx = state.wechat || {};
-  if (settingsTab !== "config" && settingsTab !== "accounts")
+  if (settingsTab !== "config" && settingsTab !== "accounts" && settingsTab !== "groups")
     settingsTab = "config";
   const tabs = [
     { id: "config", title: "\u914D\u7F6E" },
-    { id: "accounts", title: "\u8D26\u53F7" }
+    { id: "accounts", title: "\u8D26\u53F7" },
+    { id: "groups", title: "\u5206\u7EC4" }
   ];
   const updateStatus = state._update?.available ? `\u53D1\u73B0\u65B0\u7248\u672C ${esc(state._update.latest)}` : state._update?.latest ? `\u5DF2\u662F\u6700\u65B0\uFF08GitHub ${esc(state._update.latest)}\uFF09` : "\u70B9\u51FB\u68C0\u6D4B GitHub Release";
   const configBody = `<div class="dashboard-card"><div class="settings-card-head"><h3>\u5E94\u7528\u66F4\u65B0</h3><div class="settings-card-actions"><button type="button" id="open-releases">${I.external()} \u53D1\u5E03\u9875</button><button type="button" id="check-update">${I.refresh()} \u68C0\u6D4B\u66F4\u65B0</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">\u4E0B\u8F7D\u5E76\u5B89\u88C5</button>` : ""}</div></div><p class="update-version-line">\u5F53\u524D\u7248\u672C <strong>${esc(state._appVersion || "\u2026")}</strong> \xB7 <span id="update-status">${updateStatus}</span></p><label>GitHub Token\uFF08\u79C1\u6709\u4ED3\u5E93\u9700\u8981\uFF1B\u516C\u5F00\u4ED3\u5E93\u53EF\u7559\u7A7A\uFF09<input id="github-token" type="password" value="${esc(state.githubToken || "")}" placeholder="ghp_\u2026 \u6216 fine-grained token" autocomplete="off"></label><div class="settings-card-actions" style="margin-top:10px;justify-content:flex-end"><button type="button" id="save-github-token">\u4FDD\u5B58 Token</button></div><p class="muted">\u68C0\u6D4B qijin-3/inkdesk \u7684\u6700\u65B0 Release\uFF0C\u4E0B\u8F7D macOS \u5B89\u88C5\u5305\u540E\u81EA\u52A8\u66FF\u6362\u5E76\u91CD\u542F\u3002</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>Agent \u8FDE\u63A5</h3><div class="settings-card-actions"><button class="primary" id="save-settings">\u4FDD\u5B58\u8BBE\u7F6E</button></div></div><label>\u9ED8\u8BA4 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option><option value="codex">Codex ${state.agents.codex ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option></select></label><label>\u6A21\u578B\uFF08\u7559\u7A7A\u6CBF\u7528 CLI \u9ED8\u8BA4\uFF09<input id="model" value="${esc(state.model)}" placeholder="\u53EF\u9009\u6A21\u578B ID"></label><p>\u590D\u7528 CLI \u767B\u5F55\u3002\u82E5\u672A\u767B\u5F55\uFF0C\u8BF7\u5148\u5728\u7EC8\u7AEF\u6267\u884C agent login \u6216 codex login\u3002\u6B64\u7248\u672C\u4E0D\u4FDD\u5B58\u8D26\u53F7\u51ED\u636E\u3002</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>\u5FAE\u4FE1\u516C\u4F17\u53F7</h3><div class="settings-card-actions"><button type="button" id="wechat-test">\u6D4B\u8BD5\u8FDE\u63A5</button><button type="button" class="primary" id="save-wechat">\u4FDD\u5B58\u516C\u4F17\u53F7\u8BBE\u7F6E</button></div></div><p>\u7528\u4E8E\u4E00\u952E\u63A8\u9001\u5230\u8349\u7A3F\u7BB1\u3002AppSecret \u4EC5\u4FDD\u5B58\u5728\u672C\u673A workspace.json\u3002</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx\u2026" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="\u5BC6\u94A5" autocomplete="off"></label><label>\u9ED8\u8BA4\u4F5C\u8005<input id="wechat-author" value="${esc(wx.author || "\u91D1\u5947")}" placeholder="\u91D1\u5947"></label></div><div class="dashboard-card"><div class="settings-card-head"><h3>\u5185\u5BB9\u4ED3\u5E93</h3><div class="settings-card-actions"><button type="button" id="refresh-vault">${I.refresh()} \u5237\u65B0</button></div></div>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<label class="settings-path-field">\u4ED3\u5E93\u8DEF\u5F84<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="\u9009\u62E9 Content_OS \u76EE\u5F55" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} \u9009\u62E9\u6587\u4EF6\u5939</button></span></label></div>`;
   const accountsBody = `<div class="settings-card-head accounts-toolbar"><h3>\u8D26\u53F7</h3><div class="settings-card-actions"><button type="button" id="register-account">${I.folder()} \u9009\u62E9\u6587\u4EF6\u5939</button><button type="button" class="primary" id="create-account">${I.plus()} \u65B0\u5EFA\u8D26\u53F7</button></div></div>${accountList().length ? `<div class="account-card-grid">${accountList().map((a) => {
     const backup = state.backupPaths?.[a.id] || "";
-    return `<div class="dashboard-card account-card"><div class="account-card-top"><button type="button" class="account-avatar-btn account-avatar-lg" data-set-avatar="${esc(a.id)}" title="${a.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}" aria-label="\u4E3A ${esc(a.label)} ${a.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}">${accountAvatarHtml(a, "lg")}</button><div class="account-card-info"><h3>${esc(a.label)}</h3></div></div><div class="account-stat-meta"><span>${a.drafts ?? 0} \u8349\u7A3F</span><span>${a.archives ?? 0} \u5F52\u6863</span><span>${a.files ?? 0} \u6587\u4EF6</span><span>${formatBytes(a.bytes)}</span></div><label class="settings-path-field account-backup-field">\u672C\u5730\u5907\u4EFD\u8DEF\u5F84<span class="settings-path-row"><input type="text" value="${esc(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9" readonly><button type="button" data-pick-backup="${esc(a.id)}">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" data-clear-backup="${esc(a.id)}">\u6E05\u9664</button>` : ""}</span></label><button type="button" class="ghost account-card-remove" data-unregister-account="${esc(a.id)}">\u79FB\u9664</button></div>`;
+    return `<div class="dashboard-card account-card"><div class="account-card-top"><button type="button" class="account-avatar-btn account-avatar-lg" data-set-avatar="${esc(a.id)}" title="${a.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}" aria-label="\u4E3A ${esc(a.label)} ${a.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}">${accountAvatarHtml(a, "lg")}</button><div class="account-card-info"><h3>${esc(a.label)}</h3></div></div><div class="account-stat-meta"><span>${a.drafts ?? 0} \u8349\u7A3F</span><span>${a.archives ?? 0} \u5F52\u6863</span><span>${a.files ?? 0} \u6587\u4EF6</span><span>${formatBytes(a.bytes)}</span></div><label class="settings-path-field account-backup-field">\u672C\u5730\u5907\u4EFD\u8DEF\u5F84\uFF08\u65E0\u5206\u7EC4\u65F6\u56DE\u9000\uFF09<span class="settings-path-row"><input type="text" value="${esc(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9" readonly><button type="button" data-pick-backup="${esc(a.id)}">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" data-clear-backup="${esc(a.id)}">\u6E05\u9664</button>` : ""}</span></label><button type="button" class="ghost account-card-remove" data-unregister-account="${esc(a.id)}">\u79FB\u9664</button></div>`;
   }).join("")}</div>` : '<p class="muted">\u5C1A\u672A\u6DFB\u52A0\u8D26\u53F7\u3002\u53EF\u9009\u62E9\u4ED3\u5E93\u5185\u5DF2\u6709\u6587\u4EF6\u5939\uFF0C\u6216\u65B0\u5EFA\u8D26\u53F7\u3002</p>'}`;
+  const groups = groupNames();
+  const groupsBody = `<div class="settings-card-head accounts-toolbar"><h3>\u6587\u7AE0\u5206\u7EC4</h3><div class="settings-card-actions"><button type="button" class="primary" id="create-group">${I.plus()} \u65B0\u5EFA\u5206\u7EC4</button></div></div><p class="muted">\u4E3A\u4E0D\u540C\u5206\u7EC4\u914D\u7F6E\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84\u3002\u6587\u7AE0\u53EF\u5728\u5199\u7A3F\u9875\u6216\u5DF2\u53D1\u5E03\u5217\u8868\u4E2D\u6307\u5B9A\u5206\u7EC4\u3002</p>${groups.length ? `<div class="dashboard-card groups-table-wrap"><table class="groups-table"><thead><tr><th>\u5206\u7EC4</th><th>\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84</th><th class="groups-actions-col">\u64CD\u4F5C</th></tr></thead><tbody>${groups.map((name) => {
+    const backup = state.groups?.[name]?.backupPath || "";
+    return `<tr><td><span class="group-chip">${esc(name)}</span></td><td><span class="settings-path-row groups-path-row"><input type="text" value="${esc(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9\u5E76\u8BB0\u4F4F" readonly><button type="button" data-pick-group-backup="${esc(name)}">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" data-clear-group-backup="${esc(name)}">\u6E05\u9664</button>` : ""}</span></td><td class="groups-actions-col"><button type="button" class="ghost" data-rename-group="${esc(name)}">\u91CD\u547D\u540D</button><button type="button" class="ghost" data-delete-group="${esc(name)}">\u5220\u9664</button></td></tr>`;
+  }).join("")}</tbody></table></div>` : '<p class="muted">\u8FD8\u6CA1\u6709\u5206\u7EC4\u3002\u65B0\u5EFA\u540E\u5373\u53EF\u5728\u6587\u7AE0\u4E2D\u9009\u7528\uFF0C\u5E76\u4E3A\u6BCF\u4E2A\u5206\u7EC4\u8BBE\u7F6E\u9ED8\u8BA4\u540C\u6B65\u8DEF\u5F84\u3002</p>'}`;
   $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BBE\u7F6E</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><nav class="settings-tabs">${tabs.map(
     (t) => `<button type="button" data-settings-tab="${t.id}" class="${settingsTab === t.id ? "active" : ""}">${t.title}</button>`
-  ).join("")}</nav>${settingsTab === "config" ? configBody : accountsBody}</section>`;
+  ).join("")}</nav>${settingsTab === "config" ? configBody : settingsTab === "accounts" ? accountsBody : groupsBody}</section>`;
   $$("[data-settings-tab]").forEach(
     (b) => b.onclick = () => {
       settingsTab = b.dataset.settingsTab;
@@ -32414,6 +32564,116 @@ function renderSettings() {
       };
     });
   }
+  if (settingsTab === "groups") {
+    $("#create-group").onclick = async () => {
+      const name = await promptText("\u65B0\u5EFA\u5206\u7EC4", {
+        placeholder: "\u4F8B\u5982\uFF1A\u516C\u4F17\u53F7\u3001\u5C0F\u7EA2\u4E66",
+        okLabel: "\u521B\u5EFA"
+      });
+      if (!name) return;
+      try {
+        applyAccountState(await api("group-upsert", { name }));
+        toast("\u5206\u7EC4\u5DF2\u521B\u5EFA");
+      } catch (e) {
+        toast(e.message || "\u521B\u5EFA\u5931\u8D25");
+      }
+    };
+    $$("[data-rename-group]").forEach((b) => {
+      b.onclick = async () => {
+        const oldName = b.dataset.renameGroup;
+        const name = await promptText("\u91CD\u547D\u540D\u5206\u7EC4", {
+          value: oldName,
+          okLabel: "\u4FDD\u5B58"
+        });
+        if (!name || name === oldName) return;
+        try {
+          applyAccountState(
+            await api("group-upsert", {
+              name,
+              oldName
+            })
+          );
+          toast("\u5DF2\u91CD\u547D\u540D");
+        } catch (e) {
+          toast(e.message || "\u91CD\u547D\u540D\u5931\u8D25");
+        }
+      };
+    });
+    $$("[data-delete-group]").forEach((b) => {
+      b.onclick = async () => {
+        const name = b.dataset.deleteGroup;
+        if (!confirm(`\u5220\u9664\u5206\u7EC4\u300C${name}\u300D\uFF1F\u6587\u7AE0\u4E0A\u7684\u5206\u7EC4\u6807\u7B7E\u4F1A\u4FDD\u7559\uFF0C\u4F46\u4E0D\u518D\u6709\u9ED8\u8BA4\u540C\u6B65\u8DEF\u5F84\u3002`))
+          return;
+        try {
+          applyAccountState(await api("group-delete", { name }));
+          toast("\u5DF2\u5220\u9664\u5206\u7EC4");
+        } catch (e) {
+          toast(e.message || "\u5220\u9664\u5931\u8D25");
+        }
+      };
+    });
+    $$("[data-pick-group-backup]").forEach((b) => {
+      b.onclick = () => pickGroupBackupPath(b.dataset.pickGroupBackup);
+    });
+    $$("[data-clear-group-backup]").forEach((b) => {
+      b.onclick = async () => {
+        try {
+          applyAccountState(
+            await api("group-set-backup-path", {
+              name: b.dataset.clearGroupBackup,
+              path: ""
+            })
+          );
+          toast("\u5DF2\u6E05\u9664\u5206\u7EC4\u9ED8\u8BA4\u540C\u6B65\u8DEF\u5F84");
+        } catch (e) {
+          toast(e.message || "\u6E05\u9664\u5931\u8D25");
+        }
+      };
+    });
+  }
+}
+async function pickGroupBackupPath(name) {
+  if (isWeb()) return toast("\u9009\u62E9\u5907\u4EFD\u8DEF\u5F84\u4EC5\u652F\u6301\u684C\u9762\u7AEF");
+  if (!name) return toast("\u5206\u7EC4\u65E0\u6548");
+  try {
+    const folder = await api("pick-backup-folder", {
+      defaultPath: state.groups?.[name]?.backupPath || ""
+    });
+    if (!folder) return;
+    applyAccountState(
+      await api("group-set-backup-path", { name, path: folder })
+    );
+    toast("\u5206\u7EC4\u9ED8\u8BA4\u540C\u6B65\u8DEF\u5F84\u5DF2\u4FDD\u5B58");
+  } catch (e) {
+    toast(e.message || "\u8BBE\u7F6E\u5931\u8D25");
+  }
+}
+function groupNames() {
+  return Object.keys(state.groups || {}).sort(
+    (a, b) => a.localeCompare(b, "zh")
+  );
+}
+function publishedGroup(rel) {
+  const row = (state.metrics || []).find((r) => r.path === rel);
+  const fromMetrics = typeof row?.["\u5206\u7EC4"] === "string" && row["\u5206\u7EC4"].trim() ? row["\u5206\u7EC4"].trim() : null;
+  if (fromMetrics) return fromMetrics;
+  const arch = (state.archives || []).find((a) => a.path === rel);
+  return arch?.group || null;
+}
+function backupPathFor(group, accountId) {
+  const g = typeof group === "string" ? group.trim() : "";
+  if (g && state.groups?.[g]?.backupPath) return state.groups[g].backupPath;
+  return state.backupPaths?.[accountId] || "";
+}
+function groupOptionsHtml(selected, opts = {}) {
+  const allowEmpty = opts.allowEmpty !== false;
+  const emptyLabel = opts.emptyLabel || "\u65E0\u5206\u7EC4";
+  const cur = typeof selected === "string" ? selected.trim() : "";
+  const names = new Set(groupNames());
+  if (cur) names.add(cur);
+  return `${allowEmpty ? `<option value="">${esc(emptyLabel)}</option>` : ""}${[...names].sort((a, b) => a.localeCompare(b, "zh")).map(
+    (n) => `<option value="${esc(n)}" ${n === cur ? "selected" : ""}>${esc(n)}</option>`
+  ).join("")}`;
 }
 async function pickAccountBackupPath(accountId) {
   if (isWeb()) return toast("\u9009\u62E9\u5907\u4EFD\u8DEF\u5F84\u4EC5\u652F\u6301\u684C\u9762\u7AEF");

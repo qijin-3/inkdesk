@@ -499,6 +499,10 @@ class Vault {
                 account,
                 body: this.display(body, rel),
                 fields,
+                group:
+                  typeof fields["分组"] === "string" && fields["分组"].trim()
+                    ? fields["分组"].trim()
+                    : null,
               });
               continue;
             }
@@ -550,6 +554,11 @@ class Vault {
               snapshots,
               conversations,
             };
+            const groupField = fields["分组"];
+            doc.group =
+              typeof groupField === "string" && groupField.trim()
+                ? groupField.trim()
+                : meta.group || null;
             if (!meta.titles && Array.isArray(fields["标题候选"]))
               doc.titles = fields["标题候选"]
                 .map((x) => ({
@@ -631,6 +640,7 @@ class Vault {
         "所用结构",
         "标题候选",
         "结构快照",
+        "分组",
       ])
         yaml.set(k, null);
     if (
@@ -643,6 +653,19 @@ class Vault {
         "标题候选",
         doc.titles.map((x) => x.text.split("\n")[0]),
       );
+    const nextGroup =
+      typeof doc.group === "string" && doc.group.trim()
+        ? doc.group.trim()
+        : null;
+    const prevGroup = (() => {
+      try {
+        const g = JSON.parse(cached?.doc || "{}").group;
+        return typeof g === "string" && g.trim() ? g.trim() : null;
+      } catch {
+        return null;
+      }
+    })();
+    if (nextGroup !== prevGroup) yaml.set("分组", nextGroup);
     const dir = old ? path.posix.dirname(old) : `${account}/02_Drafts`;
     let dest = dir + "/" + clean(doc.title) + ".md";
     if (dest !== old && fs.existsSync(this.p(dest)))
@@ -956,6 +979,78 @@ class Vault {
     }
     this.cache.clear();
     return rel;
+  }
+
+  /**
+   * 写入 Markdown YAML「分组」字段（草稿或归档均可）。
+   * @param {string} rel vault 相对路径
+   * @param {string|null} group
+   */
+  setMarkdownGroup(rel, group) {
+    if (typeof rel !== "string" || !rel.endsWith(".md"))
+      throw Error("无效路径");
+    if (
+      !rel.includes("/02_Drafts/") &&
+      !rel.includes("/03_Archive/")
+    )
+      throw Error("只能给草稿或已发布文章设置分组");
+    const abs = this.p(rel);
+    if (!fs.existsSync(abs)) throw Error("文件不存在");
+    const raw = fs.readFileSync(abs, "utf8");
+    const { yaml, body } = split(raw);
+    yaml.set("分组", group);
+    atomic(abs, "---\n" + yaml.toString() + "---\n" + body);
+    const found = Object.entries(this.index).find(([, v]) => v.path === rel);
+    if (found && this.index[found[0]]?.status === "draft") {
+      const id = found[0];
+      const meta = this.json(`${this.meta}/articles/${id}.json`, {});
+      if (group) meta.group = group;
+      else delete meta.group;
+      this.writeJSON(`${this.meta}/articles/${id}.json`, meta);
+      this.cache.delete(id);
+    } else {
+      this.cache.clear();
+    }
+  }
+
+  /**
+   * 重命名文章 YAML 中的分组标签。
+   * @param {string} from
+   * @param {string} to
+   */
+  renameArticleGroup(from, to) {
+    if (!from || !to || from === to) return;
+    for (const account of this.listAccountIds())
+      for (const folder of ["02_Drafts", "03_Archive"])
+        for (const file of files(this.p(`${account}/${folder}`)).filter((p) =>
+          p.endsWith(".md"),
+        )) {
+          try {
+            const raw = fs.readFileSync(file, "utf8");
+            const { yaml, body } = split(raw);
+            const cur = yaml.get("分组");
+            if (cur !== from) continue;
+            yaml.set("分组", to);
+            atomic(file, "---\n" + yaml.toString() + "---\n" + body);
+          } catch {
+            /* 跳过坏文件 */
+          }
+        }
+    const articlesDir = this.p(`${this.meta}/articles`);
+    if (fs.existsSync(articlesDir)) {
+      for (const file of fs.readdirSync(articlesDir).filter((f) => f.endsWith(".json"))) {
+        try {
+          const p = path.join(articlesDir, file);
+          const meta = JSON.parse(fs.readFileSync(p, "utf8"));
+          if (meta.group !== from) continue;
+          meta.group = to;
+          fs.writeFileSync(p, JSON.stringify(meta, null, 2) + "\n");
+        } catch {
+          /* 跳过 */
+        }
+      }
+    }
+    this.cache.clear();
   }
 }
 function number(v) {
