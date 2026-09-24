@@ -109,27 +109,17 @@ app.on("window-all-closed", () => {
 });
 
 ipcMain.handle("app-info", () => updater.appInfo());
-ipcMain.handle("update-check", async () => {
-  const token = desk?.store?.githubToken || "";
-  return updater.checkForUpdate(token);
-});
+ipcMain.handle("update-check", async () => updater.checkForUpdate());
 ipcMain.handle("update-install", async (event) => {
-  const token = desk?.store?.githubToken || "";
-  const info = await updater.checkForUpdate(token);
+  const info = await updater.checkForUpdate();
   if (!info.available) throw Error("已是最新版本");
   if (!info.assetUrl) throw Error("最新 Release 没有 macOS 安装包");
   return updater.downloadAndInstall({
-    token,
     assetUrl: info.assetUrl,
     onProgress: (text) => event.sender.send("update-progress", text),
   });
 });
 ipcMain.handle("update-open-releases", () => updater.openReleasesPage());
-ipcMain.handle("set-github-token", (_, token) => {
-  desk.store.githubToken = typeof token === "string" ? token.trim() : "";
-  desk.save();
-  return { ok: true };
-});
 
 const passthrough = new Set([
   "load",

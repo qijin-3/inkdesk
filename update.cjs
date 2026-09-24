@@ -1,6 +1,6 @@
 /**
  * 从 GitHub Releases 检测并安装 macOS 更新（electron-packager 打包版）。
- * 公开仓库可直接访问；私有仓库需在设置中填写具有 Contents 读权限的 Token。
+ * 仓库需为公开，以便无需 Token 检测与下载。
  */
 const fs = require("node:fs");
 const os = require("node:os");
@@ -165,20 +165,13 @@ function pickMacAsset(release) {
 }
 
 /**
- * @param {string} [token]
+ * 检测是否有新版本。
  */
-async function checkForUpdate(token) {
+async function checkForUpdate() {
   const current = app.getVersion();
-  const auth =
-    token ||
-    process.env.GITHUB_TOKEN ||
-    process.env.GH_TOKEN ||
-    "";
-  const res = await fetchBuffer(RELEASES_API, { token: auth || undefined });
+  const res = await fetchBuffer(RELEASES_API);
   if (res.status === 401 || res.status === 403) {
-    throw Error(
-      "无法读取 GitHub Release（仓库可能为私有）。请在设置中填写具有读权限的 Token。",
-    );
+    throw Error("无法读取 GitHub Release，请确认仓库为公开。");
   }
   if (res.status === 404) {
     throw Error("尚未发布 GitHub Release，或仓库地址不正确。");
@@ -211,21 +204,15 @@ async function checkForUpdate(token) {
 
 /**
  * 下载并替换当前 .app，重启。
- * @param {{ token?: string, assetUrl: string, onProgress?: (msg: string) => void }} opts
+ * @param {{ assetUrl: string, onProgress?: (msg: string) => void }} opts
  */
 async function downloadAndInstall(opts) {
   if (!app.isPackaged) throw Error("开发模式请直接重新打包，无需在线更新");
   if (process.platform !== "darwin") throw Error("当前仅支持 macOS 更新");
   if (!opts.assetUrl) throw Error("没有可下载的安装包");
 
-  const auth =
-    opts.token ||
-    process.env.GITHUB_TOKEN ||
-    process.env.GH_TOKEN ||
-    "";
   opts.onProgress?.("开始下载…");
   const zipBuf = await downloadFile(opts.assetUrl, {
-    token: auth || undefined,
     onProgress: opts.onProgress,
   });
   opts.onProgress?.("正在解压…");

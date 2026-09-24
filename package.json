@@ -1,7 +1,7 @@
 {
   "name": "inkdesk",
   "productName": "AsIde",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AsIde — local writing desk for Content OS",
   "main": "main.cjs",
   "scripts": {

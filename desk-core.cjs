@@ -28,8 +28,6 @@ const defaults = {
    * 本地同步默认路径优先按文章「分组」字段解析。
    */
   groups: {},
-  /** 私有仓库检测更新时使用的 GitHub Token（Contents 读权限） */
-  githubToken: "",
   wechat: {
     appId: "",
     appSecret: "",
@@ -159,6 +157,7 @@ class DeskCore {
           ...(loaded.wechat || {}),
         },
       };
+      delete this.store.githubToken;
     } catch (e) {
       if (fs.existsSync(path.join(this.data, "workspace.json"))) throw e;
       this.store = structuredClone(defaults);
@@ -285,7 +284,6 @@ class DeskCore {
       metricDeltas: this.store.metricDeltas || { AI: null, Dev: null },
       backupPaths: this.store.backupPaths || {},
       groups: this.store.groups || {},
-      githubToken: this.store.githubToken || "",
       wechat: {
         appId: this.store.wechat?.appId || "",
         appSecret: this.store.wechat?.appSecret || "",

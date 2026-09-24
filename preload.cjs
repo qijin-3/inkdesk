@@ -68,7 +68,6 @@ const channels = [
   "update-check",
   "update-install",
   "update-open-releases",
-  "set-github-token",
 ];
 contextBridge.exposeInMainWorld("desk", {
   web: false,
