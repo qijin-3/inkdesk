@@ -14,6 +14,7 @@ const channels = [
   "refresh",
   "recover-refresh",
   "finalize",
+  "to-draft",
   "material-read",
   "material-add",
   "versions",

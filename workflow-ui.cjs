@@ -24,16 +24,15 @@ const assert = require("node:assert/strict"),
     );
     assert.equal(await w.locator("#export").count(), 0);
     await w.locator("#save-version").click();
-    await w.locator("#version-name").fill("自己的初稿");
-    await w.locator("#version-confirm").click();
-    await w.locator("#history").click();
-    assert.match(await w.locator(".history-items").innerText(), /自己的初稿/);
-    await w.locator("#close-history").click();
+    await w.waitForTimeout(400);
+    await w.locator("#version-menu").click();
+    assert.match(await w.locator(".history-items").innerText(), /恢复/);
+    await w.locator("body").click({ position: { x: 20, y: 20 } });
     await w.locator(".tiptap").fill("临时更改，需要恢复。");
-    await w.locator("#history").click();
+    await w.locator("#version-menu").click();
     await w
-      .locator(".history-items .result-card")
-      .filter({ has: w.locator("small").filter({ hasText: /^自己的初稿 ·/ }) })
+      .locator(".history-items .version-dropdown-item")
+      .first()
       .locator("[data-restore]")
       .click();
     assert.match(await w.locator(".tiptap").innerText(), /这是我自己的初稿/);

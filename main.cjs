@@ -132,6 +132,7 @@ const passthrough = new Set([
   "published-read",
   "vault-reveal",
   "vault-open",
+  "to-draft",
   "draft-delete",
   "materials-list",
   "materials-read",
@@ -234,10 +235,10 @@ ipcMain.handle("finalize", async (_, id) => {
   if (step?.needsConfirmation) {
     const result = await dialog.showMessageBox({
       type: "question",
-      title: "确认定稿并归档",
+      title: "确认发布并归档",
       message: step.message,
       detail: step.detail,
-      buttons: ["取消", "确认定稿"],
+      buttons: ["取消", "确认发布"],
       defaultId: 0,
       cancelId: 0,
       noLink: true,

@@ -787,6 +787,43 @@ class Vault {
     return dest;
   }
   /**
+   * 将已发布文章从 03_Archive 移回 02_Drafts，保留版本与对话元数据。
+   * @param {string} rel vault 相对路径（须含 /03_Archive/）
+   * @returns {{ id: string, path: string }}
+   */
+  toDraft(rel) {
+    if (
+      typeof rel !== "string" ||
+      !rel.includes("/03_Archive/") ||
+      !rel.endsWith(".md")
+    )
+      throw Error("不是已发布文章");
+    const from = this.p(rel);
+    if (!fs.existsSync(from)) throw Error("文件不存在");
+    const dest = rel.replace("/03_Archive/", "/02_Drafts/");
+    const to = this.p(dest);
+    if (fs.existsSync(to)) throw Error("草稿箱已有同名文章，请先处理冲突");
+    const found = Object.entries(this.index).find(([, v]) => v.path === rel);
+    const id = found?.[0] || crypto.randomUUID();
+    const raw = fs.readFileSync(from, "utf8");
+    this.version(id, split(raw).body, "移回草稿", raw);
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.linkSync(from, to);
+    try {
+      fs.unlinkSync(from);
+    } catch (e) {
+      fs.unlinkSync(to);
+      throw e;
+    }
+    const prev = this.index[id] || {};
+    const next = { ...prev, path: dest, status: "draft" };
+    delete next.finalizedAt;
+    this.index[id] = next;
+    this.writeJSON(this.meta + "/index.json", this.index);
+    this.cache.delete(id);
+    return { id, path: dest };
+  }
+  /**
    * 删除草稿及其本地元数据（版本、对话、项目链接）；不删除共享素材库正文。
    * @param {string} id
    */

@@ -1388,93 +1388,123 @@ function togglePreview() {
   renderWrite();
 }
 
+/** @type {(() => void) | null} */
+let closeVersionDropdown = null;
+
 /**
- * 绑定写作页与预览页共用的页眉操作（预览切换、版本）。
+ * 绑定写作页与预览页共用的页眉操作（预览切换、保存、版本历史）。
  */
 function bindArticleHeader() {
   $("#layout").onclick = togglePreview;
-  $("#save-version").onclick = () => {
+  $("#save-version").onclick = async () => {
+    closeVersionDropdown?.();
     sync();
-    const modal = document.createElement("div");
-    modal.className = "modal";
-    modal.innerHTML =
-      '<div class="dialog"><h2>保存一个版本</h2><input id="version-name" placeholder="如：自己的初稿 / 精修版"><div class="row"><button id="version-cancel">取消</button><button id="version-confirm" class="primary">保存版本</button></div></div>';
-    document.body.append(modal);
-    $("#version-cancel").onclick = () => modal.remove();
-    $("#version-confirm").onclick = async () => {
-      current.snapshots.push({
-        id: crypto.randomUUID(),
-        at: new Date().toISOString(),
-        name: $("#version-name").value.trim() || "手动保存",
-        body: current.body,
-      });
-      dirty = true;
-      if (await persist()) {
-        modal.remove();
-        toast("版本已保存");
-      }
-    };
+    current.snapshots.push({
+      id: crypto.randomUUID(),
+      at: new Date().toISOString(),
+      name: "手动保存",
+      body: current.body,
+    });
+    dirty = true;
+    if (await persist()) toast("已保存");
   };
-  $("#history").onclick = async () => {
-    sync();
-    if (!(await persist())) return;
-    try {
-      current.snapshots = await api("versions", current.id);
-    } catch (e) {
-      return toast(e.message);
+  $("#version-menu").onclick = (e) => {
+    e.stopPropagation();
+    if ($("#version-dropdown")) {
+      closeVersionDropdown?.();
+      return;
     }
-    const modal = document.createElement("div");
-    modal.className = "modal";
-    modal.innerHTML = `<div class="dialog"><div class="row"><h2>版本与修改记录</h2><button id="close-history">关闭</button></div><p class="muted">记录只保存在本机，不自动发送给 AI。</p><div class="history-items">${
-      (current.snapshots || [])
-        .map(
-          (x, i) =>
-            `<div class="result-card"><small>${esc(x.name || "修改前快照")} · ${new Date(x.at).toLocaleString("zh-CN")}</small><div>${esc(x.body.slice(0, 260))}</div><button data-restore="${i}">恢复此版本</button></div>`,
-        )
-        .reverse()
-        .join("") || "<p>接受修改或定稿时，会在这里保存快照。</p>"
-    }${(current.decisions || [])
-      .slice(-10)
-      .reverse()
-      .map(
-        (x) =>
-          `<div class="result-card"><small>${x.action === "accepted" ? "已接受" : "已拒绝"} · ${new Date(x.at).toLocaleString("zh-CN")}</small><div>${esc(x.before)} → ${esc(x.after)}</div></div>`,
-      )
-      .join("")}</div></div>`;
-    document.body.append(modal);
-    $("#close-history").onclick = () => modal.remove();
-    $$("[data-restore]").forEach(
-      (b) =>
-        (b.onclick = () => {
-          const body = current.snapshots[+b.dataset.restore].body;
-          sync();
-          current.snapshots.push({
-            at: new Date().toISOString(),
-            body: current.body,
-          });
-          if (editor) {
-            editor.commands.setContent(safeHTML(body));
-            sync();
-          } else current.body = body;
-          changed();
-          pending = null;
-          modal.remove();
-          toast("版本已恢复，恢复前的正文也已保存");
-          if (previewMode) renderWrite();
-        }),
-    );
+    openVersionHistoryMenu();
   };
 }
 
 /**
- * 绑定全局右侧栏「定稿」按钮。
+ * 在「保存」旁展开版本历史下拉；支持恢复某次快照。
+ */
+async function openVersionHistoryMenu() {
+  closeVersionDropdown?.();
+  sync();
+  if (!(await persist())) return;
+  try {
+    current.snapshots = await api("versions", current.id);
+  } catch (e) {
+    return toast(e.message);
+  }
+  const anchor = $("#save-split");
+  if (!anchor) return;
+  const menu = document.createElement("div");
+  menu.id = "version-dropdown";
+  menu.className = "version-dropdown";
+  const snaps = current.snapshots || [];
+  menu.innerHTML = `<div class="version-dropdown-head"><strong>版本历史</strong></div><div class="history-items">${
+    snaps
+      .map(
+        (x, i) =>
+          `<div class="version-dropdown-item"><small>${esc(new Date(x.at).toLocaleString("zh-CN"))}</small><button type="button" data-restore="${i}">恢复</button></div>`,
+      )
+      .reverse()
+      .join("") ||
+    '<p class="muted version-dropdown-empty">还没有版本。点击「保存」会留下快照。</p>'
+  }</div>`;
+  document.body.append(menu);
+  menu.onclick = (e) => e.stopPropagation();
+  const rect = anchor.getBoundingClientRect();
+  const width = Math.max(280, rect.width + 40);
+  menu.style.width = width + "px";
+  let left = rect.right - width;
+  left = Math.max(12, Math.min(left, window.innerWidth - width - 12));
+  let top = rect.bottom + 6;
+  menu.style.left = left + "px";
+  menu.style.top = top + "px";
+  requestAnimationFrame(() => {
+    const h = menu.getBoundingClientRect().height;
+    if (top + h > window.innerHeight - 12)
+      menu.style.top = Math.max(12, rect.top - h - 6) + "px";
+  });
+  $("#version-menu")?.setAttribute("aria-expanded", "true");
+  const close = () => {
+    if (closeVersionDropdown === close) closeVersionDropdown = null;
+    menu.remove();
+    $("#version-menu")?.setAttribute("aria-expanded", "false");
+    window.removeEventListener("click", close);
+    window.removeEventListener("resize", close);
+  };
+  closeVersionDropdown = close;
+  menu.querySelectorAll("[data-restore]").forEach((b) => {
+    b.onclick = (ev) => {
+      ev.stopPropagation();
+      const body = current.snapshots[+b.dataset.restore].body;
+      sync();
+      current.snapshots.push({
+        at: new Date().toISOString(),
+        body: current.body,
+      });
+      if (editor) {
+        editor.commands.setContent(safeHTML(body));
+        sync();
+      } else current.body = body;
+      changed();
+      pending = null;
+      close();
+      toast("版本已恢复，恢复前的正文也已保存");
+      if (previewMode) renderWrite();
+    };
+  });
+  setTimeout(() => {
+    window.addEventListener("click", close);
+    window.addEventListener("resize", close);
+  }, 0);
+}
+
+/**
+ * 绑定全局右侧栏「已发布」按钮（定稿归档）。
  */
 function bindFinalize() {
   const btn = $("#finalize");
   if (!btn) return;
   btn.onclick = async () => {
     if (!current) return toast("请先打开一篇草稿");
-    if (busy) return toast("请等待 AI 完成后再定稿");
+    if (busy) return toast("请等待 AI 完成后再发布");
     sync();
     if (!(await persist())) return;
     try {
@@ -1494,7 +1524,7 @@ function bindFinalize() {
       pending = null;
       page = "dashboard";
       render();
-      toast("已定稿并移入本账号 Archive，版本与对话已保留");
+      toast("已发布并移入本账号 Archive，版本与对话已保留");
     } catch (e) {
       toast(e.message);
     }
@@ -1810,7 +1840,7 @@ function setPreviewPane(pane) {
 function renderPreview() {
   previewDocId = current.id;
   if (previewPane !== "social") previewPane = "wechat";
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout" class="primary">退出预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} 导出图片</button><button type="button" id="copy-publish">${I.copy()} 复制排版</button><button type="button" id="push-wechat">${I.send()} 推送到公众号</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">正在排版…</p><div id="social-pages"></div></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout" class="primary">退出预览</button><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="finalize" class="primary">已发布</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} 导出图片</button><button type="button" id="copy-publish">${I.copy()} 复制排版</button><button type="button" id="push-wechat">${I.send()} 推送到公众号</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">正在排版…</p><div id="social-pages"></div></div></section></div>`;
   bindArticleHeader();
   bindFinalize();
   enhanceWechatPreview();
@@ -1845,7 +1875,7 @@ function renderWrite() {
     return;
   }
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div></div><div class="header-actions"><span id="saved">已保存到本地</span><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><button id="layout">预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button><button data-task="review">${I.eye()} 看稿</button><button data-task="rewrite">${I.wand()} 润色选段</button><button data-task="check">${I.check()} 核查</button></div></section></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div></div><div class="header-actions"><span id="saved">已保存到本地</span><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><button id="layout">预览</button><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button><button data-task="review">${I.eye()} 看稿</button><button data-task="rewrite">${I.wand()} 润色选段</button><button data-task="check">${I.check()} 核查</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [StarterKit, Image, TableKit],
@@ -2751,13 +2781,21 @@ function renderDashboard() {
   };
   $("#refresh-dashboard").onclick = () => refreshDashboardData();
   $("#import-notes").onclick = () => runNoteImport();
-  $$("[data-published]").forEach(
-    (b) => (b.onclick = () => openPublishedPreview(b.dataset.published)),
-  );
+  $$("[data-published]").forEach((b) => {
+    b.onclick = () => openPublishedPreview(b.dataset.published);
+    b.oncontextmenu = (e) => {
+      e.preventDefault();
+      const rel = b.dataset.published;
+      showContextMenu(e.clientX, e.clientY, [
+        { label: "预览", run: () => openPublishedPreview(rel) },
+        { label: "移回草稿", run: () => movePublishedToDraft(rel) },
+      ]);
+    };
+  });
 }
 
 /**
- * 在右侧抽屉预览已发布文章，并支持在 Finder / 默认应用中打开源文件。
+ * 在右侧抽屉预览已发布文章，并支持在 Finder / 默认应用中打开源文件、移回草稿。
  * @param {string} rel vault 相对路径
  */
 async function openPublishedPreview(rel) {
@@ -2768,7 +2806,7 @@ async function openPublishedPreview(rel) {
   const n = document.createElement("aside");
   n.id = "published-drawer";
   n.className = "reference-drawer published-drawer";
-  n.innerHTML = `<div class="published-drawer-head"><span class="published-drawer-label">预览</span><div class="published-drawer-toolbar"><button type="button" id="published-reveal" class="icon-btn" data-tip="在 Finder 中显示" title="在 Finder 中显示" aria-label="在 Finder 中显示">${I.folder({ size: 18 })}</button><button type="button" id="published-open" class="icon-btn" data-tip="用默认应用打开" title="用默认应用打开" aria-label="用默认应用打开">${I.external({ size: 18 })}</button><button type="button" id="close-published" class="icon-btn" data-tip="关闭" title="关闭" aria-label="关闭">${I.close({ size: 18 })}</button></div></div><div class="material-preview" id="published-body"><h3 class="published-article-title">${esc(title)}</h3><p class="muted">加载中…</p></div>`;
+  n.innerHTML = `<div class="published-drawer-head"><span class="published-drawer-label">预览</span><div class="published-drawer-toolbar"><button type="button" id="published-to-draft" class="ghost">移回草稿</button><button type="button" id="published-reveal" class="icon-btn" data-tip="在 Finder 中显示" title="在 Finder 中显示" aria-label="在 Finder 中显示">${I.folder({ size: 18 })}</button><button type="button" id="published-open" class="icon-btn" data-tip="用默认应用打开" title="用默认应用打开" aria-label="用默认应用打开">${I.external({ size: 18 })}</button><button type="button" id="close-published" class="icon-btn" data-tip="关闭" title="关闭" aria-label="关闭">${I.close({ size: 18 })}</button></div></div><div class="material-preview" id="published-body"><h3 class="published-article-title">${esc(title)}</h3><p class="muted">加载中…</p></div>`;
   document.body.append(n);
   $("#close-published").onclick = () => n.remove();
   try {
@@ -2779,6 +2817,7 @@ async function openPublishedPreview(rel) {
     $("#published-body").innerHTML =
       `<h3 class="published-article-title">${esc(title)}</h3><p class="notice">${esc(e.message)}</p>`;
   }
+  $("#published-to-draft").onclick = () => movePublishedToDraft(rel);
   $("#published-reveal").onclick = async () => {
     try {
       await api("vault-reveal", rel);
@@ -2793,6 +2832,37 @@ async function openPublishedPreview(rel) {
       toast(e.message);
     }
   };
+}
+
+/**
+ * 将已发布文章移回草稿箱并打开编辑。
+ * @param {string} rel vault 相对路径
+ */
+async function movePublishedToDraft(rel) {
+  if (busy) return toast("请等待 AI 完成后再操作");
+  const title =
+    (state.archives || []).find((a) => a.path === rel)?.title ||
+    rel.split("/").pop().replace(/\.md$/, "") ||
+    "文章";
+  if (!confirm(`将「${title}」移回草稿箱？可继续编辑后再发布。`)) return;
+  sync();
+  try {
+    await persist();
+    const result = await api("to-draft", rel);
+    Object.assign(state, result);
+    $("#published-drawer")?.remove();
+    const id = result.restoredId;
+    current =
+      state.documents.find((d) => d.id === id) ||
+      state.documents.find((d) => sameAccount(d.account, account));
+    dirty = false;
+    pending = null;
+    page = current ? "write" : "dashboard";
+    render();
+    toast("已移回草稿");
+  } catch (e) {
+    toast(e.message);
+  }
 }
 
 /** 仪表盘刷新：重新读取 Content_OS，同步外部改动的 YAML / 归档 */

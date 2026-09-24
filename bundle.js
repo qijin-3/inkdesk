@@ -23556,6 +23556,9 @@ var Bold2 = [
   ["path", { d: "M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8" }]
 ];
 
+// node_modules/lucide/dist/esm/icons/chevron-down.mjs
+var ChevronDown = [["path", { d: "m6 9 6 6 6-6" }]];
+
 // node_modules/lucide/dist/esm/icons/circle-user.mjs
 var CircleUser = [
   ["circle", { cx: "12", cy: "12", r: "10" }],
@@ -23899,7 +23902,8 @@ var I = {
   file: (o) => icon(FileText, o),
   link: (o) => icon(Link2, o),
   copy: (o) => icon(Copy, o),
-  imageDown: (o) => icon(ImageDown, o)
+  imageDown: (o) => icon(ImageDown, o),
+  chevronDown: (o) => icon(ChevronDown, o)
 };
 
 // node_modules/@tiptap/extension-image/dist/index.js
@@ -30842,73 +30846,103 @@ function togglePreview() {
   }
   renderWrite();
 }
+var closeVersionDropdown = null;
 function bindArticleHeader() {
   $("#layout").onclick = togglePreview;
-  $("#save-version").onclick = () => {
+  $("#save-version").onclick = async () => {
+    closeVersionDropdown?.();
     sync();
-    const modal = document.createElement("div");
-    modal.className = "modal";
-    modal.innerHTML = '<div class="dialog"><h2>\u4FDD\u5B58\u4E00\u4E2A\u7248\u672C</h2><input id="version-name" placeholder="\u5982\uFF1A\u81EA\u5DF1\u7684\u521D\u7A3F / \u7CBE\u4FEE\u7248"><div class="row"><button id="version-cancel">\u53D6\u6D88</button><button id="version-confirm" class="primary">\u4FDD\u5B58\u7248\u672C</button></div></div>';
-    document.body.append(modal);
-    $("#version-cancel").onclick = () => modal.remove();
-    $("#version-confirm").onclick = async () => {
+    current.snapshots.push({
+      id: crypto.randomUUID(),
+      at: (/* @__PURE__ */ new Date()).toISOString(),
+      name: "\u624B\u52A8\u4FDD\u5B58",
+      body: current.body
+    });
+    dirty = true;
+    if (await persist()) toast("\u5DF2\u4FDD\u5B58");
+  };
+  $("#version-menu").onclick = (e) => {
+    e.stopPropagation();
+    if ($("#version-dropdown")) {
+      closeVersionDropdown?.();
+      return;
+    }
+    openVersionHistoryMenu();
+  };
+}
+async function openVersionHistoryMenu() {
+  closeVersionDropdown?.();
+  sync();
+  if (!await persist()) return;
+  try {
+    current.snapshots = await api("versions", current.id);
+  } catch (e) {
+    return toast(e.message);
+  }
+  const anchor = $("#save-split");
+  if (!anchor) return;
+  const menu = document.createElement("div");
+  menu.id = "version-dropdown";
+  menu.className = "version-dropdown";
+  const snaps = current.snapshots || [];
+  menu.innerHTML = `<div class="version-dropdown-head"><strong>\u7248\u672C\u5386\u53F2</strong></div><div class="history-items">${snaps.map(
+    (x, i) => `<div class="version-dropdown-item"><small>${esc(new Date(x.at).toLocaleString("zh-CN"))}</small><button type="button" data-restore="${i}">\u6062\u590D</button></div>`
+  ).reverse().join("") || '<p class="muted version-dropdown-empty">\u8FD8\u6CA1\u6709\u7248\u672C\u3002\u70B9\u51FB\u300C\u4FDD\u5B58\u300D\u4F1A\u7559\u4E0B\u5FEB\u7167\u3002</p>'}</div>`;
+  document.body.append(menu);
+  menu.onclick = (e) => e.stopPropagation();
+  const rect = anchor.getBoundingClientRect();
+  const width = Math.max(280, rect.width + 40);
+  menu.style.width = width + "px";
+  let left = rect.right - width;
+  left = Math.max(12, Math.min(left, window.innerWidth - width - 12));
+  let top = rect.bottom + 6;
+  menu.style.left = left + "px";
+  menu.style.top = top + "px";
+  requestAnimationFrame(() => {
+    const h2 = menu.getBoundingClientRect().height;
+    if (top + h2 > window.innerHeight - 12)
+      menu.style.top = Math.max(12, rect.top - h2 - 6) + "px";
+  });
+  $("#version-menu")?.setAttribute("aria-expanded", "true");
+  const close2 = () => {
+    if (closeVersionDropdown === close2) closeVersionDropdown = null;
+    menu.remove();
+    $("#version-menu")?.setAttribute("aria-expanded", "false");
+    window.removeEventListener("click", close2);
+    window.removeEventListener("resize", close2);
+  };
+  closeVersionDropdown = close2;
+  menu.querySelectorAll("[data-restore]").forEach((b) => {
+    b.onclick = (ev) => {
+      ev.stopPropagation();
+      const body = current.snapshots[+b.dataset.restore].body;
+      sync();
       current.snapshots.push({
-        id: crypto.randomUUID(),
         at: (/* @__PURE__ */ new Date()).toISOString(),
-        name: $("#version-name").value.trim() || "\u624B\u52A8\u4FDD\u5B58",
         body: current.body
       });
-      dirty = true;
-      if (await persist()) {
-        modal.remove();
-        toast("\u7248\u672C\u5DF2\u4FDD\u5B58");
-      }
-    };
-  };
-  $("#history").onclick = async () => {
-    sync();
-    if (!await persist()) return;
-    try {
-      current.snapshots = await api("versions", current.id);
-    } catch (e) {
-      return toast(e.message);
-    }
-    const modal = document.createElement("div");
-    modal.className = "modal";
-    modal.innerHTML = `<div class="dialog"><div class="row"><h2>\u7248\u672C\u4E0E\u4FEE\u6539\u8BB0\u5F55</h2><button id="close-history">\u5173\u95ED</button></div><p class="muted">\u8BB0\u5F55\u53EA\u4FDD\u5B58\u5728\u672C\u673A\uFF0C\u4E0D\u81EA\u52A8\u53D1\u9001\u7ED9 AI\u3002</p><div class="history-items">${(current.snapshots || []).map(
-      (x, i) => `<div class="result-card"><small>${esc(x.name || "\u4FEE\u6539\u524D\u5FEB\u7167")} \xB7 ${new Date(x.at).toLocaleString("zh-CN")}</small><div>${esc(x.body.slice(0, 260))}</div><button data-restore="${i}">\u6062\u590D\u6B64\u7248\u672C</button></div>`
-    ).reverse().join("") || "<p>\u63A5\u53D7\u4FEE\u6539\u6216\u5B9A\u7A3F\u65F6\uFF0C\u4F1A\u5728\u8FD9\u91CC\u4FDD\u5B58\u5FEB\u7167\u3002</p>"}${(current.decisions || []).slice(-10).reverse().map(
-      (x) => `<div class="result-card"><small>${x.action === "accepted" ? "\u5DF2\u63A5\u53D7" : "\u5DF2\u62D2\u7EDD"} \xB7 ${new Date(x.at).toLocaleString("zh-CN")}</small><div>${esc(x.before)} \u2192 ${esc(x.after)}</div></div>`
-    ).join("")}</div></div>`;
-    document.body.append(modal);
-    $("#close-history").onclick = () => modal.remove();
-    $$("[data-restore]").forEach(
-      (b) => b.onclick = () => {
-        const body = current.snapshots[+b.dataset.restore].body;
+      if (editor) {
+        editor.commands.setContent(safeHTML(body));
         sync();
-        current.snapshots.push({
-          at: (/* @__PURE__ */ new Date()).toISOString(),
-          body: current.body
-        });
-        if (editor) {
-          editor.commands.setContent(safeHTML(body));
-          sync();
-        } else current.body = body;
-        changed();
-        pending = null;
-        modal.remove();
-        toast("\u7248\u672C\u5DF2\u6062\u590D\uFF0C\u6062\u590D\u524D\u7684\u6B63\u6587\u4E5F\u5DF2\u4FDD\u5B58");
-        if (previewMode) renderWrite();
-      }
-    );
-  };
+      } else current.body = body;
+      changed();
+      pending = null;
+      close2();
+      toast("\u7248\u672C\u5DF2\u6062\u590D\uFF0C\u6062\u590D\u524D\u7684\u6B63\u6587\u4E5F\u5DF2\u4FDD\u5B58");
+      if (previewMode) renderWrite();
+    };
+  });
+  setTimeout(() => {
+    window.addEventListener("click", close2);
+    window.addEventListener("resize", close2);
+  }, 0);
 }
 function bindFinalize() {
   const btn = $("#finalize");
   if (!btn) return;
   btn.onclick = async () => {
     if (!current) return toast("\u8BF7\u5148\u6253\u5F00\u4E00\u7BC7\u8349\u7A3F");
-    if (busy) return toast("\u8BF7\u7B49\u5F85 AI \u5B8C\u6210\u540E\u518D\u5B9A\u7A3F");
+    if (busy) return toast("\u8BF7\u7B49\u5F85 AI \u5B8C\u6210\u540E\u518D\u53D1\u5E03");
     sync();
     if (!await persist()) return;
     try {
@@ -30928,7 +30962,7 @@ function bindFinalize() {
       pending = null;
       page = "dashboard";
       render2();
-      toast("\u5DF2\u5B9A\u7A3F\u5E76\u79FB\u5165\u672C\u8D26\u53F7 Archive\uFF0C\u7248\u672C\u4E0E\u5BF9\u8BDD\u5DF2\u4FDD\u7559");
+      toast("\u5DF2\u53D1\u5E03\u5E76\u79FB\u5165\u672C\u8D26\u53F7 Archive\uFF0C\u7248\u672C\u4E0E\u5BF9\u8BDD\u5DF2\u4FDD\u7559");
     } catch (e) {
       toast(e.message);
     }
@@ -31183,7 +31217,7 @@ function setPreviewPane(pane) {
 function renderPreview() {
   previewDocId = current.id;
   if (previewPane !== "social") previewPane = "wechat";
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
   bindArticleHeader();
   bindFinalize();
   enhanceWechatPreview();
@@ -31214,7 +31248,7 @@ function renderWrite() {
     renderPreview();
     return;
   }
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button type="button" id="toggle-assistant">${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</button><button id="layout">\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button><button data-task="review">${I.eye()} \u770B\u7A3F</button><button data-task="rewrite">${I.wand()} \u6DA6\u8272\u9009\u6BB5</button><button data-task="check">${I.check()} \u6838\u67E5</button></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button type="button" id="toggle-assistant">${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</button><button id="layout">\u9884\u89C8</button><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button><button data-task="review">${I.eye()} \u770B\u7A3F</button><button data-task="rewrite">${I.wand()} \u6DA6\u8272\u9009\u6BB5</button><button data-task="check">${I.check()} \u6838\u67E5</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [src_default, src_default2, TableKit],
@@ -31976,9 +32010,17 @@ function renderDashboard() {
   };
   $("#refresh-dashboard").onclick = () => refreshDashboardData();
   $("#import-notes").onclick = () => runNoteImport();
-  $$("[data-published]").forEach(
-    (b) => b.onclick = () => openPublishedPreview(b.dataset.published)
-  );
+  $$("[data-published]").forEach((b) => {
+    b.onclick = () => openPublishedPreview(b.dataset.published);
+    b.oncontextmenu = (e) => {
+      e.preventDefault();
+      const rel = b.dataset.published;
+      showContextMenu(e.clientX, e.clientY, [
+        { label: "\u9884\u89C8", run: () => openPublishedPreview(rel) },
+        { label: "\u79FB\u56DE\u8349\u7A3F", run: () => movePublishedToDraft(rel) }
+      ]);
+    };
+  });
 }
 async function openPublishedPreview(rel) {
   const row = (state.archives || []).find((a) => a.path === rel);
@@ -31987,7 +32029,7 @@ async function openPublishedPreview(rel) {
   const n = document.createElement("aside");
   n.id = "published-drawer";
   n.className = "reference-drawer published-drawer";
-  n.innerHTML = `<div class="published-drawer-head"><span class="published-drawer-label">\u9884\u89C8</span><div class="published-drawer-toolbar"><button type="button" id="published-reveal" class="icon-btn" data-tip="\u5728 Finder \u4E2D\u663E\u793A" title="\u5728 Finder \u4E2D\u663E\u793A" aria-label="\u5728 Finder \u4E2D\u663E\u793A">${I.folder({ size: 18 })}</button><button type="button" id="published-open" class="icon-btn" data-tip="\u7528\u9ED8\u8BA4\u5E94\u7528\u6253\u5F00" title="\u7528\u9ED8\u8BA4\u5E94\u7528\u6253\u5F00" aria-label="\u7528\u9ED8\u8BA4\u5E94\u7528\u6253\u5F00">${I.external({ size: 18 })}</button><button type="button" id="close-published" class="icon-btn" data-tip="\u5173\u95ED" title="\u5173\u95ED" aria-label="\u5173\u95ED">${I.close({ size: 18 })}</button></div></div><div class="material-preview" id="published-body"><h3 class="published-article-title">${esc(title)}</h3><p class="muted">\u52A0\u8F7D\u4E2D\u2026</p></div>`;
+  n.innerHTML = `<div class="published-drawer-head"><span class="published-drawer-label">\u9884\u89C8</span><div class="published-drawer-toolbar"><button type="button" id="published-to-draft" class="ghost">\u79FB\u56DE\u8349\u7A3F</button><button type="button" id="published-reveal" class="icon-btn" data-tip="\u5728 Finder \u4E2D\u663E\u793A" title="\u5728 Finder \u4E2D\u663E\u793A" aria-label="\u5728 Finder \u4E2D\u663E\u793A">${I.folder({ size: 18 })}</button><button type="button" id="published-open" class="icon-btn" data-tip="\u7528\u9ED8\u8BA4\u5E94\u7528\u6253\u5F00" title="\u7528\u9ED8\u8BA4\u5E94\u7528\u6253\u5F00" aria-label="\u7528\u9ED8\u8BA4\u5E94\u7528\u6253\u5F00">${I.external({ size: 18 })}</button><button type="button" id="close-published" class="icon-btn" data-tip="\u5173\u95ED" title="\u5173\u95ED" aria-label="\u5173\u95ED">${I.close({ size: 18 })}</button></div></div><div class="material-preview" id="published-body"><h3 class="published-article-title">${esc(title)}</h3><p class="muted">\u52A0\u8F7D\u4E2D\u2026</p></div>`;
   document.body.append(n);
   $("#close-published").onclick = () => n.remove();
   try {
@@ -31996,6 +32038,7 @@ async function openPublishedPreview(rel) {
   } catch (e) {
     $("#published-body").innerHTML = `<h3 class="published-article-title">${esc(title)}</h3><p class="notice">${esc(e.message)}</p>`;
   }
+  $("#published-to-draft").onclick = () => movePublishedToDraft(rel);
   $("#published-reveal").onclick = async () => {
     try {
       await api("vault-reveal", rel);
@@ -32010,6 +32053,27 @@ async function openPublishedPreview(rel) {
       toast(e.message);
     }
   };
+}
+async function movePublishedToDraft(rel) {
+  if (busy) return toast("\u8BF7\u7B49\u5F85 AI \u5B8C\u6210\u540E\u518D\u64CD\u4F5C");
+  const title = (state.archives || []).find((a) => a.path === rel)?.title || rel.split("/").pop().replace(/\.md$/, "") || "\u6587\u7AE0";
+  if (!confirm(`\u5C06\u300C${title}\u300D\u79FB\u56DE\u8349\u7A3F\u7BB1\uFF1F\u53EF\u7EE7\u7EED\u7F16\u8F91\u540E\u518D\u53D1\u5E03\u3002`)) return;
+  sync();
+  try {
+    await persist();
+    const result = await api("to-draft", rel);
+    Object.assign(state, result);
+    $("#published-drawer")?.remove();
+    const id = result.restoredId;
+    current = state.documents.find((d) => d.id === id) || state.documents.find((d) => sameAccount(d.account, account));
+    dirty = false;
+    pending = null;
+    page = current ? "write" : "dashboard";
+    render2();
+    toast("\u5DF2\u79FB\u56DE\u8349\u7A3F");
+  } catch (e) {
+    toast(e.message);
+  }
 }
 async function refreshDashboardData() {
   if (busy) return toast("AI \u6B63\u5728\u56DE\u590D\uFF0C\u8BF7\u7ED3\u675F\u540E\u518D\u5237\u65B0");
@@ -32758,6 +32822,7 @@ render2();
 
 lucide/dist/esm/icons/at-sign.mjs:
 lucide/dist/esm/icons/bold.mjs:
+lucide/dist/esm/icons/chevron-down.mjs:
 lucide/dist/esm/icons/circle-user.mjs:
 lucide/dist/esm/icons/copy.mjs:
 lucide/dist/esm/icons/external-link.mjs:

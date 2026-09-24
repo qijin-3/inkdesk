@@ -95,6 +95,14 @@ test("canonical attachments, independent conversations, versions and final move 
   assert(
     fs.existsSync(v.p("_system/inkdesk/conversations/article-123/chat-2.json")),
   );
+  const back = v.toDraft(dest);
+  assert.equal(back.path, "金奇_AI/02_Drafts/文章一.md");
+  assert(fs.existsSync(v.p(back.path)));
+  assert(!fs.existsSync(v.p(dest)));
+  s = v.load();
+  assert.equal(s.documents.length, 1);
+  assert.equal(s.documents[0].id, d.id);
+  assert.equal(s.archives.length, 0);
 });
 test("external edits and archive collisions are never overwritten", (t) => {
   const v = fixture(t);

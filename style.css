@@ -222,11 +222,22 @@ p {
 .account-card-info h3 {
   margin: 0;
 }
+.account-card {
+  position: relative;
+  padding-top: 40px;
+}
 .account-card .account-stat-meta {
   margin: 0 0 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  margin-left: 0;
 }
 .account-card-remove {
-  padding: 6px 0;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 6px 10px;
   color: #999;
   font-size: 12px;
 }
@@ -486,6 +497,10 @@ button.title-preview:hover {
   align-items: center;
   gap: 8px;
 }
+.published-drawer-toolbar > .ghost {
+  font-size: 12px;
+  padding: 6px 10px;
+}
 .published-drawer-toolbar .icon-btn {
   position: relative;
   border: 1px solid #e0e0e0;
@@ -543,6 +558,103 @@ header select {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.save-split {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+.save-split > button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  margin: 0;
+}
+.save-split > #save-version {
+  padding: 8px 12px;
+}
+.save-split > #version-menu {
+  padding: 8px 8px;
+  border-left: 1px solid #e0e0e0;
+  color: #555555;
+}
+.save-split > button:hover {
+  background: #f5f5f5;
+}
+.version-dropdown {
+  position: fixed;
+  z-index: 220;
+  display: flex;
+  flex-direction: column;
+  max-height: min(420px, 70vh);
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  box-shadow: 0 12px 32px #00000022;
+  padding: 10px 0;
+}
+.version-dropdown .history-items {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #d0d0d0 transparent;
+  padding-right: 0;
+}
+.version-dropdown .history-items::-webkit-scrollbar {
+  width: 4px;
+}
+.version-dropdown .history-items::-webkit-scrollbar-track {
+  background: transparent;
+}
+.version-dropdown .history-items::-webkit-scrollbar-thumb {
+  background: #d0d0d0;
+  border-radius: 4px;
+}
+.version-dropdown .history-items::-webkit-scrollbar-thumb:hover {
+  background: #b8b8b8;
+}
+.version-dropdown-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 4px 16px 10px;
+  border-bottom: 1px solid #eeeeee;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.version-dropdown-head strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.version-dropdown-empty {
+  padding: 12px 16px;
+  margin: 0;
+}
+.version-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px 8px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.version-dropdown-item:last-child {
+  border-bottom: 0;
+}
+.version-dropdown-item small {
+  color: #555555;
+  font-size: 12px;
+}
+.version-dropdown-item button {
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 4px 10px;
 }
 #saved {
   font-size: 10px;
@@ -636,6 +748,7 @@ button.icon-btn .lucide {
   display: block;
 }
 .header-actions > button,
+.header-actions .save-split,
 .composer-tools button,
 .conversation-bar button,
 .selection-bar button,

@@ -46,6 +46,7 @@ const API_CHANNELS = [
   "refresh",
   "recover-refresh",
   "finalize",
+  "to-draft",
   "material-read",
   "material-add",
   "versions",
@@ -464,6 +465,8 @@ class DeskCore {
         return this.knowledge.linkMaterial(data.articleId, data.id);
       case "finalize":
         return this.finalize(data);
+      case "to-draft":
+        return this.toDraft(data);
       case "image":
         return this.image(data);
       case "copy":
@@ -778,7 +781,7 @@ class DeskCore {
       return {
         needsConfirmation: true,
         contentSnapshot: raw,
-        message: "将这篇草稿定为最终版本？",
+        message: "将这篇草稿标记为已发布并归档？",
         detail:
           "从：" +
           item.path +
@@ -791,6 +794,17 @@ class DeskCore {
       throw Error("确认期间草稿发生变化，请重新定稿");
     this.vault.finalize(id);
     return { ...this.reload(), dataPath: this.data };
+  }
+
+  /**
+   * 将已发布文章移回草稿箱。
+   * @param {string} rel vault 相对路径
+   */
+  toDraft(rel) {
+    if (this.active) throw Error("请等待 AI 完成后再操作");
+    this.save();
+    const moved = this.vault.toDraft(rel);
+    return { ...this.reload(), dataPath: this.data, restoredId: moved.id };
   }
 
   /**

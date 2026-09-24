@@ -36,6 +36,7 @@ import {
   Link2,
   Copy,
   ImageDown,
+  ChevronDown,
 } from "lucide";
 
 /**
@@ -94,4 +95,5 @@ export const I = {
   link: (o) => icon(Link2, o),
   copy: (o) => icon(Copy, o),
   imageDown: (o) => icon(ImageDown, o),
+  chevronDown: (o) => icon(ChevronDown, o),
 };
