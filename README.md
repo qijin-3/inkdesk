@@ -1,4 +1,4 @@
-# Inkdesk 0.4 · 写作工作台
+# Inkdesk 0.1 · 写作工作台
 
 独立的 Apple Silicon macOS 应用。项目在 `/Users/jin/Documents/Dev/inkdesk`。内容仓库（Content_OS）可在设置中选择；也可用 `vault.json` 或 `INKDESK_VAULT` 指定。开发时指向测试目录即可。
 

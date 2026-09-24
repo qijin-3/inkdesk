@@ -1,6 +1,6 @@
 {
   "name": "inkdesk",
-  "version": "0.4.0",
+  "version": "0.1.0",
   "description": "Local writing desk for Content OS",
   "main": "main.cjs",
   "scripts": {
