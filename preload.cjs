@@ -37,6 +37,7 @@ const channels = [
   "import-notes-preview",
   "import-notes-apply",
   "published-read",
+  "published-backup",
   "vault-reveal",
   "vault-open",
   "draft-delete",
@@ -50,6 +51,7 @@ const channels = [
   "pick-vault",
   "pick-account-folder",
   "pick-account-avatar",
+  "pick-backup-folder",
   "set-vault",
   "accounts-list",
   "account-create",
@@ -57,6 +59,7 @@ const channels = [
   "account-unregister",
   "account-folder-candidates",
   "account-set-avatar",
+  "account-set-backup-path",
 ];
 contextBridge.exposeInMainWorld("desk", {
   web: false,

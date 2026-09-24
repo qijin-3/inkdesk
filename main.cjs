@@ -133,6 +133,7 @@ const passthrough = new Set([
   "vault-reveal",
   "vault-open",
   "to-draft",
+  "published-backup",
   "draft-delete",
   "materials-list",
   "materials-read",
@@ -147,6 +148,7 @@ const passthrough = new Set([
   "account-unregister",
   "account-folder-candidates",
   "account-set-avatar",
+  "account-set-backup-path",
 ]);
 
 for (const name of passthrough) {
@@ -209,6 +211,22 @@ ipcMain.handle("pick-account-avatar", async (_, data) => {
     id,
     filePath: result.filePaths[0],
   });
+});
+
+/**
+ * 选择已发布文章的本地备份目录。
+ */
+ipcMain.handle("pick-backup-folder", async (_, data) => {
+  const result = await dialog.showOpenDialog({
+    title: "选择本地备份目录",
+    defaultPath:
+      typeof data?.defaultPath === "string" && data.defaultPath
+        ? data.defaultPath
+        : undefined,
+    properties: ["openDirectory", "createDirectory"],
+  });
+  if (result.canceled) return null;
+  return result.filePaths[0] || null;
 });
 
 ipcMain.handle("project-upload", async (_, data) => {

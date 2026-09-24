@@ -15,6 +15,8 @@ let composer = null,
   profileTab = "identity";
 let heatmapYear = new Date().getFullYear();
 let metricsSort = "阅读";
+/** 仪表盘已发布文章多选路径 */
+let publishedSelection = new Set();
 let materialsFilter = "all";
 const $ = (s) => document.querySelector(s),
   api = (n, d) => window.desk.call(n, d);
@@ -120,6 +122,8 @@ let previewDocId = null;
 let socialPreviewCtl = null;
 /** 预览子分栏：公众号 / 小红书 */
 let previewPane = "wechat";
+/** 仪表盘已发布文章的排版预览（path/title/body） */
+let publishedPreview = null;
 /** 写作伙伴侧栏是否展开；仅草稿写作可用，默认收起 */
 let assistantOpen = false;
 /** 右侧栏模式：写作伙伴 / 本文素材 */
@@ -722,6 +726,7 @@ function render() {
     previewMode = false;
     previewDocId = null;
   }
+  if (page !== "published-preview") publishedPreview = null;
   $("#app").innerHTML =
     `<aside class="sidebar"><div class="brand-row"><div class="brand"><span class="brand-icon">i</span> inkdesk</div><button type="button" data-page="settings" class="icon-btn brand-settings" title="设置" aria-label="设置">${I.settings({ size: 18 })}</button></div><div class="account">${
       accountList()
@@ -731,7 +736,7 @@ function render() {
         )
         .join("") ||
       `<p class="account-empty">请在设置中添加账号</p>`
-    }</div><nav><button data-page="dashboard" class="${page === "dashboard" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>选题与灵感</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="profile" class="${page === "profile" ? "chosen" : ""}">${I.user()} <span>账号人设</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></div><div class="docs">${
+    }</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>选题与灵感</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="profile" class="${page === "profile" ? "chosen" : ""}">${I.user()} <span>账号人设</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></div><div class="docs">${
       state.documents
         .filter(
           (d) =>
@@ -747,11 +752,13 @@ function render() {
     }</div></aside><main id="main"></main><div class="workspace-resizer hidden" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant hidden" id="rail"></aside>`;
   if (page === "write") renderWrite();
   else if (page === "dashboard") renderDashboard();
+  else if (page === "published-preview") renderPublishedPreview();
   else if (page === "topics") renderTopics();
   else if (page === "materials") renderMaterials();
   else if (page === "profile") renderProfile();
   else renderSettings();
-  if (page !== "write") renderAssistantRail();
+  // 写作预览 / 已发布预览自行收起侧栏并绑定小红书；勿再 destroy 掉进行中的排版
+  if (page !== "write" && page !== "published-preview") renderAssistantRail();
   bindWorkspaceResize();
   $$("[data-page]").forEach(
     (b) =>
@@ -780,6 +787,7 @@ function render() {
         sync();
         persist();
         account = b.dataset.account;
+        publishedSelection = new Set();
         current = state.documents.find((d) => sameAccount(d.account, account));
         pending = null;
         render();
@@ -1369,6 +1377,24 @@ function socialSourceHTML() {
 }
 
 /**
+ * 已发布文章预览用正文 HTML。
+ * @param {string} [md]
+ */
+function publishedSourceHTML(md = publishedPreview?.body) {
+  const html = safeHTML(md || "");
+  const d = new DOMParser().parseFromString(html, "text/html");
+  if (!isWeb())
+    d.querySelectorAll("img").forEach((img) => {
+      const src = img.getAttribute("src");
+      if (src?.startsWith("/api/asset/"))
+        img.src = src
+          .replace("/api/asset/vault/", "inkasset://vault/")
+          .replace("/api/asset/local/", "inkasset://local/");
+    });
+  return d.body.innerHTML;
+}
+
+/**
  * 进入或退出预览模式，并重建写作页。
  */
 function togglePreview() {
@@ -1867,6 +1893,45 @@ function renderPreview() {
   });
 }
 
+/**
+ * 渲染已发布文章的排版预览（公众号 / 小红书），与草稿预览同结构。
+ */
+function renderPublishedPreview() {
+  if (!publishedPreview) {
+    page = "dashboard";
+    return renderDashboard();
+  }
+  if (previewPane !== "social") previewPane = "wechat";
+  const doc = {
+    title: publishedPreview.title,
+    body: publishedPreview.body,
+  };
+  const html = publishedSourceHTML(doc.body);
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(doc.title || "未命名文章")}</h1><div class="byline">${esc(publishedPreview.path.split("/").pop())} <span>${(doc.body || "").length} 字</span></div></div><div class="header-actions"><button type="button" id="published-backup">${I.folder()} 本地同步</button><button type="button" id="published-to-draft">移回草稿</button><button id="layout" class="primary">退出预览</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} 导出图片</button><button type="button" id="copy-publish">${I.copy()} 复制排版</button><button type="button" id="push-wechat">${I.send()} 推送到公众号</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(doc.title || "未命名文章")}</h1><div id="article-preview">${html}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">正在排版…</p><div id="social-pages"></div></div></section></div>`;
+  $("#layout").onclick = () => {
+    publishedPreview = null;
+    page = "dashboard";
+    render();
+  };
+  $("#published-to-draft").onclick = () =>
+    movePublishedToDraft(publishedPreview.path);
+  $("#published-backup").onclick = () =>
+    backupPublishedArticle(publishedPreview.path);
+  enhanceWechatPreview();
+  $$("[data-preview-pane]").forEach((btn) => {
+    btn.onclick = () => setPreviewPane(btn.dataset.previewPane);
+  });
+  $("#copy-publish").onclick = () => copyPublish(doc);
+  $("#push-wechat").onclick = () => pushWechatDraft(doc);
+  renderAssistantRail();
+  socialPreviewCtl = bindSocialPreview($(".paper-wrap") || document, {
+    html,
+    title: doc.title,
+    api,
+    web: isWeb(),
+  });
+}
+
 function renderWrite() {
   if (!current) {
     $("#main").innerHTML =
@@ -2121,7 +2186,10 @@ function bindWorkspaceResize() {
 
   /** 将宽度限制在可用范围内 */
   const clamp = (w) => {
-    const cap = previewMode && page === "write" ? 640 : 560;
+    const cap =
+      (previewMode && page === "write") || page === "published-preview"
+        ? 640
+        : 560;
     const max = Math.max(280, window.innerWidth - 480);
     return Math.min(Math.max(Math.round(w), 280), Math.min(cap, max));
   };
@@ -2756,6 +2824,12 @@ function renderDashboard() {
       return String(b["日期"] || "").localeCompare(String(a["日期"] || ""));
     return (b[metricsSort] || 0) - (a[metricsSort] || 0);
   });
+  const validPaths = new Set(sorted.map((r) => r.path));
+  publishedSelection = new Set(
+    [...publishedSelection].filter((p) => validPaths.has(p)),
+  );
+  const selectedCount = publishedSelection.size;
+  const allSelected = sorted.length > 0 && selectedCount === sorted.length;
   $("#main").innerHTML =
     `<header><div class="header-lead"><h1 class="dashboard-tagline">让每一次表达，都有回响。</h1><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><div class="header-actions"><button type="button" id="refresh-dashboard" class="ghost icon-btn" title="从磁盘同步本地数据" aria-label="刷新">${I.refresh({ size: 18 })}</button><button id="import-notes" class="primary">更新数据</button></div></header><section class="dashboard"><div class="stats">${[
       ["粉丝量", "粉丝量"],
@@ -2772,13 +2846,13 @@ function renderDashboard() {
       )
       .join(
         "",
-      )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>已发布</h3><select id="metrics-sort" aria-label="文章排序方式">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${
+      )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>已发布</h3><div id="published-bulk" class="published-bulk" ${selectedCount ? "" : "hidden"}><span class="published-bulk-count">已选 ${selectedCount}</span><button type="button" id="bulk-backup">${I.folder()} 本地同步</button><button type="button" id="bulk-to-draft">移回草稿</button><button type="button" class="ghost" id="bulk-clear">取消选择</button></div><select id="metrics-sort" aria-label="文章排序方式">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${
       rows.length
-        ? `<table><thead><tr><th>文章</th><th>日期</th><th>阅读</th><th>点赞</th><th>收藏</th><th>涨粉</th></tr></thead><tbody>${sorted
-            .map(
-              (r) =>
-                `<tr><td><button type="button" class="title-preview" data-published="${esc(r.path)}">${esc(r["标题"])}</button></td><td>${esc(r["日期"])}</td><td>${r["阅读"] ?? "—"}${cellDelta(r.path, "阅读")}</td><td>${r["点赞"] ?? "—"}${cellDelta(r.path, "点赞")}</td><td>${r["收藏"] ?? "—"}${cellDelta(r.path, "收藏")}</td><td>${r["涨粉"] ?? "—"}${cellDelta(r.path, "涨粉")}</td></tr>`,
-            )
+        ? `<table class="published-table"><thead><tr><th class="published-check"><input type="checkbox" id="published-select-all" aria-label="全选" ${allSelected ? "checked" : ""} ${selectedCount && !allSelected ? "data-indeterminate=\"1\"" : ""}></th><th>文章</th><th>日期</th><th>阅读</th><th>点赞</th><th>收藏</th><th>涨粉</th></tr></thead><tbody>${sorted
+            .map((r) => {
+              const on = publishedSelection.has(r.path);
+              return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc(r.path)}" aria-label="选择 ${esc(r["标题"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc(r.path)}">${esc(r["标题"])}</button></td><td>${esc(r["日期"])}</td><td>${r["阅读"] ?? "—"}${cellDelta(r.path, "阅读")}</td><td>${r["点赞"] ?? "—"}${cellDelta(r.path, "点赞")}</td><td>${r["收藏"] ?? "—"}${cellDelta(r.path, "收藏")}</td><td>${r["涨粉"] ?? "—"}${cellDelta(r.path, "涨粉")}</td></tr>`;
+            })
             .join("")}</tbody></table>`
         : '<div class="empty-data">还没有数据。<p>文章归档后，在 YAML 中填写平台数据即可查看。</p></div>'
     }</div></section>`;
@@ -2789,6 +2863,33 @@ function renderDashboard() {
   };
   $("#refresh-dashboard").onclick = () => refreshDashboardData();
   $("#import-notes").onclick = () => runNoteImport();
+  const selectAll = $("#published-select-all");
+  if (selectAll?.dataset.indeterminate)
+    selectAll.indeterminate = true;
+  selectAll?.addEventListener("change", () => {
+    if (selectAll.checked)
+      sorted.forEach((r) => publishedSelection.add(r.path));
+    else publishedSelection.clear();
+    renderDashboard();
+  });
+  $$("[data-select-published]").forEach((box) => {
+    box.onchange = () => {
+      const rel = box.dataset.selectPublished;
+      if (box.checked) publishedSelection.add(rel);
+      else publishedSelection.delete(rel);
+      renderDashboard();
+    };
+  });
+  $("#bulk-clear")?.addEventListener("click", () => {
+    publishedSelection.clear();
+    renderDashboard();
+  });
+  $("#bulk-backup")?.addEventListener("click", () =>
+    backupPublishedArticle([...publishedSelection]),
+  );
+  $("#bulk-to-draft")?.addEventListener("click", () =>
+    movePublishedToDraft([...publishedSelection]),
+  );
   $$("[data-published]").forEach((b) => {
     b.onclick = () => openPublishedPreview(b.dataset.published);
     b.oncontextmenu = (e) => {
@@ -2796,6 +2897,7 @@ function renderDashboard() {
       const rel = b.dataset.published;
       showContextMenu(e.clientX, e.clientY, [
         { label: "预览", run: () => openPublishedPreview(rel) },
+        { label: "本地同步", run: () => backupPublishedArticle(rel) },
         { label: "移回草稿", run: () => movePublishedToDraft(rel) },
       ]);
     };
@@ -2803,71 +2905,143 @@ function renderDashboard() {
 }
 
 /**
- * 在右侧抽屉预览已发布文章，并支持在 Finder / 默认应用中打开源文件、移回草稿。
+ * 打开已发布文章的排版预览（公众号 / 小红书），与草稿预览一致。
  * @param {string} rel vault 相对路径
  */
 async function openPublishedPreview(rel) {
   const row = (state.archives || []).find((a) => a.path === rel);
   const title =
     row?.title || rel.split("/").pop().replace(/\.md$/, "") || "文章";
-  $("#published-drawer")?.remove();
-  const n = document.createElement("aside");
-  n.id = "published-drawer";
-  n.className = "reference-drawer published-drawer";
-  n.innerHTML = `<div class="published-drawer-head"><span class="published-drawer-label">预览</span><div class="published-drawer-toolbar"><button type="button" id="published-to-draft" class="ghost">移回草稿</button><button type="button" id="published-reveal" class="icon-btn" data-tip="在 Finder 中显示" title="在 Finder 中显示" aria-label="在 Finder 中显示">${I.folder({ size: 18 })}</button><button type="button" id="published-open" class="icon-btn" data-tip="用默认应用打开" title="用默认应用打开" aria-label="用默认应用打开">${I.external({ size: 18 })}</button><button type="button" id="close-published" class="icon-btn" data-tip="关闭" title="关闭" aria-label="关闭">${I.close({ size: 18 })}</button></div></div><div class="material-preview" id="published-body"><h3 class="published-article-title">${esc(title)}</h3><p class="muted">加载中…</p></div>`;
-  document.body.append(n);
-  $("#close-published").onclick = () => n.remove();
   try {
     const body = row?.body ?? (await api("published-read", rel));
-    $("#published-body").innerHTML =
-      `<h3 class="published-article-title">${esc(title)}</h3>` + safeHTML(body);
+    publishedPreview = { path: rel, title, body: body || "" };
+    page = "published-preview";
+    previewPane = "wechat";
+    render();
   } catch (e) {
-    $("#published-body").innerHTML =
-      `<h3 class="published-article-title">${esc(title)}</h3><p class="notice">${esc(e.message)}</p>`;
+    toast(e.message);
   }
-  $("#published-to-draft").onclick = () => movePublishedToDraft(rel);
-  $("#published-reveal").onclick = async () => {
-    try {
-      await api("vault-reveal", rel);
-    } catch (e) {
-      toast(e.message);
-    }
-  };
-  $("#published-open").onclick = async () => {
-    try {
-      await api("vault-open", rel);
-    } catch (e) {
-      toast(e.message);
-    }
-  };
 }
 
 /**
- * 将已发布文章移回草稿箱并打开编辑。
- * @param {string} rel vault 相对路径
+ * 将已发布文章同步备份到本地目录（支持单篇或多选）。
+ * @param {string|string[]} paths vault 相对路径
  */
-async function movePublishedToDraft(rel) {
+async function backupPublishedArticle(paths) {
+  if (isWeb()) return toast("本地同步仅支持桌面端");
+  const list = (Array.isArray(paths) ? paths : [paths]).filter(Boolean);
+  if (!list.length) return;
+  const first = list[0];
+  const accountId =
+    (state.archives || []).find((a) => a.path === first)?.account ||
+    first.split("/")[0] ||
+    account;
+  const defaultPath = state.backupPaths?.[accountId] || "";
+  const label =
+    list.length === 1
+      ? `「${
+          publishedPreview?.path === first
+            ? publishedPreview.title
+            : (state.archives || []).find((a) => a.path === first)?.title ||
+              first.split("/").pop().replace(/\.md$/, "") ||
+              "文章"
+        }」`
+      : `选中的 ${list.length} 篇文章`;
+
+  /** @param {string} destDir @param {boolean} [remember] */
+  const runBackup = async (destDir, remember) => {
+    let ok = 0;
+    for (const rel of list) {
+      await api("published-backup", { rel, destDir });
+      ok += 1;
+    }
+    if (remember && destDir !== defaultPath) {
+      applyAccountState(
+        await api("account-set-backup-path", {
+          id: accountId,
+          path: destDir,
+        }),
+      );
+    }
+    toast(`已同步 ${ok} 篇到 ${destDir}`);
+  };
+
+  $("#backup-sync-modal")?.remove();
+  const m = document.createElement("div");
+  m.id = "backup-sync-modal";
+  m.className = "modal";
+  m.innerHTML = `<div class="dialog"><h2>本地同步</h2><p>将${label}备份为 Markdown 到本机文件夹。</p><p class="muted">默认路径：${defaultPath ? esc(defaultPath) : "未设置（可在设置 · 账号中配置）"}</p><label class="backup-remember"><input type="checkbox" id="backup-remember" ${defaultPath ? "" : "checked"}> 将本次选择的路径设为该账号默认</label><div class="row"><button type="button" id="backup-cancel">取消</button>${defaultPath ? `<button type="button" id="backup-pick">${I.folder()} 选择其他路径</button><button type="button" class="primary" id="backup-default">同步到默认</button>` : `<button type="button" class="primary" id="backup-pick">${I.folder()} 选择并同步</button>`}</div></div>`;
+  document.body.append(m);
+  const remember = () => !!$("#backup-remember")?.checked;
+  $("#backup-cancel").onclick = () => m.remove();
+  const pickAndSync = async () => {
+    try {
+      const folder = await api("pick-backup-folder", {
+        defaultPath: defaultPath || "",
+      });
+      if (!folder) return;
+      await runBackup(folder, remember());
+      m.remove();
+    } catch (e) {
+      toast(e.message || "同步失败");
+    }
+  };
+  $("#backup-pick")?.addEventListener("click", pickAndSync);
+  $("#backup-default")?.addEventListener("click", async () => {
+    try {
+      await runBackup(defaultPath, false);
+      m.remove();
+    } catch (e) {
+      toast(e.message || "同步失败");
+    }
+  });
+}
+
+/**
+ * 将已发布文章移回草稿箱（支持单篇或多选）。
+ * @param {string|string[]} paths vault 相对路径
+ */
+async function movePublishedToDraft(paths) {
   if (busy) return toast("请等待 AI 完成后再操作");
-  const title =
-    (state.archives || []).find((a) => a.path === rel)?.title ||
-    rel.split("/").pop().replace(/\.md$/, "") ||
-    "文章";
-  if (!confirm(`将「${title}」移回草稿箱？可继续编辑后再发布。`)) return;
+  const list = (Array.isArray(paths) ? paths : [paths]).filter(Boolean);
+  if (!list.length) return;
+  const titleOf = (rel) =>
+    publishedPreview?.path === rel
+      ? publishedPreview.title
+      : (state.archives || []).find((a) => a.path === rel)?.title ||
+        rel.split("/").pop().replace(/\.md$/, "") ||
+        "文章";
+  const msg =
+    list.length === 1
+      ? `将「${titleOf(list[0])}」移回草稿箱？可继续编辑后再发布。`
+      : `将选中的 ${list.length} 篇文章移回草稿箱？可继续编辑后再发布。`;
+  if (!confirm(msg)) return;
   sync();
   try {
     await persist();
-    const result = await api("to-draft", rel);
-    Object.assign(state, result);
-    $("#published-drawer")?.remove();
-    const id = result.restoredId;
-    current =
-      state.documents.find((d) => d.id === id) ||
-      state.documents.find((d) => sameAccount(d.account, account));
+    let lastId = null;
+    for (const rel of list) {
+      const result = await api("to-draft", rel);
+      Object.assign(state, result);
+      lastId = result.restoredId;
+      publishedSelection.delete(rel);
+    }
+    publishedPreview = null;
     dirty = false;
     pending = null;
-    page = current ? "write" : "dashboard";
+    if (list.length === 1) {
+      current =
+        state.documents.find((d) => d.id === lastId) ||
+        state.documents.find((d) => sameAccount(d.account, account));
+      page = current ? "write" : "dashboard";
+    } else {
+      page = "dashboard";
+      current =
+        state.documents.find((d) => sameAccount(d.account, account)) ||
+        current;
+    }
     render();
-    toast("已移回草稿");
+    toast(list.length === 1 ? "已移回草稿" : `已移回 ${list.length} 篇草稿`);
   } catch (e) {
     toast(e.message);
   }
@@ -2945,10 +3119,10 @@ function renderSettings() {
   const accountsBody = `<div class="settings-card-head accounts-toolbar"><h3>账号</h3><div class="settings-card-actions"><button type="button" id="register-account">${I.folder()} 选择文件夹</button><button type="button" class="primary" id="create-account">${I.plus()} 新建账号</button></div></div>${
     accountList().length
       ? `<div class="account-card-grid">${accountList()
-          .map(
-            (a) =>
-              `<div class="dashboard-card account-card"><div class="account-card-top"><button type="button" class="account-avatar-btn account-avatar-lg" data-set-avatar="${esc(a.id)}" title="${a.avatar ? "更换头像" : "添加头像"}" aria-label="为 ${esc(a.label)} ${a.avatar ? "更换头像" : "添加头像"}">${accountAvatarHtml(a, "lg")}</button><div class="account-card-info"><h3>${esc(a.label)}</h3></div></div><div class="account-stat-meta"><span>${a.drafts ?? 0} 草稿</span><span>${a.archives ?? 0} 归档</span><span>${a.files ?? 0} 文件</span><span>${formatBytes(a.bytes)}</span></div><button type="button" class="ghost account-card-remove" data-unregister-account="${esc(a.id)}">移除</button></div>`,
-          )
+          .map((a) => {
+            const backup = state.backupPaths?.[a.id] || "";
+            return `<div class="dashboard-card account-card"><div class="account-card-top"><button type="button" class="account-avatar-btn account-avatar-lg" data-set-avatar="${esc(a.id)}" title="${a.avatar ? "更换头像" : "添加头像"}" aria-label="为 ${esc(a.label)} ${a.avatar ? "更换头像" : "添加头像"}">${accountAvatarHtml(a, "lg")}</button><div class="account-card-info"><h3>${esc(a.label)}</h3></div></div><div class="account-stat-meta"><span>${a.drafts ?? 0} 草稿</span><span>${a.archives ?? 0} 归档</span><span>${a.files ?? 0} 文件</span><span>${formatBytes(a.bytes)}</span></div><label class="settings-path-field account-backup-field">本地备份路径<span class="settings-path-row"><input type="text" value="${esc(backup)}" placeholder="未设置，同步时可选择" readonly><button type="button" data-pick-backup="${esc(a.id)}">${I.folder()} 选择</button>${backup ? `<button type="button" class="ghost" data-clear-backup="${esc(a.id)}">清除</button>` : ""}</span></label><button type="button" class="ghost account-card-remove" data-unregister-account="${esc(a.id)}">移除</button></div>`;
+          })
           .join("")}</div>`
       : '<p class="muted">尚未添加账号。可选择仓库内已有文件夹，或新建账号。</p>'
   }`;
@@ -3055,6 +3229,45 @@ function renderSettings() {
     $$("[data-set-avatar]").forEach((b) => {
       b.onclick = () => pickAndSetAccountAvatar(b.dataset.setAvatar);
     });
+    $$("[data-pick-backup]").forEach((b) => {
+      b.onclick = () => pickAccountBackupPath(b.dataset.pickBackup);
+    });
+    $$("[data-clear-backup]").forEach((b) => {
+      b.onclick = async () => {
+        try {
+          applyAccountState(
+            await api("account-set-backup-path", {
+              id: b.dataset.clearBackup,
+              path: "",
+            }),
+          );
+          toast("已清除默认备份路径");
+        } catch (e) {
+          toast(e.message || "清除失败");
+        }
+      };
+    });
+  }
+}
+
+/**
+ * 为账号选择并保存本地备份默认目录。
+ * @param {string} accountId
+ */
+async function pickAccountBackupPath(accountId) {
+  if (isWeb()) return toast("选择备份路径仅支持桌面端");
+  if (!accountId) return toast("账号无效");
+  try {
+    const folder = await api("pick-backup-folder", {
+      defaultPath: state.backupPaths?.[accountId] || "",
+    });
+    if (!folder) return;
+    applyAccountState(
+      await api("account-set-backup-path", { id: accountId, path: folder }),
+    );
+    toast("默认备份路径已保存");
+  } catch (e) {
+    toast(e.message || "设置失败");
   }
 }
 

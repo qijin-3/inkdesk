@@ -21,6 +21,8 @@ const defaults = {
   model: "",
   followers: {},
   metricDeltas: {},
+  /** 各账号已发布文章的本地备份默认目录 */
+  backupPaths: {},
   wechat: {
     appId: "",
     appSecret: "",
@@ -69,6 +71,7 @@ const API_CHANNELS = [
   "import-notes-preview",
   "import-notes-apply",
   "published-read",
+  "published-backup",
   "vault-reveal",
   "vault-open",
   "draft-delete",
@@ -85,6 +88,7 @@ const API_CHANNELS = [
   "account-unregister",
   "account-folder-candidates",
   "account-set-avatar",
+  "account-set-backup-path",
 ];
 
 /**
@@ -130,6 +134,10 @@ class DeskCore {
         metricDeltas: {
           ...defaults.metricDeltas,
           ...(loaded.metricDeltas || {}),
+        },
+        backupPaths: {
+          ...defaults.backupPaths,
+          ...(loaded.backupPaths || {}),
         },
         wechat: {
           ...defaults.wechat,
@@ -230,6 +238,7 @@ class DeskCore {
       ...this.store,
       followers: this.store.followers || {},
       metricDeltas: this.store.metricDeltas || {},
+      backupPaths: this.store.backupPaths || {},
       wechat: {
         appId: this.store.wechat?.appId || "",
         appSecret: this.store.wechat?.appSecret || "",
@@ -258,6 +267,7 @@ class DeskCore {
       model: this.store.model,
       followers: this.store.followers || { AI: null, Dev: null },
       metricDeltas: this.store.metricDeltas || { AI: null, Dev: null },
+      backupPaths: this.store.backupPaths || {},
       wechat: {
         appId: this.store.wechat?.appId || "",
         appSecret: this.store.wechat?.appSecret || "",
@@ -352,6 +362,10 @@ class DeskCore {
         this.reload();
         return this.publicState();
       }
+      case "account-set-backup-path":
+        return this.setAccountBackupPath(data?.id, data?.path);
+      case "published-backup":
+        return this.backupPublished(data?.rel || data, data?.destDir);
       case "source":
       case "scan":
         return { root: this.vault.root, files: scan(this.vault.root) };
@@ -654,6 +668,50 @@ class DeskCore {
     within(this.vault.root, this.vault.p(rel));
     const { body } = split(fs.readFileSync(this.vault.p(rel), "utf8"));
     return this.vault.display(body, rel);
+  }
+
+  /**
+   * 设置或清除账号的本地备份默认目录。
+   * @param {string} id
+   * @param {string} [dirPath] 空则清除
+   */
+  setAccountBackupPath(id, dirPath) {
+    const accountId = this.vault.resolveAccountId(id);
+    if (!this.store.backupPaths) this.store.backupPaths = {};
+    if (!dirPath) {
+      delete this.store.backupPaths[accountId];
+    } else {
+      if (typeof dirPath !== "string") throw Error("请选择有效的文件夹");
+      if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory())
+        throw Error("请选择有效的文件夹");
+      this.store.backupPaths[accountId] = fs.realpathSync(dirPath);
+    }
+    this.save();
+    return this.publicState();
+  }
+
+  /**
+   * 将已发布文章 Markdown 复制到本地目录（覆盖同名文件）。
+   * @param {string} rel vault 相对路径
+   * @param {string} destDir 目标文件夹绝对路径
+   */
+  backupPublished(rel, destDir) {
+    if (
+      typeof rel !== "string" ||
+      !rel.includes("/03_Archive/") ||
+      !rel.endsWith(".md")
+    )
+      throw Error("不是已发布文章");
+    if (typeof destDir !== "string" || !destDir.trim())
+      throw Error("请选择备份目录");
+    if (!fs.existsSync(destDir) || !fs.statSync(destDir).isDirectory())
+      throw Error("备份目录不存在");
+    const from = within(this.vault.root, this.vault.p(rel));
+    if (!fs.existsSync(from)) throw Error("文件不存在");
+    const name = path.basename(rel);
+    const dest = path.join(fs.realpathSync(destDir), name);
+    fs.copyFileSync(from, dest);
+    return { path: dest, name };
   }
 
   /**

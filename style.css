@@ -241,6 +241,25 @@ p {
   color: #999;
   font-size: 12px;
 }
+.account-backup-field {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+.account-backup-field .settings-path-row {
+  margin-top: 6px;
+}
+.backup-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 4px;
+  color: #555555;
+  font-size: 12px;
+}
+.backup-remember input {
+  width: auto;
+  margin: 0;
+}
 .settings-tabs {
   display: inline-flex;
   flex-direction: row;
@@ -1193,6 +1212,42 @@ header .byline {
 }
 .performance-head {
   margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+}
+.published-bulk {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-right: auto;
+}
+.published-bulk[hidden] {
+  display: none;
+}
+.published-bulk-count {
+  font-size: 12px;
+  color: #666666;
+  margin-right: 4px;
+}
+.published-bulk button {
+  font-size: 12px;
+  padding: 6px 10px;
+}
+.published-table .published-check {
+  width: 36px;
+  text-align: center;
+  vertical-align: middle;
+}
+.published-table .published-check input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: #111111;
+  cursor: pointer;
+}
+.published-table tr.is-selected td {
+  background: #f5f5f5;
 }
 .import-dialog .match-row {
   margin: 14px 0 18px;
