@@ -462,7 +462,7 @@ button.icon-btn .lucide {
 .conversation-bar button,
 .selection-bar button,
 .assistant-head-actions > button,
-.preview-actions button,
+.preview-toolbar button,
 .dashboard-card button,
 button.primary,
 button.secondary {
@@ -526,6 +526,10 @@ header .byline {
 .tiptap p {
   color: inherit;
   margin: 0 0 20px;
+}
+.tiptap h1,
+.tiptap h2 {
+  white-space: pre-wrap;
 }
 .tiptap h2 {
   font-size: 22px;
@@ -1980,25 +1984,109 @@ pre {
   padding: 0 14px 24px;
   scrollbar-width: thin;
 }
-.preview-actions {
-  padding: 0 16px 8px;
+/* 预览顶栏：复用 formatbar 布局 + 公众号/小红书子分栏 */
+.formatbar.preview-toolbar {
+  gap: 8px;
+  flex-wrap: wrap;
 }
-.preview-actions .wide {
-  margin: 6px 0;
-}
-.preview-actions .notice {
-  margin: 8px 0 4px;
-}
-.social-size-label {
-  font-size: 11px;
-  color: #666666;
-  display: flex;
+.preview-tabs {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
+  padding: 2px;
+  background: #ececec;
+  border-radius: 8px;
+  margin-right: 4px;
 }
-.social-size-label select {
+.preview-tabs button {
+  border: 0 !important;
+  background: transparent !important;
+  border-radius: 6px !important;
+  padding: 6px 14px !important;
+  font-size: 12px;
+  color: #666;
+}
+.preview-tabs button:hover {
+  background: #e2e2e2 !important;
+  color: #222;
+}
+.preview-tabs button.active {
+  background: #fff !important;
+  color: #111;
+  box-shadow: 0 1px 2px #00000014;
+  font-weight: 600;
+}
+.formatbar.preview-toolbar > button {
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.formatbar.preview-toolbar > button:hover {
+  background: #f3f3f3;
+}
+.formatbar.preview-toolbar > button.primary {
+  background: #111111;
+  color: #fff;
+  border-color: #111111;
+}
+.formatbar.preview-toolbar > button.primary:hover {
+  background: #000;
+}
+.formatbar.preview-toolbar > button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.preview-toolbar-status {
   font-size: 11px;
-  padding: 4px 6px;
+  color: #888;
+  white-space: nowrap;
+}
+.preview-pane-social {
+  padding: 8px 28px 40px;
+  background: #e8e8e8;
+  min-height: 60vh;
+}
+.social-pane-hint {
+  margin: 8px 0 14px;
+  font-size: 11px;
+  color: #888;
+}
+#social-pages {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+#social-pages figure.social-page {
+  margin: 0;
+  min-width: 0;
+  background: #fff;
+  cursor: zoom-in;
+  outline: none;
+  border-radius: 4px;
+  overflow: hidden;
+}
+#social-pages figure.social-page:hover {
+  box-shadow: 0 0 0 2px #0f3ff7;
+}
+#social-pages figure.social-page:focus-visible {
+  box-shadow: 0 0 0 2px #0f3ff7;
+}
+#social-pages canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  box-shadow: none;
+  pointer-events: none;
+}
+#social-pages figcaption {
+  text-align: center;
+  padding: 8px;
+  color: #666;
+  font-size: 11px;
+  background: #fff;
 }
 .wechat-preview {
   --wechat-blue: #0f3ff7;
@@ -2174,29 +2262,146 @@ pre {
 .wechat-preview #article-preview img {
   max-width: 100%;
   height: auto;
+  box-sizing: border-box;
+  border: 2px solid var(--wechat-blue);
+  display: block;
+  margin: 0 0 24px;
 }
-#social-pages {
+/* 仅含配图的段落：下边距交给图片，避免叠加倍增 */
+.wechat-preview #article-preview p:has(> img:only-child) {
+  margin-bottom: 0;
+}
+/* 小红书分页灯箱：默认适应屏幕，底部悬浮工具栏 */
+.social-lightbox {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  background: #d8d8d8;
-  padding: 14px;
-  border-radius: 12px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: #000000cc;
+  z-index: 30;
 }
-#social-pages figure {
-  margin: 0;
-  min-width: 0;
-  background: #fff;
+.social-lightbox.is-fit {
+  overflow: hidden;
 }
-#social-pages canvas {
+.social-lightbox.is-full {
+  overflow: auto;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+.social-lightbox-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
   width: 100%;
-  height: auto;
-  display: block;
-  box-shadow: 0 10px 28px #00000014;
+  padding: 24px 56px 88px;
+  box-sizing: border-box;
 }
-#social-pages figcaption {
+.social-lightbox.is-full .social-lightbox-stage {
+  min-width: 100%;
+  min-height: 100%;
+  padding: 40px 56px 100px;
+  width: max-content;
+  margin: auto;
+}
+.social-lightbox-body {
+  line-height: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 16px 48px #00000066;
+  background: #111;
+}
+.social-lightbox-body img {
+  display: block;
+  user-select: none;
+}
+.social-lightbox.is-fit .social-lightbox-body img {
+  width: auto;
+  height: auto;
+  max-width: min(100vw - 120px, 100%);
+  max-height: calc(100vh - 120px);
+  cursor: zoom-in;
+}
+.social-lightbox.is-full .social-lightbox-body img {
+  max-width: none;
+  max-height: none;
+  cursor: zoom-out;
+}
+.social-lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: #ffffff22;
+  color: #fff;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0 2px;
+}
+.social-lightbox-nav:hover:not(:disabled) {
+  background: #ffffff44;
+}
+.social-lightbox-nav:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.social-lightbox-nav[data-prev] {
+  left: 12px;
+}
+.social-lightbox-nav[data-next] {
+  right: 12px;
+}
+.social-lightbox-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: #1a1a1ae6;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 32px #00000055;
+  color: #eee;
+  font-size: 12px;
+}
+.social-lightbox-bar button {
+  border: 0;
+  background: transparent;
+  color: #eee;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.social-lightbox-bar button:hover:not(:disabled) {
+  background: #ffffff22;
+}
+.social-lightbox-bar button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.social-lightbox-bar button[data-close] {
+  margin-left: 4px;
+}
+.social-lightbox-count {
+  min-width: 52px;
   text-align: center;
-  padding: 8px;
-  color: #666;
-  font-size: 11px;
+  color: #ccc;
+  font-variant-numeric: tabular-nums;
+  padding: 0 4px;
 }

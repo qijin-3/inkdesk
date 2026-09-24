@@ -95,6 +95,49 @@ var SANS = '"OPPO Sans 4.0", "PingFang SC", "Helvetica Neue", sans-serif';
 var DESIGN_W = 768;
 var CANVAS_W = 1200;
 var SCALE = CANVAS_W / DESIGN_W;
+var T = {
+  padX: 40,
+  padY: 40,
+  /** 正文 24 / 行高 1.7 / 段后 20 / 字距 0.5 */
+  body: 24,
+  bodyLine: 24 * 1.7,
+  bodyAfter: 20,
+  bodyTracking: 0.5,
+  /** 一级标题 64 / 行高 72 / 序号 96 / 色块 112 */
+  h1: 64,
+  h1Line: 72,
+  h1Num: 96,
+  h1Badge: 112,
+  h1Gap: 16,
+  h1Tracking: 1.5,
+  h1MarginTop: 48,
+  h1MarginTopAtPageStart: 8,
+  h1MarginBottom: 24,
+  /** 二级标题 36 / 行高 1.25 / 字距 1 */
+  h2: 36,
+  h2Line: 36 * 1.25,
+  h2PadX: 12,
+  h2PadY: 10,
+  h2Tracking: 1,
+  h2MarginTop: 20,
+  h2MarginBottom: 16,
+  h3: 28,
+  h3Line: 28 * 1.35,
+  h3MarginTop: 24,
+  h3MarginBottom: 14,
+  h3Tracking: 0.8,
+  quote: 24,
+  quoteLine: 24 * 1.7,
+  quoteMark: 36,
+  quotePad: 12,
+  quoteGap: 10,
+  quoteMarkW: 28,
+  quoteMargin: 24,
+  continueY: 56
+};
+function S(n) {
+  return n * SCALE;
+}
 function splitTitle(raw) {
   const text = String(raw || "").replace(/\s+/g, " ").trim();
   const m = text.match(
@@ -102,6 +145,55 @@ function splitTitle(raw) {
   );
   if (!m) return { zh: text, en: "" };
   return { zh: m[1].trim(), en: m[2].trim() };
+}
+function wrapLines(ctx, text, maxW, tracking = 0) {
+  const lines = [];
+  for (const para of String(text || "").split(/\n/)) {
+    let line = "";
+    let lineW = 0;
+    for (const ch of Array.from(para)) {
+      const w = ctx.measureText(ch).width + (line ? tracking : 0);
+      if (line && lineW + w > maxW) {
+        lines.push(line);
+        line = ch;
+        lineW = ctx.measureText(ch).width;
+      } else {
+        line += ch;
+        lineW += w;
+      }
+    }
+    if (line || !para) lines.push(line);
+  }
+  return lines.length ? lines : [""];
+}
+function fillTracked(ctx, text, x, y, tracking = 0) {
+  let cx = x;
+  for (const ch of Array.from(text)) {
+    ctx.fillText(ch, cx, y);
+    cx += ctx.measureText(ch).width + tracking;
+  }
+  return cx;
+}
+function measureTracked(ctx, text, tracking = 0) {
+  const chars = Array.from(text);
+  if (!chars.length) return 0;
+  let w = 0;
+  for (const ch of chars) w += ctx.measureText(ch).width;
+  return w + Math.max(0, chars.length - 1) * tracking;
+}
+function blockPlainText(node) {
+  let out = "";
+  function walk(n) {
+    if (n.nodeType === 3) out += n.textContent;
+    else if (n.nodeName === "BR") out += "\n";
+    else if (n.childNodes?.length)
+      for (const c of n.childNodes) walk(c);
+  }
+  walk(node);
+  return out.replace(/[ \t]*\n[ \t]*/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+function headingSoftLines(raw) {
+  return String(raw || "").split("\n").map((l) => l.replace(/[ \t]+/g, " ").trim()).filter(Boolean);
 }
 function collectRuns(node, bold = false) {
   const runs = [];
@@ -115,48 +207,39 @@ function collectRuns(node, bold = false) {
   walk(node, bold);
   return runs;
 }
-async function socialPages(html2, title, size = 36) {
+async function socialPages(html2, _title) {
   await document.fonts.ready;
   const root2 = new DOMParser().parseFromString(html2, "text/html").body;
   const pages = [];
   let ctx;
   let y;
+  let h1Index = 0;
   const W = CANVAS_W;
   const H = Math.round(1024 * SCALE);
-  const pad = Math.round(40 * SCALE);
+  const pad = S(T.padX);
   const contentW = W - pad * 2;
-  const bottom = H - pad;
-  const bodySize = size;
-  const h1Size = Math.round(bodySize * (60 / 24));
-  const h1Line = Math.round(bodySize * (72 / 24));
-  const numSize = Math.round(96 * SCALE);
-  const badge = Math.round(112 * SCALE);
-  const h2Size = Math.round(bodySize * (36 / 24));
-  const h2BarH = Math.round(bodySize * (56 / 24));
-  const quoteMarkSize = Math.round(bodySize * (36 / 24));
-  const bodyLine = bodySize * 1.7;
-  const continueY = Math.round(180 * SCALE);
+  const bottom = H - S(T.padY);
+  const bodySize = S(T.body);
+  const bodyLine = S(T.bodyLine);
+  const bodyTracking = S(T.bodyTracking);
+  const h1Size = S(T.h1);
+  const h1Line = S(T.h1Line);
+  const h1Tracking = S(T.h1Tracking);
+  const numSize = S(T.h1Num);
+  const badge = S(T.h1Badge);
+  const h1Gap = S(T.h1Gap);
+  const h2Size = S(T.h2);
+  const h2Line = S(T.h2Line);
+  const h2Tracking = S(T.h2Tracking);
+  const quoteMarkSize = S(T.quoteMark);
+  const continueY = S(T.continueY);
   function font(family, weight, px) {
     ctx.font = `${weight} ${px}px ${family}`;
-  }
-  function drawPageNumber() {
-    const i = pages.length;
-    const num = String(i).padStart(2, "0");
-    const bgX = Math.round(607 * SCALE);
-    const bgY = Math.round(67 * SCALE);
-    const numX = Math.round(619 * SCALE);
-    const numY = Math.round(52 * SCALE);
-    ctx.fillStyle = BLUE_SOFT;
-    ctx.fillRect(bgX, bgY, badge, badge);
-    font(SERIF, 800, numSize);
-    ctx.fillStyle = BLUE;
-    ctx.textBaseline = "top";
-    ctx.fillText(num, numX, numY);
   }
   function page2() {
     if (pages.length >= 17)
       throw Error(
-        "\u5185\u5BB9\u8D85\u8FC7 17 \u5F20\uFF0C\u8BF7\u7F29\u5C0F\u5B57\u53F7\u6216\u7CBE\u7B80\u6B63\u6587\u540E\u91CD\u8BD5\u3002\u672A\u5BFC\u51FA\u622A\u65AD\u5185\u5BB9\u3002"
+        "\u5185\u5BB9\u8D85\u8FC7 17 \u5F20\uFF0C\u8BF7\u7CBE\u7B80\u6B63\u6587\u540E\u91CD\u8BD5\u3002\u672A\u5BFC\u51FA\u622A\u65AD\u5185\u5BB9\u3002"
       );
     const canvas = document.createElement("canvas");
     canvas.width = W;
@@ -166,7 +249,6 @@ async function socialPages(html2, title, size = 36) {
     ctx.fillRect(0, 0, W, H);
     ctx.textBaseline = "top";
     pages.push(canvas);
-    drawPageNumber();
     y = pad;
   }
   function ensure(need) {
@@ -175,91 +257,101 @@ async function socialPages(html2, title, size = 36) {
       y = continueY;
     }
   }
-  function drawH1(raw) {
-    const { zh, en } = splitTitle(raw);
-    const lines = en ? [zh, en] : [zh];
-    const blockH = lines.length * h1Line + Math.round(24 * SCALE);
-    ensure(blockH);
+  function drawH1(rawOrNode) {
+    const raw = typeof rawOrNode === "string" ? rawOrNode : blockPlainText(
+      /** @type {Node} */
+      rawOrNode
+    );
+    const soft = headingSoftLines(raw);
+    let seed;
+    if (soft.length > 1) seed = soft;
+    else {
+      const { zh, en } = splitTitle(soft[0] || "");
+      seed = en ? [zh, en] : [zh];
+    }
+    const num = String(++h1Index).padStart(2, "0");
+    const textW = contentW - badge - h1Gap;
     font(SERIF, 800, h1Size);
+    const lines = seed.flatMap(
+      (para) => wrapLines(ctx, para, textW, h1Tracking)
+    );
+    const textH = Math.max(badge, lines.length * h1Line);
+    const startTop = S(T.h1MarginTopAtPageStart);
+    const midTop = S(T.h1MarginTop);
+    const after = S(T.h1MarginBottom);
+    if (y > continueY + 1 && y + midTop + textH + after > bottom) {
+      page2();
+      y = continueY;
+    }
+    const top = y <= continueY + 1 ? startTop : midTop;
+    ensure(top + textH + after);
+    y += y <= continueY + 1 ? startTop : top;
+    let ty = y + textH - lines.length * h1Line;
     ctx.fillStyle = BLUE;
+    font(SERIF, 800, h1Size);
     for (const line of lines) {
-      let x = pad;
-      for (const ch of Array.from(line)) {
-        const w = ctx.measureText(ch).width;
-        if (x + w > pad + contentW - badge) {
-          x = pad;
-          y += h1Line;
-          ensure(h1Line);
-          font(SERIF, 800, h1Size);
-          ctx.fillStyle = BLUE;
-        }
-        ctx.fillText(ch, x, y);
-        x += w;
-      }
-      y += h1Line;
+      fillTracked(ctx, line, pad, ty, h1Tracking);
+      ty += h1Line;
     }
-    y += Math.round(24 * SCALE);
+    const bx = pad + contentW - badge;
+    const by = y + textH - badge;
+    ctx.fillStyle = BLUE_SOFT;
+    ctx.fillRect(bx, by, badge, badge);
+    font(SERIF, 800, numSize);
+    ctx.fillStyle = BLUE;
+    const nw = ctx.measureText(num).width;
+    ctx.fillText(num, bx + (badge - nw) / 2, by + (badge - numSize) / 2);
+    y += textH + after;
   }
-  function drawH2(raw) {
-    const text = String(raw || "").trim();
-    if (!text) return;
+  function drawH2(rawOrNode) {
+    const raw = typeof rawOrNode === "string" ? rawOrNode : blockPlainText(
+      /** @type {Node} */
+      rawOrNode
+    );
+    const soft = headingSoftLines(raw);
+    if (!soft.length) return;
+    const padX = S(T.h2PadX);
+    const padY = S(T.h2PadY);
     font(SERIF, 800, h2Size);
-    const padX = Math.round(8 * SCALE);
-    const padY = Math.round(10 * SCALE);
-    const maxTextW = contentW - padX * 2;
-    const lines = [];
-    let line = "";
-    let lineW = 0;
-    for (const ch of Array.from(text)) {
-      const w = ctx.measureText(ch).width;
-      if (lineW + w > maxTextW && line) {
-        lines.push(line);
-        line = ch;
-        lineW = w;
-      } else {
-        line += ch;
-        lineW += w;
-      }
-    }
-    if (line) lines.push(line);
-    const textBlockH = lines.length * h2Size * 1.2;
-    const barH = Math.max(h2BarH, textBlockH + padY * 2);
-    const longest = Math.max(
-      ...lines.map(
-        (l) => Array.from(l).reduce((s, ch) => s + ctx.measureText(ch).width, 0)
+    const maxInner = contentW - padX * 2;
+    const lines = soft.flatMap(
+      (para) => wrapLines(ctx, para, maxInner, h2Tracking)
+    );
+    const innerW = Math.min(
+      maxInner,
+      Math.ceil(
+        Math.max(...lines.map((l) => measureTracked(ctx, l, h2Tracking)), 1)
       )
     );
-    const barW = Math.min(contentW, longest + padX * 2);
-    ensure(barH + Math.round(28 * SCALE));
-    y += Math.round(12 * SCALE);
+    const barW = Math.min(contentW, innerW + padX * 2);
+    const barH = lines.length * h2Line + padY * 2;
+    ensure(S(T.h2MarginTop) + barH + S(T.h2MarginBottom));
+    y += S(T.h2MarginTop);
     ctx.fillStyle = BLUE;
     ctx.fillRect(pad, y, barW, barH);
     ctx.fillStyle = WHITE;
     font(SERIF, 800, h2Size);
-    let ty = y + (barH - textBlockH) / 2;
+    let ty = y + padY;
     for (const l of lines) {
-      let x = pad + padX;
-      for (const ch of Array.from(l)) {
-        ctx.fillText(ch, x, ty);
-        x += ctx.measureText(ch).width;
-      }
-      ty += h2Size * 1.2;
+      fillTracked(ctx, l, pad + padX, ty, h2Tracking);
+      ty += h2Line;
     }
-    y += barH + Math.round(18 * SCALE);
+    y += barH + S(T.h2MarginBottom);
   }
   function drawText(runs, opt = {}) {
     const n = opt.size ?? bodySize;
-    const line = opt.line ?? n * 1.7;
+    const line = opt.line ?? bodyLine;
     const family = opt.family ?? SANS;
     const color = opt.color ?? BLACK;
     const baseWeight = opt.weight ?? 400;
+    const tracking = opt.tracking ?? bodyTracking;
     let x = pad;
     ensure(line);
     for (const run3 of runs) {
       for (const ch of Array.from(run3.text)) {
         const weight = run3.bold ? 600 : baseWeight;
         font(family, weight, n);
-        const width = ctx.measureText(ch).width;
+        const width = ctx.measureText(ch).width + tracking;
         if (ch === "\n" || x + width > pad + contentW) {
           x = pad;
           y += line;
@@ -272,51 +364,39 @@ async function socialPages(html2, title, size = 36) {
         x += width;
       }
     }
-    y += line + (opt.after ?? Math.round(16 * SCALE));
+    y += line + (opt.after ?? S(T.bodyAfter));
   }
   function drawQuote(node) {
     const runs = collectRuns(node).filter((r) => r.text.trim() || r.text === "\n");
     if (!runs.some((r) => r.text.trim())) return;
-    const plain = runs.map((r) => r.text).join("");
-    font(SERIF, 800, bodySize);
-    const line = bodySize * 1.7;
-    const markW = Math.round(28 * SCALE);
-    const innerPad = Math.round(16 * SCALE);
-    const textMax = contentW - markW - innerPad * 2;
-    let lines = 1;
-    let x = 0;
-    for (const ch of Array.from(plain.replace(/\n+/g, " ").trim())) {
-      const w = ctx.measureText(ch).width;
-      if (x + w > textMax) {
-        lines++;
-        x = w;
-      } else x += w;
-    }
+    const plain = runs.map((r) => r.text).join("").replace(/\n+/g, " ").trim();
+    const qPad = S(T.quotePad);
+    const markW = S(T.quoteMarkW);
+    const gap = S(T.quoteGap);
+    const qSize = S(T.quote);
+    const qLine = S(T.quoteLine);
+    const textMax = contentW - qPad * 2 - markW - gap;
+    font(SERIF, 800, qSize);
+    const lines = wrapLines(ctx, plain, textMax, bodyTracking);
     const boxH = Math.max(
-      Math.round(96 * SCALE),
-      innerPad * 2 + quoteMarkSize * 0.3 + lines * line
+      quoteMarkSize + qPad * 2,
+      lines.length * qLine + qPad * 2
     );
-    ensure(boxH + Math.round(24 * SCALE));
-    y += Math.round(8 * SCALE);
+    ensure(S(T.quoteMargin) + boxH + S(T.quoteMargin));
+    y += S(T.quoteMargin);
     ctx.fillStyle = BLUE_SOFT;
     ctx.fillRect(pad, y, contentW, boxH);
-    font(SANS, 700, quoteMarkSize);
     ctx.fillStyle = BLUE;
-    ctx.fillText("\u201C", pad + Math.round(16 * SCALE), y + innerPad);
-    let tx = pad + markW + Math.round(8 * SCALE);
-    let ty = y + innerPad + Math.round(4 * SCALE);
-    font(SERIF, 800, bodySize);
-    for (const ch of Array.from(plain.replace(/\n+/g, " ").trim())) {
-      const w = ctx.measureText(ch).width;
-      if (tx + w > pad + contentW - innerPad) {
-        tx = pad + markW + Math.round(8 * SCALE);
-        ty += line;
-      }
-      ctx.fillStyle = BLUE;
-      ctx.fillText(ch, tx, ty);
-      tx += w;
+    font(SERIF, 800, quoteMarkSize);
+    ctx.fillText("\u201C", pad + qPad, y + qPad);
+    font(SERIF, 800, qSize);
+    let ty = y + qPad + S(4);
+    const tx0 = pad + qPad + markW + gap;
+    for (const line of lines) {
+      fillTracked(ctx, line, tx0, ty, bodyTracking);
+      ty += qLine;
     }
-    y += boxH + Math.round(20 * SCALE);
+    y += boxH + S(T.quoteMargin);
   }
   async function picture(src) {
     if (!src) return;
@@ -341,20 +421,31 @@ async function socialPages(html2, title, size = 36) {
       ]);
       const scale = Math.min(
         contentW / img.naturalWidth,
-        Math.round(620 * SCALE) / img.naturalHeight
+        S(620) / img.naturalHeight
       );
       const w = img.naturalWidth * scale;
       const h2 = img.naturalHeight * scale;
-      ensure(h2 + 26);
-      ctx.drawImage(img, pad + (contentW - w) / 2, y, w, h2);
-      y += h2 + 26;
+      const border = S(2);
+      const after = S(24);
+      ensure(h2 + after);
+      const x = pad + (contentW - w) / 2;
+      ctx.drawImage(img, x, y, w, h2);
+      ctx.strokeStyle = BLUE;
+      ctx.lineWidth = border;
+      ctx.strokeRect(
+        x + border / 2,
+        y + border / 2,
+        w - border,
+        h2 - border
+      );
+      y += h2 + after;
     } catch (e) {
       const msg = "\uFF3B\u56FE\u7247\u672A\u52A0\u8F7D\uFF3D";
-      font(SANS, 400, Math.round(14 * SCALE));
-      ensure(Math.round(40 * SCALE));
+      font(SANS, 400, S(14));
+      ensure(S(40));
       ctx.fillStyle = "#999";
-      ctx.fillText(msg, pad, y + Math.round(20 * SCALE));
-      y += Math.round(40 * SCALE);
+      ctx.fillText(msg, pad, y + S(20));
+      y += S(40);
       console.warn("social picture:", src, e);
     } finally {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -382,39 +473,134 @@ async function socialPages(html2, title, size = 36) {
       return;
     }
     if (node.nodeName === "H1") {
-      drawH1(node.textContent);
+      drawH1(node);
       return;
     }
     if (node.nodeName === "H2") {
-      drawH2(node.textContent);
+      drawH2(node);
       return;
     }
     if (/^H[3-6]$/.test(node.nodeName)) {
       drawText(collectRuns(node), {
         family: SERIF,
         weight: 800,
-        size: Math.round(bodySize * 1.15),
+        size: S(T.h3),
+        line: S(T.h3Line),
+        tracking: S(T.h3Tracking),
         color: BLUE,
-        after: Math.round(14 * SCALE)
+        after: S(T.h3MarginBottom)
       });
       return;
     }
     const runs = collectRuns(node);
     if (!runs.some((r) => r.text.trim())) return;
     if (node.nodeName === "LI") runs.unshift({ text: "\u2022 ", bold: false });
-    drawText(runs, { line: bodyLine, after: Math.round(14 * SCALE) });
+    drawText(runs, { line: bodyLine, after: S(T.bodyAfter) });
   }
   page2();
-  if (title) {
-    y = Math.round(43 * SCALE);
-    drawH1(title);
-    y = Math.max(y, Math.round(200 * SCALE));
-  } else {
-    y = Math.round(200 * SCALE);
-  }
   for (const node of root2.childNodes) await block2(node);
   for (const c of pages) c.toDataURL("image/png");
   return pages;
+}
+function openSocialLightbox(canvases, startIndex) {
+  if (!canvases?.length) return;
+  document.getElementById("social-lightbox")?.remove();
+  let index = Math.max(0, Math.min(startIndex, canvases.length - 1));
+  let mode = "fit";
+  const total = canvases.length;
+  const modal = document.createElement("div");
+  modal.id = "social-lightbox";
+  modal.className = "modal social-lightbox is-fit";
+  modal.innerHTML = `<div class="social-lightbox-stage"><button type="button" class="social-lightbox-nav" data-prev aria-label="\u4E0A\u4E00\u9875">\u2039</button><div class="social-lightbox-body"><img alt="" draggable="false"></div><button type="button" class="social-lightbox-nav" data-next aria-label="\u4E0B\u4E00\u9875">\u203A</button></div><div class="social-lightbox-bar" role="toolbar" aria-label="\u9884\u89C8\u5DE5\u5177"><button type="button" data-prev>\u4E0A\u4E00\u9875</button><span class="social-lightbox-count"></span><button type="button" data-next>\u4E0B\u4E00\u9875</button><button type="button" data-zoom>\u5B8C\u6574\u5927\u5C0F</button><button type="button" data-close>\u5173\u95ED</button></div>`;
+  const img = modal.querySelector("img");
+  const countEl = modal.querySelector(".social-lightbox-count");
+  const zoomBtn = modal.querySelector("[data-zoom]");
+  const prevBtns = modal.querySelectorAll("[data-prev]");
+  const nextBtns = modal.querySelectorAll("[data-next]");
+  function render3() {
+    const canvas = canvases[index];
+    img.alt = `\u7B2C ${index + 1} \u9875`;
+    img.src = canvas.toDataURL("image/png");
+    img.width = canvas.width;
+    img.height = canvas.height;
+    countEl.textContent = `${index + 1} / ${total}`;
+    modal.classList.toggle("is-fit", mode === "fit");
+    modal.classList.toggle("is-full", mode === "full");
+    zoomBtn.textContent = mode === "fit" ? "\u5B8C\u6574\u5927\u5C0F" : "\u9002\u5E94\u5C4F\u5E55";
+    img.title = mode === "fit" ? "\u70B9\u51FB\u67E5\u770B\u5B8C\u6574\u5927\u5C0F" : "\u70B9\u51FB\u9002\u5E94\u5C4F\u5E55";
+    if (mode === "full") {
+      img.style.width = `${canvas.width}px`;
+      img.style.height = `${canvas.height}px`;
+    } else {
+      img.style.width = "";
+      img.style.height = "";
+    }
+    const atStart = index <= 0;
+    const atEnd = index >= total - 1;
+    prevBtns.forEach((b) => {
+      b.disabled = atStart;
+    });
+    nextBtns.forEach((b) => {
+      b.disabled = atEnd;
+    });
+    if (mode === "full")
+      requestAnimationFrame(() => {
+        modal.scrollTop = Math.max(0, (modal.scrollHeight - modal.clientHeight) / 2);
+        modal.scrollLeft = Math.max(0, (modal.scrollWidth - modal.clientWidth) / 2);
+      });
+  }
+  function close2() {
+    window.removeEventListener("keydown", onKey);
+    modal.remove();
+  }
+  function go(i) {
+    if (i < 0 || i >= total) return;
+    index = i;
+    render3();
+  }
+  function toggleZoom() {
+    mode = mode === "fit" ? "full" : "fit";
+    render3();
+  }
+  function onKey(e) {
+    if (e.key === "Escape") close2();
+    else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      go(index - 1);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      go(index + 1);
+    } else if (e.key === " " || e.key === "Enter") {
+      if (e.target === img || e.target === modal) {
+        e.preventDefault();
+        toggleZoom();
+      }
+    }
+  }
+  modal.addEventListener("click", (e) => {
+    const t = e.target;
+    if (!(t instanceof Element)) return;
+    if (t === modal || t.closest("[data-close]")) {
+      close2();
+      return;
+    }
+    if (t.closest("[data-prev]")) {
+      go(index - 1);
+      return;
+    }
+    if (t.closest("[data-next]")) {
+      go(index + 1);
+      return;
+    }
+    if (t.closest("[data-zoom]")) {
+      toggleZoom();
+      return;
+    }
+    if (t === img) toggleZoom();
+  });
+  window.addEventListener("keydown", onKey);
+  document.body.append(modal);
+  render3();
 }
 function bindSocialPreview(root2, { html: html2, title, api: api2, web }) {
   const q = (s) => root2.querySelector(s);
@@ -422,57 +608,75 @@ function bindSocialPreview(root2, { html: html2, title, api: api2, web }) {
   let generation = 0;
   async function draw() {
     const g = ++generation;
-    const exportBtn = q("#social-export");
+    const exportBtn2 = q("#social-export");
     const status = q("#social-status");
     const list2 = q("#social-pages");
-    exportBtn.disabled = true;
+    if (!exportBtn2 || !status || !list2) return;
+    exportBtn2.disabled = true;
     status.textContent = "\u6B63\u5728\u6392\u7248\u2026";
     list2.replaceChildren();
     try {
-      const next2 = await socialPages(html2, title, +q("#social-size").value);
+      const next2 = await socialPages(html2, title);
       if (g !== generation) return;
       pages = next2;
       for (const [i, c] of pages.entries()) {
+        let open = function(e) {
+          e.preventDefault();
+          openSocialLightbox(pages, i);
+        };
         const figure = document.createElement("figure");
+        figure.className = "social-page";
+        figure.title = "\u70B9\u51FB\u9884\u89C8";
+        figure.tabIndex = 0;
+        figure.setAttribute("role", "button");
+        figure.setAttribute("aria-label", `\u7B2C ${i + 1} \u9875\uFF0C\u70B9\u51FB\u9884\u89C8`);
         const label = document.createElement("figcaption");
         label.textContent = `${i + 1} / ${pages.length}`;
+        figure.addEventListener("click", open);
+        figure.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") open(e);
+        });
         figure.append(c, label);
         list2.append(figure);
       }
       status.textContent = `\u5171 ${pages.length} \u5F20`;
-      exportBtn.disabled = false;
+      exportBtn2.disabled = false;
     } catch (e) {
       if (g === generation) status.textContent = "\u6392\u7248\u5931\u8D25\uFF1A" + e.message;
     }
   }
-  q("#social-size").onchange = draw;
-  q("#social-export").onclick = async () => {
-    const b = q("#social-export");
-    b.disabled = true;
-    try {
-      const images = pages.map((c) => c.toDataURL("image/png"));
-      if (web) {
-        for (const [i, url] of images.entries()) {
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `${title.replace(/[\\/:*?"<>|]/g, "_")}-${String(i + 1).padStart(2, "0")}.png`;
-          a.click();
+  const exportBtn = q("#social-export");
+  if (exportBtn)
+    exportBtn.onclick = async () => {
+      const b = q("#social-export");
+      const status = q("#social-status");
+      if (!b || !status) return;
+      b.disabled = true;
+      try {
+        const images = pages.map((c) => c.toDataURL("image/png"));
+        if (web) {
+          for (const [i, url] of images.entries()) {
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${title.replace(/[\\/:*?"<>|]/g, "_")}-${String(i + 1).padStart(2, "0")}.png`;
+            a.click();
+          }
+          status.textContent = "\u5DF2\u63D0\u4EA4\u6D4F\u89C8\u5668\u4E0B\u8F7D\uFF0C\u8BF7\u5141\u8BB8\u4E0B\u8F7D\u591A\u4E2A\u6587\u4EF6";
+        } else {
+          const result = await api2("export-social", { title, images });
+          status.textContent = result ? `\u5DF2\u5BFC\u51FA ${images.length} \u5F20\u5230 ${result}` : "\u5DF2\u53D6\u6D88\u5BFC\u51FA";
         }
-        q("#social-status").textContent = "\u5DF2\u63D0\u4EA4\u6D4F\u89C8\u5668\u4E0B\u8F7D\uFF0C\u8BF7\u5141\u8BB8\u4E0B\u8F7D\u591A\u4E2A\u6587\u4EF6";
-      } else {
-        const result = await api2("export-social", { title, images });
-        q("#social-status").textContent = result ? `\u5DF2\u5BFC\u51FA ${images.length} \u5F20\u5230 ${result}` : "\u5DF2\u53D6\u6D88\u5BFC\u51FA";
+      } catch (e) {
+        status.textContent = e.message;
+      } finally {
+        b.disabled = false;
       }
-    } catch (e) {
-      q("#social-status").textContent = e.message;
-    } finally {
-      b.disabled = false;
-    }
-  };
+    };
   draw();
   return {
     destroy() {
       generation++;
+      document.getElementById("social-lightbox")?.remove();
     }
   };
 }
@@ -29673,6 +29877,7 @@ var editorHTML = "";
 var previewMode = false;
 var previewDocId = null;
 var socialPreviewCtl = null;
+var previewPane = "wechat";
 var assistantOpen = false;
 var railMode = "assistant";
 var outlinePinned = false;
@@ -29697,32 +29902,143 @@ td.addRule("images", {
   filter: "img",
   replacement: (_, node) => "![" + (node.alt || "\u56FE\u7247") + "](" + node.getAttribute("src") + ")"
 });
-function safeHTML(md) {
-  const d = new DOMParser().parseFromString(
-    marked.parse(md || ""),
-    "text/html"
-  );
+td.addRule("headingSoftBreak", {
+  filter: (node) => {
+    if (!/^H[1-6]$/.test(node.nodeName)) return false;
+    const brs = node.querySelectorAll?.("br");
+    if (!brs || !brs.length) return false;
+    for (let i = 0; i < brs.length; i++) {
+      const cls = brs[i].getAttribute?.("class") || "";
+      if (!cls.includes("ProseMirror-trailingBreak")) return true;
+    }
+    return false;
+  },
+  replacement: (_content, node) => {
+    const level = node.nodeName.charAt(1);
+    const clone = node.cloneNode(true);
+    const brs = clone.querySelectorAll("br");
+    for (let i = brs.length - 1; i >= 0; i--) {
+      const cls = brs[i].getAttribute?.("class") || "";
+      if (cls.includes("ProseMirror-trailingBreak"))
+        brs[i].parentNode?.removeChild(brs[i]);
+    }
+    if (!clone.querySelector("br")) {
+      const text = (clone.textContent || "").replace(/\s+/g, " ").trim();
+      return `
+
+${"#".repeat(+level)} ${text}
+
+`;
+    }
+    const els = clone.querySelectorAll("*");
+    for (let i = 0; i < els.length; i++) {
+      els[i].removeAttribute("class");
+      els[i].removeAttribute("style");
+      els[i].removeAttribute("id");
+      els[i].removeAttribute("draggable");
+    }
+    return `
+
+<h${level}>${clone.innerHTML}</h${level}>
+
+`;
+  }
+});
+function blockPlainText2(node) {
+  let out = "";
+  function walk(n) {
+    if (n.nodeType === 3) out += n.textContent;
+    else if (n.nodeName === "BR") {
+      const cls = n.getAttribute?.("class") || "";
+      if (!cls.includes("ProseMirror-trailingBreak")) out += "\n";
+    } else if (n.childNodes?.length)
+      for (const c of n.childNodes) walk(c);
+  }
+  walk(node);
+  return out.replace(/[ \t]*\n[ \t]*/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+function normalizeHeadingText(raw) {
+  return String(raw || "").split("\n").map((l) => l.replace(/[ \t]+/g, " ").trim()).filter(Boolean).join("\n");
+}
+function sanitizeRichHTML(html2) {
+  const d = new DOMParser().parseFromString(html2 || "", "text/html");
   d.querySelectorAll(
     "script,iframe,object,embed,style,link,form,input,button"
   ).forEach((n) => n.remove());
   d.body.querySelectorAll("*").forEach((n) => {
     [...n.attributes].forEach((a) => {
-      if (a.name.startsWith("on") || a.name === "style" || ["href", "src"].includes(a.name) && !/^(https?:|inkasset:|\/api\/asset\/|data:image\/|[^:]*$)/i.test(
+      if (a.name.startsWith("on") || a.name === "style" || ["href", "src"].includes(a.name) && !/^(https?:|inkasset:|\/api\/asset\/|data:image\/|blob:|[^:]*$)/i.test(
         a.value
       ))
         n.removeAttribute(a.name);
     });
   });
-  let html2 = d.body.innerHTML;
-  if (isWeb())
-    return html2.replace(
-      /inkasset:\/\/(vault|local)\/([^"'\s)]+)/g,
-      (_, kind, rel) => "/api/asset/" + kind + "/" + rel
-    );
-  return html2.replace(
-    /\/api\/asset\/(vault|local)\/([^"'\s)]+)/g,
-    (_, kind, rel) => "inkasset://" + kind + "/" + rel
+  d.querySelectorAll("img[src]").forEach((img) => {
+    const src = img.getAttribute("src") || "";
+    if (isWeb()) {
+      if (src.startsWith("inkasset://vault/"))
+        img.setAttribute(
+          "src",
+          "/api/asset/vault/" + src.slice("inkasset://vault/".length)
+        );
+      else if (src.startsWith("inkasset://local/"))
+        img.setAttribute(
+          "src",
+          "/api/asset/local/" + src.slice("inkasset://local/".length)
+        );
+    } else if (src.startsWith("/api/asset/vault/"))
+      img.setAttribute(
+        "src",
+        "inkasset://vault/" + src.slice("/api/asset/vault/".length)
+      );
+    else if (src.startsWith("/api/asset/local/"))
+      img.setAttribute(
+        "src",
+        "inkasset://local/" + src.slice("/api/asset/local/".length)
+      );
+  });
+  return d.body.innerHTML;
+}
+function splitWechatH1(h1) {
+  if (h1.querySelector(".h1-en, .h1-zh")) return;
+  const soft = normalizeHeadingText(blockPlainText2(h1)).split("\n");
+  if (!soft.length) return;
+  const doc3 = h1.ownerDocument;
+  const wrap2 = doc3.createElement("span");
+  wrap2.className = "h1-text";
+  function addLine(line, cls) {
+    const span = doc3.createElement("span");
+    span.className = cls;
+    if (cls === "h1-en") span.lang = "en";
+    span.textContent = line;
+    wrap2.append(span);
+  }
+  if (soft.length > 1) {
+    for (let i = 0; i < soft.length; i++) {
+      const line = soft[i];
+      const isEn = i === soft.length - 1 && /^[A-Za-z][A-Za-z0-9&/.,'’\- ]{0,60}$/.test(line);
+      addLine(line, isEn ? "h1-en" : "h1-zh");
+    }
+    h1.replaceChildren(wrap2);
+    return;
+  }
+  const text = soft[0];
+  const m = text.match(
+    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/
   );
+  if (!m) return;
+  addLine(m[1].trim(), "h1-zh");
+  addLine(m[2].trim(), "h1-en");
+  h1.replaceChildren(wrap2);
+}
+function safeHTML(md) {
+  return sanitizeRichHTML(
+    new DOMParser().parseFromString(marked.parse(md || ""), "text/html").body.innerHTML
+  );
+}
+function articleSourceHTML() {
+  if (current?.richHTML) return sanitizeRichHTML(current.richHTML);
+  return safeHTML(current?.body || "");
 }
 function sanitizeHtmlPreview(html2) {
   const d = new DOMParser().parseFromString(html2 || "", "text/html");
@@ -29914,8 +30230,10 @@ function newDoc() {
 }
 function sync() {
   if (editor && current && editor.getHTML() !== editorHTML) {
-    current.body = td.turndown(editor.getHTML());
-    editorHTML = editor.getHTML();
+    const html2 = editor.getHTML();
+    current.richHTML = html2;
+    current.body = td.turndown(html2);
+    editorHTML = html2;
   }
 }
 function render2() {
@@ -30064,26 +30382,6 @@ var WECHAT_BLUE_SOFT = "rgba(15, 63, 247, 0.2)";
 var WECHAT_SERIF = "'\u5BD2\u8749\u9526\u4E66\u5B8BCompact','Songti SC','STSong','\u534E\u6587\u5B8B\u4F53','\u5B8B\u4F53',SimSun,serif";
 var WECHAT_SERIF_PUBLISH = "Songti SC,STSong,\u534E\u6587\u5B8B\u4F53,\u5B8B\u4F53,SimSun,serif";
 var WECHAT_SANS = "'OPPO Sans 4.0','PingFang SC','Helvetica Neue',Arial,sans-serif";
-function splitWechatH1(h1) {
-  if (h1.querySelector(".h1-en")) return;
-  const text = h1.textContent.replace(/\s+/g, " ").trim();
-  const m = text.match(
-    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/
-  );
-  if (!m) return;
-  const doc3 = h1.ownerDocument;
-  const zh = doc3.createElement("span");
-  zh.className = "h1-zh";
-  zh.textContent = m[1].trim();
-  const en = doc3.createElement("span");
-  en.className = "h1-en";
-  en.lang = "en";
-  en.textContent = m[2].trim();
-  const wrap2 = doc3.createElement("span");
-  wrap2.className = "h1-text";
-  wrap2.append(zh, en);
-  h1.replaceChildren(wrap2);
-}
 var WECHAT_BLOCK_W = 360;
 var WECHAT_BLOCK_SCALE = 4;
 function wechatWrapLines(ctx, text, maxW) {
@@ -30112,12 +30410,7 @@ function wechatBlockCanvas(cssW, cssH) {
   return { c, ctx };
 }
 function renderWechatH1Png(raw, num) {
-  const text = String(raw || "").replace(/\s+/g, " ").trim();
-  const m = text.match(
-    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/
-  );
-  const zh = m ? m[1].trim() : text;
-  const en = m ? m[2].trim() : "";
+  const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
   const badge = 48;
   const gap = 10;
   const textW = WECHAT_BLOCK_W - badge - gap;
@@ -30125,23 +30418,29 @@ function renderWechatH1Png(raw, num) {
   const lineH = 44;
   const measure = wechatBlockCanvas(1, 1).ctx;
   measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  const zhLines = wechatWrapLines(measure, zh, textW);
-  const enLines = en ? wechatWrapLines(measure, en, textW) : [];
-  const textH = Math.max(
-    badge,
-    zhLines.length * lineH + enLines.length * lineH
-  );
+  let lines = [];
+  if (soft.length > 1) {
+    lines = soft.flatMap((para) => wechatWrapLines(measure, para, textW));
+  } else {
+    const one = soft[0] || "";
+    const m = one.match(
+      /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/
+    );
+    const zh = m ? m[1].trim() : one;
+    const en = m ? m[2].trim() : "";
+    lines = [
+      ...wechatWrapLines(measure, zh, textW),
+      ...en ? wechatWrapLines(measure, en, textW) : []
+    ];
+  }
+  const textH = Math.max(badge, lines.length * lineH);
   const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, textH);
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, WECHAT_BLOCK_W, textH);
   ctx.fillStyle = WECHAT_BLUE;
   ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  let y = textH - zhLines.length * lineH - enLines.length * lineH;
-  for (const line of zhLines) {
-    ctx.fillText(line, 0, y);
-    y += lineH;
-  }
-  for (const line of enLines) {
+  let y = textH - lines.length * lineH;
+  for (const line of lines) {
     ctx.fillText(line, 0, y);
     y += lineH;
   }
@@ -30157,7 +30456,7 @@ function renderWechatH1Png(raw, num) {
   return c.toDataURL("image/png");
 }
 function renderWechatH2Png(raw) {
-  const text = String(raw || "").replace(/\s+/g, " ").trim();
+  const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
   const padX = 10;
   const padY = 8;
   const fontSize = 20;
@@ -30165,13 +30464,15 @@ function renderWechatH2Png(raw) {
   const maxInner = WECHAT_BLOCK_W - padX * 2;
   const measure = wechatBlockCanvas(1, 1).ctx;
   measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  const lines = wechatWrapLines(measure, text, maxInner);
+  const lines = soft.flatMap(
+    (para) => wechatWrapLines(measure, para, maxInner)
+  );
   const innerW = Math.min(
     maxInner,
     Math.ceil(Math.max(...lines.map((l) => measure.measureText(l).width), 1))
   );
   const boxW = Math.min(WECHAT_BLOCK_W, innerW + padX * 2);
-  const boxH = lines.length * lineH + padY * 2;
+  const boxH = Math.max(lineH + padY * 2, lines.length * lineH + padY * 2);
   const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, boxH);
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
@@ -30294,7 +30595,7 @@ async function publishHTML(md, opts = {}) {
       replaceWithWechatBlockImage(
         d,
         h1,
-        renderWechatH1Png(h1.textContent, num),
+        renderWechatH1Png(blockPlainText2(h1), num),
         "\u4E00\u7EA7\u6807\u9898",
         "56px 0 20px"
       );
@@ -30303,7 +30604,7 @@ async function publishHTML(md, opts = {}) {
       replaceWithWechatBlockImage(
         d,
         h2,
-        renderWechatH2Png(h2.textContent),
+        renderWechatH2Png(blockPlainText2(h2)),
         "\u4E8C\u7EA7\u6807\u9898",
         "16px 0 14px"
       );
@@ -30377,6 +30678,14 @@ async function publishHTML(md, opts = {}) {
         'img[alt="\u4E00\u7EA7\u6807\u9898"], img[alt="\u4E8C\u7EA7\u6807\u9898"], img[alt="\u5F15\u7528"]'
       ))
         return;
+      if (tag2 === "p" && n.children.length === 1 && n.children[0].tagName === "IMG" && !["\u4E00\u7EA7\u6807\u9898", "\u4E8C\u7EA7\u6807\u9898", "\u5F15\u7528"].includes(
+        n.children[0].getAttribute("alt") || ""
+      )) {
+        const prev2 = n.getAttribute("style") || "";
+        const s = `margin:0;line-height:1.75;font-size:15px;color:#111;font-family:${WECHAT_SANS};font-weight:400;`;
+        n.setAttribute("style", prev2 ? `${prev2};${s}` : s);
+        return;
+      }
       const prev = n.getAttribute("style") || "";
       n.setAttribute("style", prev ? `${prev};${style2}` : style2);
     })
@@ -30427,10 +30736,17 @@ async function publishHTML(md, opts = {}) {
       )
     );
   }
+  d.querySelectorAll("img").forEach((img) => {
+    if (["\u4E00\u7EA7\u6807\u9898", "\u4E8C\u7EA7\u6807\u9898", "\u5F15\u7528"].includes(img.getAttribute("alt") || ""))
+      return;
+    const prev = img.getAttribute("style") || "";
+    const style2 = `max-width:100% !important;height:auto !important;box-sizing:border-box;border:2px solid ${WECHAT_BLUE};display:block;margin:0 0 24px;`;
+    img.setAttribute("style", prev ? `${prev};${style2}` : style2);
+  });
   return `<section style="font-family:${WECHAT_SANS};padding:8px;color:#111;max-width:768px;">${d.body.innerHTML}</section>`;
 }
 function socialSourceHTML() {
-  const html2 = editor ? editor.getHTML() : safeHTML(current.body);
+  const html2 = editor ? editor.getHTML() : articleSourceHTML();
   const d = new DOMParser().parseFromString(html2, "text/html");
   if (!isWeb())
     d.querySelectorAll("img").forEach((img) => {
@@ -30442,6 +30758,11 @@ function socialSourceHTML() {
 }
 function togglePreview() {
   sync();
+  if (editor && current) {
+    current.richHTML = editor.getHTML();
+    current.body = td.turndown(current.richHTML);
+    editorHTML = current.richHTML;
+  }
   previewMode = !previewMode;
   previewDocId = previewMode ? current.id : null;
   if (editor) {
@@ -30555,14 +30876,9 @@ function syncRailVisibility() {
   const resizer = $("#workspace-resizer");
   const draftWriting = page === "write" && !!current;
   if (!rail) return;
-  if (!draftWriting) {
+  if (!draftWriting || previewMode) {
     rail.classList.add("hidden");
     resizer?.classList.add("hidden");
-    return;
-  }
-  if (previewMode) {
-    rail.classList.remove("hidden");
-    resizer?.classList.remove("hidden");
     return;
   }
   rail.classList.toggle("hidden", !assistantOpen);
@@ -30612,27 +30928,14 @@ function renderAssistantRail() {
     socialPreviewCtl = null;
   }
   const draftWriting = page === "write" && !!current;
-  if (!draftWriting) {
+  if (!draftWriting || previewMode) {
     rail.innerHTML = "";
     rail.classList.remove("preview-mode");
+    delete rail.dataset.railMode;
     syncRailVisibility();
     return;
   }
-  const showPreviewRail = previewMode;
-  rail.classList.toggle("preview-mode", !!showPreviewRail);
-  if (showPreviewRail) {
-    rail.innerHTML = `<div class="assistant-head"><span>\u5C0F\u7EA2\u4E66\u5206\u9875</span><div class="assistant-head-actions"><label class="social-size-label">\u5B57\u53F7 <select id="social-size"><option value="36">\u6807\u51C6</option><option value="42">\u5927\u5B57</option><option value="30">\u7D27\u51D1</option></select></label></div></div><div class="preview-actions"><button id="social-export" class="primary wide" disabled>\u5BFC\u51FA\u56FE\u7247</button><button id="copy-publish" class="wide">\u590D\u5236\u6392\u7248\uFF08\u516C\u4F17\u53F7\uFF09</button><button id="push-wechat" class="wide">\u63A8\u9001\u5230\u8349\u7A3F\u7BB1</button><p id="social-status" class="notice">\u6B63\u5728\u6392\u7248\u2026</p></div><div id="panel" data-ready="1"><div id="social-pages"></div></div>`;
-    $("#copy-publish").onclick = () => copyPublish(current);
-    $("#push-wechat").onclick = () => pushWechatDraft(current);
-    socialPreviewCtl = bindSocialPreview(rail, {
-      html: socialSourceHTML(),
-      title: current.title,
-      api,
-      web: isWeb()
-    });
-    syncRailVisibility();
-    return;
-  }
+  rail.classList.remove("preview-mode");
   if (!assistantOpen) {
     rail.innerHTML = "";
     delete rail.dataset.railMode;
@@ -30801,13 +31104,42 @@ function bindArticleMaterialsPanel() {
   }
   draw();
 }
+function setPreviewPane(pane) {
+  previewPane = pane === "social" ? "social" : "wechat";
+  const wrap2 = $(".paper-wrap");
+  if (!wrap2) return;
+  wrap2.querySelectorAll("[data-preview-pane]").forEach((btn) => {
+    const on = btn.dataset.previewPane === previewPane;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  wrap2.querySelectorAll("[data-pane]").forEach((el) => {
+    el.hidden = el.dataset.pane !== previewPane;
+  });
+  const exportBtn = $("#social-export");
+  const status = $("#social-status");
+  if (exportBtn) exportBtn.hidden = previewPane !== "social";
+  if (status) status.hidden = previewPane !== "social";
+}
 function renderPreview() {
   previewDocId = current.id;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${safeHTML(current.body)}</div></article></section></div>`;
+  if (previewPane !== "social") previewPane = "wechat";
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span></div></div><div class="header-actions"><span id="saved">\u5DF2\u4FDD\u5B58\u5230\u672C\u5730</span><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="history">\u7248\u672C</button><button id="save-version">\u4FDD\u5B58\u7248\u672C</button><button id="finalize" class="primary">\u5B9A\u7A3F</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><button type="button" id="social-export" class="primary" disabled ${previewPane !== "social" ? "hidden" : ""}>${I.upload()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">\u590D\u5236\u6392\u7248\uFF08\u516C\u4F17\u53F7\uFF09</button><button type="button" id="push-wechat">\u63A8\u9001\u5230\u8349\u7A3F\u7BB1</button><span></span><span id="social-status" class="preview-toolbar-status" ${previewPane !== "social" ? "hidden" : ""}>\u6B63\u5728\u6392\u7248\u2026</span></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p class="social-pane-hint">\u70B9\u51FB\u5206\u9875\u9884\u89C8\uFF0C\u5DE6\u53F3\u952E\u53EF\u7FFB\u9875</p><div id="social-pages"></div></div></section></div>`;
   bindArticleHeader();
   bindFinalize();
   enhanceWechatPreview();
+  $$("[data-preview-pane]").forEach((btn) => {
+    btn.onclick = () => setPreviewPane(btn.dataset.previewPane);
+  });
+  $("#copy-publish").onclick = () => copyPublish(current);
+  $("#push-wechat").onclick = () => pushWechatDraft(current);
   renderAssistantRail();
+  socialPreviewCtl = bindSocialPreview($(".paper-wrap") || document, {
+    html: socialSourceHTML(),
+    title: current.title,
+    api,
+    web: isWeb()
+  });
 }
 function renderWrite() {
   if (!current) {
@@ -30827,7 +31159,7 @@ function renderWrite() {
   editor = new Editor({
     element: $("#editor"),
     extensions: [src_default, src_default2, TableKit],
-    content: safeHTML(current.body),
+    content: current.richHTML ? sanitizeRichHTML(current.richHTML) : safeHTML(current.body),
     onUpdate() {
       sync();
       $("#wordcount").textContent = current.body.length + " \u5B57";

@@ -116,6 +116,8 @@ let editorHTML = "";
 let previewMode = false;
 let previewDocId = null;
 let socialPreviewCtl = null;
+/** 预览子分栏：公众号 / 小红书 */
+let previewPane = "wechat";
 /** 写作伙伴侧栏是否展开；仅草稿写作可用，默认收起 */
 let assistantOpen = false;
 /** 右侧栏模式：写作伙伴 / 本文素材 */
@@ -151,11 +153,90 @@ td.addRule("images", {
   replacement: (_, node) =>
     "![" + (node.alt || "图片") + "](" + node.getAttribute("src") + ")",
 });
-function safeHTML(md) {
-  const d = new DOMParser().parseFromString(
-    marked.parse(md || ""),
-    "text/html",
-  );
+/**
+ * 标题内 Shift+Enter（&lt;br&gt;）用 HTML 原样保留，避免 ATX 标题把软换行吃掉。
+ * 忽略 ProseMirror 自动追加的 trailingBreak。
+ */
+td.addRule("headingSoftBreak", {
+  filter: (node) => {
+    if (!/^H[1-6]$/.test(node.nodeName)) return false;
+    const brs = node.querySelectorAll?.("br");
+    if (!brs || !brs.length) return false;
+    for (let i = 0; i < brs.length; i++) {
+      const cls = brs[i].getAttribute?.("class") || "";
+      if (!cls.includes("ProseMirror-trailingBreak")) return true;
+    }
+    return false;
+  },
+  replacement: (_content, node) => {
+    const level = node.nodeName.charAt(1);
+    const clone = node.cloneNode(true);
+    const brs = clone.querySelectorAll("br");
+    for (let i = brs.length - 1; i >= 0; i--) {
+      const cls = brs[i].getAttribute?.("class") || "";
+      if (cls.includes("ProseMirror-trailingBreak"))
+        brs[i].parentNode?.removeChild(brs[i]);
+    }
+    if (!clone.querySelector("br")) {
+      const text = (clone.textContent || "").replace(/\s+/g, " ").trim();
+      return `\n\n${"#".repeat(+level)} ${text}\n\n`;
+    }
+    const els = clone.querySelectorAll("*");
+    for (let i = 0; i < els.length; i++) {
+      els[i].removeAttribute("class");
+      els[i].removeAttribute("style");
+      els[i].removeAttribute("id");
+      els[i].removeAttribute("draggable");
+    }
+    return `\n\n<h${level}>${clone.innerHTML}</h${level}>\n\n`;
+  },
+});
+
+/**
+ * 从块级节点提取纯文本，将 &lt;br&gt; 转为换行（同一标题内的软换行）。
+ * @param {Node} node
+ * @returns {string}
+ */
+function blockPlainText(node) {
+  let out = "";
+  /**
+   * @param {Node} n
+   */
+  function walk(n) {
+    if (n.nodeType === 3) out += n.textContent;
+    else if (n.nodeName === "BR") {
+      const cls = n.getAttribute?.("class") || "";
+      if (!cls.includes("ProseMirror-trailingBreak")) out += "\n";
+    } else if (n.childNodes?.length)
+      for (const c of n.childNodes) walk(c);
+  }
+  walk(node);
+  return out
+    .replace(/[ \t]*\n[ \t]*/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * 规范化标题文本：保留软换行，仅折叠同行空白。
+ * @param {string} raw
+ * @returns {string}
+ */
+function normalizeHeadingText(raw) {
+  return String(raw || "")
+    .split("\n")
+    .map((l) => l.replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
+ * 清洗富文本 HTML，并按环境改写图片资源地址（避免整页正则误伤）。
+ * @param {string} html
+ * @returns {string}
+ */
+function sanitizeRichHTML(html) {
+  const d = new DOMParser().parseFromString(html || "", "text/html");
   d.querySelectorAll(
     "script,iframe,object,embed,style,link,form,input,button",
   ).forEach((n) => n.remove());
@@ -165,24 +246,105 @@ function safeHTML(md) {
         a.name.startsWith("on") ||
         a.name === "style" ||
         (["href", "src"].includes(a.name) &&
-          !/^(https?:|inkasset:|\/api\/asset\/|data:image\/|[^:]*$)/i.test(
+          !/^(https?:|inkasset:|\/api\/asset\/|data:image\/|blob:|[^:]*$)/i.test(
             a.value,
           ))
       )
         n.removeAttribute(a.name);
     });
   });
-  let html = d.body.innerHTML;
-  // 网页端：inkasset → /api/asset；桌面端：/api/asset → inkasset（主进程 protocol 加载）
-  if (isWeb())
-    return html.replace(
-      /inkasset:\/\/(vault|local)\/([^"'\s)]+)/g,
-      (_, kind, rel) => "/api/asset/" + kind + "/" + rel,
-    );
-  return html.replace(
-    /\/api\/asset\/(vault|local)\/([^"'\s)]+)/g,
-    (_, kind, rel) => "inkasset://" + kind + "/" + rel,
+  d.querySelectorAll("img[src]").forEach((img) => {
+    const src = img.getAttribute("src") || "";
+    if (isWeb()) {
+      if (src.startsWith("inkasset://vault/"))
+        img.setAttribute(
+          "src",
+          "/api/asset/vault/" + src.slice("inkasset://vault/".length),
+        );
+      else if (src.startsWith("inkasset://local/"))
+        img.setAttribute(
+          "src",
+          "/api/asset/local/" + src.slice("inkasset://local/".length),
+        );
+    } else if (src.startsWith("/api/asset/vault/"))
+      img.setAttribute(
+        "src",
+        "inkasset://vault/" + src.slice("/api/asset/vault/".length),
+      );
+    else if (src.startsWith("/api/asset/local/"))
+      img.setAttribute(
+        "src",
+        "inkasset://local/" + src.slice("/api/asset/local/".length),
+      );
+  });
+  return d.body.innerHTML;
+}
+
+/**
+ * 将一级标题拆成中文主标题 + 英文副标题（若存在）；保留 Shift+Enter 软换行。
+ * @param {HTMLElement} h1
+ */
+function splitWechatH1(h1) {
+  if (h1.querySelector(".h1-en, .h1-zh")) return;
+  const soft = normalizeHeadingText(blockPlainText(h1)).split("\n");
+  if (!soft.length) return;
+  const doc = h1.ownerDocument;
+  const wrap = doc.createElement("span");
+  wrap.className = "h1-text";
+
+  /**
+   * 追加一行标题 span。
+   * @param {string} line
+   * @param {"h1-zh"|"h1-en"} cls
+   */
+  function addLine(line, cls) {
+    const span = doc.createElement("span");
+    span.className = cls;
+    if (cls === "h1-en") span.lang = "en";
+    span.textContent = line;
+    wrap.append(span);
+  }
+
+  if (soft.length > 1) {
+    for (let i = 0; i < soft.length; i++) {
+      const line = soft[i];
+      const isEn =
+        i === soft.length - 1 &&
+        /^[A-Za-z][A-Za-z0-9&/.,'’\- ]{0,60}$/.test(line);
+      addLine(line, isEn ? "h1-en" : "h1-zh");
+    }
+    h1.replaceChildren(wrap);
+    return;
+  }
+
+  const text = soft[0];
+  const m = text.match(
+    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/,
   );
+  if (!m) return;
+  addLine(m[1].trim(), "h1-zh");
+  addLine(m[2].trim(), "h1-en");
+  h1.replaceChildren(wrap);
+}
+
+/**
+ * 将 Markdown 转为可安全插入的 HTML。
+ * @param {string} md
+ */
+function safeHTML(md) {
+  return sanitizeRichHTML(
+    new DOMParser().parseFromString(marked.parse(md || ""), "text/html").body
+      .innerHTML,
+  );
+}
+
+/**
+ * 预览用正文 HTML：优先编辑器快照（保留标题软换行与原始图片地址）。
+ * @returns {string}
+ */
+function articleSourceHTML() {
+  if (current?.richHTML) return sanitizeRichHTML(current.richHTML);
+  return safeHTML(current?.body || "");
 }
 
 /**
@@ -453,8 +615,10 @@ function newDoc() {
 }
 function sync() {
   if (editor && current && editor.getHTML() !== editorHTML) {
-    current.body = td.turndown(editor.getHTML());
-    editorHTML = editor.getHTML();
+    const html = editor.getHTML();
+    current.richHTML = html;
+    current.body = td.turndown(html);
+    editorHTML = html;
   }
 }
 function render() {
@@ -657,30 +821,6 @@ const WECHAT_SANS =
   "'OPPO Sans 4.0','PingFang SC','Helvetica Neue',Arial,sans-serif";
 
 /**
- * 将一级标题拆成中文主标题 + 英文副标题（若存在）。
- */
-function splitWechatH1(h1) {
-  if (h1.querySelector(".h1-en")) return;
-  const text = h1.textContent.replace(/\s+/g, " ").trim();
-  const m = text.match(
-    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/,
-  );
-  if (!m) return;
-  const doc = h1.ownerDocument;
-  const zh = doc.createElement("span");
-  zh.className = "h1-zh";
-  zh.textContent = m[1].trim();
-  const en = doc.createElement("span");
-  en.className = "h1-en";
-  en.lang = "en";
-  en.textContent = m[2].trim();
-  const wrap = doc.createElement("span");
-  wrap.className = "h1-text";
-  wrap.append(zh, en);
-  h1.replaceChildren(wrap);
-}
-
-/**
  * 推送用标题/引用图。
  * 逻辑宽取手机微信正文区约 360px（非整页 677）：图会按栏宽 100% 显示，
  * 若按 677 画 15px 字，缩到 ~360 后只剩约 8px，会远小于正文。
@@ -728,19 +868,12 @@ function wechatBlockCanvas(cssW, cssH) {
 }
 
 /**
- * 画一级标题图（蓝字 + 序号方块）。
+ * 画一级标题图（蓝字 + 序号方块）；保留标题内软换行。
  * @param {string} raw
  * @param {string} num
  */
 function renderWechatH1Png(raw, num) {
-  const text = String(raw || "")
-    .replace(/\s+/g, " ")
-    .trim();
-  const m = text.match(
-    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/,
-  );
-  const zh = m ? m[1].trim() : text;
-  const en = m ? m[2].trim() : "";
+  const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
   const badge = 48;
   const gap = 10;
   const textW = WECHAT_BLOCK_W - badge - gap;
@@ -748,24 +881,32 @@ function renderWechatH1Png(raw, num) {
   const lineH = 44;
   const measure = wechatBlockCanvas(1, 1).ctx;
   measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  const zhLines = wechatWrapLines(measure, zh, textW);
-  const enLines = en ? wechatWrapLines(measure, en, textW) : [];
-  const textH = Math.max(
-    badge,
-    zhLines.length * lineH + enLines.length * lineH,
-  );
+
+  /** @type {string[]} */
+  let lines = [];
+  if (soft.length > 1) {
+    lines = soft.flatMap((para) => wechatWrapLines(measure, para, textW));
+  } else {
+    const one = soft[0] || "";
+    const m = one.match(
+      /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/,
+    );
+    const zh = m ? m[1].trim() : one;
+    const en = m ? m[2].trim() : "";
+    lines = [
+      ...wechatWrapLines(measure, zh, textW),
+      ...(en ? wechatWrapLines(measure, en, textW) : []),
+    ];
+  }
+
+  const textH = Math.max(badge, lines.length * lineH);
   const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, textH);
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, WECHAT_BLOCK_W, textH);
   ctx.fillStyle = WECHAT_BLUE;
   ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  // 与序号底对齐
-  let y = textH - zhLines.length * lineH - enLines.length * lineH;
-  for (const line of zhLines) {
-    ctx.fillText(line, 0, y);
-    y += lineH;
-  }
-  for (const line of enLines) {
+  let y = textH - lines.length * lineH;
+  for (const line of lines) {
     ctx.fillText(line, 0, y);
     y += lineH;
   }
@@ -782,13 +923,11 @@ function renderWechatH1Png(raw, num) {
 }
 
 /**
- * 画二级标题：整行定宽画布，蓝条按文字真实宽度左对齐，避免短标题被拉大。
+ * 画二级标题：整行定宽画布，蓝条按文字真实宽度左对齐；保留软换行。
  * @param {string} raw
  */
 function renderWechatH2Png(raw) {
-  const text = String(raw || "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
   const padX = 10;
   const padY = 8;
   const fontSize = 20;
@@ -796,15 +935,16 @@ function renderWechatH2Png(raw) {
   const maxInner = WECHAT_BLOCK_W - padX * 2;
   const measure = wechatBlockCanvas(1, 1).ctx;
   measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  const lines = wechatWrapLines(measure, text, maxInner);
+  const lines = soft.flatMap((para) =>
+    wechatWrapLines(measure, para, maxInner),
+  );
   const innerW = Math.min(
     maxInner,
     Math.ceil(Math.max(...lines.map((l) => measure.measureText(l).width), 1)),
   );
   const boxW = Math.min(WECHAT_BLOCK_W, innerW + padX * 2);
-  const boxH = lines.length * lineH + padY * 2;
+  const boxH = Math.max(lineH + padY * 2, lines.length * lineH + padY * 2);
   const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, boxH);
-  // 白底占满行宽；蓝条仅覆盖文字所需宽度
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
   ctx.fillStyle = WECHAT_BLUE;
@@ -961,7 +1101,7 @@ async function publishHTML(md, opts = {}) {
       replaceWithWechatBlockImage(
         d,
         h1,
-        renderWechatH1Png(h1.textContent, num),
+        renderWechatH1Png(blockPlainText(h1), num),
         "一级标题",
         "56px 0 20px",
       );
@@ -970,7 +1110,7 @@ async function publishHTML(md, opts = {}) {
       replaceWithWechatBlockImage(
         d,
         h2,
-        renderWechatH2Png(h2.textContent),
+        renderWechatH2Png(blockPlainText(h2)),
         "二级标题",
         "16px 0 14px",
       );
@@ -1050,6 +1190,20 @@ async function publishHTML(md, opts = {}) {
         )
       )
         return;
+      // 仅含正文配图的段落：下边距交给图片
+      if (
+        tag === "p" &&
+        n.children.length === 1 &&
+        n.children[0].tagName === "IMG" &&
+        !["一级标题", "二级标题", "引用"].includes(
+          n.children[0].getAttribute("alt") || "",
+        )
+      ) {
+        const prev = n.getAttribute("style") || "";
+        const s = `margin:0;line-height:1.75;font-size:15px;color:#111;font-family:${WECHAT_SANS};font-weight:400;`;
+        n.setAttribute("style", prev ? `${prev};${s}` : s);
+        return;
+      }
       const prev = n.getAttribute("style") || "";
       n.setAttribute("style", prev ? `${prev};${style}` : style);
     }),
@@ -1101,14 +1255,22 @@ async function publishHTML(md, opts = {}) {
       ),
     );
   }
+  // 正文配图：主题蓝 2px 边框（跳过标题/引用块图）
+  d.querySelectorAll("img").forEach((img) => {
+    if (["一级标题", "二级标题", "引用"].includes(img.getAttribute("alt") || ""))
+      return;
+    const prev = img.getAttribute("style") || "";
+    const style = `max-width:100% !important;height:auto !important;box-sizing:border-box;border:2px solid ${WECHAT_BLUE};display:block;margin:0 0 24px;`;
+    img.setAttribute("style", prev ? `${prev};${style}` : style);
+  });
   return `<section style="font-family:${WECHAT_SANS};padding:8px;color:#111;max-width:768px;">${d.body.innerHTML}</section>`;
 }
 
 /**
- * 生成小红书分页用的正文 HTML；桌面端把网页资源路径转回 inkasset。
+ * 生成小红书分页用的正文 HTML；优先编辑器快照。
  */
 function socialSourceHTML() {
-  const html = editor ? editor.getHTML() : safeHTML(current.body);
+  const html = editor ? editor.getHTML() : articleSourceHTML();
   const d = new DOMParser().parseFromString(html, "text/html");
   if (!isWeb())
     d.querySelectorAll("img").forEach((img) => {
@@ -1126,6 +1288,12 @@ function socialSourceHTML() {
  */
 function togglePreview() {
   sync();
+  // 进入预览前再刷一次快照，保证标题软换行 / 图片地址与编辑器一致
+  if (editor && current) {
+    current.richHTML = editor.getHTML();
+    current.body = td.turndown(current.richHTML);
+    editorHTML = current.richHTML;
+  }
   previewMode = !previewMode;
   previewDocId = previewMode ? current.id : null;
   if (editor) {
@@ -1257,21 +1425,16 @@ function bindFinalize() {
 }
 
 /**
- * 同步右侧栏与分隔条显隐：仅草稿写作可用；写作伙伴默认收起，预览时展开小红书栏。
+ * 同步右侧栏与分隔条显隐：仅草稿写作可用；写作伙伴默认收起；预览时收起侧栏。
  */
 function syncRailVisibility() {
   const rail = $("#rail");
   const resizer = $("#workspace-resizer");
   const draftWriting = page === "write" && !!current;
   if (!rail) return;
-  if (!draftWriting) {
+  if (!draftWriting || previewMode) {
     rail.classList.add("hidden");
     resizer?.classList.add("hidden");
-    return;
-  }
-  if (previewMode) {
-    rail.classList.remove("hidden");
-    resizer?.classList.remove("hidden");
     return;
   }
   rail.classList.toggle("hidden", !assistantOpen);
@@ -1323,7 +1486,7 @@ function openArticleMaterials() {
 }
 
 /**
- * 渲染右侧栏：草稿预览→小红书；草稿写作且已展开→写作伙伴；其余隐藏。
+ * 渲染右侧栏：草稿写作且已展开→写作伙伴/素材；预览时不占用侧栏。
  */
 function renderAssistantRail() {
   const rail = $("#rail");
@@ -1338,29 +1501,15 @@ function renderAssistantRail() {
   }
 
   const draftWriting = page === "write" && !!current;
-  if (!draftWriting) {
+  if (!draftWriting || previewMode) {
     rail.innerHTML = "";
     rail.classList.remove("preview-mode");
+    delete rail.dataset.railMode;
     syncRailVisibility();
     return;
   }
 
-  const showPreviewRail = previewMode;
-  rail.classList.toggle("preview-mode", !!showPreviewRail);
-
-  if (showPreviewRail) {
-    rail.innerHTML = `<div class="assistant-head"><span>小红书分页</span><div class="assistant-head-actions"><label class="social-size-label">字号 <select id="social-size"><option value="36">标准</option><option value="42">大字</option><option value="30">紧凑</option></select></label></div></div><div class="preview-actions"><button id="social-export" class="primary wide" disabled>导出图片</button><button id="copy-publish" class="wide">复制排版（公众号）</button><button id="push-wechat" class="wide">推送到草稿箱</button><p id="social-status" class="notice">正在排版…</p></div><div id="panel" data-ready="1"><div id="social-pages"></div></div>`;
-    $("#copy-publish").onclick = () => copyPublish(current);
-    $("#push-wechat").onclick = () => pushWechatDraft(current);
-    socialPreviewCtl = bindSocialPreview(rail, {
-      html: socialSourceHTML(),
-      title: current.title,
-      api,
-      web: isWeb(),
-    });
-    syncRailVisibility();
-    return;
-  }
+  rail.classList.remove("preview-mode");
 
   // 默认收起：未展开时不挂载对话，节省资源
   if (!assistantOpen) {
@@ -1561,15 +1710,50 @@ function bindArticleMaterialsPanel() {
 }
 
 /**
- * 渲染预览模式：中间公众号排版，右侧栏切换为小红书分页。
+ * 切换预览子分栏（公众号 / 小红书），并同步操作按钮显隐。
+ * @param {"wechat"|"social"} pane
+ */
+function setPreviewPane(pane) {
+  previewPane = pane === "social" ? "social" : "wechat";
+  const wrap = $(".paper-wrap");
+  if (!wrap) return;
+  wrap.querySelectorAll("[data-preview-pane]").forEach((btn) => {
+    const on = btn.dataset.previewPane === previewPane;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  wrap.querySelectorAll("[data-pane]").forEach((el) => {
+    el.hidden = el.dataset.pane !== previewPane;
+  });
+  const exportBtn = $("#social-export");
+  const status = $("#social-status");
+  if (exportBtn) exportBtn.hidden = previewPane !== "social";
+  if (status) status.hidden = previewPane !== "social";
+}
+
+/**
+ * 渲染预览模式：顶栏分栏切换公众号 / 小红书；侧栏收起。
  */
 function renderPreview() {
   previewDocId = current.id;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout" class="primary">退出预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div id="article-preview">${safeHTML(current.body)}</div></article></section></div>`;
+  if (previewPane !== "social") previewPane = "wechat";
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span></div></div><div class="header-actions"><span id="saved">已保存到本地</span><button id="layout" class="primary">退出预览</button><button id="history">版本</button><button id="save-version">保存版本</button><button id="finalize" class="primary">定稿</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><button type="button" id="social-export" class="primary" disabled ${previewPane !== "social" ? "hidden" : ""}>${I.upload()} 导出图片</button><button type="button" id="copy-publish">复制排版（公众号）</button><button type="button" id="push-wechat">推送到草稿箱</button><span></span><span id="social-status" class="preview-toolbar-status" ${previewPane !== "social" ? "hidden" : ""}>正在排版…</span></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p class="social-pane-hint">点击分页预览，左右键可翻页</p><div id="social-pages"></div></div></section></div>`;
   bindArticleHeader();
   bindFinalize();
   enhanceWechatPreview();
+  $$("[data-preview-pane]").forEach((btn) => {
+    btn.onclick = () => setPreviewPane(btn.dataset.previewPane);
+  });
+  $("#copy-publish").onclick = () => copyPublish(current);
+  $("#push-wechat").onclick = () => pushWechatDraft(current);
+  // 先收起侧栏（会 destroy 旧 ctl），再绑定本页小红书排版
   renderAssistantRail();
+  socialPreviewCtl = bindSocialPreview($(".paper-wrap") || document, {
+    html: socialSourceHTML(),
+    title: current.title,
+    api,
+    web: isWeb(),
+  });
 }
 
 function renderWrite() {
@@ -1592,7 +1776,9 @@ function renderWrite() {
   editor = new Editor({
     element: $("#editor"),
     extensions: [StarterKit, Image, TableKit],
-    content: safeHTML(current.body),
+    content: current.richHTML
+      ? sanitizeRichHTML(current.richHTML)
+      : safeHTML(current.body),
     onUpdate() {
       sync();
       $("#wordcount").textContent = current.body.length + " 字";
