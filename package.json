@@ -1,7 +1,8 @@
 {
   "name": "inkdesk",
+  "productName": "AsIde",
   "version": "0.1.0",
-  "description": "Local writing desk for Content OS",
+  "description": "AsIde — local writing desk for Content OS",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
@@ -9,7 +10,7 @@
     "dev:server": "node server.cjs",
     "build:watch": "esbuild renderer.js --bundle --format=esm --outfile=bundle.js --watch",
     "test": "node --test test.cjs vault.test.cjs knowledge.test.cjs model.test.cjs note-import.test.cjs",
-    "package:mac": "electron-packager . Inkdesk --platform=darwin --arch=arm64 --out=dist-v4 --overwrite --icon=assets/Inkdesk.icns --ignore='^/data' --ignore='^/dist' --ignore='screenshot-' --extra-resource=assets/reference-reader",
+    "package:mac": "electron-packager . AsIde --platform=darwin --arch=arm64 --out=dist-v4 --overwrite --icon=assets/AsIde.icns --ignore='^/data' --ignore='^/dist' --ignore='screenshot-' --extra-resource=assets/reference-reader",
     "build": "esbuild renderer.js --bundle --format=esm --outfile=bundle.js",
     "test:ui": "node smoke-ui.cjs && node review-ui.cjs && node workflow-v4.cjs"
   },

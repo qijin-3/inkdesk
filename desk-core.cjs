@@ -103,7 +103,7 @@ const API_CHANNELS = [
 ];
 
 /**
- * Inkdesk 共享业务层：Vault、人设、Agent 等与 UI 无关的逻辑。
+ * AsIde 共享业务层：Vault、人设、Agent 等与 UI 无关的逻辑。
  */
 class DeskCore {
   constructor() {

@@ -9,7 +9,7 @@ const { _electron: electron } = require("@playwright/test"),
   delete env.ELECTRON_RUN_AS_NODE;
   const app = await electron.launch({
     executablePath: path.resolve(
-      "dist-v4/Inkdesk-darwin-arm64/Inkdesk.app/Contents/MacOS/Inkdesk",
+      "dist-v4/AsIde-darwin-arm64/AsIde.app/Contents/MacOS/AsIde",
     ),
     args: [],
     env,
@@ -24,7 +24,7 @@ const { _electron: electron } = require("@playwright/test"),
     info.config = JSON.parse(
       extractFile(
         path.resolve(
-          "dist-v4/Inkdesk-darwin-arm64/Inkdesk.app/Contents/Resources/app.asar",
+          "dist-v4/AsIde-darwin-arm64/AsIde.app/Contents/Resources/app.asar",
         ),
         "vault.json",
       ).toString(),
@@ -47,7 +47,7 @@ const { _electron: electron } = require("@playwright/test"),
       /独立运行保存成功/,
     );
     const reader = path.resolve(
-      "dist-v4/Inkdesk-darwin-arm64/Inkdesk.app/Contents/Resources/reference-reader",
+      "dist-v4/AsIde-darwin-arm64/AsIde.app/Contents/Resources/reference-reader",
     );
     assert(fs.existsSync(reader));
     const { execFileSync } = require("node:child_process");

@@ -112,9 +112,11 @@ p {
   gap: 8px;
 }
 .brand {
-  font-size: 22px;
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia,
+    "Songti SC", serif;
+  font-size: 26px;
   font-weight: 600;
-  letter-spacing: -1px;
+  letter-spacing: -0.5px;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -127,12 +129,12 @@ p {
   margin-top: 2px;
 }
 .brand-icon {
-  font-family: Georgia, serif;
-  background: #111111;
-  color: #fff;
-  padding: 1px 10px;
-  border-radius: 8px;
-  font-size: 25px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: block;
 }
 .account {
   display: flex;

@@ -1,8 +1,8 @@
-# Inkdesk 0.1 · 写作工作台
+# AsIde 0.1 · 写作工作台
 
 独立的 Apple Silicon macOS 应用。项目在 `/Users/jin/Documents/Dev/inkdesk`。内容仓库（Content_OS）可在设置中选择；也可用 `vault.json` 或 `INKDESK_VAULT` 指定。开发时指向测试目录即可。
 
-打开 `dist-v4/Inkdesk-darwin-arm64/Inkdesk.app`。左侧选择账号和草稿，正文自动保存，右侧按需调用 Cursor 或 Codex。无需另购 API。
+打开 `dist-v4/AsIde-darwin-arm64/AsIde.app`。左侧选择账号和草稿，正文自动保存，右侧按需调用 Cursor 或 Codex。无需另购 API。
 
 ## 0.4 当前框架
 
@@ -77,7 +77,7 @@ Content_OS 路径优先取自设置中用户选择的仓库（写入 `workspace.
 
 ## 开发与验证
 
-`npm run package:mac` 产出 `dist-v4/Inkdesk-darwin-arm64/Inkdesk.app`。生产包启动后会检测 GitHub Release；设置页可手动检测、下载并替换安装。仓库若为私有，需在设置中填写具有 Contents 读权限的 Token。
+`npm run package:mac` 产出 `dist-v4/AsIde-darwin-arm64/AsIde.app`。生产包启动后会检测 GitHub Release；设置页可手动检测、下载并替换安装。仓库若为私有，需在设置中填写具有 Contents 读权限的 Token。
 
 ```sh
 npm ci

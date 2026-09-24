@@ -187,7 +187,7 @@ const server = http.createServer(async (req, res) => {
  */
 function start() {
   server.listen(PORT, HOST, () => {
-    console.log(`Inkdesk web dev: http://${HOST}:${PORT}`);
+    console.log(`AsIde web dev: http://${HOST}:${PORT}`);
   });
 }
 

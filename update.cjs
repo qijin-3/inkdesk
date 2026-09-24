@@ -43,7 +43,7 @@ function cmpVersion(a, b) {
 function fetchBuffer(url, opts = {}) {
   return new Promise((resolve, reject) => {
     const headers = {
-      "User-Agent": "Inkdesk-Updater",
+      "User-Agent": "AsIde-Updater",
       Accept: opts.accept || "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
     };
@@ -86,7 +86,7 @@ async function downloadFile(url, opts = {}) {
   let current = url;
   for (let hop = 0; hop < 8; hop++) {
     const res = await new Promise((resolve, reject) => {
-      const headers = { "User-Agent": "Inkdesk-Updater" };
+      const headers = { "User-Agent": "AsIde-Updater" };
       if (opts.token && /github\.com|githubusercontent\.com/i.test(current)) {
         headers.Authorization = `Bearer ${opts.token}`;
         headers.Accept = "application/octet-stream";
@@ -155,7 +155,7 @@ function pickMacAsset(release) {
       if (/\.zip$/i.test(name)) score += 10;
       if (/mac|darwin|osx/i.test(name)) score += 5;
       if (/arm64|aarch64|apple.?silicon/i.test(name)) score += 3;
-      if (/Inkdesk/i.test(name)) score += 2;
+      if (/AsIde|Inkdesk/i.test(name)) score += 2;
       if (/\.dmg$/i.test(name)) score += 1;
       return { asset: a, score, name };
     })
@@ -251,7 +251,8 @@ async function downloadAndInstall(opts) {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const e of entries) {
       const p = path.join(dir, e.name);
-      if (e.isDirectory() && e.name === "Inkdesk.app") return p;
+      if (e.isDirectory() && (e.name === "AsIde.app" || e.name === "Inkdesk.app"))
+        return p;
     }
     for (const e of entries) {
       if (!e.isDirectory()) continue;
@@ -262,7 +263,7 @@ async function downloadAndInstall(opts) {
   }
 
   const newApp = findApp(extractDir);
-  if (!newApp) throw Error("安装包中未找到 Inkdesk.app");
+  if (!newApp) throw Error("安装包中未找到 AsIde.app");
 
   const currentApp = path.resolve(process.execPath, "../../..");
   if (!currentApp.endsWith(".app")) {
@@ -279,7 +280,8 @@ NEW="$2"
 WORK="$3"
 sleep 1
 for i in $(seq 1 60); do
-  if ! pgrep -f "Inkdesk.app/Contents/MacOS/Inkdesk" >/dev/null 2>&1; then
+  if ! pgrep -f "AsIde.app/Contents/MacOS/AsIde" >/dev/null 2>&1 && \
+     ! pgrep -f "Inkdesk.app/Contents/MacOS/Inkdesk" >/dev/null 2>&1; then
     break
   fi
   sleep 0.5

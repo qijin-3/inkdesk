@@ -15,6 +15,10 @@ const { pathToFileURL } = require("node:url");
 const { DeskCore } = require("./desk-core.cjs");
 const updater = require("./update.cjs");
 
+if (process.platform === "darwin") {
+  app.setName("AsIde");
+}
+
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "inkasset",
@@ -33,7 +37,8 @@ function createWindow() {
     height: 940,
     minWidth: 1050,
     minHeight: 700,
-    title: "Inkdesk",
+    title: "AsIde",
+    icon: path.join(__dirname, "assets", "logo.png"),
     backgroundColor: "#f7f6f2",
     titleBarStyle: "hiddenInset",
     webPreferences: {
