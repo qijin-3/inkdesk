@@ -1,6 +1,6 @@
 # AsIde 0.1 · 写作工作台
 
-独立的 Apple Silicon macOS 应用。项目在 `/Users/jin/Documents/Dev/inkdesk`。内容仓库（Content_OS）可在设置中选择；也可用 `vault.json` 或 `INKDESK_VAULT` 指定。开发时指向测试目录即可。
+独立的 Apple Silicon macOS 应用。内容仓库（Content_OS）可在设置中选择；开发时可用本地 `vault.json`（参考 `vault.example.json`）或环境变量 `INKDESK_VAULT` 指定，勿把个人路径提交或打进发布包。
 
 打开 `dist-v4/AsIde-darwin-arm64/AsIde.app`。左侧选择账号和草稿，正文自动保存，右侧按需调用 Cursor 或 Codex。无需另购 API。
 
@@ -57,9 +57,9 @@ Content_OS/
     ...
 ```
 
-内容仓库在设置中选择。账号对应仓库内文件夹：可「选择文件夹」注册，或「新建账号」自动创建 Profile / Topics / Drafts / Archive 四个目录。旧版 `金奇_AI` / `金奇_Dev` 会被自动识别。
+内容仓库在设置中选择。账号对应仓库内文件夹：可「选择文件夹」注册，或「新建账号」自动创建 Profile / Topics / Drafts / Archive 四个目录。旧版逻辑 ID（AI / Dev）会匹配已存在的同名或 `*_AI` / `*_Dev` 文件夹。
 
-Content_OS 路径优先取自设置中用户选择的仓库（写入 `workspace.json` 的 `vaultPath`）；也可用 `vault.json` 或环境变量 `INKDESK_VAULT` / `INKDESK_DATA`。测试常用临时目录。
+Content_OS 路径优先取自设置中用户选择的仓库（写入 `workspace.json` 的 `vaultPath`）；也可用本地 `vault.json` 或环境变量 `INKDESK_VAULT` / `INKDESK_DATA`。测试常用临时目录。
 
 打包版工作区设置在 macOS Application Support 的 `inkdesk/workspace-v2` 下。第一次运行会从旧 `workspace` 复制旧 JSON 与图片，迁移前保留 `.v1-backup`；旧应用数据保留。实际路径可在「设置 → 本地数据」查看。
 

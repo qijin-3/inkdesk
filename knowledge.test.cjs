@@ -10,8 +10,8 @@ function setup(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ink-knowledge-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const v = new Vault(root);
-  v.createAccount("金奇_AI");
-  v.createAccount("金奇_Dev");
+  v.createAccount("Demo_AI");
+  v.createAccount("Demo_Dev");
   v.load();
   for (const id of ["a", "b"])
     v.saveDoc({
@@ -121,10 +121,10 @@ test("markdown kept as original file without txt extract", async (t) => {
 });
 test("whole Profile is managed; proposals keep evidence, backups, rejection and stale protection", (t) => {
   const { v, k } = setup(t);
-  fs.writeFileSync(v.p("金奇_AI/00_Profile/Persona_Doc.md"), "原始定位");
-  fs.mkdirSync(v.p("金奇_AI/00_Profile/Author_DNA"), { recursive: true });
+  fs.writeFileSync(v.p("Demo_AI/00_Profile/Persona_Doc.md"), "原始定位");
+  fs.mkdirSync(v.p("Demo_AI/00_Profile/Author_DNA"), { recursive: true });
   fs.writeFileSync(
-    v.p("金奇_AI/00_Profile/Author_DNA/语言风格.md"),
+    v.p("Demo_AI/00_Profile/Author_DNA/语言风格.md"),
     "原始语言",
   );
   assert.equal(k.profile("AI").files.length, 2);
@@ -149,7 +149,7 @@ test("whole Profile is managed; proposals keep evidence, backups, rejection and 
         {
           path: "Persona_Doc.md",
           content: "新定位",
-          sources: ["金奇_AI/00_Profile/Persona_Doc.md"],
+          sources: ["Demo_AI/00_Profile/Persona_Doc.md"],
         },
       ],
       e,
@@ -177,7 +177,7 @@ test("whole Profile is managed; proposals keep evidence, backups, rejection and 
 });
 test("iteration evidence includes current account articles and YAML only", (t) => {
   const { v, k } = setup(t);
-  fs.writeFileSync(v.p("金奇_AI/00_Profile/Persona_Doc.md"), "AI 人设");
+  fs.writeFileSync(v.p("Demo_AI/00_Profile/Persona_Doc.md"), "AI 人设");
   const e = k.evidence("AI", {
     documents: [
       {
@@ -198,7 +198,7 @@ test("iteration evidence includes current account articles and YAML only", (t) =
     archives: [
       {
         account: "AI",
-        path: "金奇_AI/03_Archive/x.md",
+        path: "Demo_AI/03_Archive/x.md",
         body: "案例正文",
         title: "x",
         fields: { 发布时间: "2026-09-12", 观看量: 123, 收藏: null },

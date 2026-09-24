@@ -10,7 +10,7 @@
     "dev:server": "node server.cjs",
     "build:watch": "esbuild renderer.js --bundle --format=esm --outfile=bundle.js --watch",
     "test": "node --test test.cjs vault.test.cjs knowledge.test.cjs model.test.cjs note-import.test.cjs",
-    "package:mac": "electron-packager . AsIde --platform=darwin --arch=arm64 --out=dist-v4 --overwrite --icon=assets/AsIde.icns --ignore='^/data' --ignore='^/dist' --ignore='screenshot-' --extra-resource=assets/reference-reader",
+    "package:mac": "electron-packager . AsIde --platform=darwin --arch=arm64 --out=dist-v4 --overwrite --icon=assets/AsIde.icns --ignore='^/data(/|$)' --ignore='^/dist' --ignore='screenshot-' --ignore='/(vault|development-vault)\\.json$' --ignore='/(vault|knowledge|model|note-import)\\.test\\.cjs$' --ignore='/test\\.cjs$' --ignore='/(smoke|review|social|workflow|packaged|real-vault|live-agent)[^/]*\\.cjs$' --ignore='^/dist-' --extra-resource=assets/reference-reader",
     "build": "esbuild renderer.js --bundle --format=esm --outfile=bundle.js",
     "test:ui": "node smoke-ui.cjs && node review-ui.cjs && node workflow-v4.cjs"
   },

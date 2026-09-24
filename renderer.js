@@ -159,8 +159,12 @@ function accountLabelOf(id) {
 function sameAccount(a, b) {
   if (!a || !b) return false;
   if (a === b) return true;
-  const map = { AI: "金奇_AI", Dev: "金奇_Dev" };
-  return (map[a] || a) === (map[b] || b);
+  const key = (id) => {
+    if (id === "AI" || id.endsWith("_AI")) return "AI";
+    if (id === "Dev" || id.endsWith("_Dev")) return "Dev";
+    return id;
+  };
+  return key(a) === key(b);
 }
 
 /**
@@ -3306,7 +3310,7 @@ function renderSettings() {
     : state._update?.latest
       ? `已是最新（GitHub ${esc(state._update.latest)}）`
       : "点击检测 GitHub Release";
-  const configBody = `<div class="dashboard-card"><div class="settings-card-head"><h3>应用更新</h3><div class="settings-card-actions"><button type="button" id="open-releases">${I.external()} 发布页</button><button type="button" id="check-update">${I.refresh()} 检测更新</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">下载并安装</button>` : ""}</div></div><p class="update-version-line">当前版本 <strong>${esc(state._appVersion || "…")}</strong> · <span id="update-status">${updateStatus}</span></p><p class="muted">从公开 GitHub Release 检测并安装更新。</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>Agent 连接</h3><div class="settings-card-actions"><button class="primary" id="save-settings">保存设置</button></div></div><label>默认 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "· 已找到 CLI" : "· 未安装"}</option><option value="codex">Codex ${state.agents.codex ? "· 已找到 CLI" : "· 未安装"}</option></select></label><label>模型（留空沿用 CLI 默认）<input id="model" value="${esc(state.model)}" placeholder="可选模型 ID"></label><p>复用 CLI 登录。若未登录，请先在终端执行 agent login 或 codex login。此版本不保存账号凭据。</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>微信公众号</h3><div class="settings-card-actions"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存公众号设置</button></div></div><p>用于一键推送到草稿箱。AppSecret 仅保存在本机 workspace.json。</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx…" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="密钥" autocomplete="off"></label><label>默认作者<input id="wechat-author" value="${esc(wx.author || "金奇")}" placeholder="金奇"></label></div><div class="dashboard-card"><div class="settings-card-head"><h3>内容仓库</h3><div class="settings-card-actions"><button type="button" id="refresh-vault">${I.refresh()} 刷新</button></div></div>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<label class="settings-path-field">仓库路径<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="选择 Content_OS 目录" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} 选择文件夹</button></span></label></div>`;
+  const configBody = `<div class="dashboard-card"><div class="settings-card-head"><h3>应用更新</h3><div class="settings-card-actions"><button type="button" id="open-releases">${I.external()} 发布页</button><button type="button" id="check-update">${I.refresh()} 检测更新</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">下载并安装</button>` : ""}</div></div><p class="update-version-line">当前版本 <strong>${esc(state._appVersion || "…")}</strong> · <span id="update-status">${updateStatus}</span></p><p class="muted">从公开 GitHub Release 检测并安装更新。</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>Agent 连接</h3><div class="settings-card-actions"><button class="primary" id="save-settings">保存设置</button></div></div><label>默认 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "· 已找到 CLI" : "· 未安装"}</option><option value="codex">Codex ${state.agents.codex ? "· 已找到 CLI" : "· 未安装"}</option></select></label><label>模型（留空沿用 CLI 默认）<input id="model" value="${esc(state.model)}" placeholder="可选模型 ID"></label><p>复用 CLI 登录。若未登录，请先在终端执行 agent login 或 codex login。此版本不保存账号凭据。</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>微信公众号</h3><div class="settings-card-actions"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存公众号设置</button></div></div><p>用于一键推送到草稿箱。AppSecret 仅保存在本机 workspace.json。</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx…" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="密钥" autocomplete="off"></label><label>默认作者<input id="wechat-author" value="${esc(wx.author || "")}" placeholder="可选"></label></div><div class="dashboard-card"><div class="settings-card-head"><h3>内容仓库</h3><div class="settings-card-actions"><button type="button" id="refresh-vault">${I.refresh()} 刷新</button></div></div>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<label class="settings-path-field">仓库路径<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="选择 Content_OS 目录" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} 选择文件夹</button></span></label></div>`;
   const accountsBody = `<div class="settings-card-head accounts-toolbar"><h3>账号</h3><div class="settings-card-actions"><button type="button" id="register-account">${I.folder()} 选择文件夹</button><button type="button" class="primary" id="create-account">${I.plus()} 新建账号</button></div></div>${
     accountList().length
       ? `<div class="account-card-grid">${accountList()
@@ -3365,7 +3369,7 @@ function renderSettings() {
       state.wechat = {
         appId: $("#wechat-appid").value.trim(),
         appSecret: $("#wechat-secret").value.trim(),
-        author: $("#wechat-author").value.trim() || "金奇",
+        author: $("#wechat-author").value.trim(),
         coverPath: state.wechat?.coverPath || "",
       };
     };

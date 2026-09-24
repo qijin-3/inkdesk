@@ -5,7 +5,10 @@ const assert = require("node:assert/strict"),
   path = require("node:path");
 (async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "inkdesk-v2-ui-"));
-  const env = { ...process.env, INKDESK_DATA: dir };
+  const vaultRoot = path.join(dir, "Content_OS");
+  for (const sub of ["00_Profile", "01_Topics", "02_Drafts", "03_Archive"])
+    fs.mkdirSync(path.join(vaultRoot, "Demo_AI", sub), { recursive: true });
+  const env = { ...process.env, INKDESK_DATA: dir, INKDESK_VAULT: vaultRoot };
   delete env.ELECTRON_RUN_AS_NODE;
   let app;
   try {
@@ -18,9 +21,9 @@ const assert = require("node:assert/strict"),
     await w.locator("#title").fill("工作台闭环测试");
     await w.locator(".tiptap").fill("这是我自己的初稿。");
     await w.waitForTimeout(700);
-    const root = path.join(dir, "Content_OS");
+    const root = vaultRoot;
     assert(
-      fs.existsSync(path.join(root, "金奇_AI/02_Drafts/工作台闭环测试.md")),
+      fs.existsSync(path.join(root, "Demo_AI/02_Drafts/工作台闭环测试.md")),
     );
     assert.equal(await w.locator("#export").count(), 0);
     await w.locator("#save-version").click();
@@ -93,7 +96,7 @@ const assert = require("node:assert/strict"),
     await w.waitForTimeout(100);
     assert.match(
       fs.readFileSync(
-        path.join(root, "金奇_AI/00_Profile/Writing_Contract.md"),
+        path.join(root, "Demo_AI/00_Profile/Writing_Contract.md"),
         "utf8",
       ),
       /亲历/,
@@ -114,10 +117,10 @@ const assert = require("node:assert/strict"),
     await w.locator("#finalize").click();
     await w.waitForTimeout(200);
     assert(
-      fs.existsSync(path.join(root, "金奇_AI/02_Drafts/工作台闭环测试.md")),
+      fs.existsSync(path.join(root, "Demo_AI/02_Drafts/工作台闭环测试.md")),
     );
     assert(
-      !fs.existsSync(path.join(root, "金奇_AI/03_Archive/工作台闭环测试.md")),
+      !fs.existsSync(path.join(root, "Demo_AI/03_Archive/工作台闭环测试.md")),
     );
     await app.evaluate(({ dialog }) => {
       dialog.showMessageBox = async () => ({ response: 1 });
@@ -125,10 +128,10 @@ const assert = require("node:assert/strict"),
     await w.locator("#finalize").click();
     await w.locator("[data-archive]").waitFor();
     assert(
-      !fs.existsSync(path.join(root, "金奇_AI/02_Drafts/工作台闭环测试.md")),
+      !fs.existsSync(path.join(root, "Demo_AI/02_Drafts/工作台闭环测试.md")),
     );
     assert(
-      fs.existsSync(path.join(root, "金奇_AI/03_Archive/工作台闭环测试.md")),
+      fs.existsSync(path.join(root, "Demo_AI/03_Archive/工作台闭环测试.md")),
     );
     assert.equal(await w.locator(".docs .doc").count(), 0);
     await w.locator("[data-archive]").click();

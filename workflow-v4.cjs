@@ -8,18 +8,18 @@ const { _electron: electron } = require("@playwright/test"),
     root = path.join(dir, "Content_OS");
   let app;
   try {
-    fs.mkdirSync(path.join(root, "金奇_AI/03_Archive"), { recursive: true });
+    fs.mkdirSync(path.join(root, "Demo_AI/03_Archive"), { recursive: true });
     const year = new Date().getFullYear();
     for (const t of ["第一篇", "第二篇"])
       fs.writeFileSync(
-        path.join(root, "金奇_AI/03_Archive", t + ".md"),
+        path.join(root, "Demo_AI/03_Archive", t + ".md"),
         `---\n发布时间: ${year}-01-10\n观看量: 100\n涨粉: 3\n---\n文章正文`,
       );
     const capture = path.join(dir, "prompt.txt"),
       boot = path.join(dir, "bootstrap.cjs");
     fs.writeFileSync(
       boot,
-      String.raw`const Module=require('module'),EventEmitter=require('events'),fs=require('fs');const load=Module._load;Module._load=function(id,parent,...rest){const real=load.call(this,id,parent,...rest);if(id==='node:child_process'&&parent?.filename===MAIN)return {...real,spawn:(exe,args)=>{const child=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.kill=()=>child.emit('close',1);child.stdin={end(input){const prompt=args.at(-1)==='-'?input:args.at(-1);fs.writeFileSync(CAPTURE,prompt);let result='已参考指定资料。';if(prompt.includes('任务：rewrite-tags')){const ids=prompt.split(String.fromCharCode(10)).filter(line=>line.startsWith('[引用 ')&&line.includes('：当前文章选段')).map(line=>line.slice(4,line.indexOf('：')));result=JSON.stringify(ids.map((id,i)=>({id,text:'改写后的选段 '+(i+1)})));}if(prompt.includes('任务：model-iterate'))result=JSON.stringify([{module:'learning',content:'观察：两篇文章数据相近，样本不足；下次验证更具体的开头。',reason:'根据真实 YAML 作暂时观察',sources:['金奇_AI/00_Profile/Account_Model.md','金奇_AI/03_Archive/第一篇.md']}]);setTimeout(()=>{child.stdout.emit('data',Buffer.from(result));child.emit('close',0)},60);}};return child;}};return real;};require(MAIN);`
+      String.raw`const Module=require('module'),EventEmitter=require('events'),fs=require('fs');const load=Module._load;Module._load=function(id,parent,...rest){const real=load.call(this,id,parent,...rest);if(id==='node:child_process'&&parent?.filename===MAIN)return {...real,spawn:(exe,args)=>{const child=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.kill=()=>child.emit('close',1);child.stdin={end(input){const prompt=args.at(-1)==='-'?input:args.at(-1);fs.writeFileSync(CAPTURE,prompt);let result='已参考指定资料。';if(prompt.includes('任务：rewrite-tags')){const ids=prompt.split(String.fromCharCode(10)).filter(line=>line.startsWith('[引用 ')&&line.includes('：当前文章选段')).map(line=>line.slice(4,line.indexOf('：')));result=JSON.stringify(ids.map((id,i)=>({id,text:'改写后的选段 '+(i+1)})));}if(prompt.includes('任务：model-iterate'))result=JSON.stringify([{module:'learning',content:'观察：两篇文章数据相近，样本不足；下次验证更具体的开头。',reason:'根据真实 YAML 作暂时观察',sources:['Demo_AI/00_Profile/Account_Model.md','Demo_AI/03_Archive/第一篇.md']}]);setTimeout(()=>{child.stdout.emit('data',Buffer.from(result));child.emit('close',0)},60);}};return child;}};return real;};require(MAIN);`
         .replaceAll("MAIN", JSON.stringify(path.resolve("main.cjs")))
         .replaceAll("CAPTURE", JSON.stringify(capture)),
     );
@@ -159,7 +159,7 @@ const { _electron: electron } = require("@playwright/test"),
     assert.match(await w.locator("#model-text").inputValue(), /样本不足/);
     assert.equal(await w.locator("[data-model-tab]").count(), 5);
     assert(
-      fs.existsSync(path.join(root, "金奇_AI/00_Profile/Account_Model.md")),
+      fs.existsSync(path.join(root, "Demo_AI/00_Profile/Account_Model.md")),
     );
     assert.deepEqual(errors, []);
     await app.close();

@@ -5,7 +5,10 @@ const os = require("node:os");
 const path = require("node:path");
 (async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "inkdesk-ui-"));
-  const env = { ...process.env, INKDESK_DATA: dir };
+  const vaultRoot = path.join(dir, "Content_OS");
+  for (const sub of ["00_Profile", "01_Topics", "02_Drafts", "03_Archive"])
+    fs.mkdirSync(path.join(vaultRoot, "Demo_AI", sub), { recursive: true });
+  const env = { ...process.env, INKDESK_DATA: dir, INKDESK_VAULT: vaultRoot };
   delete env.ELECTRON_RUN_AS_NODE;
   const app = await electron.launch({ args: [path.resolve("main.cjs")], env });
   try {
@@ -37,7 +40,7 @@ const path = require("node:path");
     await win.locator(".doc").first().click();
     await win.waitForTimeout(700);
     const saved = fs.readFileSync(
-      path.join(dir, "Content_OS/金奇_AI/02_Drafts/把写作还给自己.md"),
+      path.join(vaultRoot, "Demo_AI/02_Drafts/把写作还给自己.md"),
       "utf8",
     );
     assert.match(saved, /注意力/);

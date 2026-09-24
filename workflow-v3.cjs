@@ -8,26 +8,26 @@ const { _electron: electron } = require("@playwright/test"),
   let app;
   try {
     const root = path.join(dir, "Content_OS");
-    fs.mkdirSync(path.join(root, "金奇_AI/00_Profile/Author_DNA"), {
+    fs.mkdirSync(path.join(root, "Demo_AI/00_Profile/Author_DNA"), {
       recursive: true,
     });
     fs.writeFileSync(
-      path.join(root, "金奇_AI/00_Profile/Persona_Doc.md"),
+      path.join(root, "Demo_AI/00_Profile/Persona_Doc.md"),
       "# 我是谁\n真实的 AI 实践者。",
     );
     fs.writeFileSync(
-      path.join(root, "金奇_AI/00_Profile/Author_DNA/语言风格.md"),
+      path.join(root, "Demo_AI/00_Profile/Author_DNA/语言风格.md"),
       "# 语言\n讲人话。",
     );
     fs.writeFileSync(
-      path.join(root, "金奇_AI/00_Profile/Author_DNA/禁止规则.md"),
+      path.join(root, "Demo_AI/00_Profile/Author_DNA/禁止规则.md"),
       "# 边界\n不编造。",
     );
-    fs.mkdirSync(path.join(root, "金奇_AI/03_Archive"), { recursive: true });
+    fs.mkdirSync(path.join(root, "Demo_AI/03_Archive"), { recursive: true });
     const year = new Date().getFullYear();
     for (const title of ["第一篇", "第二篇"])
       fs.writeFileSync(
-        path.join(root, "金奇_AI/03_Archive", title + ".md"),
+        path.join(root, "Demo_AI/03_Archive", title + ".md"),
         `---\n发布时间: ${year}-01-10\n观看量: 100\n---\n归档正文`,
       );
     const capture = path.join(dir, "prompt.txt"),
@@ -35,7 +35,7 @@ const { _electron: electron } = require("@playwright/test"),
       main = path.resolve("main.cjs");
     fs.writeFileSync(
       bootstrap,
-      `const Module=require('module'),EventEmitter=require('events'),fs=require('fs');const original=Module._load;Module._load=function(id,parent,...rest){const real=original.call(this,id,parent,...rest);if(id==='node:child_process'&&parent?.filename===${JSON.stringify(main)})return {...real,spawn:(exe,args)=>{const child=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.kill=()=>child.emit('close',1);child.stdin={end(input){const prompt=args.at(-1)==='-'?input:args.at(-1);fs.writeFileSync(${JSON.stringify(capture)},prompt);setTimeout(()=>{const result=prompt.includes('任务：profile-iterate')?JSON.stringify([{path:'Author_DNA/迭代观察.md',content:'# 新观察\\n两篇文章均有记录，但不足以推断因果。',reason:'使用归档 YAML 作为反馈',sources:['金奇_AI/00_Profile/Persona_Doc.md','金奇_AI/03_Archive/第一篇.md']} ]):'已读取当前项目资料。';child.stdout.emit('data',Buffer.from(result));child.emit('close',0);},40)}};return child;}};return real;};require(${JSON.stringify(main)});`,
+      `const Module=require('module'),EventEmitter=require('events'),fs=require('fs');const original=Module._load;Module._load=function(id,parent,...rest){const real=original.call(this,id,parent,...rest);if(id==='node:child_process'&&parent?.filename===${JSON.stringify(main)})return {...real,spawn:(exe,args)=>{const child=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.kill=()=>child.emit('close',1);child.stdin={end(input){const prompt=args.at(-1)==='-'?input:args.at(-1);fs.writeFileSync(${JSON.stringify(capture)},prompt);setTimeout(()=>{const result=prompt.includes('任务：profile-iterate')?JSON.stringify([{path:'Author_DNA/迭代观察.md',content:'# 新观察\\n两篇文章均有记录，但不足以推断因果。',reason:'使用归档 YAML 作为反馈',sources:['Demo_AI/00_Profile/Persona_Doc.md','Demo_AI/03_Archive/第一篇.md']} ]):'已读取当前项目资料。';child.stdout.emit('data',Buffer.from(result));child.emit('close',0);},40)}};return child;}};return real;};require(${JSON.stringify(main)});`,
     );
     const env = { ...process.env, INKDESK_DATA: dir };
     delete env.ELECTRON_RUN_AS_NODE;
@@ -95,7 +95,7 @@ const { _electron: electron } = require("@playwright/test"),
     await w.waitForTimeout(150);
     assert.match(
       fs.readFileSync(
-        path.join(root, "金奇_AI/00_Profile/Author_DNA/语言风格.md"),
+        path.join(root, "Demo_AI/00_Profile/Author_DNA/语言风格.md"),
         "utf8",
       ),
       /自然/,

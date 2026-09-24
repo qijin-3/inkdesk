@@ -10,8 +10,8 @@ function setup(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ink-model-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const v = new Vault(root);
-  v.createAccount("金奇_AI");
-  v.createAccount("金奇_Dev");
+  v.createAccount("Demo_AI");
+  v.createAccount("Demo_Dev");
   v.load();
   const k = new Knowledge(v, "");
   const m = new AccountModel(v, k);
@@ -20,7 +20,7 @@ function setup(t) {
 test("fixed account modules migrate to one Markdown and exclude conflicting old rule files", (t) => {
   const { v, m } = setup(t);
   fs.writeFileSync(
-    v.p("金奇_AI/00_Profile/Persona_Doc.md"),
+    v.p("Demo_AI/00_Profile/Persona_Doc.md"),
     "所有文章必须写三段",
   );
   const p = m.load("AI");
@@ -28,10 +28,10 @@ test("fixed account modules migrate to one Markdown and exclude conflicting old 
     p.definitions.map((x) => x.id),
     ["identity", "voice", "examples", "learning"],
   );
-  assert(fs.existsSync(v.p("金奇_AI/00_Profile/Account_Model.md")));
+  assert(fs.existsSync(v.p("Demo_AI/00_Profile/Account_Model.md")));
   assert.doesNotMatch(m.context("AI"), /必须写三段/);
   assert.equal(
-    fs.readFileSync(v.p("金奇_AI/00_Profile/Persona_Doc.md"), "utf8"),
+    fs.readFileSync(v.p("Demo_AI/00_Profile/Persona_Doc.md"), "utf8"),
     "所有文章必须写三段",
   );
   const next = m.save("AI", { ...p.modules, voice: "我的新表达" }, p.hash);

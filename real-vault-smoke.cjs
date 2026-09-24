@@ -4,7 +4,11 @@ const { _electron: electron } = require("@playwright/test"),
   os = require("node:os"),
   assert = require("node:assert/strict"),
   crypto = require("node:crypto");
-const root = "/Users/jin/Documents/Dev/Content_OS-dev";
+const root = process.env.INKDESK_VAULT || process.env.CONTENT_OS_ROOT;
+if (!root) {
+  console.error("Set INKDESK_VAULT or CONTENT_OS_ROOT to a Content_OS directory");
+  process.exit(1);
+}
 function hashes(dir, result = {}) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     if (

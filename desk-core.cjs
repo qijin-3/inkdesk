@@ -31,7 +31,7 @@ const defaults = {
   wechat: {
     appId: "",
     appSecret: "",
-    author: "金奇",
+    author: "",
     coverPath: "",
   },
   /** 用户选定的 Content_OS 仓库路径 */
@@ -257,7 +257,7 @@ class DeskCore {
       wechat: {
         appId: this.store.wechat?.appId || "",
         appSecret: this.store.wechat?.appSecret || "",
-        author: this.store.wechat?.author || "金奇",
+        author: this.store.wechat?.author || "",
         coverPath: this.store.wechat?.coverPath || "",
       },
       dataPath: this.data,
@@ -280,14 +280,14 @@ class DeskCore {
       vaultPath: this.store.vaultPath || this.vault?.root || "",
       provider: this.store.provider,
       model: this.store.model,
-      followers: this.store.followers || { AI: null, Dev: null },
-      metricDeltas: this.store.metricDeltas || { AI: null, Dev: null },
+      followers: this.store.followers || {},
+      metricDeltas: this.store.metricDeltas || {},
       backupPaths: this.store.backupPaths || {},
       groups: this.store.groups || {},
       wechat: {
         appId: this.store.wechat?.appId || "",
         appSecret: this.store.wechat?.appSecret || "",
-        author: this.store.wechat?.author || "金奇",
+        author: this.store.wechat?.author || "",
         coverPath: this.store.wechat?.coverPath || "",
       },
     };
@@ -636,7 +636,7 @@ class DeskCore {
     if (!Number.isFinite(followers) || followers < 0)
       throw Error("请填写有效的粉丝量");
     const before = this.snapshotAccountMetrics(account);
-    this.store.followers ||= { AI: null, Dev: null };
+    this.store.followers ||= {};
     this.store.followers[account] = followers;
     const rows = payload.rows || [];
     const updated = [];
@@ -671,7 +671,7 @@ class DeskCore {
       };
       if (Object.values(d).some((n) => n !== 0)) articles[newPath] = d;
     }
-    this.store.metricDeltas ||= { AI: null, Dev: null };
+    this.store.metricDeltas ||= {};
     this.store.metricDeltas[account] = {
       at: new Date().toISOString(),
       粉丝量: delta(before.followers, after.followers),
@@ -1273,7 +1273,7 @@ class DeskCore {
     );
 
     const title = String(payload.title || "未命名文章").slice(0, 32);
-    const author = String(payload.author || cfg.author || "金奇").slice(0, 16);
+    const author = String(payload.author || cfg.author || "").slice(0, 16);
     const digest = String(
       payload.digest ||
         html
@@ -1336,7 +1336,7 @@ class DeskCore {
     return {
       appId,
       appSecret,
-      author: String(w.author || "金奇").trim() || "金奇",
+      author: String(w.author || "").trim(),
       coverPath: String(w.coverPath || "").trim(),
     };
   }

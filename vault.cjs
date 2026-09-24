@@ -43,8 +43,8 @@ function files(root) {
 }
 const ACCOUNT_SUBDIRS = ["00_Profile", "01_Topics", "02_Drafts", "03_Archive"];
 const RESERVED_ROOTS = new Set(["00_wiki", "Attachment", "_system"]);
-/** 旧版逻辑 ID → 文件夹名 */
-const LEGACY_ACCOUNT = { AI: "金奇_AI", Dev: "金奇_Dev" };
+/** 旧版逻辑 ID（AI/Dev）可匹配已存在的同名或 *_AI / *_Dev 文件夹 */
+const LEGACY_IDS = new Set(["AI", "Dev"]);
 
 /**
  * 将用户输入规范为 vault 下一级账号文件夹名。
@@ -148,11 +148,10 @@ class Vault {
   }
 
   /**
-   * 目录是否像账号仓库（含四个标准子目录之一，或历史金奇_ 前缀）。
+   * 目录是否像账号仓库（含四个标准子目录之一）。
    * @param {string} folder
    */
   looksLikeAccount(folder) {
-    if (folder.startsWith("金奇_")) return true;
     return ACCOUNT_SUBDIRS.some((d) =>
       fs.existsSync(path.join(this.root, folder, d)),
     );
@@ -168,26 +167,19 @@ class Vault {
   }
 
   /**
-   * 解析账号 ID：支持文件夹名，以及旧版 AI/Dev。
+   * 解析账号 ID：支持文件夹名，以及旧版 AI/Dev（匹配已存在的同名或 *_AI / *_Dev）。
    * @param {string} id
    */
   resolveAccountId(id) {
     const raw = String(id || "").trim();
     if (!raw) throw Error("未知账号");
     if (this.accounts.some((a) => a.id === raw)) return raw;
-    const mapped = LEGACY_ACCOUNT[raw];
-    if (mapped) {
-      this.ensureAccountDirs(mapped);
-      if (!this.accounts.some((a) => a.id === mapped)) {
-        this.accounts.push({
-          id: mapped,
-          folder: mapped,
-          label: accountLabel(mapped),
-          avatar: "",
-        });
-        this.writeJSON(this.meta + "/accounts.json", { accounts: this.accounts });
-      }
-      return mapped;
+    if (LEGACY_IDS.has(raw)) {
+      const suffix = "_" + raw;
+      const hit = this.accounts.find(
+        (a) => a.folder === raw || a.folder.endsWith(suffix),
+      );
+      if (hit) return hit.id;
     }
     throw Error("未知账号：" + raw);
   }
