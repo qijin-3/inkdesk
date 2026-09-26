@@ -950,9 +950,21 @@ header select {
   height: calc(100vh - 85px);
   min-width: 0;
 }
-.workspace > .paper-wrap {
+.workspace > .paper-wrap,
+.workspace > .paper-stage {
   flex: 1;
   min-width: 280px;
+}
+.paper-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.paper-stage > .paper-wrap {
+  flex: 1;
+  min-width: 0;
 }
 .paper-wrap {
   flex: 1;
@@ -1047,6 +1059,10 @@ button.secondary {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+.assistant-head > .aster {
+  flex-shrink: 0;
+  cursor: default;
 }
 .welcome-icon {
   display: inline-flex;
@@ -1923,13 +1939,16 @@ th {
   opacity: 1;
 }
 .article-outline {
-  position: fixed;
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
   z-index: 20;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   max-width: min(260px, 42vw);
-  max-height: calc(100vh - 96px);
+  max-height: calc(100% - 48px);
   overflow: hidden;
   padding: 18px 10px 18px 28px;
   pointer-events: auto;
@@ -3548,8 +3567,20 @@ button:disabled {
    Aster — AI writing partner avatar
 ========================= */
 
+.aster-dock {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.aster-dock .aster {
+  pointer-events: auto;
+}
+
 .aster {
-  --aster-size: 40px;
+  --aster-size: 48px;
   --eye-x: 0px;
   --eye-y: 0px;
 
@@ -3570,9 +3601,7 @@ button:disabled {
 }
 
 .aster:hover,
-.aster.primary,
-.header-actions > button.aster,
-.header-actions > button.aster.primary {
+.aster.primary {
   background: transparent;
   border: 0;
   color: inherit;
@@ -3661,30 +3690,6 @@ button:disabled {
   height: 2px;
 }
 
-.aster__orbit {
-  position: absolute;
-  width: 108%;
-  height: 108%;
-  z-index: 4;
-  overflow: visible;
-  color: rgba(82, 88, 150, 0.5);
-  transform: rotate(-12deg);
-  pointer-events: none;
-}
-
-.aster__satellite {
-  position: absolute;
-  width: 9%;
-  height: 9%;
-  min-width: 4px;
-  min-height: 4px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff 0%, #fff1d5 35%, #d8c6ff 100%);
-  box-shadow: 0 0 8px rgba(255, 226, 187, 0.8);
-  z-index: 6;
-  animation: aster-satellite 7s linear infinite;
-}
-
 .aster__halo {
   position: absolute;
   width: 82%;
@@ -3709,10 +3714,6 @@ button:disabled {
 
 .aster__spark[hidden] {
   display: none;
-}
-
-.aster--thinking .aster__orbit {
-  animation: aster-orbit-thinking 1.8s linear infinite;
 }
 
 .aster--thinking .aster__body {
@@ -3787,33 +3788,6 @@ button:disabled {
   50% {
     opacity: 0.75;
     scale: 1.08;
-  }
-}
-
-@keyframes aster-satellite {
-  0% {
-    transform: translate(calc(var(--aster-size) * -0.46), calc(var(--aster-size) * 0.125));
-  }
-  25% {
-    transform: translate(0, calc(var(--aster-size) * -0.3));
-  }
-  50% {
-    transform: translate(calc(var(--aster-size) * 0.48), calc(var(--aster-size) * -0.02));
-  }
-  75% {
-    transform: translate(0, calc(var(--aster-size) * 0.3));
-  }
-  100% {
-    transform: translate(calc(var(--aster-size) * -0.46), calc(var(--aster-size) * 0.125));
-  }
-}
-
-@keyframes aster-orbit-thinking {
-  from {
-    transform: rotate(-12deg);
-  }
-  to {
-    transform: rotate(348deg);
   }
 }
 

@@ -136,8 +136,10 @@ let railMode = "assistant";
 let outlinePinned = false;
 /** 磁盘冲突中：抑制重复 toast，直到用户刷新或放弃 */
 let saveConflict = false;
-/** Aster 头像卸载（眨眼 / 视线跟随） */
+/** Aster FAB 卸载（眨眼 / 视线跟随） */
 let unmountAster = null;
+/** 侧栏头像 Aster 卸载 */
+let unmountAsterRail = null;
 
 /**
  * 当前仓库已注册账号列表。
@@ -818,6 +820,7 @@ function render() {
     }</div></aside><main id="main"></main><div class="workspace-resizer hidden" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant hidden" id="rail"></aside>`;
   unmountAster?.();
   unmountAster = null;
+  clearAsterRail();
   if (page === "write") renderWrite();
   else if (page === "dashboard") renderDashboard();
   else if (page === "published-preview") renderPublishedPreview();
@@ -1658,26 +1661,25 @@ function bindFinalize() {
  * 按当前上下文同步 Aster 表情：thinking > idea > watching > idle。
  */
 function syncAsterFace() {
-  const el = $("#toggle-assistant");
-  if (!el?.classList.contains("aster")) return;
-  if (busy) {
-    setAsterState(el, "thinking");
-    return;
-  }
-  if (
+  let face = "idle";
+  if (busy) face = "thinking";
+  else if (
     pending &&
     pending.doc === current?.id &&
     (pending.edits?.length || pending.next)
-  ) {
-    setAsterState(el, "idea");
-    return;
+  )
+    face = "idea";
+  else {
+    const sel = editor?.state?.selection;
+    if (sel && sel.to > sel.from) face = "watching";
   }
-  const sel = editor?.state?.selection;
-  if (sel && sel.to > sel.from) {
-    setAsterState(el, "watching");
-    return;
-  }
-  setAsterState(el, "idle");
+  $$(".aster").forEach((el) => setAsterState(el, face));
+}
+
+/** 卸下侧栏 Aster 头像 */
+function clearAsterRail() {
+  unmountAsterRail?.();
+  unmountAsterRail = null;
 }
 
 /**
@@ -1691,10 +1693,12 @@ function syncRailVisibility() {
   if (!draftWriting || previewMode) {
     rail.classList.add("hidden");
     resizer?.classList.add("hidden");
+    $(".aster-dock")?.classList.add("hidden");
     return;
   }
   rail.classList.toggle("hidden", !assistantOpen);
   resizer?.classList.toggle("hidden", !assistantOpen);
+  $(".aster-dock")?.classList.toggle("hidden", assistantOpen);
   const toggle = $("#toggle-assistant");
   if (toggle) {
     toggle.setAttribute(
@@ -1747,6 +1751,7 @@ function openArticleMaterials() {
 function renderAssistantRail() {
   const rail = $("#rail");
   if (!rail) return;
+  clearAsterRail();
   if (composer) {
     composer.destroy();
     composer = null;
@@ -1788,7 +1793,9 @@ function renderAssistantRail() {
   }
 
   rail.dataset.railMode = "assistant";
-  rail.innerHTML = `<div class="assistant-head"><span>${I.sparkles()} 写作伙伴</span><div class="assistant-head-actions"><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select><button type="button" id="close-assistant" title="收起">${I.panelClose()} 收起</button></div></div><div id="panel" data-ready="1"></div>`;
+  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<div class="assistant-head-actions"><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select><button type="button" id="close-assistant" class="ghost icon-btn" title="收起" aria-label="收起">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
+  unmountAsterRail = mountAster($("#aster-rail"));
+  syncAsterFace();
 
   const provider = $("#provider");
   if (provider) {
@@ -2065,7 +2072,7 @@ function renderWrite() {
   unmountAster?.();
   unmountAster = null;
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions">${asterHtml({ size: 40, state: "idle" })}<div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></section></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div></div>`;
   unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
   editor = new Editor({
@@ -2264,26 +2271,22 @@ function renderWrite() {
 
 /**
  * 在正文右侧挂载锚点大纲：悬停展开、离开收起，可固定。
+ * 挂在 .paper-stage 内绝对定位，随侧栏开合/拖宽自动贴齐正文右缘。
  */
 function mountArticleOutline() {
   const wrap = $(".paper-wrap");
-  if (!wrap || !editor) return;
+  const stage = $(".paper-stage") || wrap;
+  if (!wrap || !stage || !editor) return;
   const prev = $("#article-outline");
   prev?._teardown?.();
   prev?.remove();
   const nav = document.createElement("aside");
   nav.id = "article-outline";
   nav.className = "article-outline" + (outlinePinned ? " is-pinned" : "");
-  document.body.appendChild(nav);
+  stage.appendChild(nav);
 
-  /** 贴在正文区右侧并垂直居中 */
-  const place = () => {
-    const box = $(".paper-wrap")?.getBoundingClientRect();
-    if (!box) return;
-    nav.style.top = box.top + box.height / 2 + "px";
-    nav.style.transform = "translateY(-50%)";
-    nav.style.right = Math.max(8, window.innerWidth - box.right + 6) + "px";
-  };
+  /** 兼容旧调用；位置已由 CSS 相对 paper-stage 固定 */
+  const place = () => {};
   nav._place = place;
 
   /** 根据编辑器标题刷新锚点 */
@@ -2322,16 +2325,9 @@ function mountArticleOutline() {
         });
       };
     });
-    place();
   };
 
-  const onScroll = () => place();
-  wrap.addEventListener("scroll", onScroll, { passive: true });
-  window.addEventListener("resize", onScroll);
-  nav._teardown = () => {
-    wrap.removeEventListener("scroll", onScroll);
-    window.removeEventListener("resize", onScroll);
-  };
+  nav._teardown = () => {};
 
   editor.on("update", refresh);
   refresh();

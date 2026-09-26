@@ -10,15 +10,27 @@ const ASTER_STATES = new Set([
 ]);
 
 /**
- * @param {{ size?: number, state?: string, label?: string }} [opts]
+ * @param {{
+ *   size?: number,
+ *   state?: string,
+ *   label?: string,
+ *   id?: string,
+ *   button?: boolean,
+ * }} [opts]
  */
 export function asterHtml({
   size = 40,
   state = "idle",
   label = "写作伙伴",
+  id = "toggle-assistant",
+  button = true,
 } = {}) {
   const s = ASTER_STATES.has(state) ? state : "idle";
-  return `<button type="button" id="toggle-assistant" class="aster aster--${s}" style="--aster-size:${size}px" aria-label="${label}" title="${label}" aria-pressed="false"><span class="aster__halo"></span><span class="aster__body"><span class="aster__surface"></span><span class="aster__light"></span><span class="aster__eyes"><span class="aster__eye"></span><span class="aster__eye"></span></span></span><svg class="aster__orbit" viewBox="0 0 120 120" aria-hidden="true"><ellipse cx="60" cy="60" rx="53" ry="19" fill="none" stroke="currentColor" stroke-width="1.2"/></svg><span class="aster__satellite"></span><span class="aster__spark" hidden>✦</span></button>`;
+  const tag = button ? "button" : "span";
+  const attrs = button
+    ? `type="button" aria-pressed="false"`
+    : `role="img"`;
+  return `<${tag} id="${id}" class="aster aster--${s}" style="--aster-size:${size}px" aria-label="${label}" title="${label}" ${attrs}><span class="aster__halo"></span><span class="aster__body"><span class="aster__surface"></span><span class="aster__light"></span><span class="aster__eyes"><span class="aster__eye"></span><span class="aster__eye"></span></span></span><span class="aster__spark" hidden>✦</span></${tag}>`;
 }
 
 /**

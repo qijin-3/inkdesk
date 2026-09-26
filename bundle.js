@@ -24156,10 +24156,14 @@ var ASTER_STATES = /* @__PURE__ */ new Set([
 function asterHtml({
   size = 40,
   state: state2 = "idle",
-  label = "\u5199\u4F5C\u4F19\u4F34"
+  label = "\u5199\u4F5C\u4F19\u4F34",
+  id = "toggle-assistant",
+  button = true
 } = {}) {
   const s = ASTER_STATES.has(state2) ? state2 : "idle";
-  return `<button type="button" id="toggle-assistant" class="aster aster--${s}" style="--aster-size:${size}px" aria-label="${label}" title="${label}" aria-pressed="false"><span class="aster__halo"></span><span class="aster__body"><span class="aster__surface"></span><span class="aster__light"></span><span class="aster__eyes"><span class="aster__eye"></span><span class="aster__eye"></span></span></span><svg class="aster__orbit" viewBox="0 0 120 120" aria-hidden="true"><ellipse cx="60" cy="60" rx="53" ry="19" fill="none" stroke="currentColor" stroke-width="1.2"/></svg><span class="aster__satellite"></span><span class="aster__spark" hidden>\u2726</span></button>`;
+  const tag2 = button ? "button" : "span";
+  const attrs = button ? `type="button" aria-pressed="false"` : `role="img"`;
+  return `<${tag2} id="${id}" class="aster aster--${s}" style="--aster-size:${size}px" aria-label="${label}" title="${label}" ${attrs}><span class="aster__halo"></span><span class="aster__body"><span class="aster__surface"></span><span class="aster__light"></span><span class="aster__eyes"><span class="aster__eye"></span><span class="aster__eye"></span></span></span><span class="aster__spark" hidden>\u2726</span></${tag2}>`;
 }
 function mountAster(root2, { interactive = true } = {}) {
   if (!root2) return () => {
@@ -30209,6 +30213,7 @@ var railMode = "assistant";
 var outlinePinned = false;
 var saveConflict = false;
 var unmountAster = null;
+var unmountAsterRail = null;
 function accountList() {
   return state?.accounts || [];
 }
@@ -30683,6 +30688,7 @@ function render2() {
   ).join("") || '<p class="muted">\u4ECE\u4E00\u4E2A\u60F3\u6CD5\u5F00\u59CB\u3002</p>'}</div></aside><main id="main"></main><div class="workspace-resizer hidden" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant hidden" id="rail"></aside>`;
   unmountAster?.();
   unmountAster = null;
+  clearAsterRail();
   if (page === "write") renderWrite();
   else if (page === "dashboard") renderDashboard();
   else if (page === "published-preview") renderPublishedPreview();
@@ -31354,22 +31360,19 @@ function bindFinalize() {
   };
 }
 function syncAsterFace() {
-  const el = $("#toggle-assistant");
-  if (!el?.classList.contains("aster")) return;
-  if (busy) {
-    setAsterState(el, "thinking");
-    return;
+  let face = "idle";
+  if (busy) face = "thinking";
+  else if (pending && pending.doc === current?.id && (pending.edits?.length || pending.next))
+    face = "idea";
+  else {
+    const sel = editor?.state?.selection;
+    if (sel && sel.to > sel.from) face = "watching";
   }
-  if (pending && pending.doc === current?.id && (pending.edits?.length || pending.next)) {
-    setAsterState(el, "idea");
-    return;
-  }
-  const sel = editor?.state?.selection;
-  if (sel && sel.to > sel.from) {
-    setAsterState(el, "watching");
-    return;
-  }
-  setAsterState(el, "idle");
+  $$(".aster").forEach((el) => setAsterState(el, face));
+}
+function clearAsterRail() {
+  unmountAsterRail?.();
+  unmountAsterRail = null;
 }
 function syncRailVisibility() {
   const rail = $("#rail");
@@ -31379,10 +31382,12 @@ function syncRailVisibility() {
   if (!draftWriting || previewMode) {
     rail.classList.add("hidden");
     resizer?.classList.add("hidden");
+    $(".aster-dock")?.classList.add("hidden");
     return;
   }
   rail.classList.toggle("hidden", !assistantOpen);
   resizer?.classList.toggle("hidden", !assistantOpen);
+  $(".aster-dock")?.classList.toggle("hidden", assistantOpen);
   const toggle = $("#toggle-assistant");
   if (toggle) {
     toggle.setAttribute(
@@ -31419,6 +31424,7 @@ function openArticleMaterials() {
 function renderAssistantRail() {
   const rail = $("#rail");
   if (!rail) return;
+  clearAsterRail();
   if (composer) {
     composer.destroy();
     composer = null;
@@ -31454,7 +31460,9 @@ function renderAssistantRail() {
     return;
   }
   rail.dataset.railMode = "assistant";
-  rail.innerHTML = `<div class="assistant-head"><span>${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</span><div class="assistant-head-actions"><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select><button type="button" id="close-assistant" title="\u6536\u8D77">${I.panelClose()} \u6536\u8D77</button></div></div><div id="panel" data-ready="1"></div>`;
+  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<div class="assistant-head-actions"><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select><button type="button" id="close-assistant" class="ghost icon-btn" title="\u6536\u8D77" aria-label="\u6536\u8D77">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
+  unmountAsterRail = mountAster($("#aster-rail"));
+  syncAsterFace();
   const provider = $("#provider");
   if (provider) {
     provider.value = state.provider;
@@ -31685,7 +31693,7 @@ function renderWrite() {
   }
   unmountAster?.();
   unmountAster = null;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions">${asterHtml({ size: 40, state: "idle" })}<div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div></div>`;
   unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
   editor = new Editor({
@@ -31872,20 +31880,16 @@ function renderWrite() {
 }
 function mountArticleOutline() {
   const wrap2 = $(".paper-wrap");
-  if (!wrap2 || !editor) return;
+  const stage = $(".paper-stage") || wrap2;
+  if (!wrap2 || !stage || !editor) return;
   const prev = $("#article-outline");
   prev?._teardown?.();
   prev?.remove();
   const nav2 = document.createElement("aside");
   nav2.id = "article-outline";
   nav2.className = "article-outline" + (outlinePinned ? " is-pinned" : "");
-  document.body.appendChild(nav2);
+  stage.appendChild(nav2);
   const place = () => {
-    const box = $(".paper-wrap")?.getBoundingClientRect();
-    if (!box) return;
-    nav2.style.top = box.top + box.height / 2 + "px";
-    nav2.style.transform = "translateY(-50%)";
-    nav2.style.right = Math.max(8, window.innerWidth - box.right + 6) + "px";
   };
   nav2._place = place;
   const refresh = () => {
@@ -31919,14 +31923,8 @@ function mountArticleOutline() {
         });
       };
     });
-    place();
   };
-  const onScroll = () => place();
-  wrap2.addEventListener("scroll", onScroll, { passive: true });
-  window.addEventListener("resize", onScroll);
   nav2._teardown = () => {
-    wrap2.removeEventListener("scroll", onScroll);
-    window.removeEventListener("resize", onScroll);
   };
   editor.on("update", refresh);
   refresh();
