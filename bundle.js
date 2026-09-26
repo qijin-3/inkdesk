@@ -830,9 +830,13 @@ function bindSocialPreview(root2, { html: html2, title, api: api2, web }) {
     const exportBtn2 = q("#social-export");
     const status = q("#social-status");
     const list2 = q("#social-pages");
+    const pane = list2?.closest(".preview-pane-social") || q(".preview-pane-social");
     if (!exportBtn2 || !status || !list2) return;
     exportBtn2.disabled = true;
     status.textContent = "\u6B63\u5728\u6392\u7248\u2026";
+    status.classList.remove("is-tip");
+    pane?.classList.remove("is-tip-only");
+    list2.hidden = false;
     list2.replaceChildren();
     try {
       const next2 = await socialPages(html2, title);
@@ -861,7 +865,14 @@ function bindSocialPreview(root2, { html: html2, title, api: api2, web }) {
       status.textContent = `\u5171 ${pages.length} \u5F20`;
       exportBtn2.disabled = false;
     } catch (e) {
-      if (g === generation) status.textContent = "\u6392\u7248\u5931\u8D25\uFF1A" + e.message;
+      if (g !== generation) return;
+      pages = [];
+      list2.replaceChildren();
+      list2.hidden = true;
+      pane?.classList.add("is-tip-only");
+      status.classList.add("is-tip");
+      status.textContent = e.message || "\u6392\u7248\u5931\u8D25";
+      exportBtn2.disabled = true;
     }
   }
   const exportBtn = q("#social-export");
@@ -30580,9 +30591,7 @@ function render2() {
   $("#reference-drawer")?.remove();
   $("#published-drawer")?.remove();
   $("#outline-popover")?.remove();
-  const outline = $("#article-outline");
-  outline?._teardown?.();
-  outline?.remove();
+  removeArticleOutline();
   if (composer) {
     composer.destroy();
     composer = null;
@@ -31518,8 +31527,14 @@ function setPreviewPane(pane) {
     el.hidden = el.dataset.pane !== previewPane;
   });
 }
+function removeArticleOutline() {
+  const outline = $("#article-outline");
+  outline?._teardown?.();
+  outline?.remove();
+}
 function renderPreview() {
   previewDocId = current.id;
+  removeArticleOutline();
   if (previewPane !== "social") previewPane = "wechat";
   $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
   bindArticleHeader();
@@ -31543,6 +31558,7 @@ function renderPublishedPreview() {
     page = "dashboard";
     return renderDashboard();
   }
+  removeArticleOutline();
   if (previewPane !== "social") previewPane = "wechat";
   const doc3 = {
     title: publishedPreview.title,

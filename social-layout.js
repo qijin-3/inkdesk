@@ -699,9 +699,13 @@ export function bindSocialPreview(root, { html, title, api, web }) {
     const exportBtn = q("#social-export");
     const status = q("#social-status");
     const list = q("#social-pages");
+    const pane = list?.closest(".preview-pane-social") || q(".preview-pane-social");
     if (!exportBtn || !status || !list) return;
     exportBtn.disabled = true;
     status.textContent = "正在排版…";
+    status.classList.remove("is-tip");
+    pane?.classList.remove("is-tip-only");
+    list.hidden = false;
     list.replaceChildren();
     try {
       const next = await socialPages(html, title);
@@ -734,7 +738,14 @@ export function bindSocialPreview(root, { html, title, api, web }) {
       status.textContent = `共 ${pages.length} 张`;
       exportBtn.disabled = false;
     } catch (e) {
-      if (g === generation) status.textContent = "排版失败：" + e.message;
+      if (g !== generation) return;
+      pages = [];
+      list.replaceChildren();
+      list.hidden = true;
+      pane?.classList.add("is-tip-only");
+      status.classList.add("is-tip");
+      status.textContent = e.message || "排版失败";
+      exportBtn.disabled = true;
     }
   }
 

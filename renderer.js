@@ -773,9 +773,7 @@ function render() {
   $("#reference-drawer")?.remove();
   $("#published-drawer")?.remove();
   $("#outline-popover")?.remove();
-  const outline = $("#article-outline");
-  outline?._teardown?.();
-  outline?.remove();
+  removeArticleOutline();
   if (composer) {
     composer.destroy();
     composer = null;
@@ -1946,11 +1944,19 @@ function setPreviewPane(pane) {
   });
 }
 
+/** 移除正文右侧大纲（预览态不展示）。 */
+function removeArticleOutline() {
+  const outline = $("#article-outline");
+  outline?._teardown?.();
+  outline?.remove();
+}
+
 /**
  * 渲染预览模式：顶栏分栏切换公众号 / 小红书；侧栏收起。
  */
 function renderPreview() {
   previewDocId = current.id;
+  removeArticleOutline();
   if (previewPane !== "social") previewPane = "wechat";
   $("#main").innerHTML =
     `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">退出预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} 导出图片</button><button type="button" id="copy-publish">${I.copy()} 复制排版</button><button type="button" id="push-wechat">${I.send()} 推送到公众号</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">正在排版…</p><div id="social-pages"></div></div></section></div>`;
@@ -1980,6 +1986,7 @@ function renderPublishedPreview() {
     page = "dashboard";
     return renderDashboard();
   }
+  removeArticleOutline();
   if (previewPane !== "social") previewPane = "wechat";
   const doc = {
     title: publishedPreview.title,
