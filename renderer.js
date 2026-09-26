@@ -1,4 +1,4 @@
-import { manageSkills, mountSkillPicker } from "./skills-ui.js";
+import { mountSkillPicker, mountSkillsSettings } from "./skills-ui.js";
 import { bindSocialPreview } from "./social-layout.js";
 import { Composer } from "./composer.js";
 import { I } from "./icons.js";
@@ -3296,7 +3296,7 @@ function renderSettings() {
       )
       .join(
         "",
-      )}</nav>${settingsTab === "config" ? configBody : settingsTab === "accounts" ? accountsBody : settingsTab === "skills" ? `<div class="dashboard-card"><div class="settings-card-head"><h3>技能配置</h3><button id="manage-skills" class="primary">管理技能</button></div><p>通用技能供所有账号使用；账号技能与默认启用项按账号独立配置。</p><label>配置账号<select id="skill-account">${accountList().map(a=>`<option value="${esc(a.id)}">${esc(a.label)}</option>`).join("")}</select></label><p class="muted">在这里编辑指令和组合步骤。对话中只选择本次使用的技能。</p></div>` : groupsBody}</section>`;
+      )}</nav>${settingsTab === "config" ? configBody : settingsTab === "accounts" ? accountsBody : settingsTab === "skills" ? `<div id="skills-settings-root"></div>` : groupsBody}</section>`;
   $$("[data-settings-tab]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -3305,8 +3305,20 @@ function renderSettings() {
       }),
   );
   if (settingsTab === "skills") {
-    $("#skill-account").value=account;
-    $("#manage-skills").onclick=()=>manageSkills(api,$("#skill-account").value);
+    const accounts = accountList();
+    const skillAccount = accounts.some((a) => a.id === account)
+      ? account
+      : accounts[0]?.id;
+    mountSkillsSettings(
+      $("#skills-settings-root"),
+      api,
+      skillAccount,
+      accounts,
+      (nextAccount) => {
+        if (nextAccount) account = nextAccount;
+        render();
+      },
+    );
   }
   if (settingsTab === "config") {
     $("#setting-provider").value = state.provider;
@@ -4152,7 +4164,7 @@ async function renderProfile() {
                       .join("")}</div></details>`
                   : ""
               }`
-            : `<button id="profile-skills" class="primary">${I.sparkles()} 配置账号技能</button><p>在技能工作室维护账号专属指令；历史人设建议和版本继续保留。</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} · ${p.status === "pending" ? "待审阅" : p.status === "applied" ? "已采纳" : "已保留原设定"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("、")}</p><button data-model-proposal="${p.id}">查看建议</button></div>`).join("") || "<p>还没有 AI 调整建议。</p>"}</div><h3>历史版本</h3>${model.history.map((h) => `<div class="result-card"><small>${esc(h.at)} · ${esc(h.reason)}</small><details><summary>查看当时的设定</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h.id}">恢复此版本</button></div>`).join("")}`
+            : `<button id="profile-skills" class="primary">${I.sparkles()} 配置账号技能</button><p>在设置 → 技能中维护仓库 <code>.agents/skills</code> 技能包与默认启用；历史人设建议和版本继续保留。</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} · ${p.status === "pending" ? "待审阅" : p.status === "applied" ? "已采纳" : "已保留原设定"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("、")}</p><button data-model-proposal="${p.id}">查看建议</button></div>`).join("") || "<p>还没有 AI 调整建议。</p>"}</div><h3>历史版本</h3>${model.history.map((h) => `<div class="result-card"><small>${esc(h.at)} · ${esc(h.reason)}</small><details><summary>查看当时的设定</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h.id}">恢复此版本</button></div>`).join("")}`
         }</div></section>`;
       const save = async () => {
         if (!definition || $("#model-text").value === model.modules[profileTab])

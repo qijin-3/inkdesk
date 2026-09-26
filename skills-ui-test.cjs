@@ -14,31 +14,38 @@ const { _electron: electron } = require("@playwright/test"),
   try {
     app = await electron.launch({ args: [path.resolve("main.cjs")], env });
     const w = await app.firstWindow();
-    assert.equal(await w.locator(".sidebar #manage-skills").count(),0);
     await w.locator('[data-page="settings"]').click();
     await w.locator('[data-settings-tab="skills"]').click();
-    await w.locator("#manage-skills").click();
     await w.locator("#skill-new").click();
-    await w.locator("#skill-name").fill("我的核查");
-    await w.locator("#skill-prompt").fill("逐项标记没有来源的论断。");
-    await w.locator("#skill-enabled").check();
-    await w.locator("#skill-save").click();
+    await w.locator("#skill-prompt-input").fill("fact-check");
+    await w.locator("#skill-prompt-ok").click();
+    await w.locator("#skill-prompt-input").fill("核实来源与待核实标注");
+    await w.locator("#skill-prompt-ok").click();
+    await w.locator("#skill-prompt-input").fill("");
+    await w.locator("#skill-prompt-ok").click();
     await w.waitForFunction(() =>
-      document.querySelector(".skill-list")?.textContent.includes("默认启用"),
+      document
+        .querySelector(".skill-tree")
+        ?.textContent.includes("fact-check"),
     );
-    await w.screenshot({path:"/tmp/aside-skills.png"});
-    await w.locator("#skill-close").click();
+    await w.locator('[data-default="fact-check"]').check();
+    await w.waitForFunction(() =>
+      document.querySelector('[data-default="fact-check"]')?.checked,
+    );
+    assert.ok(
+      fs.existsSync(
+        path.join(vaultRoot, ".agents/skills/fact-check/SKILL.md"),
+      ),
+    );
     await w.locator("#new").click();
     await w.locator("#toggle-assistant").click();
     await w
       .locator("#skill-picker input:checked")
       .waitFor({ state: "attached" });
-    assert.equal(await w.locator('[data-tab="titles"]').count(), 0);
     await app.evaluate(({ ipcMain }) => {
       ipcMain.removeHandler("agent");
       ipcMain.handle("agent", (_, req) => "收到技能 " + req.skillIds?.length);
     });
-    await w.screenshot({path:"/tmp/aside-agent-chat.png"});
     await w.locator("#instruction").fill("检查这一段");
     await w.locator("#send").click();
     await w.locator(".message.assistant").waitFor();
@@ -46,9 +53,7 @@ const { _electron: electron } = require("@playwright/test"),
       await w.locator(".message.assistant").innerText(),
       /收到技能 1/,
     );
-    console.log(
-      "PASS skills UI: create, defaults, picker, request, removed old tabs",
-    );
+    console.log("PASS skills UI: tree page, defaults, picker, symlink store");
   } finally {
     if (app) await app.close();
     fs.rmSync(dir, { recursive: true, force: true });

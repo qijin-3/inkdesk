@@ -1,9 +1,11 @@
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
 const channels = [
   "skills-list",
-  "skills-save",
+  "skills-import",
+  "skills-create",
   "skills-remove",
   "skills-configure",
+  "skills-reveal",
   "export-social",
   "load",
   "model-load",

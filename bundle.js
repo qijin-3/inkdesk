@@ -90,156 +90,169 @@ var escape = (s) => String(s ?? "").replace(
   /[&<>"']/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
 );
-async function manageSkills(api2, account2, onDone = () => {
-}) {
-  const modal = document.createElement("dialog");
-  modal.className = "skill-dialog";
-  document.body.append(modal);
-  let state2, active = null, scope = "global", modified = false;
-  const close2 = () => {
-    if (modified && !confirm("\u653E\u5F03\u672A\u4FDD\u5B58\u7684\u6280\u80FD\u4FEE\u6539\uFF1F")) return;
-    modal.close();
-    modal.remove();
-    onDone();
-  };
-  modal.addEventListener("cancel", (e) => {
-    e.preventDefault();
-    close2();
+function askLine(title, placeholder = "", { allowEmpty = false } = {}) {
+  return new Promise((resolve) => {
+    const d = document.createElement("dialog");
+    d.className = "skill-ask-dialog";
+    d.innerHTML = `<div class="skill-ask-body"><h2>${escape(title)}</h2><input id="skill-prompt-input" type="text" placeholder="${escape(placeholder)}" autocomplete="off"><div class="row"><button type="button" id="skill-prompt-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="skill-prompt-ok">\u786E\u5B9A</button></div></div>`;
+    document.body.append(d);
+    const input = d.querySelector("#skill-prompt-input");
+    const done = (v) => {
+      d.close();
+      d.remove();
+      resolve(v);
+    };
+    d.querySelector("#skill-prompt-cancel").onclick = () => done(null);
+    d.addEventListener("cancel", (e) => {
+      e.preventDefault();
+      done(null);
+    });
+    const submit = () => {
+      const v = input.value.trim();
+      if (!v && !allowEmpty) return;
+      done(v);
+    };
+    d.querySelector("#skill-prompt-ok").onclick = submit;
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submit();
+      }
+    });
+    d.showModal();
+    input.focus();
   });
-  async function load() {
+}
+async function mountSkillsSettings(root2, api2, account2, accounts, onRefresh = () => {
+}) {
+  let state2;
+  const err = (msg) => {
+    const el = root2.querySelector("#skill-page-error");
+    if (el) el.textContent = msg || "";
+  };
+  const load = async () => {
+    if (!account2) {
+      root2.innerHTML = '<p class="muted">\u8BF7\u5148\u6DFB\u52A0\u8D26\u53F7\uFF0C\u518D\u7BA1\u7406\u6280\u80FD\u9ED8\u8BA4\u542F\u7528\u9879\u3002</p>';
+      return;
+    }
     state2 = await api2("skills-list", { account: account2 });
     draw();
-  }
-  function draw() {
-    modal.innerHTML = `<div class="skill-header"><div><h2>\u6280\u80FD\u5DE5\u4F5C\u5BA4</h2><p>\u901A\u7528\u6280\u80FD\u8DE8\u8D26\u53F7\u590D\u7528\uFF0C\u8D26\u53F7\u6280\u80FD\u4EC5\u4F9B\u5F53\u524D\u8D26\u53F7\u4F7F\u7528\u3002</p></div><button id="skill-close" aria-label="\u5173\u95ED\u6280\u80FD\u5DE5\u4F5C\u5BA4">\u5173\u95ED</button></div><div class="skill-scopes"><button data-scope="global" class="${scope === "global" ? "primary" : ""}">\u901A\u7528\u6280\u80FD</button><button data-scope="account" class="${scope === "account" ? "primary" : ""}">\u8D26\u53F7\u6280\u80FD</button><button id="skill-new">\uFF0B \u65B0\u5EFA\u6280\u80FD</button></div><div class="skill-workspace"><div class="skill-list">${state2.items.filter((x) => x.scope === scope).map(
-      (x) => `<button data-skill="${x.id}" class="${active?.id === x.id ? "selected" : ""}"><strong>${escape(x.name)}</strong><small>${x.includes.length ? "\u7EC4\u5408\u6280\u80FD" : "\u6307\u4EE4\u6280\u80FD"}${(state2.accounts[state2.account] || []).includes(x.id) ? " \xB7 \u9ED8\u8BA4\u542F\u7528" : ""}</small></button>`
-    ).join("") || '<p class="muted">\u8FD8\u6CA1\u6709\u6280\u80FD\u3002\u521B\u5EFA\u4E00\u6761\u6307\u4EE4\uFF0C\u6216\u7EC4\u5408\u5DF2\u6709\u6280\u80FD\u3002</p>'}</div><div class="skill-editor">${active ? `<label>\u6280\u80FD\u540D\u79F0<input id="skill-name" maxlength="80" value="${escape(active.name)}"></label><label>\u6267\u884C\u6307\u4EE4<textarea id="skill-prompt" rows="9" placeholder="\u63CF\u8FF0\u4EFB\u52A1\u3001\u65B9\u6CD5\u548C\u8F93\u51FA\u8981\u6C42\u2026">${escape(active.prompt)}</textarea></label><label>\u7EC4\u5408\u6B65\u9AA4 <small>\u6309\u987A\u5E8F\u6267\u884C\uFF0C\u6700\u540E\u6267\u884C\u4E0A\u65B9\u6307\u4EE4</small></label><div id="skill-steps"></div><div class="row"><select id="skill-add-choice"><option value="">\u9009\u62E9\u4E00\u4E2A\u6280\u80FD</option>${state2.items.filter(
-      (x) => x.id !== active.id && (active.scope === "account" || x.scope === "global")
-    ).map((x) => `<option value="${x.id}">${escape(x.name)}</option>`).join(
-      ""
-    )}</select><button id="skill-add">\u6DFB\u52A0\u6B65\u9AA4</button></div><label class="skill-check"><input type="checkbox" id="skill-enabled" ${(state2.accounts[state2.account] || []).includes(active.id) ? "checked" : ""}> \u5F53\u524D\u8D26\u53F7\u9ED8\u8BA4\u542F\u7528</label><div class="skill-actions"><button id="skill-save" class="primary">\u4FDD\u5B58\u6280\u80FD</button>${active.id ? '<button id="skill-delete" class="danger">\u5220\u9664</button>' : ""}</div>` : '<div class="skill-empty">\u9009\u62E9\u6216\u65B0\u5EFA\u6280\u80FD<br><small>\u6280\u80FD\u662F\u53EF\u7F16\u8F91\u7684\u6307\u4EE4\uFF0C\u53EF\u81EA\u7531\u7EC4\u5408\u3002\u8D26\u53F7\u4EBA\u8BBE\u7EE7\u7EED\u4F5C\u4E3A\u5199\u4F5C\u80CC\u666F\u3002</small></div>'}</div></div><p id="skill-error" role="status"></p>`;
-    modal.querySelector("#skill-close").onclick = close2;
-    const switchTo = (fn) => {
-      if (modified && !confirm("\u653E\u5F03\u672A\u4FDD\u5B58\u7684\u6280\u80FD\u4FEE\u6539\uFF1F")) return;
-      modified = false;
-      fn();
-      draw();
+  };
+  const draw = () => {
+    const defaults2 = state2.accounts[state2.account] || [];
+    const accountOpts = accounts.map(
+      (a) => `<option value="${escape(a.id)}" ${a.id === state2.account ? "selected" : ""}>${escape(a.label)}</option>`
+    ).join("");
+    const treeHtml = state2.tree.length ? state2.tree.map((g) => {
+      const rows = g.skills.map((x) => {
+        const enabled = defaults2.includes(x.id);
+        return `<div class="skill-tree-row" data-skill-id="${escape(x.id)}"><div class="skill-tree-main"><strong>${escape(x.name)}</strong><span class="muted">${escape(x.description || "")}</span>${x.missing ? '<span class="notice">\u76EE\u5F55\u5F02\u5E38</span>' : ""}</div><div class="skill-tree-actions"><label class="skill-check"><input type="checkbox" data-default="${escape(x.id)}" ${enabled ? "checked" : ""}> \u9ED8\u8BA4\u542F\u7528</label><button type="button" class="ghost" data-reveal="${escape(x.id)}">\u8BBF\u8FBE</button><button type="button" class="ghost danger" data-remove="${escape(x.id)}">\u5220\u9664</button></div></div>`;
+      }).join("");
+      return `<details class="skill-tree-group" open><summary><span class="skill-tree-group-label">${escape(g.label)}</span><span class="muted">${g.skills.length}</span></summary><div class="skill-tree-list">${rows}</div></details>`;
+    }).join("") : '<p class="muted">\u8FD8\u6CA1\u6709\u6280\u80FD\u3002\u5C06\u542B SKILL.md \u7684\u6587\u4EF6\u5939\u653E\u5230\u4ED3\u5E93 <code>.agents/skills</code>\uFF0C\u6216\u4F7F\u7528\u5BFC\u5165 / \u65B0\u5EFA\u3002</p>';
+    root2.innerHTML = `<div class="settings-card-head accounts-toolbar"><h3>\u6280\u80FD</h3><div class="settings-card-actions"><button type="button" id="skill-reveal-root">${escape("\u8BBF\u8FBE")}</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div></div><p class="muted">\u6280\u80FD\u5B58\u653E\u4E8E\u4ED3\u5E93 <code>${escape(state2.root)}</code>\uFF1B\u8FD0\u884C\u65F6\u4EE5\u8F6F\u94FE\u63A5\u6302\u5230 Agent \u5DE5\u4F5C\u533A\u540C\u540D\u8DEF\u5F84\u3002\u4E0B\u65B9\u6309\u6587\u4EF6\u5939\u5206\u7EC4\u5E73\u94FA\u5168\u90E8\u6280\u80FD\u3002</p><label class="skill-default-account">\u9ED8\u8BA4\u542F\u7528\u8D26\u53F7<select id="skill-account">${accountOpts}</select></label><div class="skill-tree">${treeHtml}</div><p id="skill-page-error" role="status"></p>`;
+    root2.querySelector("#skill-account").onchange = async (e) => {
+      onRefresh(e.target.value);
     };
-    modal.querySelectorAll("[data-scope]").forEach(
-      (b) => b.onclick = () => switchTo(() => {
-        scope = b.dataset.scope;
-        active = null;
-      })
-    );
-    modal.querySelectorAll("[data-skill]").forEach(
-      (b) => b.onclick = () => switchTo(() => {
-        active = structuredClone(
-          state2.items.find((x) => x.id === b.dataset.skill)
-        );
-      })
-    );
-    modal.querySelector("#skill-new").onclick = () => switchTo(() => {
-      active = { scope, name: "", prompt: "", includes: [] };
-    });
-    if (!active) return;
-    const q = (s) => modal.querySelector(s);
-    q("#skill-name").oninput = (e) => {
-      active.name = e.target.value;
-      modified = true;
-    };
-    q("#skill-prompt").oninput = (e) => {
-      active.prompt = e.target.value;
-      modified = true;
-    };
-    q("#skill-enabled").onchange = () => modified = true;
-    const steps = () => {
-      q("#skill-steps").innerHTML = active.includes.map(
-        (id, i) => `<div class="skill-step"><span>${i + 1}. ${escape(state2.items.find((x) => x.id === id)?.name || "\u5DF2\u5931\u6548")}</span><button data-up="${i}" ${i === 0 ? "disabled" : ""} aria-label="\u4E0A\u79FB\u6B65\u9AA4">\u2191</button><button data-remove="${i}" aria-label="\u79FB\u9664\u6B65\u9AA4">\xD7</button></div>`
-      ).join("");
-      q("#skill-steps").querySelectorAll("[data-remove]").forEach(
-        (b) => b.onclick = () => {
-          active.includes.splice(+b.dataset.remove, 1);
-          modified = true;
-          steps();
-        }
-      );
-      q("#skill-steps").querySelectorAll("[data-up]").forEach(
-        (b) => b.onclick = () => {
-          const i = +b.dataset.up;
-          [active.includes[i - 1], active.includes[i]] = [
-            active.includes[i],
-            active.includes[i - 1]
-          ];
-          modified = true;
-          steps();
-        }
-      );
-    };
-    steps();
-    q("#skill-add").onclick = () => {
-      const id = q("#skill-add-choice").value;
-      if (id && !active.includes.includes(id)) {
-        active.includes.push(id);
-        modified = true;
-        steps();
+    root2.querySelector("#skill-reveal-root").onclick = async () => {
+      try {
+        await api2("skills-reveal", { account: state2.account });
+      } catch (e) {
+        err(e.message);
       }
     };
-    q("#skill-save").onclick = async () => {
-      const b = q("#skill-save");
-      b.disabled = true;
+    root2.querySelector("#skill-import").onclick = async () => {
       try {
-        const enabled = q("#skill-enabled").checked;
-        const ids = new Set(state2.items.map((x) => x.id));
-        state2 = await api2("skills-save", {
-          account: account2,
-          revision: state2.revision,
-          skill: active
+        const next2 = await api2("skills-import", {
+          account: state2.account,
+          revision: state2.revision
         });
-        active = state2.items.find(
-          (x) => active.id ? x.id === active.id : !ids.has(x.id)
-        );
-        const defaults2 = (state2.accounts[state2.account] || []).filter(
-          (id) => id !== active.id
-        );
-        if (enabled) defaults2.push(active.id);
-        state2 = await api2("skills-configure", {
-          account: account2,
-          revision: state2.revision,
-          ids: defaults2
-        });
-        modified = false;
+        if (!next2) return;
+        state2 = next2;
         draw();
       } catch (e) {
-        q("#skill-error").textContent = e.message;
-        b.disabled = false;
+        err(e.message);
       }
     };
-    if (q("#skill-delete"))
-      q("#skill-delete").onclick = async () => {
-        if (!confirm("\u5220\u9664\u6B64\u6280\u80FD\uFF1F\u901A\u7528\u6280\u80FD\u5220\u9664\u540E\u5C06\u5BF9\u6240\u6709\u8D26\u53F7\u751F\u6548\u3002")) return;
+    root2.querySelector("#skill-new").onclick = async () => {
+      const name = await askLine(
+        "\u6280\u80FD\u540D\u79F0",
+        "\u5C0F\u5199\u5B57\u6BCD\u3001\u6570\u5B57\u3001\u8FDE\u5B57\u7B26\uFF0C\u5982 fact-check"
+      );
+      if (name == null) return;
+      const description = await askLine(
+        "\u6280\u80FD\u63CF\u8FF0",
+        "\u505A\u4EC0\u4E48\u3001\u4F55\u65F6\u4F7F\u7528\uFF081\u20131024 \u5B57\uFF09"
+      );
+      if (description == null) return;
+      const group = await askLine("\u5206\u7EC4\u8DEF\u5F84\uFF08\u53EF\u7559\u7A7A\uFF09", "\u53EF\u9009\uFF0C\u5982 writing\uFF1B\u7559\u7A7A\u653E\u5728\u6839\u76EE\u5F55", {
+        allowEmpty: true
+      });
+      if (group == null) return;
+      try {
+        state2 = await api2("skills-create", {
+          account: state2.account,
+          revision: state2.revision,
+          name,
+          description,
+          group
+        });
+        draw();
+      } catch (e) {
+        err(e.message);
+      }
+    };
+    root2.querySelectorAll("[data-default]").forEach((input) => {
+      input.onchange = async () => {
         try {
-          state2 = await api2("skills-remove", {
-            account: account2,
+          const ids = [
+            ...root2.querySelectorAll("[data-default]:checked")
+          ].map((el) => el.getAttribute("data-default"));
+          state2 = await api2("skills-configure", {
+            account: state2.account,
             revision: state2.revision,
-            id: active.id
+            ids
           });
-          active = null;
-          modified = false;
           draw();
         } catch (e) {
-          q("#skill-error").textContent = e.message;
+          err(e.message);
+          input.checked = !input.checked;
         }
       };
-  }
-  modal.showModal();
+    });
+    root2.querySelectorAll("[data-reveal]").forEach((b) => {
+      b.onclick = async () => {
+        try {
+          await api2("skills-reveal", {
+            account: state2.account,
+            id: b.getAttribute("data-reveal")
+          });
+        } catch (e) {
+          err(e.message);
+        }
+      };
+    });
+    root2.querySelectorAll("[data-remove]").forEach((b) => {
+      b.onclick = async () => {
+        if (!confirm("\u5220\u9664\u6B64\u6280\u80FD\uFF1F\u5C06\u79FB\u9664\u4ED3\u5E93 .agents/skills \u4E0B\u5BF9\u5E94\u6587\u4EF6\u5939\u3002"))
+          return;
+        try {
+          state2 = await api2("skills-remove", {
+            account: state2.account,
+            revision: state2.revision,
+            id: b.getAttribute("data-remove")
+          });
+          draw();
+        } catch (e) {
+          err(e.message);
+        }
+      };
+    });
+  };
   try {
     await load();
   } catch (e) {
-    modal.textContent = e.message;
-    const b = document.createElement("button");
-    b.textContent = "\u5173\u95ED";
-    b.onclick = close2;
-    modal.append(b);
+    root2.innerHTML = `<p class="notice">${escape(e.message)}</p>`;
   }
 }
 async function mountSkillPicker(root2, api2, account2, session) {
@@ -251,12 +264,24 @@ async function mountSkillPicker(root2, api2, account2, session) {
     session.skillIds = [...ids];
     const draw = () => {
       const selected = session.skillIds || [];
-      root2.innerHTML = `<details class="chat-skill-menu"><summary title="\u9009\u62E9\u672C\u6B21\u6280\u80FD">\u6280\u80FD${selected.length ? ` \xB7 ${selected.length}` : ""}</summary><div class="chat-skill-options"><strong>\u672C\u6B21\u4F7F\u7528</strong>${data.items.map((x) => `<label class="skill-check"><input type="checkbox" value="${x.id}" ${selected.includes(x.id) ? "checked" : ""}>${escape(x.name)}<small>${x.scope === "global" ? "\u901A\u7528" : "\u8D26\u53F7"}</small></label>`).join("") || "<p>\u8FD8\u6CA1\u6709\u6280\u80FD\uFF0C\u8BF7\u5728\u8BBE\u7F6E \u2192 \u6280\u80FD\u4E2D\u914D\u7F6E\u3002</p>"}</div></details>`;
-      root2.querySelectorAll("input").forEach((x) => x.onchange = () => {
-        session.skillIds = [...root2.querySelectorAll("input:checked")].map((x2) => x2.value);
-        root2.querySelector("summary").textContent = `\u6280\u80FD${session.skillIds.length ? " \xB7 " + session.skillIds.length : ""}`;
-        root2.dispatchEvent(new CustomEvent("skills-change", { bubbles: true }));
-      });
+      const byGroup = data.tree?.length ? data.tree : [{ group: "", label: "\u6280\u80FD", skills: data.items || [] }];
+      root2.innerHTML = `<details class="chat-skill-menu"><summary title="\u9009\u62E9\u672C\u6B21\u6280\u80FD">\u6280\u80FD${selected.length ? ` \xB7 ${selected.length}` : ""}</summary><div class="chat-skill-options"><strong>\u672C\u6B21\u4F7F\u7528</strong>${byGroup.map((g) => {
+        const rows = g.skills.map(
+          (x) => `<label class="skill-check"><input type="checkbox" value="${escape(x.id)}" ${selected.includes(x.id) ? "checked" : ""}>${escape(x.name)}${g.group ? `<small>${escape(g.group)}</small>` : ""}</label>`
+        ).join("");
+        return g.group ? `<div class="chat-skill-group"><span>${escape(g.label)}</span>${rows}</div>` : rows;
+      }).join("") || "<p>\u8FD8\u6CA1\u6709\u6280\u80FD\uFF0C\u8BF7\u5728\u8BBE\u7F6E \u2192 \u6280\u80FD\u4E2D\u914D\u7F6E\u3002</p>"}</div></details>`;
+      root2.querySelectorAll("input").forEach(
+        (x) => x.onchange = () => {
+          session.skillIds = [...root2.querySelectorAll("input:checked")].map(
+            (el) => el.value
+          );
+          root2.querySelector("summary").textContent = `\u6280\u80FD${session.skillIds.length ? " \xB7 " + session.skillIds.length : ""}`;
+          root2.dispatchEvent(
+            new CustomEvent("skills-change", { bubbles: true })
+          );
+        }
+      );
       root2.querySelector("details").addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
           e.currentTarget.open = false;
@@ -32589,7 +32614,7 @@ function renderSettings() {
     (t) => `<button type="button" data-settings-tab="${t.id}" class="${settingsTab === t.id ? "active" : ""}">${t.title}</button>`
   ).join(
     ""
-  )}</nav>${settingsTab === "config" ? configBody : settingsTab === "accounts" ? accountsBody : settingsTab === "skills" ? `<div class="dashboard-card"><div class="settings-card-head"><h3>\u6280\u80FD\u914D\u7F6E</h3><button id="manage-skills" class="primary">\u7BA1\u7406\u6280\u80FD</button></div><p>\u901A\u7528\u6280\u80FD\u4F9B\u6240\u6709\u8D26\u53F7\u4F7F\u7528\uFF1B\u8D26\u53F7\u6280\u80FD\u4E0E\u9ED8\u8BA4\u542F\u7528\u9879\u6309\u8D26\u53F7\u72EC\u7ACB\u914D\u7F6E\u3002</p><label>\u914D\u7F6E\u8D26\u53F7<select id="skill-account">${accountList().map((a) => `<option value="${esc(a.id)}">${esc(a.label)}</option>`).join("")}</select></label><p class="muted">\u5728\u8FD9\u91CC\u7F16\u8F91\u6307\u4EE4\u548C\u7EC4\u5408\u6B65\u9AA4\u3002\u5BF9\u8BDD\u4E2D\u53EA\u9009\u62E9\u672C\u6B21\u4F7F\u7528\u7684\u6280\u80FD\u3002</p></div>` : groupsBody}</section>`;
+  )}</nav>${settingsTab === "config" ? configBody : settingsTab === "accounts" ? accountsBody : settingsTab === "skills" ? `<div id="skills-settings-root"></div>` : groupsBody}</section>`;
   $$("[data-settings-tab]").forEach(
     (b) => b.onclick = () => {
       settingsTab = b.dataset.settingsTab;
@@ -32597,8 +32622,18 @@ function renderSettings() {
     }
   );
   if (settingsTab === "skills") {
-    $("#skill-account").value = account;
-    $("#manage-skills").onclick = () => manageSkills(api, $("#skill-account").value);
+    const accounts = accountList();
+    const skillAccount = accounts.some((a) => a.id === account) ? account : accounts[0]?.id;
+    mountSkillsSettings(
+      $("#skills-settings-root"),
+      api,
+      skillAccount,
+      accounts,
+      (nextAccount) => {
+        if (nextAccount) account = nextAccount;
+        render2();
+      }
+    );
   }
   if (settingsTab === "config") {
     $("#setting-provider").value = state.provider;
@@ -33264,7 +33299,7 @@ async function renderProfile() {
       const definition = model.definitions.find((d) => d.id === profileTab);
       $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u4FDD\u6301\u81EA\u5DF1\u7684\u58F0\u97F3\uFF0C\u9010\u6B65\u9A8C\u8BC1\u6709\u6548\u7684\u8868\u8FBE\u3002</h1><span class="eyebrow">${esc(accountLabelOf(a))} \xB7 \u8D26\u53F7\u6A21\u578B</span></div></header><section class="dashboard profile-manager"><nav class="model-tabs">${[...model.definitions, { id: "history", title: "\u8FED\u4EE3\u8BB0\u5F55" }].map((d) => `<button data-model-tab="${d.id}" class="${profileTab === d.id ? "active" : ""}">${d.title}</button>`).join("")}</nav><div id="model-content">${definition ? `<h2>${definition.title}</h2><p>${{ identity: "\u53EA\u7EF4\u62A4\u6211\u662F\u8C01\u3001\u5199\u7ED9\u8C01\u3001\u5E0C\u671B\u63D0\u4F9B\u4EC0\u4E48\u4EF7\u503C\u3002", voice: "\u7EF4\u62A4\u81EA\u7136\u7684\u8868\u8FBE\u504F\u597D\u4E0E\u5FC5\u8981\u8FB9\u754C\uFF0C\u907F\u514D\u628A\u6BCF\u7BC7\u6587\u7AE0\u5199\u6210\u89C4\u5219\u68C0\u67E5\u8868\u3002", examples: "\u4FDD\u7559\u6211\u8BA4\u53EF\u7684\u771F\u5B9E\u7ECF\u5386\u548C\u8303\u6587\u7247\u6BB5\uFF0C\u5E76\u5199\u6E05\u51FA\u5904\u4E0E\u4E3A\u4EC0\u4E48\u50CF\u6211\u3002", learning: "\u7528\u6709\u6765\u6E90\u7684\u6570\u636E\u89C2\u5BDF\u6307\u5BFC\u4E0B\u4E00\u6B21\u5C0F\u5B9E\u9A8C\uFF1B\u6700\u591A\u4FDD\u7559\u4E09\u4E2A\uFF0C\u8FC7\u65F6\u5C31\u66FF\u6362\u3002" }[profileTab]}</p><textarea id="model-text" rows="15" maxlength="${definition.limit}">${esc(model.modules[profileTab])}</textarea><div class="row"><button id="save-model" class="primary">\u4FDD\u5B58\u5F53\u524D\u6A21\u5757</button><small>${definition.limit} \u5B57\u4EE5\u5185</small></div>${profileTab === "learning" ? `<p class="notice">\u5F53\u524D\u8D26\u53F7\u6709 ${state.metrics.filter((r) => r["\u8D26\u53F7"] === a).length} \u7BC7\u5F52\u6863\u6570\u636E\u3002\u5355\u7BC7\u6CE2\u52A8\u4E0D\u4EE3\u8868\u8868\u8FBE\u65B9\u5F0F\u7684\u56E0\u679C\u6548\u679C\u3002</p>` : ""}${profileTab === "examples" ? `<details><summary>\u67E5\u770B\u65E7 Profile \u8D44\u6599\uFF08\u53EA\u8BFB\uFF09</summary><div class="material-cards">${model.legacy.filter((f) => f.editable).map(
         (f) => `<button class="material-card" data-model-legacy="${esc(f.path)}"><strong>${esc(f.path)}</strong></button>`
-      ).join("")}</div></details>` : ""}` : `<button id="profile-skills" class="primary">${I.sparkles()} \u914D\u7F6E\u8D26\u53F7\u6280\u80FD</button><p>\u5728\u6280\u80FD\u5DE5\u4F5C\u5BA4\u7EF4\u62A4\u8D26\u53F7\u4E13\u5C5E\u6307\u4EE4\uFF1B\u5386\u53F2\u4EBA\u8BBE\u5EFA\u8BAE\u548C\u7248\u672C\u7EE7\u7EED\u4FDD\u7559\u3002</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} \xB7 ${p.status === "pending" ? "\u5F85\u5BA1\u9605" : p.status === "applied" ? "\u5DF2\u91C7\u7EB3" : "\u5DF2\u4FDD\u7559\u539F\u8BBE\u5B9A"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("\u3001")}</p><button data-model-proposal="${p.id}">\u67E5\u770B\u5EFA\u8BAE</button></div>`).join("") || "<p>\u8FD8\u6CA1\u6709 AI \u8C03\u6574\u5EFA\u8BAE\u3002</p>"}</div><h3>\u5386\u53F2\u7248\u672C</h3>${model.history.map((h2) => `<div class="result-card"><small>${esc(h2.at)} \xB7 ${esc(h2.reason)}</small><details><summary>\u67E5\u770B\u5F53\u65F6\u7684\u8BBE\u5B9A</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h2.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h2.id}">\u6062\u590D\u6B64\u7248\u672C</button></div>`).join("")}`}</div></section>`;
+      ).join("")}</div></details>` : ""}` : `<button id="profile-skills" class="primary">${I.sparkles()} \u914D\u7F6E\u8D26\u53F7\u6280\u80FD</button><p>\u5728\u8BBE\u7F6E \u2192 \u6280\u80FD\u4E2D\u7EF4\u62A4\u4ED3\u5E93 <code>.agents/skills</code> \u6280\u80FD\u5305\u4E0E\u9ED8\u8BA4\u542F\u7528\uFF1B\u5386\u53F2\u4EBA\u8BBE\u5EFA\u8BAE\u548C\u7248\u672C\u7EE7\u7EED\u4FDD\u7559\u3002</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} \xB7 ${p.status === "pending" ? "\u5F85\u5BA1\u9605" : p.status === "applied" ? "\u5DF2\u91C7\u7EB3" : "\u5DF2\u4FDD\u7559\u539F\u8BBE\u5B9A"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("\u3001")}</p><button data-model-proposal="${p.id}">\u67E5\u770B\u5EFA\u8BAE</button></div>`).join("") || "<p>\u8FD8\u6CA1\u6709 AI \u8C03\u6574\u5EFA\u8BAE\u3002</p>"}</div><h3>\u5386\u53F2\u7248\u672C</h3>${model.history.map((h2) => `<div class="result-card"><small>${esc(h2.at)} \xB7 ${esc(h2.reason)}</small><details><summary>\u67E5\u770B\u5F53\u65F6\u7684\u8BBE\u5B9A</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h2.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h2.id}">\u6062\u590D\u6B64\u7248\u672C</button></div>`).join("")}`}</div></section>`;
       const save = async () => {
         if (!definition || $("#model-text").value === model.modules[profileTab])
           return true;

@@ -123,9 +123,10 @@ ipcMain.handle("update-open-releases", () => updater.openReleasesPage());
 
 const passthrough = new Set([
   "skills-list",
-  "skills-save",
+  "skills-create",
   "skills-remove",
   "skills-configure",
+  "skills-reveal",
   "load",
   "save",
   "source",
@@ -181,6 +182,18 @@ const passthrough = new Set([
 for (const name of passthrough) {
   ipcMain.handle(name, (_, data) => desk.invoke(name, data));
 }
+
+ipcMain.handle("skills-import", async (_, data = {}) => {
+  const result = await dialog.showOpenDialog({
+    title: "选择技能文件夹（含 SKILL.md）",
+    properties: ["openDirectory"],
+  });
+  if (result.canceled) return null;
+  return desk.invoke("skills-import", {
+    ...data,
+    sourcePath: result.filePaths[0],
+  });
+});
 
 ipcMain.handle("wechat-pick-cover", async () => {
   const result = await dialog.showOpenDialog({

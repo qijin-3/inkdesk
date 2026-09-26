@@ -1,34 +1,173 @@
 const fs = require("node:fs"),
   path = require("node:path"),
-  crypto = require("node:crypto");
+  crypto = require("node:crypto"),
+  { execFileSync } = require("node:child_process");
+
+const NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SKILLS_ROOT = ".agents/skills";
+
+/**
+ * 解析 SKILL.md YAML frontmatter（仅支持简单 key: value）。
+ * @param {string} text
+ */
+function parseSkillMd(text) {
+  const m = String(text || "").match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!m) throw Error("SKILL.md 缺少 YAML frontmatter");
+  const meta = {};
+  for (const line of m[1].split(/\r?\n/)) {
+    const i = line.indexOf(":");
+    if (i < 0) continue;
+    const key = line.slice(0, i).trim();
+    let val = line.slice(i + 1).trim();
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    )
+      val = val.slice(1, -1);
+    if (key) meta[key] = val;
+  }
+  const name = String(meta.name || "").trim();
+  const description = String(meta.description || "").trim();
+  if (!NAME_RE.test(name) || name.length > 64)
+    throw Error("SKILL.md 的 name 须为 1–64 位小写字母、数字与连字符");
+  if (!description || description.length > 1024)
+    throw Error("SKILL.md 的 description 须为 1–1024 字");
+  return { name, description, body: text.slice(m[0].length) };
+}
+
+function copyDir(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const e of fs.readdirSync(src, { withFileTypes: true })) {
+    if (e.name.startsWith(".")) continue;
+    const from = path.join(src, e.name),
+      to = path.join(dest, e.name);
+    if (e.isDirectory()) copyDir(from, to);
+    else if (e.isFile()) fs.copyFileSync(from, to);
+  }
+}
+
+function rmrf(dir) {
+  if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+}
+
 class Skills {
   constructor(vault) {
     this.vault = vault;
     this.file = vault.p("_system/inkdesk/skills.json");
+    this.rootRel = SKILLS_ROOT;
   }
-  read() {
-    return fs.existsSync(this.file)
-      ? JSON.parse(fs.readFileSync(this.file, "utf8"))
-      : { revision: 0, items: [], accounts: {} };
+
+  rootAbs() {
+    return this.vault.p(this.rootRel);
   }
-  list(account) {
-    account = this.vault.resolveAccountId(account);
-    const s = this.read();
+
+  packAbs(id) {
+    const rel = String(id || "").replace(/\\/g, "/");
+    if (!rel || rel.includes("..") || path.isAbsolute(rel))
+      throw Error("无效的技能路径");
+    return this.vault.p(path.join(this.rootRel, rel));
+  }
+
+  readRegistry() {
+    if (!fs.existsSync(this.file))
+      return { revision: 0, accounts: {} };
+    const s = JSON.parse(fs.readFileSync(this.file, "utf8"));
+    if (!s || typeof s !== "object")
+      return { revision: 0, accounts: {} };
+    const items = Array.isArray(s.items) ? s.items : [];
+    const legacy = items.some(
+      (x) =>
+        x &&
+        (typeof x.prompt === "string" ||
+          Array.isArray(x.includes) ||
+          x.scope === "account" ||
+          x.scope === "global"),
+    );
+    if (legacy)
+      return { revision: Number(s.revision) || 0, accounts: {} };
     return {
-      ...s,
-      account,
-      items: s.items.filter(
-        (x) => x.scope === "global" || x.account === account,
-      ),
+      revision: Number(s.revision) || 0,
+      accounts:
+        s.accounts && typeof s.accounts === "object" ? s.accounts : {},
     };
   }
+
+  /**
+   * 扫描 .agents/skills：含 SKILL.md 的目录为技能，其余目录为分组。
+   */
+  scan(dirAbs = this.rootAbs(), group = "") {
+    const items = [];
+    if (!fs.existsSync(dirAbs)) return items;
+    for (const e of fs.readdirSync(dirAbs, { withFileTypes: true })) {
+      if (!e.isDirectory() || e.name.startsWith(".")) continue;
+      const abs = path.join(dirAbs, e.name);
+      const id = group ? `${group}/${e.name}` : e.name;
+      const skillMd = path.join(abs, "SKILL.md");
+      if (fs.existsSync(skillMd)) {
+        let description = "";
+        let missing = false;
+        let name = e.name;
+        try {
+          const meta = parseSkillMd(fs.readFileSync(skillMd, "utf8"));
+          description = meta.description;
+          name = meta.name;
+          if (meta.name !== e.name) missing = true;
+        } catch {
+          missing = true;
+        }
+        items.push({
+          id,
+          name,
+          group,
+          description,
+          missing,
+          path: `${this.rootRel}/${id}`,
+        });
+      } else {
+        items.push(...this.scan(abs, id));
+      }
+    }
+    return items.sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  treeFrom(items) {
+    const map = new Map();
+    for (const x of items) {
+      const g = x.group || "";
+      if (!map.has(g)) map.set(g, []);
+      map.get(g).push(x);
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([group, skills]) => ({ group, label: group || "根目录", skills }));
+  }
+
+  list(account) {
+    account = this.vault.resolveAccountId(account);
+    const reg = this.readRegistry();
+    const items = this.scan();
+    const ids = new Set(items.map((x) => x.id));
+    const accounts = {};
+    for (const [k, v] of Object.entries(reg.accounts)) {
+      accounts[k] = (Array.isArray(v) ? v : []).filter((id) => ids.has(id));
+    }
+    return {
+      revision: reg.revision,
+      account,
+      root: this.rootRel,
+      items,
+      tree: this.treeFrom(items),
+      accounts,
+    };
+  }
+
   change(account, revision, fn) {
     account = this.vault.resolveAccountId(account);
-    const s = this.read();
-    if (revision !== s.revision)
+    const reg = this.readRegistry();
+    if (revision !== reg.revision)
       throw Error("技能已在其他窗口更新，请重新打开后编辑");
-    fn(s, account);
-    s.revision++;
+    fn(reg, account);
+    reg.revision++;
     fs.mkdirSync(path.dirname(this.file), { recursive: true });
     if (fs.existsSync(this.file)) {
       fs.mkdirSync(this.file + ".history", { recursive: true });
@@ -36,90 +175,165 @@ class Skills {
         this.file,
         path.join(
           this.file + ".history",
-          `${s.revision}-${crypto.randomUUID()}.json`,
+          `${reg.revision}-${crypto.randomUUID()}.json`,
         ),
       );
     }
     const tmp = this.file + ".tmp";
-    fs.writeFileSync(tmp, JSON.stringify(s, null, 2));
+    fs.writeFileSync(
+      tmp,
+      JSON.stringify(
+        { revision: reg.revision, accounts: reg.accounts },
+        null,
+        2,
+      ),
+    );
     fs.renameSync(tmp, this.file);
     return this.list(account);
   }
-  save(p) {
-    return this.change(p.account, p.revision, (s, a) => {
-      const x = p.skill;
-      const old = s.items.find((v) => v.id === x.id);
-      if (x.id && !old) throw Error("技能不存在");
-      if (old && old.scope !== "global" && old.account !== a)
-        throw Error("不能修改其他账号技能");
-      if (!["global", "account"].includes(x.scope))
-        throw Error("无效的技能范围");
-      if (old && old.scope !== x.scope)
-        throw Error("已有技能不能改变范围，请创建副本");
-      if (typeof x.name !== "string" || !x.name.trim() || x.name.length > 80)
-        throw Error("请输入 1–80 字技能名称");
-      if (typeof x.prompt !== "string" || x.prompt.length > 20000)
-        throw Error("技能指令最多 20000 字");
-      const item = {
-        id: old?.id || crypto.randomUUID(),
-        name: x.name.trim(),
-        scope: x.scope,
-        account: x.scope === "account" ? a : null,
-        prompt: x.prompt,
-        includes: Array.isArray(x.includes) ? [...new Set(x.includes)] : [],
-      };
-      if (!item.prompt.trim() && !item.includes.length)
-        throw Error("请填写指令或组合其他技能");
-      const next = s.items.filter((v) => v.id !== item.id).concat(item);
-      this.expand(next, [item.id], a);
-      s.items = next;
+
+  readSkillDir(dir) {
+    const skillMd = path.join(dir, "SKILL.md");
+    if (!fs.existsSync(skillMd)) throw Error("所选文件夹缺少 SKILL.md");
+    const meta = parseSkillMd(fs.readFileSync(skillMd, "utf8"));
+    const folder = path.basename(dir);
+    if (folder !== meta.name)
+      throw Error(`目录名「${folder}」须与 SKILL.md 的 name「${meta.name}」一致`);
+    return meta;
+  }
+
+  assertName(name) {
+    if (!NAME_RE.test(name) || name.length > 64)
+      throw Error("技能名称须为 1–64 位小写字母、数字与连字符");
+  }
+
+  /** 目标相对 id：可选 group/name */
+  resolveTargetId(p, name) {
+    const group = String(p.group || "")
+      .replace(/\\/g, "/")
+      .replace(/^\/+|\/+$/g, "");
+    if (group) {
+      for (const part of group.split("/")) {
+        if (!NAME_RE.test(part)) throw Error("分组路径须为小写字母、数字与连字符");
+      }
+    }
+    return group ? `${group}/${name}` : name;
+  }
+
+  import(p) {
+    return this.change(p.account, p.revision, () => {
+      const src = path.resolve(String(p.sourcePath || ""));
+      if (!src || !fs.existsSync(src) || !fs.statSync(src).isDirectory())
+        throw Error("请选择有效的技能文件夹");
+      const meta = this.readSkillDir(src);
+      this.assertName(meta.name);
+      const id = this.resolveTargetId(p, meta.name);
+      const dest = this.packAbs(id);
+      if (fs.existsSync(dest)) throw Error("技能目录已存在：" + id);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      copyDir(src, dest);
     });
   }
+
+  create(p) {
+    return this.change(p.account, p.revision, () => {
+      const name = String(p.name || "")
+        .trim()
+        .toLowerCase();
+      const description = String(p.description || "").trim();
+      this.assertName(name);
+      if (!description || description.length > 1024)
+        throw Error("请填写 1–1024 字描述");
+      const id = this.resolveTargetId(p, name);
+      const dest = this.packAbs(id);
+      if (fs.existsSync(dest)) throw Error("技能目录已存在：" + id);
+      fs.mkdirSync(dest, { recursive: true });
+      fs.writeFileSync(
+        path.join(dest, "SKILL.md"),
+        `---\nname: ${name}\ndescription: ${description}\n---\n\n# ${name}\n\n在此编写技能说明。需要时把参考资料放到 references/，脚本放到 scripts/。\n`,
+      );
+    });
+  }
+
   remove(p) {
-    return this.change(p.account, p.revision, (s, a) => {
-      const item = s.items.find((x) => x.id === p.id);
-      if (!item || (item.scope !== "global" && item.account !== a))
+    return this.change(p.account, p.revision, (reg) => {
+      const abs = this.packAbs(p.id);
+      if (!fs.existsSync(path.join(abs, "SKILL.md")))
         throw Error("技能不存在");
-      if (s.items.some((x) => x.includes.includes(p.id)))
-        throw Error("这个技能仍被组合技能引用，请先解除引用");
-      s.items = s.items.filter((x) => x.id !== p.id);
-      for (const k of Object.keys(s.accounts))
-        s.accounts[k] = s.accounts[k].filter((id) => id !== p.id);
+      rmrf(abs);
+      for (const k of Object.keys(reg.accounts))
+        reg.accounts[k] = (reg.accounts[k] || []).filter((id) => id !== p.id);
     });
   }
+
   configure(p) {
-    return this.change(p.account, p.revision, (s, a) => {
-      this.expand(s.items, p.ids, a);
-      s.accounts[a] = [...new Set(p.ids)];
+    return this.change(p.account, p.revision, (reg, a) => {
+      const ids = Array.isArray(p.ids) ? [...new Set(p.ids)] : [];
+      if (ids.length > 30) throw Error("一次最多启用 30 个技能");
+      const known = new Set(this.scan().map((x) => x.id));
+      for (const id of ids) {
+        if (!known.has(id)) throw Error("引用的技能不存在：" + id);
+        this.readSkillDir(this.packAbs(id));
+      }
+      reg.accounts[a] = ids;
     });
   }
-  expand(items, ids, account) {
-    if (!Array.isArray(ids) || ids.length > 30)
-      throw Error("一次最多使用 30 个技能");
-    const result = [],
-      seen = new Set();
-    const visit = (id, stack = [], globalParent = false) => {
-      const x = items.find((x) => x.id === id);
-      if (!x || (x.scope !== "global" && x.account !== account))
-        throw Error("引用的技能不存在或不属于当前账号");
-      if (globalParent && x.scope !== "global")
-        throw Error("通用技能只能组合通用技能");
-      if (stack.includes(id)) throw Error("技能组合存在循环引用");
-      if (seen.has(id)) return;
-      for (const child of x.includes)
-        visit(child, [...stack, id], x.scope === "global");
-      seen.add(id);
-      result.push(x);
-    };
-    for (const id of ids) visit(id);
-    return result;
-  }
-  context(account, ids) {
+
+  /**
+   * 将启用技能以软链接挂到 agent 工作区的 .agents/skills。
+   * @returns {{ name: string, description: string, id: string }[]}
+   */
+  mount(account, ids, destRoot) {
     account = this.vault.resolveAccountId(account);
-    const s = this.read();
-    return this.expand(s.items, ids ?? s.accounts[account] ?? [], account)
-      .map((x, i) => `技能 ${i + 1}：${x.name}\n${x.prompt}`)
-      .join("\n\n");
+    const reg = this.readRegistry();
+    const selected = ids ?? reg.accounts[account] ?? [];
+    if (!Array.isArray(selected) || selected.length > 30)
+      throw Error("一次最多使用 30 个技能");
+    const mountDir = path.join(destRoot, SKILLS_ROOT);
+    rmrf(mountDir);
+    fs.mkdirSync(mountDir, { recursive: true });
+    const mounted = [];
+    const usedNames = new Set();
+    for (const id of selected) {
+      const src = this.packAbs(id);
+      const meta = this.readSkillDir(src);
+      if (usedNames.has(meta.name))
+        throw Error(`启用列表中存在同名技能：${meta.name}`);
+      usedNames.add(meta.name);
+      fs.symlinkSync(src, path.join(mountDir, meta.name), "dir");
+      mounted.push({
+        id,
+        name: meta.name,
+        description: meta.description,
+      });
+    }
+    return mounted;
+  }
+
+  contextPrompt(mounted) {
+    if (!mounted.length) return "本次未启用文件夹技能。\n";
+    const list = mounted
+      .map((x, i) => `${i + 1}. ${x.name} — ${x.description}`)
+      .join("\n");
+    return (
+      "本次启用的技能已通过软链接挂载到工作区 .agents/skills/<name>/。\n" +
+      "每个技能含 SKILL.md。请阅读并遵循已启用技能；需要时再加载其 references/、scripts/、assets/。\n" +
+      "已启用：\n" +
+      list +
+      "\n"
+    );
+  }
+
+  reveal(p) {
+    const abs = p.id ? this.packAbs(p.id) : this.rootAbs();
+    if (!fs.existsSync(abs)) {
+      fs.mkdirSync(this.rootAbs(), { recursive: true });
+    }
+    const target = p.id ? abs : this.rootAbs();
+    if (!fs.existsSync(target)) throw Error("技能目录不存在");
+    execFileSync("open", [target]);
+    return { ok: true, path: target };
   }
 }
-module.exports = { Skills };
+
+module.exports = { Skills, parseSkillMd, SKILLS_ROOT };
