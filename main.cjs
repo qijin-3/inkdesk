@@ -122,6 +122,10 @@ ipcMain.handle("update-install", async (event) => {
 ipcMain.handle("update-open-releases", () => updater.openReleasesPage());
 
 const passthrough = new Set([
+  "skills-list",
+  "skills-save",
+  "skills-remove",
+  "skills-configure",
   "load",
   "save",
   "source",
@@ -183,7 +187,10 @@ ipcMain.handle("wechat-pick-cover", async () => {
     title: "选择公众号默认封面",
     properties: ["openFile"],
     filters: [
-      { name: "图片", extensions: ["jpg", "jpeg", "png", "gif", "bmp", "webp"] },
+      {
+        name: "图片",
+        extensions: ["jpg", "jpeg", "png", "gif", "bmp", "webp"],
+      },
     ],
   });
   if (result.canceled) return null;
@@ -309,11 +316,7 @@ ipcMain.handle("image", async (_, payload = {}) => {
 ipcMain.handle("pick-note-table", async () => {
   const result = await dialog.showOpenDialog({
     title: "选择笔记列表明细表",
-    defaultPath: path.join(
-      os.homedir(),
-      "Downloads",
-      "笔记列表明细表.xlsx",
-    ),
+    defaultPath: path.join(os.homedir(), "Downloads", "笔记列表明细表.xlsx"),
     properties: ["openFile"],
     filters: [{ name: "Excel", extensions: ["xlsx"] }],
   });
@@ -324,9 +327,7 @@ ipcMain.handle("pick-note-table", async () => {
 ipcMain.handle("import-notes-preview", (_, data) =>
   desk.importNotesPreview(data),
 );
-ipcMain.handle("import-notes-apply", (_, data) =>
-  desk.importNotesApply(data),
-);
+ipcMain.handle("import-notes-apply", (_, data) => desk.importNotesApply(data));
 
 ipcMain.handle("copy", async (_, p) => {
   const payload = { "text/plain": p.text };
@@ -348,18 +349,50 @@ ipcMain.on("save-sync", (event, next) => {
 });
 
 ipcMain.handle("export-social", async (_, payload) => {
-  if (!Array.isArray(payload?.images) || !payload.images.length || payload.images.length > 17) throw Error("图片数量必须为 1–17 张");
-  const buffers = payload.images.map(s => {
-    if(typeof s !== "string" || s.length > 24000000 || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(s)) throw Error("无效的 PNG 图片");
-    const b=Buffer.from(s.split(",")[1],"base64");
-    if(b.length<24 || b.subarray(0,8).toString("hex")!=="89504e470d0a1a0a" || b.readUInt32BE(16)!==1200 || b.readUInt32BE(20)!==1600) throw Error("图片必须为 1200 × 1600");
+  if (
+    !Array.isArray(payload?.images) ||
+    !payload.images.length ||
+    payload.images.length > 17
+  )
+    throw Error("图片数量必须为 1–17 张");
+  const buffers = payload.images.map((s) => {
+    if (
+      typeof s !== "string" ||
+      s.length > 24000000 ||
+      !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(s)
+    )
+      throw Error("无效的 PNG 图片");
+    const b = Buffer.from(s.split(",")[1], "base64");
+    if (
+      b.length < 24 ||
+      b.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a" ||
+      b.readUInt32BE(16) !== 1200 ||
+      b.readUInt32BE(20) !== 1600
+    )
+      throw Error("图片必须为 1200 × 1600");
     return b;
   });
-  const r=await dialog.showOpenDialog({title:"选择图文导出目录",properties:["openDirectory","createDirectory"]});
-  if(r.canceled)return null;
-  const name=String(payload.title||"图文").replace(/[\\/:*?"<>|\x00-\x1f]/g,"_").slice(0,60)||"图文";
-  const dir=fs.mkdtempSync(path.join(r.filePaths[0],name+"-"));
-  try {buffers.forEach((b,i)=>fs.writeFileSync(path.join(dir,String(i+1).padStart(2,"0")+".png"),b,{flag:"wx"}));}
-  catch(e){fs.rmSync(dir,{recursive:true,force:true});throw e;}
+  const r = await dialog.showOpenDialog({
+    title: "选择图文导出目录",
+    properties: ["openDirectory", "createDirectory"],
+  });
+  if (r.canceled) return null;
+  const name =
+    String(payload.title || "图文")
+      .replace(/[\\/:*?"<>|\x00-\x1f]/g, "_")
+      .slice(0, 60) || "图文";
+  const dir = fs.mkdtempSync(path.join(r.filePaths[0], name + "-"));
+  try {
+    buffers.forEach((b, i) =>
+      fs.writeFileSync(
+        path.join(dir, String(i + 1).padStart(2, "0") + ".png"),
+        b,
+        { flag: "wx" },
+      ),
+    );
+  } catch (e) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    throw e;
+  }
   return dir;
 });

@@ -1,7 +1,7 @@
 {
   "name": "inkdesk",
   "productName": "AsIde",
-  "version": "0.1.1",
+  "version": "0.2.2",
   "description": "AsIde — local writing desk for Content OS",
   "main": "main.cjs",
   "scripts": {
@@ -9,10 +9,11 @@
     "dev": "node dev.cjs",
     "dev:server": "node server.cjs",
     "build:watch": "esbuild renderer.js --bundle --format=esm --outfile=bundle.js --watch",
-    "test": "node --test test.cjs vault.test.cjs knowledge.test.cjs model.test.cjs note-import.test.cjs",
-    "package:mac": "electron-packager . AsIde --platform=darwin --arch=arm64 --out=dist-v4 --overwrite --icon=assets/AsIde.icns --ignore='^/data(/|$)' --ignore='^/dist' --ignore='screenshot-' --ignore='/(vault|development-vault)\\.json$' --ignore='/(vault|knowledge|model|note-import)\\.test\\.cjs$' --ignore='/test\\.cjs$' --ignore='/(smoke|review|social|workflow|packaged|real-vault|live-agent)[^/]*\\.cjs$' --ignore='^/dist-' --extra-resource=assets/reference-reader",
+    "test": "node --test test.cjs vault.test.cjs knowledge.test.cjs model.test.cjs note-import.test.cjs skills.test.cjs",
+    "package:mac": "electron-packager . AsIde --platform=darwin --arch=arm64 --out=dist-0.2.2 --overwrite --icon=assets/AsIde.icns --ignore='^/data(/|$)' --ignore='^/dist' --ignore='screenshot-' --ignore='/(vault|development-vault)\\.json$' --ignore='/(vault|knowledge|model|note-import)\\.test\\.cjs$' --ignore='/test\\.cjs$' --ignore='/(smoke|review|social|workflow|packaged|real-vault|live-agent)[^/]*\\.cjs$' --ignore='^/dist-' --ignore='/skills(?:\\.test|-ui-test)\\.cjs$' --extra-resource=assets/reference-reader",
     "build": "esbuild renderer.js --bundle --format=esm --outfile=bundle.js",
-    "test:ui": "node smoke-ui.cjs && node review-ui.cjs && node workflow-v4.cjs"
+    "test:ui": "node smoke-ui.cjs && node review-ui.cjs && node skills-ui-test.cjs && node heatmap-ui.cjs",
+    "test:skills": "node skills-ui-test.cjs"
   },
   "dependencies": {
     "@tiptap/core": "^3.31.3",

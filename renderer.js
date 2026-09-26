@@ -1,3 +1,4 @@
+import { manageSkills, mountSkillPicker } from "./skills-ui.js";
 import { bindSocialPreview } from "./social-layout.js";
 import { Composer } from "./composer.js";
 import { I } from "./icons.js";
@@ -283,8 +284,7 @@ function blockPlainText(node) {
     else if (n.nodeName === "BR") {
       const cls = n.getAttribute?.("class") || "";
       if (!cls.includes("ProseMirror-trailingBreak")) out += "\n";
-    } else if (n.childNodes?.length)
-      for (const c of n.childNodes) walk(c);
+    } else if (n.childNodes?.length) for (const c of n.childNodes) walk(c);
   }
   walk(node);
   return out
@@ -784,8 +784,7 @@ function render() {
           (a) =>
             `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc(a.id)}" title="${esc(a.label)}" aria-label="${esc(a.label)}">${accountAvatarHtml(a)}</button>`,
         )
-        .join("") ||
-      `<p class="account-empty">请在设置中添加账号</p>`
+        .join("") || `<p class="account-empty">请在设置中添加账号</p>`
     }</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>选题与灵感</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="profile" class="${page === "profile" ? "chosen" : ""}">${I.user()} <span>账号人设</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></div><div class="docs">${
       state.documents
         .filter(
@@ -958,8 +957,7 @@ const WECHAT_SERIF =
  * 公众号粘贴专用：不含自定义字体。
  * 微信遇到未知字体名常会丢弃整段 font-family，从而退化成黑体。
  */
-const WECHAT_SERIF_PUBLISH =
-  "Songti SC,STSong,华文宋体,宋体,SimSun,serif";
+const WECHAT_SERIF_PUBLISH = "Songti SC,STSong,华文宋体,宋体,SimSun,serif";
 const WECHAT_SANS =
   "'OPPO Sans 4.0','PingFang SC','Helvetica Neue',Arial,sans-serif";
 
@@ -1388,7 +1386,10 @@ async function publishHTML(md, opts = {}) {
       if (!/font-family/.test(prev))
         el.setAttribute(
           "style",
-          `${prev};font-family:${serif};color:${WECHAT_BLUE};`.replace(/^;/, ""),
+          `${prev};font-family:${serif};color:${WECHAT_BLUE};`.replace(
+            /^;/,
+            "",
+          ),
         );
     });
     d.querySelectorAll("h1 .h1-zh, h1 .h1-en").forEach((el) =>
@@ -1400,7 +1401,9 @@ async function publishHTML(md, opts = {}) {
   }
   // 正文配图：主题蓝 2px 边框（跳过标题/引用块图）
   d.querySelectorAll("img").forEach((img) => {
-    if (["一级标题", "二级标题", "引用"].includes(img.getAttribute("alt") || ""))
+    if (
+      ["一级标题", "二级标题", "引用"].includes(img.getAttribute("alt") || "")
+    )
       return;
     const prev = img.getAttribute("style") || "";
     const style = `max-width:100% !important;height:auto !important;box-sizing:border-box;border:2px solid ${WECHAT_BLUE};display:block;margin:0 0 24px;`;
@@ -1632,7 +1635,10 @@ function syncRailVisibility() {
   resizer?.classList.toggle("hidden", !assistantOpen);
   const toggle = $("#toggle-assistant");
   if (toggle) {
-    toggle.classList.toggle("primary", assistantOpen && railMode === "assistant");
+    toggle.classList.toggle(
+      "primary",
+      assistantOpen && railMode === "assistant",
+    );
     toggle.setAttribute(
       "aria-pressed",
       assistantOpen && railMode === "assistant" ? "true" : "false",
@@ -1723,18 +1729,7 @@ function renderAssistantRail() {
   }
 
   rail.dataset.railMode = "assistant";
-  rail.innerHTML = `<div class="assistant-head"><span>${I.sparkles()} 写作伙伴</span><div class="assistant-head-actions"><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select><button type="button" id="close-assistant" title="收起">${I.panelClose()} 收起</button></div></div><div class="tabs">${[
-    ["chat", "对话"],
-    ["topics", "思路"],
-    ["titles", "标题"],
-    ["prompts", "配图"],
-    ["checks", "核查"],
-  ]
-    .map(
-      ([id, name]) =>
-        `<button data-tab="${id}" class="${tab === id ? "active" : ""}">${name}</button>`,
-    )
-    .join("")}</div><div id="panel" data-ready="1"></div>`;
+  rail.innerHTML = `<div class="assistant-head"><span>${I.sparkles()} 写作伙伴</span><div class="assistant-head-actions"><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select><button type="button" id="close-assistant" title="收起">${I.panelClose()} 收起</button></div></div><div id="panel" data-ready="1"></div>`;
 
   const provider = $("#provider");
   if (provider) {
@@ -1768,7 +1763,8 @@ function renderAssistantRail() {
 function bindArticleMaterialsPanel() {
   const listEl = $("#article-material-list");
   const uploadBtn = $("#upload-article-material");
-  const panel = $("#panel.article-materials-panel") || $(".article-materials-panel");
+  const panel =
+    $("#panel.article-materials-panel") || $(".article-materials-panel");
   const doc = current;
   if (!listEl || !doc) return;
 
@@ -1869,8 +1865,7 @@ function bindArticleMaterialsPanel() {
     panel.dataset.dropBound = "1";
     let dragDepth = 0;
     /** 是否为从系统拖入的文件 */
-    const isFileDrag = (dt) =>
-      !!dt && [...(dt.types || [])].includes("Files");
+    const isFileDrag = (dt) => !!dt && [...(dt.types || [])].includes("Files");
     panel.addEventListener("dragenter", (e) => {
       if (!isFileDrag(e.dataTransfer)) return;
       e.preventDefault();
@@ -1924,7 +1919,8 @@ function setPreviewPane(pane) {
 function renderPreview() {
   previewDocId = current.id;
   if (previewPane !== "social") previewPane = "wechat";
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">退出预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} 导出图片</button><button type="button" id="copy-publish">${I.copy()} 复制排版</button><button type="button" id="push-wechat">${I.send()} 推送到公众号</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">正在排版…</p><div id="social-pages"></div></div></section></div>`;
+  $("#main").innerHTML =
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">退出预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} 导出图片</button><button type="button" id="copy-publish">${I.copy()} 复制排版</button><button type="button" id="push-wechat">${I.send()} 推送到公众号</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">正在排版…</p><div id="social-pages"></div></div></section></div>`;
   bindArticleHeader();
   bindFinalize();
   enhanceWechatPreview();
@@ -1957,7 +1953,8 @@ function renderPublishedPreview() {
     body: publishedPreview.body,
   };
   const html = publishedSourceHTML(doc.body);
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(doc.title || "未命名文章")}</h1><div class="byline">${esc(publishedPreview.path.split("/").pop())} <span>${(doc.body || "").length} 字</span></div></div><div class="header-actions"><button type="button" id="published-backup">${I.folder()} 本地同步</button><button type="button" id="published-to-draft">移回草稿</button><button id="layout" class="primary">退出预览</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} 导出图片</button><button type="button" id="copy-publish">${I.copy()} 复制排版</button><button type="button" id="push-wechat">${I.send()} 推送到公众号</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(doc.title || "未命名文章")}</h1><div id="article-preview">${html}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">正在排版…</p><div id="social-pages"></div></div></section></div>`;
+  $("#main").innerHTML =
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(doc.title || "未命名文章")}</h1><div class="byline">${esc(publishedPreview.path.split("/").pop())} <span>${(doc.body || "").length} 字</span></div></div><div class="header-actions"><button type="button" id="published-backup">${I.folder()} 本地同步</button><button type="button" id="published-to-draft">移回草稿</button><button id="layout" class="primary">退出预览</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} 导出图片</button><button type="button" id="copy-publish">${I.copy()} 复制排版</button><button type="button" id="push-wechat">${I.send()} 推送到公众号</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(doc.title || "未命名文章")}</h1><div id="article-preview">${html}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">正在排版…</p><div id="social-pages"></div></div></section></div>`;
   $("#layout").onclick = () => {
     publishedPreview = null;
     page = "dashboard";
@@ -1992,13 +1989,13 @@ function renderWrite() {
   }
   if (previewMode && previewDocId && previewDocId !== current.id)
     previewMode = false;
-  if (tab === "publish") tab = "chat";
+  tab = "chat";
   if (previewMode) {
     renderPreview();
     return;
   }
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button><button data-task="review">${I.eye()} 看稿</button><button data-task="rewrite">${I.wand()} 润色选段</button><button data-task="check">${I.check()} 核查</button></div></section></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [StarterKit, Image, TableKit],
@@ -2286,7 +2283,8 @@ function bindWorkspaceResize() {
   };
 
   const stored = Number(localStorage.getItem("inkdesk-assistant-width"));
-  if (Number.isFinite(stored) && stored > 0) aside.style.width = clamp(stored) + "px";
+  if (Number.isFinite(stored) && stored > 0)
+    aside.style.width = clamp(stored) + "px";
 
   let startX = 0;
   let startW = 0;
@@ -2328,7 +2326,7 @@ function renderPanel() {
   $$("[data-task]").forEach((b) => (b.disabled = busy));
   const panel = $("#panel");
   if (!panel) return;
-  if (tab === "publish") tab = "chat";
+  tab = "chat";
   const key = tab;
   let content = "";
   if (tab === "chat") {
@@ -2336,28 +2334,12 @@ function renderPanel() {
       conversation()
         .messages.map(
           (m) =>
-            `<div class="message ${m.role}"><div>${m.parts ? m.parts.map((p) => (p.kind === "tag" ? `<span class="inline-reference">${esc(p.label)}</span>` : esc(p.text))).join("") : esc(m.text)}</div></div>`,
+            `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "你" : "Agent"}</small><div>${m.parts ? m.parts.map((p) => (p.kind === "tag" ? `<span class="inline-reference">${esc(p.label)}</span>` : esc(p.text))).join("") : esc(m.text)}</div></div>`,
         )
         .join("") ||
       '<div class="welcome"><span class="welcome-icon">' +
-      I.sparkles({ size: 22 }) +
-      "</span><h3>先保留你的声音。</h3><p>一起聊想法，或选中一段文字推敲。<br>修改先预览，由你决定是否采用。</p></div>";
-  } else {
-    const labels = {
-      topics: ["本篇思路", "围绕表达意图，准备少量可用角度。"],
-      titles: ["标题建议", "给同一篇文章，找到更贴切的开头。"],
-      prompts: ["配图提示词", "复制到 Lovart，生成后导入正文。"],
-      checks: ["内容核查", "来源不足的判断会保留为待核实。"],
-    };
-    content =
-      `<div class="panel-intro"><h3>${labels[key][0]}</h3><p>${labels[key][1]}</p></div>` +
-      (current[key] || [])
-        .map(
-          (x, i) =>
-            `<div class="result-card"><small>${new Date(x.at).toLocaleDateString("zh-CN")}</small><div>${esc(x.text)}</div><button data-copy="${i}">复制</button>${key === "titles" ? `<button data-use="${i}">选择标题</button>` : ""}</div>`,
-        )
-        .join("") +
-      `<button class="secondary wide" id="generate">${I.sparkles()} 生成${labels[key][0]}</button>`;
+        I.sparkles({ size: 22 }) +
+        "</span><h3>先保留你的声音。</h3><p>一起聊想法，或选中一段文字推敲。<br>修改先预览，由你决定是否采用。</p></div>";
   }
   panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" title="为本篇创建新对话">${I.plus()} 新对话</button></div>` : ""}<div class="panel-scroll">${
     pending &&
@@ -2375,7 +2357,7 @@ function renderPanel() {
             "",
           )}</div><div class="row"><button id="accept" class="primary">接受修改</button><button id="reject">保留原文</button></div></div>`
       : ""
-  }${content}</div><div class="composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload">${I.upload()} 上传文件</button><button id="chat-reference">${I.at()} 项目文件</button><button id="rewrite-tags">${I.tags()} 改写标签选段</button><button id="send" class="primary">${busy ? "停止" : `${I.send()} 发送`}</button></div></div>`;
+  }${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="上传文件" aria-label="上传文件">${I.plus()}</button><button id="chat-reference" class="icon-btn" title="引用项目文件" aria-label="引用项目文件">${I.at()}</button><div id="skill-picker"></div><select id="agent-output" aria-label="对话模式"><option value="chat">对话</option><option value="rewrite-tags">修改标签选段</option><option value="rewrite">修改当前选区</option></select><button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div><div class="composer-hint">⌘Enter 发送 · @ 引用文件</div></div>`;
   if (tab === "chat") {
     $("#conversation").value = conversation().id;
     $("#conversation").onchange = (e) => {
@@ -2396,7 +2378,7 @@ function renderPanel() {
     };
   }
   $("#send").onclick = () =>
-    busy ? api("cancel") : runTask(tab === "chat" ? "chat" : tab);
+    busy ? api("cancel") : runTask($("#agent-output").value);
   composer = new Composer($("#composer-input"), conversation(), {
     changed: () => {
       dirty = true;
@@ -2410,7 +2392,8 @@ function renderPanel() {
   $("#chat-upload").onclick = uploadChatFiles;
   for (const id of ["#chat-upload", "#chat-reference"])
     $(id).onmousedown = (e) => e.preventDefault();
-  $("#rewrite-tags").onclick = () => runTask("rewrite-tags");
+  $("#skill-picker").addEventListener("skills-change",()=>{ dirty=true; persist(); });
+  mountSkillPicker($("#skill-picker"), api, account, conversation());
   if ($("#generate")) $("#generate").onclick = () => runTask(tab);
   $$("[data-copy]").forEach(
     (b) =>
@@ -2525,29 +2508,22 @@ async function runTask(task) {
     if (sorted.some((a, i) => i > 0 && a.from < sorted[i - 1].to))
       return toast("选段有重叠，请保留不重叠的标签");
   }
-  if (task === "rewrite" && !selection) return toast("请先选中需要润色的段落");
-  if (task === "chat" && !instruction) return toast("先写一句想讨论的内容");
+  if (task === "rewrite" && !selection) return toast("请先选中需要修改的段落");
+  if (task === "chat" && !instruction && !conversation(doc).skillIds?.length)
+    return toast("先写一句想讨论的内容");
   const prompts = {
     "rewrite-tags":
-      "仅改写标记的正文选段，文件标签是参考资料。只返回 JSON 数组 [{id,text}]，id 为每个正文选段的引用 ID，text 为该选段修改后的完整文本，保持未标记内容不变。每个选段恰好一个结果。",
-    review: "指出最多三个值得修改的问题，解释取舍，不重写。",
-    rewrite: "保留原意和个人语气，轻量润色。",
-    check:
-      "检查事实、案例和专业概念。区分已核实与待核实；没有真实检索证据不得宣称核实完成或编造链接。",
-    titles:
-      "给出三个标题。只返回 JSON 数组，每项含 title 和 reason 字段，不要代码围栏。",
-    prompts:
-      "给出两张正文配图的中文提示词，说明对应段落与图意，适合复制到 Lovart。",
-    topics: "提炼表达意图，给出三个与本篇相关的可写角度和所需素材。",
-    checks: "检查关键事实与推理边界，没有检索证据的条目列为待核实。",
+      "仅修改标记选段。只返回 JSON 数组 [{id,text}]；每个正文选段恰好一个结果，保持未标记内容不变。",
+    rewrite: "按所选技能和用户要求修改当前选区，只输出修改后的文本。",
     chat: "",
   };
   const session = conversation(doc);
   if (!session.messages.length)
-    session.title = (draft.display || prompts[task]).slice(0, 22);
+    session.title = (draft.display || "运行所选技能").slice(0, 22);
   session.messages.push({
     role: "user",
-    text: draft.display || prompts[task],
+    text: draft.display || "运行所选技能",
+    skillIds: session.skillIds,
     parts: draft.parts.length ? draft.parts : undefined,
   });
   const submittedDraft = session.composerDraft;
@@ -2571,6 +2547,7 @@ async function runTask(task) {
       account: doc.account,
       task,
       articleId: doc.id,
+      skillIds: session.skillIds,
       references: draft.references,
       instruction: (prompts[task] || "") + "\n" + instruction,
       body,
@@ -2619,29 +2596,6 @@ async function runTask(task) {
           from,
           to,
         };
-    } else if (
-      ["titles", "prompts", "topics", "checks", "check"].includes(task)
-    ) {
-      const k = task === "check" ? "checks" : task;
-      doc[k] ??= [];
-      if (k === "titles") {
-        try {
-          const items = JSON.parse(
-            result.replace(/^```(?:json)?\s*|\s*```$/g, ""),
-          );
-          if (!Array.isArray(items)) throw Error();
-          doc[k].unshift(
-            ...items
-              .filter((x) => typeof x.title === "string")
-              .map((x) => ({
-                text: x.title + "\n" + (x.reason || ""),
-                at: new Date().toISOString(),
-              })),
-          );
-        } catch {
-          doc[k].unshift({ text: result, at: new Date().toISOString() });
-        }
-      } else doc[k].unshift({ text: result, at: new Date().toISOString() });
     }
     await persist();
   } catch (e) {
@@ -2755,7 +2709,9 @@ function showUnmatchedMatcher(preview) {
     })();
     /** 近半年归档；搜索时扩大到全量 */
     const recent = () =>
-      archives.filter((a) => !a.date || String(a.date).slice(0, 10) >= halfYearAgo);
+      archives.filter(
+        (a) => !a.date || String(a.date).slice(0, 10) >= halfYearAgo,
+      );
     /** 按关键词筛选归档，无关键词时返回近半年列表 */
     const filterArchives = (q) => {
       const list = q ? archives : recent();
@@ -2939,7 +2895,7 @@ function renderDashboard() {
         "",
       )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>已发布</h3><div id="published-bulk" class="published-bulk" ${selectedCount ? "" : "hidden"}><span class="published-bulk-count">已选 ${selectedCount}</span><button type="button" id="bulk-group">${I.tags()} 设置分组</button><button type="button" id="bulk-backup">${I.folder()} 本地同步</button><button type="button" id="bulk-to-draft">移回草稿</button><button type="button" class="ghost" id="bulk-clear">取消选择</button></div><select id="metrics-sort" aria-label="文章排序方式">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${
       rows.length
-        ? `<table class="published-table"><thead><tr><th class="published-check"><input type="checkbox" id="published-select-all" aria-label="全选" ${allSelected ? "checked" : ""} ${selectedCount && !allSelected ? "data-indeterminate=\"1\"" : ""}></th><th>文章</th><th>分组</th><th>日期</th><th>阅读</th><th>点赞</th><th>收藏</th><th>涨粉</th></tr></thead><tbody>${sorted
+        ? `<table class="published-table"><thead><tr><th class="published-check"><input type="checkbox" id="published-select-all" aria-label="全选" ${allSelected ? "checked" : ""} ${selectedCount && !allSelected ? 'data-indeterminate="1"' : ""}></th><th>文章</th><th>分组</th><th>日期</th><th>阅读</th><th>点赞</th><th>收藏</th><th>涨粉</th></tr></thead><tbody>${sorted
             .map((r) => {
               const on = publishedSelection.has(r.path);
               const g =
@@ -2959,8 +2915,7 @@ function renderDashboard() {
   $("#refresh-dashboard").onclick = () => refreshDashboardData();
   $("#import-notes").onclick = () => runNoteImport();
   const selectAll = $("#published-select-all");
-  if (selectAll?.dataset.indeterminate)
-    selectAll.indeterminate = true;
+  if (selectAll?.dataset.indeterminate) selectAll.indeterminate = true;
   selectAll?.addEventListener("change", () => {
     if (selectAll.checked)
       sorted.forEach((r) => publishedSelection.add(r.path));
@@ -3013,8 +2968,7 @@ async function setPublishedGroups(paths) {
   const currentGroups = [
     ...new Set(list.map((rel) => publishedGroup(rel) || "")),
   ];
-  const selected =
-    currentGroups.length === 1 ? currentGroups[0] || "" : "";
+  const selected = currentGroups.length === 1 ? currentGroups[0] || "" : "";
   $("#group-set-modal")?.remove();
   const m = document.createElement("div");
   m.id = "group-set-modal";
@@ -3030,9 +2984,7 @@ async function setPublishedGroups(paths) {
       if (created) {
         applyAccountState(await api("group-upsert", { name: created }));
       }
-      applyAccountState(
-        await api("article-set-group", { paths: list, group }),
-      );
+      applyAccountState(await api("article-set-group", { paths: list, group }));
       m.remove();
       toast(group ? `已设为分组「${group}」` : "已清除分组");
     } catch (e) {
@@ -3077,9 +3029,7 @@ async function backupPublishedArticle(paths) {
   const groups = [...new Set(list.map((rel) => publishedGroup(rel) || ""))];
   const singleGroup = groups.length === 1 ? groups[0] || null : null;
   const mixedGroups = groups.length > 1;
-  const defaultPath = singleGroup
-    ? backupPathFor(singleGroup, accountId)
-    : "";
+  const defaultPath = singleGroup ? backupPathFor(singleGroup, accountId) : "";
   const perPathDefaults = list.map((rel) => ({
     rel,
     group: publishedGroup(rel),
@@ -3096,12 +3046,11 @@ async function backupPublishedArticle(paths) {
               "文章"
         }」`
       : `选中的 ${list.length} 篇文章`;
-  const rememberTarget =
-    singleGroup
-      ? `分组「${singleGroup}」`
-      : mixedGroups
-        ? "（多分组时请分别设置）"
-        : "该账号";
+  const rememberTarget = singleGroup
+    ? `分组「${singleGroup}」`
+    : mixedGroups
+      ? "（多分组时请分别设置）"
+      : "该账号";
   const defaultHint = mixedGroups
     ? allHaveDefault
       ? "各分组已配置默认路径，可按分组分别同步"
@@ -3126,7 +3075,12 @@ async function backupPublishedArticle(paths) {
           path: destDir,
         }),
       );
-    } else if (remember && !singleGroup && !mixedGroups && destDir !== defaultPath) {
+    } else if (
+      remember &&
+      !singleGroup &&
+      !mixedGroups &&
+      destDir !== defaultPath
+    ) {
       applyAccountState(
         await api("account-set-backup-path", {
           id: accountId,
@@ -3161,7 +3115,8 @@ async function backupPublishedArticle(paths) {
   const pickAndSync = async () => {
     try {
       const folder = await api("pick-backup-folder", {
-        defaultPath: defaultPath || perPathDefaults.find((x) => x.dest)?.dest || "",
+        defaultPath:
+          defaultPath || perPathDefaults.find((x) => x.dest)?.dest || "",
       });
       if (!folder) return;
       await runBackup(folder, remember());
@@ -3222,8 +3177,7 @@ async function movePublishedToDraft(paths) {
     } else {
       page = "dashboard";
       current =
-        state.documents.find((d) => sameAccount(d.account, account)) ||
-        current;
+        state.documents.find((d) => sameAccount(d.account, account)) || current;
     }
     render();
     toast(list.length === 1 ? "已移回草稿" : `已移回 ${list.length} 篇草稿`);
@@ -3297,13 +3251,15 @@ function renderSettings() {
   if (
     settingsTab !== "config" &&
     settingsTab !== "accounts" &&
-    settingsTab !== "groups"
+    settingsTab !== "groups" &&
+    settingsTab !== "skills"
   )
     settingsTab = "config";
   const tabs = [
     { id: "config", title: "配置" },
     { id: "accounts", title: "账号" },
     { id: "groups", title: "分组" },
+    { id: "skills", title: "技能" },
   ];
   const updateStatus = state._update?.available
     ? `发现新版本 ${esc(state._update.latest)}`
@@ -3332,12 +3288,15 @@ function renderSettings() {
           .join("")}</tbody></table></div>`
       : '<p class="muted">还没有分组。新建后即可在文章中选用，并为每个分组设置默认同步路径。</p>'
   }`;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">设置</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><nav class="settings-tabs">${tabs
-    .map(
-      (t) =>
-        `<button type="button" data-settings-tab="${t.id}" class="${settingsTab === t.id ? "active" : ""}">${t.title}</button>`,
-    )
-    .join("")}</nav>${settingsTab === "config" ? configBody : settingsTab === "accounts" ? accountsBody : groupsBody}</section>`;
+  $("#main").innerHTML =
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">设置</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><nav class="settings-tabs">${tabs
+      .map(
+        (t) =>
+          `<button type="button" data-settings-tab="${t.id}" class="${settingsTab === t.id ? "active" : ""}">${t.title}</button>`,
+      )
+      .join(
+        "",
+      )}</nav>${settingsTab === "config" ? configBody : settingsTab === "accounts" ? accountsBody : settingsTab === "skills" ? `<div class="dashboard-card"><div class="settings-card-head"><h3>技能配置</h3><button id="manage-skills" class="primary">管理技能</button></div><p>通用技能供所有账号使用；账号技能与默认启用项按账号独立配置。</p><label>配置账号<select id="skill-account">${accountList().map(a=>`<option value="${esc(a.id)}">${esc(a.label)}</option>`).join("")}</select></label><p class="muted">在这里编辑指令和组合步骤。对话中只选择本次使用的技能。</p></div>` : groupsBody}</section>`;
   $$("[data-settings-tab]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -3345,6 +3304,10 @@ function renderSettings() {
         render();
       }),
   );
+  if (settingsTab === "skills") {
+    $("#skill-account").value=account;
+    $("#manage-skills").onclick=()=>manageSkills(api,$("#skill-account").value);
+  }
   if (settingsTab === "config") {
     $("#setting-provider").value = state.provider;
     $("#save-settings").onclick = () => {
@@ -3362,8 +3325,7 @@ function renderSettings() {
     };
     $("#check-update").onclick = () => checkForAppUpdate({ manual: true });
     const installBtn = $("#install-update");
-    if (installBtn)
-      installBtn.onclick = () => installAppUpdate();
+    if (installBtn) installBtn.onclick = () => installAppUpdate();
     /** 把表单写回 state.wechat */
     const readWechatForm = () => {
       state.wechat = {
@@ -3414,16 +3376,13 @@ function renderSettings() {
         );
         if (!name?.trim()) return;
         try {
-          applyAccountState(
-            await api("account-create", { name: name.trim() }),
-          );
+          applyAccountState(await api("account-create", { name: name.trim() }));
           toast("已创建账号");
         } catch (e) {
           toast(e.message || "创建失败");
         }
       };
-    if (registerBtn)
-      registerBtn.onclick = () => pickAndRegisterAccountFolder();
+    if (registerBtn) registerBtn.onclick = () => pickAndRegisterAccountFolder();
     $$("[data-unregister-account]").forEach((b) => {
       b.onclick = async () => {
         const ok = await askConfirm(
@@ -3503,7 +3462,11 @@ function renderSettings() {
     $$("[data-delete-group]").forEach((b) => {
       b.onclick = async () => {
         const name = b.dataset.deleteGroup;
-        if (!confirm(`删除分组「${name}」？文章上的分组标签会保留，但不再有默认同步路径。`))
+        if (
+          !confirm(
+            `删除分组「${name}」？文章上的分组标签会保留，但不再有默认同步路径。`,
+          )
+        )
           return;
         try {
           applyAccountState(await api("group-delete", { name }));
@@ -3603,7 +3566,9 @@ function groupOptionsHtml(selected, opts = {}) {
   const cur = typeof selected === "string" ? selected.trim() : "";
   const names = new Set(groupNames());
   if (cur) names.add(cur);
-  return `${allowEmpty ? `<option value="">${esc(emptyLabel)}</option>` : ""}${[...names]
+  return `${allowEmpty ? `<option value="">${esc(emptyLabel)}</option>` : ""}${[
+    ...names,
+  ]
     .sort((a, b) => a.localeCompare(b, "zh"))
     .map(
       (n) =>
@@ -3792,7 +3757,9 @@ async function pickAccountFolderOnWeb() {
         (f) =>
           `<button type="button" class="folder-pick-item" data-folder="${esc(f.name)}"><strong>${esc(f.label)}</strong><small>${esc(f.name)}</small></button>`,
       )
-      .join("")}</div><div class="row"><button type="button" id="cancel-folder-pick">取消</button></div></div>`;
+      .join(
+        "",
+      )}</div><div class="row"><button type="button" id="cancel-folder-pick">取消</button></div></div>`;
     document.body.append(m);
     $("#cancel-folder-pick").onclick = () => {
       m.remove();
@@ -4060,7 +4027,8 @@ async function renderMaterials() {
     $("#reference-drawer")?.remove();
     $("#published-drawer")?.remove();
     if (materialsFilter !== "all")
-      current = state.documents.find((d) => d.id === materialsFilter) || current;
+      current =
+        state.documents.find((d) => d.id === materialsFilter) || current;
     renderMaterials();
   };
 
@@ -4078,7 +4046,7 @@ async function renderMaterials() {
       rows
         .map((r) => materialPreviewCardHTML(r, { showRefCount: true }))
         .join("") ||
-      "<p class=\"empty-data\">还没有素材。上传后可在多篇文章间共用。</p>";
+      '<p class="empty-data">还没有素材。上传后可在多篇文章间共用。</p>';
     $$("#project-files [data-ref-preview]").forEach(
       (b) =>
         (b.onclick = async () => {
@@ -4184,7 +4152,7 @@ async function renderProfile() {
                       .join("")}</div></details>`
                   : ""
               }`
-            : `<button id="iterate-model" class="primary">${I.sparkles()} 根据新文章和数据提出调整</button><p>向当前 ${esc(state.provider)} 提供本账号模型、最近 12 篇文章及 YAML；长文每篇前 3000 字。只建议替换现有模块内容。</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} · ${p.status === "pending" ? "待审阅" : p.status === "applied" ? "已采纳" : "已保留原设定"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("、")}</p><button data-model-proposal="${p.id}">查看建议</button></div>`).join("") || "<p>还没有 AI 调整建议。</p>"}</div><h3>历史版本</h3>${model.history.map((h) => `<div class="result-card"><small>${esc(h.at)} · ${esc(h.reason)}</small><details><summary>查看当时的设定</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h.id}">恢复此版本</button></div>`).join("")}`
+            : `<button id="profile-skills" class="primary">${I.sparkles()} 配置账号技能</button><p>在技能工作室维护账号专属指令；历史人设建议和版本继续保留。</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} · ${p.status === "pending" ? "待审阅" : p.status === "applied" ? "已采纳" : "已保留原设定"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("、")}</p><button data-model-proposal="${p.id}">查看建议</button></div>`).join("") || "<p>还没有 AI 调整建议。</p>"}</div><h3>历史版本</h3>${model.history.map((h) => `<div class="result-card"><small>${esc(h.at)} · ${esc(h.reason)}</small><details><summary>查看当时的设定</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h.id}">恢复此版本</button></div>`).join("")}`
         }</div></section>`;
       const save = async () => {
         if (!definition || $("#model-text").value === model.modules[profileTab])
@@ -4246,36 +4214,8 @@ async function renderProfile() {
             }
           }),
       );
-      if ($("#iterate-model"))
-        $("#iterate-model").onclick = async () => {
-          if (busy) return toast("请等待当前 AI 任务");
-          const b = $("#iterate-model");
-          busy = true;
-          b.disabled = true;
-          b.textContent = "正在生成调整建议…";
-          try {
-            if (!(await persist())) return;
-            const proposal = await api("agent", {
-              provider: state.provider,
-              model: state.model,
-              account: a,
-              task: "model-iterate",
-              body: "",
-              instruction:
-                "让表达更符合我实际写出的文章，并根据原始数据提出少量可检验的调整。",
-            });
-            model = await api("model-load", a);
-            showModelProposal(proposal, model);
-          } catch (e) {
-            toast(e.message);
-          } finally {
-            busy = false;
-            if (b.isConnected) {
-              b.disabled = false;
-              b.innerHTML = `${I.sparkles()} 根据新文章和数据提出调整`;
-            }
-          }
-        };
+      if ($("#profile-skills"))
+        $("#profile-skills").onclick = () => { page="settings"; settingsTab="skills"; render(); };
     };
     draw();
   } catch (e) {

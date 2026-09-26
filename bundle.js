@@ -85,6 +85,191 @@ var require_calendar = __commonJS({
   }
 });
 
+// skills-ui.js
+var escape = (s) => String(s ?? "").replace(
+  /[&<>"']/g,
+  (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
+);
+async function manageSkills(api2, account2, onDone = () => {
+}) {
+  const modal = document.createElement("dialog");
+  modal.className = "skill-dialog";
+  document.body.append(modal);
+  let state2, active = null, scope = "global", modified = false;
+  const close2 = () => {
+    if (modified && !confirm("\u653E\u5F03\u672A\u4FDD\u5B58\u7684\u6280\u80FD\u4FEE\u6539\uFF1F")) return;
+    modal.close();
+    modal.remove();
+    onDone();
+  };
+  modal.addEventListener("cancel", (e) => {
+    e.preventDefault();
+    close2();
+  });
+  async function load() {
+    state2 = await api2("skills-list", { account: account2 });
+    draw();
+  }
+  function draw() {
+    modal.innerHTML = `<div class="skill-header"><div><h2>\u6280\u80FD\u5DE5\u4F5C\u5BA4</h2><p>\u901A\u7528\u6280\u80FD\u8DE8\u8D26\u53F7\u590D\u7528\uFF0C\u8D26\u53F7\u6280\u80FD\u4EC5\u4F9B\u5F53\u524D\u8D26\u53F7\u4F7F\u7528\u3002</p></div><button id="skill-close" aria-label="\u5173\u95ED\u6280\u80FD\u5DE5\u4F5C\u5BA4">\u5173\u95ED</button></div><div class="skill-scopes"><button data-scope="global" class="${scope === "global" ? "primary" : ""}">\u901A\u7528\u6280\u80FD</button><button data-scope="account" class="${scope === "account" ? "primary" : ""}">\u8D26\u53F7\u6280\u80FD</button><button id="skill-new">\uFF0B \u65B0\u5EFA\u6280\u80FD</button></div><div class="skill-workspace"><div class="skill-list">${state2.items.filter((x) => x.scope === scope).map(
+      (x) => `<button data-skill="${x.id}" class="${active?.id === x.id ? "selected" : ""}"><strong>${escape(x.name)}</strong><small>${x.includes.length ? "\u7EC4\u5408\u6280\u80FD" : "\u6307\u4EE4\u6280\u80FD"}${(state2.accounts[state2.account] || []).includes(x.id) ? " \xB7 \u9ED8\u8BA4\u542F\u7528" : ""}</small></button>`
+    ).join("") || '<p class="muted">\u8FD8\u6CA1\u6709\u6280\u80FD\u3002\u521B\u5EFA\u4E00\u6761\u6307\u4EE4\uFF0C\u6216\u7EC4\u5408\u5DF2\u6709\u6280\u80FD\u3002</p>'}</div><div class="skill-editor">${active ? `<label>\u6280\u80FD\u540D\u79F0<input id="skill-name" maxlength="80" value="${escape(active.name)}"></label><label>\u6267\u884C\u6307\u4EE4<textarea id="skill-prompt" rows="9" placeholder="\u63CF\u8FF0\u4EFB\u52A1\u3001\u65B9\u6CD5\u548C\u8F93\u51FA\u8981\u6C42\u2026">${escape(active.prompt)}</textarea></label><label>\u7EC4\u5408\u6B65\u9AA4 <small>\u6309\u987A\u5E8F\u6267\u884C\uFF0C\u6700\u540E\u6267\u884C\u4E0A\u65B9\u6307\u4EE4</small></label><div id="skill-steps"></div><div class="row"><select id="skill-add-choice"><option value="">\u9009\u62E9\u4E00\u4E2A\u6280\u80FD</option>${state2.items.filter(
+      (x) => x.id !== active.id && (active.scope === "account" || x.scope === "global")
+    ).map((x) => `<option value="${x.id}">${escape(x.name)}</option>`).join(
+      ""
+    )}</select><button id="skill-add">\u6DFB\u52A0\u6B65\u9AA4</button></div><label class="skill-check"><input type="checkbox" id="skill-enabled" ${(state2.accounts[state2.account] || []).includes(active.id) ? "checked" : ""}> \u5F53\u524D\u8D26\u53F7\u9ED8\u8BA4\u542F\u7528</label><div class="skill-actions"><button id="skill-save" class="primary">\u4FDD\u5B58\u6280\u80FD</button>${active.id ? '<button id="skill-delete" class="danger">\u5220\u9664</button>' : ""}</div>` : '<div class="skill-empty">\u9009\u62E9\u6216\u65B0\u5EFA\u6280\u80FD<br><small>\u6280\u80FD\u662F\u53EF\u7F16\u8F91\u7684\u6307\u4EE4\uFF0C\u53EF\u81EA\u7531\u7EC4\u5408\u3002\u8D26\u53F7\u4EBA\u8BBE\u7EE7\u7EED\u4F5C\u4E3A\u5199\u4F5C\u80CC\u666F\u3002</small></div>'}</div></div><p id="skill-error" role="status"></p>`;
+    modal.querySelector("#skill-close").onclick = close2;
+    const switchTo = (fn) => {
+      if (modified && !confirm("\u653E\u5F03\u672A\u4FDD\u5B58\u7684\u6280\u80FD\u4FEE\u6539\uFF1F")) return;
+      modified = false;
+      fn();
+      draw();
+    };
+    modal.querySelectorAll("[data-scope]").forEach(
+      (b) => b.onclick = () => switchTo(() => {
+        scope = b.dataset.scope;
+        active = null;
+      })
+    );
+    modal.querySelectorAll("[data-skill]").forEach(
+      (b) => b.onclick = () => switchTo(() => {
+        active = structuredClone(
+          state2.items.find((x) => x.id === b.dataset.skill)
+        );
+      })
+    );
+    modal.querySelector("#skill-new").onclick = () => switchTo(() => {
+      active = { scope, name: "", prompt: "", includes: [] };
+    });
+    if (!active) return;
+    const q = (s) => modal.querySelector(s);
+    q("#skill-name").oninput = (e) => {
+      active.name = e.target.value;
+      modified = true;
+    };
+    q("#skill-prompt").oninput = (e) => {
+      active.prompt = e.target.value;
+      modified = true;
+    };
+    q("#skill-enabled").onchange = () => modified = true;
+    const steps = () => {
+      q("#skill-steps").innerHTML = active.includes.map(
+        (id, i) => `<div class="skill-step"><span>${i + 1}. ${escape(state2.items.find((x) => x.id === id)?.name || "\u5DF2\u5931\u6548")}</span><button data-up="${i}" ${i === 0 ? "disabled" : ""} aria-label="\u4E0A\u79FB\u6B65\u9AA4">\u2191</button><button data-remove="${i}" aria-label="\u79FB\u9664\u6B65\u9AA4">\xD7</button></div>`
+      ).join("");
+      q("#skill-steps").querySelectorAll("[data-remove]").forEach(
+        (b) => b.onclick = () => {
+          active.includes.splice(+b.dataset.remove, 1);
+          modified = true;
+          steps();
+        }
+      );
+      q("#skill-steps").querySelectorAll("[data-up]").forEach(
+        (b) => b.onclick = () => {
+          const i = +b.dataset.up;
+          [active.includes[i - 1], active.includes[i]] = [
+            active.includes[i],
+            active.includes[i - 1]
+          ];
+          modified = true;
+          steps();
+        }
+      );
+    };
+    steps();
+    q("#skill-add").onclick = () => {
+      const id = q("#skill-add-choice").value;
+      if (id && !active.includes.includes(id)) {
+        active.includes.push(id);
+        modified = true;
+        steps();
+      }
+    };
+    q("#skill-save").onclick = async () => {
+      const b = q("#skill-save");
+      b.disabled = true;
+      try {
+        const enabled = q("#skill-enabled").checked;
+        const ids = new Set(state2.items.map((x) => x.id));
+        state2 = await api2("skills-save", {
+          account: account2,
+          revision: state2.revision,
+          skill: active
+        });
+        active = state2.items.find(
+          (x) => active.id ? x.id === active.id : !ids.has(x.id)
+        );
+        const defaults2 = (state2.accounts[state2.account] || []).filter(
+          (id) => id !== active.id
+        );
+        if (enabled) defaults2.push(active.id);
+        state2 = await api2("skills-configure", {
+          account: account2,
+          revision: state2.revision,
+          ids: defaults2
+        });
+        modified = false;
+        draw();
+      } catch (e) {
+        q("#skill-error").textContent = e.message;
+        b.disabled = false;
+      }
+    };
+    if (q("#skill-delete"))
+      q("#skill-delete").onclick = async () => {
+        if (!confirm("\u5220\u9664\u6B64\u6280\u80FD\uFF1F\u901A\u7528\u6280\u80FD\u5220\u9664\u540E\u5C06\u5BF9\u6240\u6709\u8D26\u53F7\u751F\u6548\u3002")) return;
+        try {
+          state2 = await api2("skills-remove", {
+            account: account2,
+            revision: state2.revision,
+            id: active.id
+          });
+          active = null;
+          modified = false;
+          draw();
+        } catch (e) {
+          q("#skill-error").textContent = e.message;
+        }
+      };
+  }
+  modal.showModal();
+  try {
+    await load();
+  } catch (e) {
+    modal.textContent = e.message;
+    const b = document.createElement("button");
+    b.textContent = "\u5173\u95ED";
+    b.onclick = close2;
+    modal.append(b);
+  }
+}
+async function mountSkillPicker(root2, api2, account2, session) {
+  let data;
+  try {
+    data = await api2("skills-list", { account: account2 });
+    if (!root2.isConnected) return;
+    const ids = session.skillIds ?? data.accounts[data.account] ?? [];
+    session.skillIds = [...ids];
+    const draw = () => {
+      const selected = session.skillIds || [];
+      root2.innerHTML = `<details class="chat-skill-menu"><summary title="\u9009\u62E9\u672C\u6B21\u6280\u80FD">\u6280\u80FD${selected.length ? ` \xB7 ${selected.length}` : ""}</summary><div class="chat-skill-options"><strong>\u672C\u6B21\u4F7F\u7528</strong>${data.items.map((x) => `<label class="skill-check"><input type="checkbox" value="${x.id}" ${selected.includes(x.id) ? "checked" : ""}>${escape(x.name)}<small>${x.scope === "global" ? "\u901A\u7528" : "\u8D26\u53F7"}</small></label>`).join("") || "<p>\u8FD8\u6CA1\u6709\u6280\u80FD\uFF0C\u8BF7\u5728\u8BBE\u7F6E \u2192 \u6280\u80FD\u4E2D\u914D\u7F6E\u3002</p>"}</div></details>`;
+      root2.querySelectorAll("input").forEach((x) => x.onchange = () => {
+        session.skillIds = [...root2.querySelectorAll("input:checked")].map((x2) => x2.value);
+        root2.querySelector("summary").textContent = `\u6280\u80FD${session.skillIds.length ? " \xB7 " + session.skillIds.length : ""}`;
+        root2.dispatchEvent(new CustomEvent("skills-change", { bubbles: true }));
+      });
+      root2.querySelector("details").addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          e.currentTarget.open = false;
+          root2.querySelector("summary").focus();
+        }
+      });
+    };
+    draw();
+  } catch (e) {
+    if (root2.isConnected) root2.textContent = e.message;
+  }
+}
+
 // social-layout.js
 var BLUE = "#0f3ff7";
 var BLUE_SOFT = "rgba(15, 63, 247, 0.2)";
@@ -26694,7 +26879,7 @@ var blockPedantic = {
   lheading: /^(.+?)\n {0,3}(=+|-+) *(?:\n+|$)/,
   paragraph: edit(_paragraph).replace("hr", hr).replace("heading", " *#{1,6} *[^\n]").replace("lheading", lheading).replace("|table", "").replace("blockquote", " {0,3}>").replace("|fences", "").replace("|list", "").replace("|html", "").replace("|tag", "").getRegex()
 };
-var escape = /^\\([!"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~])/;
+var escape2 = /^\\([!"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~])/;
 var inlineCode = /^(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/;
 var br = /^( {2,}|\\)\n(?!\s*$)/;
 var inlineText = /^(`+|[^`])(?:(?= {2,}\n)|[\s\S]*?(?:(?=[\\<!\[`*_]|\b_|$)|[^ ](?= {2,}\n)))/;
@@ -26739,7 +26924,7 @@ var inlineNormal = {
   emStrongLDelim,
   emStrongRDelimAst,
   emStrongRDelimUnd,
-  escape,
+  escape: escape2,
   link,
   nolink,
   punctuation,
@@ -26787,7 +26972,7 @@ var escapeReplacements = {
   "'": "&#39;"
 };
 var getEscapeReplacement = (ch) => escapeReplacements[ch];
-function escape2(html2, encode) {
+function escape22(html2, encode) {
   if (encode) {
     if (other.escapeTest.test(html2)) {
       return html2.replace(other.escapeReplace, getEscapeReplacement);
@@ -27962,9 +28147,9 @@ var _Renderer = class {
     const langString = (lang || "").match(other.notSpaceStart)?.[0];
     const code = text.replace(other.endingNewline, "") + "\n";
     if (!langString) {
-      return "<pre><code>" + (escaped ? code : escape2(code, true)) + "</code></pre>\n";
+      return "<pre><code>" + (escaped ? code : escape22(code, true)) + "</code></pre>\n";
     }
-    return '<pre><code class="language-' + escape2(langString) + '">' + (escaped ? code : escape2(code, true)) + "</code></pre>\n";
+    return '<pre><code class="language-' + escape22(langString) + '">' + (escaped ? code : escape22(code, true)) + "</code></pre>\n";
   }
   blockquote({ tokens }) {
     const body = this.parser.parse(tokens);
@@ -28002,7 +28187,7 @@ ${body}</blockquote>
         if (item.tokens[0]?.type === "paragraph") {
           item.tokens[0].text = checkbox + " " + item.tokens[0].text;
           if (item.tokens[0].tokens && item.tokens[0].tokens.length > 0 && item.tokens[0].tokens[0].type === "text") {
-            item.tokens[0].tokens[0].text = checkbox + " " + escape2(item.tokens[0].tokens[0].text);
+            item.tokens[0].tokens[0].text = checkbox + " " + escape22(item.tokens[0].tokens[0].text);
             item.tokens[0].tokens[0].escaped = true;
           }
         } else {
@@ -28069,7 +28254,7 @@ ${text}</tr>
     return `<em>${this.parser.parseInline(tokens)}</em>`;
   }
   codespan({ text }) {
-    return `<code>${escape2(text, true)}</code>`;
+    return `<code>${escape22(text, true)}</code>`;
   }
   br(token) {
     return "<br>";
@@ -28086,7 +28271,7 @@ ${text}</tr>
     href = cleanHref;
     let out = '<a href="' + href + '"';
     if (title) {
-      out += ' title="' + escape2(title) + '"';
+      out += ' title="' + escape22(title) + '"';
     }
     out += ">" + text + "</a>";
     return out;
@@ -28097,18 +28282,18 @@ ${text}</tr>
     }
     const cleanHref = cleanUrl(href);
     if (cleanHref === null) {
-      return escape2(text);
+      return escape22(text);
     }
     href = cleanHref;
     let out = `<img src="${href}" alt="${text}"`;
     if (title) {
-      out += ` title="${escape2(title)}"`;
+      out += ` title="${escape22(title)}"`;
     }
     out += ">";
     return out;
   }
   text(token) {
-    return "tokens" in token && token.tokens ? this.parser.parseInline(token.tokens) : "escaped" in token && token.escaped ? token.text : escape2(token.text);
+    return "tokens" in token && token.tokens ? this.parser.parseInline(token.tokens) : "escaped" in token && token.escaped ? token.text : escape22(token.text);
   }
 };
 var _TextRenderer = class {
@@ -28627,7 +28812,7 @@ var Marked = class {
     return (e) => {
       e.message += "\nPlease report this to https://github.com/markedjs/marked.";
       if (silent) {
-        const msg = "<p>An error occurred:</p><pre>" + escape2(e.message + "", true) + "</pre>";
+        const msg = "<p>An error occurred:</p><pre>" + escape22(e.message + "", true) + "</pre>";
         if (async) {
           return Promise.resolve(msg);
         }
@@ -30015,8 +30200,7 @@ function blockPlainText2(node) {
     else if (n.nodeName === "BR") {
       const cls = n.getAttribute?.("class") || "";
       if (!cls.includes("ProseMirror-trailingBreak")) out += "\n";
-    } else if (n.childNodes?.length)
-      for (const c of n.childNodes) walk(c);
+    } else if (n.childNodes?.length) for (const c of n.childNodes) walk(c);
   }
   walk(node);
   return out.replace(/[ \t]*\n[ \t]*/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
@@ -30843,7 +31027,10 @@ async function publishHTML(md, opts = {}) {
       if (!/font-family/.test(prev))
         el.setAttribute(
           "style",
-          `${prev};font-family:${serif};color:${WECHAT_BLUE};`.replace(/^;/, "")
+          `${prev};font-family:${serif};color:${WECHAT_BLUE};`.replace(
+            /^;/,
+            ""
+          )
         );
     });
     d.querySelectorAll("h1 .h1-zh, h1 .h1-en").forEach(
@@ -31043,7 +31230,10 @@ function syncRailVisibility() {
   resizer?.classList.toggle("hidden", !assistantOpen);
   const toggle = $("#toggle-assistant");
   if (toggle) {
-    toggle.classList.toggle("primary", assistantOpen && railMode === "assistant");
+    toggle.classList.toggle(
+      "primary",
+      assistantOpen && railMode === "assistant"
+    );
     toggle.setAttribute(
       "aria-pressed",
       assistantOpen && railMode === "assistant" ? "true" : "false"
@@ -31112,15 +31302,7 @@ function renderAssistantRail() {
     return;
   }
   rail.dataset.railMode = "assistant";
-  rail.innerHTML = `<div class="assistant-head"><span>${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</span><div class="assistant-head-actions"><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select><button type="button" id="close-assistant" title="\u6536\u8D77">${I.panelClose()} \u6536\u8D77</button></div></div><div class="tabs">${[
-    ["chat", "\u5BF9\u8BDD"],
-    ["topics", "\u601D\u8DEF"],
-    ["titles", "\u6807\u9898"],
-    ["prompts", "\u914D\u56FE"],
-    ["checks", "\u6838\u67E5"]
-  ].map(
-    ([id, name]) => `<button data-tab="${id}" class="${tab === id ? "active" : ""}">${name}</button>`
-  ).join("")}</div><div id="panel" data-ready="1"></div>`;
+  rail.innerHTML = `<div class="assistant-head"><span>${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</span><div class="assistant-head-actions"><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select><button type="button" id="close-assistant" title="\u6536\u8D77">${I.panelClose()} \u6536\u8D77</button></div></div><div id="panel" data-ready="1"></div>`;
   const provider = $("#provider");
   if (provider) {
     provider.value = state.provider;
@@ -31337,12 +31519,12 @@ function renderWrite() {
   }
   if (previewMode && previewDocId && previewDocId !== current.id)
     previewMode = false;
-  if (tab === "publish") tab = "chat";
+  tab = "chat";
   if (previewMode) {
     renderPreview();
     return;
   }
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</button><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button><button data-task="review">${I.eye()} \u770B\u7A3F</button><button data-task="rewrite">${I.wand()} \u6DA6\u8272\u9009\u6BB5</button><button data-task="check">${I.check()} \u6838\u67E5</button></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</button><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [src_default, src_default2, TableKit],
@@ -31595,7 +31777,8 @@ function bindWorkspaceResize() {
     return Math.min(Math.max(Math.round(w), 280), Math.min(cap, max));
   };
   const stored = Number(localStorage.getItem("inkdesk-assistant-width"));
-  if (Number.isFinite(stored) && stored > 0) aside.style.width = clamp(stored) + "px";
+  if (Number.isFinite(stored) && stored > 0)
+    aside.style.width = clamp(stored) + "px";
   let startX = 0;
   let startW = 0;
   const onMove = (e) => {
@@ -31631,23 +31814,13 @@ function renderPanel() {
   $$("[data-task]").forEach((b) => b.disabled = busy);
   const panel = $("#panel");
   if (!panel) return;
-  if (tab === "publish") tab = "chat";
+  tab = "chat";
   const key = tab;
   let content = "";
   if (tab === "chat") {
     content = conversation().messages.map(
-      (m) => `<div class="message ${m.role}"><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? `<span class="inline-reference">${esc(p.label)}</span>` : esc(p.text)).join("") : esc(m.text)}</div></div>`
+      (m) => `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "\u4F60" : "Agent"}</small><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? `<span class="inline-reference">${esc(p.label)}</span>` : esc(p.text)).join("") : esc(m.text)}</div></div>`
     ).join("") || '<div class="welcome"><span class="welcome-icon">' + I.sparkles({ size: 22 }) + "</span><h3>\u5148\u4FDD\u7559\u4F60\u7684\u58F0\u97F3\u3002</h3><p>\u4E00\u8D77\u804A\u60F3\u6CD5\uFF0C\u6216\u9009\u4E2D\u4E00\u6BB5\u6587\u5B57\u63A8\u6572\u3002<br>\u4FEE\u6539\u5148\u9884\u89C8\uFF0C\u7531\u4F60\u51B3\u5B9A\u662F\u5426\u91C7\u7528\u3002</p></div>";
-  } else {
-    const labels = {
-      topics: ["\u672C\u7BC7\u601D\u8DEF", "\u56F4\u7ED5\u8868\u8FBE\u610F\u56FE\uFF0C\u51C6\u5907\u5C11\u91CF\u53EF\u7528\u89D2\u5EA6\u3002"],
-      titles: ["\u6807\u9898\u5EFA\u8BAE", "\u7ED9\u540C\u4E00\u7BC7\u6587\u7AE0\uFF0C\u627E\u5230\u66F4\u8D34\u5207\u7684\u5F00\u5934\u3002"],
-      prompts: ["\u914D\u56FE\u63D0\u793A\u8BCD", "\u590D\u5236\u5230 Lovart\uFF0C\u751F\u6210\u540E\u5BFC\u5165\u6B63\u6587\u3002"],
-      checks: ["\u5185\u5BB9\u6838\u67E5", "\u6765\u6E90\u4E0D\u8DB3\u7684\u5224\u65AD\u4F1A\u4FDD\u7559\u4E3A\u5F85\u6838\u5B9E\u3002"]
-    };
-    content = `<div class="panel-intro"><h3>${labels[key][0]}</h3><p>${labels[key][1]}</p></div>` + (current[key] || []).map(
-      (x, i) => `<div class="result-card"><small>${new Date(x.at).toLocaleDateString("zh-CN")}</small><div>${esc(x.text)}</div><button data-copy="${i}">\u590D\u5236</button>${key === "titles" ? `<button data-use="${i}">\u9009\u62E9\u6807\u9898</button>` : ""}</div>`
-    ).join("") + `<button class="secondary wide" id="generate">${I.sparkles()} \u751F\u6210${labels[key][0]}</button>`;
   }
   panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" title="\u4E3A\u672C\u7BC7\u521B\u5EFA\u65B0\u5BF9\u8BDD">${I.plus()} \u65B0\u5BF9\u8BDD</button></div>` : ""}<div class="panel-scroll">${pending && pending.doc === current.id && pending.conversationId === conversation().id ? `<div class="review-card"><h3>\u4FEE\u6539\u5EFA\u8BAE</h3><div class="diff">${diffWords(
     pending.old,
@@ -31656,7 +31829,7 @@ function renderPanel() {
     (p) => `<${p.added ? "ins" : p.removed ? "del" : "span"}>${esc(p.value)}</${p.added ? "ins" : p.removed ? "del" : "span"}>`
   ).join(
     ""
-  )}</div><div class="row"><button id="accept" class="primary">\u63A5\u53D7\u4FEE\u6539</button><button id="reject">\u4FDD\u7559\u539F\u6587</button></div></div>` : ""}${content}</div><div class="composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload">${I.upload()} \u4E0A\u4F20\u6587\u4EF6</button><button id="chat-reference">${I.at()} \u9879\u76EE\u6587\u4EF6</button><button id="rewrite-tags">${I.tags()} \u6539\u5199\u6807\u7B7E\u9009\u6BB5</button><button id="send" class="primary">${busy ? "\u505C\u6B62" : `${I.send()} \u53D1\u9001`}</button></div></div>`;
+  )}</div><div class="row"><button id="accept" class="primary">\u63A5\u53D7\u4FEE\u6539</button><button id="reject">\u4FDD\u7559\u539F\u6587</button></div></div>` : ""}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="\u4E0A\u4F20\u6587\u4EF6" aria-label="\u4E0A\u4F20\u6587\u4EF6">${I.plus()}</button><button id="chat-reference" class="icon-btn" title="\u5F15\u7528\u9879\u76EE\u6587\u4EF6" aria-label="\u5F15\u7528\u9879\u76EE\u6587\u4EF6">${I.at()}</button><div id="skill-picker"></div><select id="agent-output" aria-label="\u5BF9\u8BDD\u6A21\u5F0F"><option value="chat">\u5BF9\u8BDD</option><option value="rewrite-tags">\u4FEE\u6539\u6807\u7B7E\u9009\u6BB5</option><option value="rewrite">\u4FEE\u6539\u5F53\u524D\u9009\u533A</option></select><button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div><div class="composer-hint">\u2318Enter \u53D1\u9001 \xB7 @ \u5F15\u7528\u6587\u4EF6</div></div>`;
   if (tab === "chat") {
     $("#conversation").value = conversation().id;
     $("#conversation").onchange = (e) => {
@@ -31676,7 +31849,7 @@ function renderPanel() {
       renderPanel();
     };
   }
-  $("#send").onclick = () => busy ? api("cancel") : runTask(tab === "chat" ? "chat" : tab);
+  $("#send").onclick = () => busy ? api("cancel") : runTask($("#agent-output").value);
   composer = new Composer($("#composer-input"), conversation(), {
     changed: () => {
       dirty = true;
@@ -31690,7 +31863,11 @@ function renderPanel() {
   $("#chat-upload").onclick = uploadChatFiles;
   for (const id of ["#chat-upload", "#chat-reference"])
     $(id).onmousedown = (e) => e.preventDefault();
-  $("#rewrite-tags").onclick = () => runTask("rewrite-tags");
+  $("#skill-picker").addEventListener("skills-change", () => {
+    dirty = true;
+    persist();
+  });
+  mountSkillPicker($("#skill-picker"), api, account, conversation());
   if ($("#generate")) $("#generate").onclick = () => runTask(tab);
   $$("[data-copy]").forEach(
     (b) => b.onclick = () => api("copy", { text: current[key][+b.dataset.copy].text }).then(
@@ -31790,25 +31967,21 @@ async function runTask(task) {
     if (sorted.some((a, i) => i > 0 && a.from < sorted[i - 1].to))
       return toast("\u9009\u6BB5\u6709\u91CD\u53E0\uFF0C\u8BF7\u4FDD\u7559\u4E0D\u91CD\u53E0\u7684\u6807\u7B7E");
   }
-  if (task === "rewrite" && !selection) return toast("\u8BF7\u5148\u9009\u4E2D\u9700\u8981\u6DA6\u8272\u7684\u6BB5\u843D");
-  if (task === "chat" && !instruction) return toast("\u5148\u5199\u4E00\u53E5\u60F3\u8BA8\u8BBA\u7684\u5185\u5BB9");
+  if (task === "rewrite" && !selection) return toast("\u8BF7\u5148\u9009\u4E2D\u9700\u8981\u4FEE\u6539\u7684\u6BB5\u843D");
+  if (task === "chat" && !instruction && !conversation(doc3).skillIds?.length)
+    return toast("\u5148\u5199\u4E00\u53E5\u60F3\u8BA8\u8BBA\u7684\u5185\u5BB9");
   const prompts = {
-    "rewrite-tags": "\u4EC5\u6539\u5199\u6807\u8BB0\u7684\u6B63\u6587\u9009\u6BB5\uFF0C\u6587\u4EF6\u6807\u7B7E\u662F\u53C2\u8003\u8D44\u6599\u3002\u53EA\u8FD4\u56DE JSON \u6570\u7EC4 [{id,text}]\uFF0Cid \u4E3A\u6BCF\u4E2A\u6B63\u6587\u9009\u6BB5\u7684\u5F15\u7528 ID\uFF0Ctext \u4E3A\u8BE5\u9009\u6BB5\u4FEE\u6539\u540E\u7684\u5B8C\u6574\u6587\u672C\uFF0C\u4FDD\u6301\u672A\u6807\u8BB0\u5185\u5BB9\u4E0D\u53D8\u3002\u6BCF\u4E2A\u9009\u6BB5\u6070\u597D\u4E00\u4E2A\u7ED3\u679C\u3002",
-    review: "\u6307\u51FA\u6700\u591A\u4E09\u4E2A\u503C\u5F97\u4FEE\u6539\u7684\u95EE\u9898\uFF0C\u89E3\u91CA\u53D6\u820D\uFF0C\u4E0D\u91CD\u5199\u3002",
-    rewrite: "\u4FDD\u7559\u539F\u610F\u548C\u4E2A\u4EBA\u8BED\u6C14\uFF0C\u8F7B\u91CF\u6DA6\u8272\u3002",
-    check: "\u68C0\u67E5\u4E8B\u5B9E\u3001\u6848\u4F8B\u548C\u4E13\u4E1A\u6982\u5FF5\u3002\u533A\u5206\u5DF2\u6838\u5B9E\u4E0E\u5F85\u6838\u5B9E\uFF1B\u6CA1\u6709\u771F\u5B9E\u68C0\u7D22\u8BC1\u636E\u4E0D\u5F97\u5BA3\u79F0\u6838\u5B9E\u5B8C\u6210\u6216\u7F16\u9020\u94FE\u63A5\u3002",
-    titles: "\u7ED9\u51FA\u4E09\u4E2A\u6807\u9898\u3002\u53EA\u8FD4\u56DE JSON \u6570\u7EC4\uFF0C\u6BCF\u9879\u542B title \u548C reason \u5B57\u6BB5\uFF0C\u4E0D\u8981\u4EE3\u7801\u56F4\u680F\u3002",
-    prompts: "\u7ED9\u51FA\u4E24\u5F20\u6B63\u6587\u914D\u56FE\u7684\u4E2D\u6587\u63D0\u793A\u8BCD\uFF0C\u8BF4\u660E\u5BF9\u5E94\u6BB5\u843D\u4E0E\u56FE\u610F\uFF0C\u9002\u5408\u590D\u5236\u5230 Lovart\u3002",
-    topics: "\u63D0\u70BC\u8868\u8FBE\u610F\u56FE\uFF0C\u7ED9\u51FA\u4E09\u4E2A\u4E0E\u672C\u7BC7\u76F8\u5173\u7684\u53EF\u5199\u89D2\u5EA6\u548C\u6240\u9700\u7D20\u6750\u3002",
-    checks: "\u68C0\u67E5\u5173\u952E\u4E8B\u5B9E\u4E0E\u63A8\u7406\u8FB9\u754C\uFF0C\u6CA1\u6709\u68C0\u7D22\u8BC1\u636E\u7684\u6761\u76EE\u5217\u4E3A\u5F85\u6838\u5B9E\u3002",
+    "rewrite-tags": "\u4EC5\u4FEE\u6539\u6807\u8BB0\u9009\u6BB5\u3002\u53EA\u8FD4\u56DE JSON \u6570\u7EC4 [{id,text}]\uFF1B\u6BCF\u4E2A\u6B63\u6587\u9009\u6BB5\u6070\u597D\u4E00\u4E2A\u7ED3\u679C\uFF0C\u4FDD\u6301\u672A\u6807\u8BB0\u5185\u5BB9\u4E0D\u53D8\u3002",
+    rewrite: "\u6309\u6240\u9009\u6280\u80FD\u548C\u7528\u6237\u8981\u6C42\u4FEE\u6539\u5F53\u524D\u9009\u533A\uFF0C\u53EA\u8F93\u51FA\u4FEE\u6539\u540E\u7684\u6587\u672C\u3002",
     chat: ""
   };
   const session = conversation(doc3);
   if (!session.messages.length)
-    session.title = (draft.display || prompts[task]).slice(0, 22);
+    session.title = (draft.display || "\u8FD0\u884C\u6240\u9009\u6280\u80FD").slice(0, 22);
   session.messages.push({
     role: "user",
-    text: draft.display || prompts[task],
+    text: draft.display || "\u8FD0\u884C\u6240\u9009\u6280\u80FD",
+    skillIds: session.skillIds,
     parts: draft.parts.length ? draft.parts : void 0
   });
   const submittedDraft = session.composerDraft;
@@ -31829,6 +32002,7 @@ async function runTask(task) {
       account: doc3.account,
       task,
       articleId: doc3.id,
+      skillIds: session.skillIds,
       references: draft.references,
       instruction: (prompts[task] || "") + "\n" + instruction,
       body,
@@ -31870,25 +32044,6 @@ async function runTask(task) {
           from: from2,
           to
         };
-    } else if (["titles", "prompts", "topics", "checks", "check"].includes(task)) {
-      const k = task === "check" ? "checks" : task;
-      doc3[k] ??= [];
-      if (k === "titles") {
-        try {
-          const items = JSON.parse(
-            result.replace(/^```(?:json)?\s*|\s*```$/g, "")
-          );
-          if (!Array.isArray(items)) throw Error();
-          doc3[k].unshift(
-            ...items.filter((x) => typeof x.title === "string").map((x) => ({
-              text: x.title + "\n" + (x.reason || ""),
-              at: (/* @__PURE__ */ new Date()).toISOString()
-            }))
-          );
-        } catch {
-          doc3[k].unshift({ text: result, at: (/* @__PURE__ */ new Date()).toISOString() });
-        }
-      } else doc3[k].unshift({ text: result, at: (/* @__PURE__ */ new Date()).toISOString() });
     }
     await persist();
   } catch (e) {
@@ -31986,7 +32141,9 @@ function showUnmatchedMatcher(preview) {
         String(d.getDate()).padStart(2, "0")
       ].join("-");
     })();
-    const recent = () => archives.filter((a) => !a.date || String(a.date).slice(0, 10) >= halfYearAgo);
+    const recent = () => archives.filter(
+      (a) => !a.date || String(a.date).slice(0, 10) >= halfYearAgo
+    );
     const filterArchives = (q) => {
       const list2 = q ? archives : recent();
       const key = String(q || "").trim().toLowerCase();
@@ -32151,8 +32308,7 @@ function renderDashboard() {
   $("#refresh-dashboard").onclick = () => refreshDashboardData();
   $("#import-notes").onclick = () => runNoteImport();
   const selectAll3 = $("#published-select-all");
-  if (selectAll3?.dataset.indeterminate)
-    selectAll3.indeterminate = true;
+  if (selectAll3?.dataset.indeterminate) selectAll3.indeterminate = true;
   selectAll3?.addEventListener("change", () => {
     if (selectAll3.checked)
       sorted.forEach((r) => publishedSelection.add(r.path));
@@ -32219,9 +32375,7 @@ async function setPublishedGroups(paths) {
       if (created) {
         applyAccountState(await api("group-upsert", { name: created }));
       }
-      applyAccountState(
-        await api("article-set-group", { paths: list2, group })
-      );
+      applyAccountState(await api("article-set-group", { paths: list2, group }));
       m.remove();
       toast(group ? `\u5DF2\u8BBE\u4E3A\u5206\u7EC4\u300C${group}\u300D` : "\u5DF2\u6E05\u9664\u5206\u7EC4");
     } catch (e) {
@@ -32412,12 +32566,13 @@ function renderTopics() {
 }
 function renderSettings() {
   const wx = state.wechat || {};
-  if (settingsTab !== "config" && settingsTab !== "accounts" && settingsTab !== "groups")
+  if (settingsTab !== "config" && settingsTab !== "accounts" && settingsTab !== "groups" && settingsTab !== "skills")
     settingsTab = "config";
   const tabs = [
     { id: "config", title: "\u914D\u7F6E" },
     { id: "accounts", title: "\u8D26\u53F7" },
-    { id: "groups", title: "\u5206\u7EC4" }
+    { id: "groups", title: "\u5206\u7EC4" },
+    { id: "skills", title: "\u6280\u80FD" }
   ];
   const updateStatus = state._update?.available ? `\u53D1\u73B0\u65B0\u7248\u672C ${esc(state._update.latest)}` : state._update?.latest ? `\u5DF2\u662F\u6700\u65B0\uFF08GitHub ${esc(state._update.latest)}\uFF09` : "\u70B9\u51FB\u68C0\u6D4B GitHub Release";
   const configBody = `<div class="dashboard-card"><div class="settings-card-head"><h3>\u5E94\u7528\u66F4\u65B0</h3><div class="settings-card-actions"><button type="button" id="open-releases">${I.external()} \u53D1\u5E03\u9875</button><button type="button" id="check-update">${I.refresh()} \u68C0\u6D4B\u66F4\u65B0</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">\u4E0B\u8F7D\u5E76\u5B89\u88C5</button>` : ""}</div></div><p class="update-version-line">\u5F53\u524D\u7248\u672C <strong>${esc(state._appVersion || "\u2026")}</strong> \xB7 <span id="update-status">${updateStatus}</span></p><p class="muted">\u4ECE\u516C\u5F00 GitHub Release \u68C0\u6D4B\u5E76\u5B89\u88C5\u66F4\u65B0\u3002</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>Agent \u8FDE\u63A5</h3><div class="settings-card-actions"><button class="primary" id="save-settings">\u4FDD\u5B58\u8BBE\u7F6E</button></div></div><label>\u9ED8\u8BA4 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option><option value="codex">Codex ${state.agents.codex ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option></select></label><label>\u6A21\u578B\uFF08\u7559\u7A7A\u6CBF\u7528 CLI \u9ED8\u8BA4\uFF09<input id="model" value="${esc(state.model)}" placeholder="\u53EF\u9009\u6A21\u578B ID"></label><p>\u590D\u7528 CLI \u767B\u5F55\u3002\u82E5\u672A\u767B\u5F55\uFF0C\u8BF7\u5148\u5728\u7EC8\u7AEF\u6267\u884C agent login \u6216 codex login\u3002\u6B64\u7248\u672C\u4E0D\u4FDD\u5B58\u8D26\u53F7\u51ED\u636E\u3002</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>\u5FAE\u4FE1\u516C\u4F17\u53F7</h3><div class="settings-card-actions"><button type="button" id="wechat-test">\u6D4B\u8BD5\u8FDE\u63A5</button><button type="button" class="primary" id="save-wechat">\u4FDD\u5B58\u516C\u4F17\u53F7\u8BBE\u7F6E</button></div></div><p>\u7528\u4E8E\u4E00\u952E\u63A8\u9001\u5230\u8349\u7A3F\u7BB1\u3002AppSecret \u4EC5\u4FDD\u5B58\u5728\u672C\u673A workspace.json\u3002</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx\u2026" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="\u5BC6\u94A5" autocomplete="off"></label><label>\u9ED8\u8BA4\u4F5C\u8005<input id="wechat-author" value="${esc(wx.author || "")}" placeholder="\u53EF\u9009"></label></div><div class="dashboard-card"><div class="settings-card-head"><h3>\u5185\u5BB9\u4ED3\u5E93</h3><div class="settings-card-actions"><button type="button" id="refresh-vault">${I.refresh()} \u5237\u65B0</button></div></div>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<label class="settings-path-field">\u4ED3\u5E93\u8DEF\u5F84<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="\u9009\u62E9 Content_OS \u76EE\u5F55" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} \u9009\u62E9\u6587\u4EF6\u5939</button></span></label></div>`;
@@ -32432,13 +32587,19 @@ function renderSettings() {
   }).join("")}</tbody></table></div>` : '<p class="muted">\u8FD8\u6CA1\u6709\u5206\u7EC4\u3002\u65B0\u5EFA\u540E\u5373\u53EF\u5728\u6587\u7AE0\u4E2D\u9009\u7528\uFF0C\u5E76\u4E3A\u6BCF\u4E2A\u5206\u7EC4\u8BBE\u7F6E\u9ED8\u8BA4\u540C\u6B65\u8DEF\u5F84\u3002</p>'}`;
   $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BBE\u7F6E</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><nav class="settings-tabs">${tabs.map(
     (t) => `<button type="button" data-settings-tab="${t.id}" class="${settingsTab === t.id ? "active" : ""}">${t.title}</button>`
-  ).join("")}</nav>${settingsTab === "config" ? configBody : settingsTab === "accounts" ? accountsBody : groupsBody}</section>`;
+  ).join(
+    ""
+  )}</nav>${settingsTab === "config" ? configBody : settingsTab === "accounts" ? accountsBody : settingsTab === "skills" ? `<div class="dashboard-card"><div class="settings-card-head"><h3>\u6280\u80FD\u914D\u7F6E</h3><button id="manage-skills" class="primary">\u7BA1\u7406\u6280\u80FD</button></div><p>\u901A\u7528\u6280\u80FD\u4F9B\u6240\u6709\u8D26\u53F7\u4F7F\u7528\uFF1B\u8D26\u53F7\u6280\u80FD\u4E0E\u9ED8\u8BA4\u542F\u7528\u9879\u6309\u8D26\u53F7\u72EC\u7ACB\u914D\u7F6E\u3002</p><label>\u914D\u7F6E\u8D26\u53F7<select id="skill-account">${accountList().map((a) => `<option value="${esc(a.id)}">${esc(a.label)}</option>`).join("")}</select></label><p class="muted">\u5728\u8FD9\u91CC\u7F16\u8F91\u6307\u4EE4\u548C\u7EC4\u5408\u6B65\u9AA4\u3002\u5BF9\u8BDD\u4E2D\u53EA\u9009\u62E9\u672C\u6B21\u4F7F\u7528\u7684\u6280\u80FD\u3002</p></div>` : groupsBody}</section>`;
   $$("[data-settings-tab]").forEach(
     (b) => b.onclick = () => {
       settingsTab = b.dataset.settingsTab;
       render2();
     }
   );
+  if (settingsTab === "skills") {
+    $("#skill-account").value = account;
+    $("#manage-skills").onclick = () => manageSkills(api, $("#skill-account").value);
+  }
   if (settingsTab === "config") {
     $("#setting-provider").value = state.provider;
     $("#save-settings").onclick = () => {
@@ -32456,8 +32617,7 @@ function renderSettings() {
     };
     $("#check-update").onclick = () => checkForAppUpdate({ manual: true });
     const installBtn = $("#install-update");
-    if (installBtn)
-      installBtn.onclick = () => installAppUpdate();
+    if (installBtn) installBtn.onclick = () => installAppUpdate();
     const readWechatForm = () => {
       state.wechat = {
         appId: $("#wechat-appid").value.trim(),
@@ -32507,16 +32667,13 @@ function renderSettings() {
         );
         if (!name?.trim()) return;
         try {
-          applyAccountState(
-            await api("account-create", { name: name.trim() })
-          );
+          applyAccountState(await api("account-create", { name: name.trim() }));
           toast("\u5DF2\u521B\u5EFA\u8D26\u53F7");
         } catch (e) {
           toast(e.message || "\u521B\u5EFA\u5931\u8D25");
         }
       };
-    if (registerBtn)
-      registerBtn.onclick = () => pickAndRegisterAccountFolder();
+    if (registerBtn) registerBtn.onclick = () => pickAndRegisterAccountFolder();
     $$("[data-unregister-account]").forEach((b) => {
       b.onclick = async () => {
         const ok = await askConfirm(
@@ -32596,7 +32753,9 @@ function renderSettings() {
     $$("[data-delete-group]").forEach((b) => {
       b.onclick = async () => {
         const name = b.dataset.deleteGroup;
-        if (!confirm(`\u5220\u9664\u5206\u7EC4\u300C${name}\u300D\uFF1F\u6587\u7AE0\u4E0A\u7684\u5206\u7EC4\u6807\u7B7E\u4F1A\u4FDD\u7559\uFF0C\u4F46\u4E0D\u518D\u6709\u9ED8\u8BA4\u540C\u6B65\u8DEF\u5F84\u3002`))
+        if (!confirm(
+          `\u5220\u9664\u5206\u7EC4\u300C${name}\u300D\uFF1F\u6587\u7AE0\u4E0A\u7684\u5206\u7EC4\u6807\u7B7E\u4F1A\u4FDD\u7559\uFF0C\u4F46\u4E0D\u518D\u6709\u9ED8\u8BA4\u540C\u6B65\u8DEF\u5F84\u3002`
+        ))
           return;
         try {
           applyAccountState(await api("group-delete", { name }));
@@ -32665,7 +32824,9 @@ function groupOptionsHtml(selected, opts = {}) {
   const cur = typeof selected === "string" ? selected.trim() : "";
   const names = new Set(groupNames());
   if (cur) names.add(cur);
-  return `${allowEmpty ? `<option value="">${esc(emptyLabel)}</option>` : ""}${[...names].sort((a, b) => a.localeCompare(b, "zh")).map(
+  return `${allowEmpty ? `<option value="">${esc(emptyLabel)}</option>` : ""}${[
+    ...names
+  ].sort((a, b) => a.localeCompare(b, "zh")).map(
     (n) => `<option value="${esc(n)}" ${n === cur ? "selected" : ""}>${esc(n)}</option>`
   ).join("")}`;
 }
@@ -32800,7 +32961,9 @@ async function pickAccountFolderOnWeb() {
     m.className = "modal";
     m.innerHTML = `<div class="dialog"><h2>\u9009\u62E9\u8D26\u53F7\u6587\u4EF6\u5939</h2><p>\u4EE5\u4E0B\u4E3A\u5F53\u524D\u5185\u5BB9\u4ED3\u5E93\u5185\u5C1A\u672A\u6CE8\u518C\u7684\u4E00\u7EA7\u76EE\u5F55\u3002</p><div class="folder-pick-list">${folders.map(
       (f) => `<button type="button" class="folder-pick-item" data-folder="${esc(f.name)}"><strong>${esc(f.label)}</strong><small>${esc(f.name)}</small></button>`
-    ).join("")}</div><div class="row"><button type="button" id="cancel-folder-pick">\u53D6\u6D88</button></div></div>`;
+    ).join(
+      ""
+    )}</div><div class="row"><button type="button" id="cancel-folder-pick">\u53D6\u6D88</button></div></div>`;
     document.body.append(m);
     $("#cancel-folder-pick").onclick = () => {
       m.remove();
@@ -33101,7 +33264,7 @@ async function renderProfile() {
       const definition = model.definitions.find((d) => d.id === profileTab);
       $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u4FDD\u6301\u81EA\u5DF1\u7684\u58F0\u97F3\uFF0C\u9010\u6B65\u9A8C\u8BC1\u6709\u6548\u7684\u8868\u8FBE\u3002</h1><span class="eyebrow">${esc(accountLabelOf(a))} \xB7 \u8D26\u53F7\u6A21\u578B</span></div></header><section class="dashboard profile-manager"><nav class="model-tabs">${[...model.definitions, { id: "history", title: "\u8FED\u4EE3\u8BB0\u5F55" }].map((d) => `<button data-model-tab="${d.id}" class="${profileTab === d.id ? "active" : ""}">${d.title}</button>`).join("")}</nav><div id="model-content">${definition ? `<h2>${definition.title}</h2><p>${{ identity: "\u53EA\u7EF4\u62A4\u6211\u662F\u8C01\u3001\u5199\u7ED9\u8C01\u3001\u5E0C\u671B\u63D0\u4F9B\u4EC0\u4E48\u4EF7\u503C\u3002", voice: "\u7EF4\u62A4\u81EA\u7136\u7684\u8868\u8FBE\u504F\u597D\u4E0E\u5FC5\u8981\u8FB9\u754C\uFF0C\u907F\u514D\u628A\u6BCF\u7BC7\u6587\u7AE0\u5199\u6210\u89C4\u5219\u68C0\u67E5\u8868\u3002", examples: "\u4FDD\u7559\u6211\u8BA4\u53EF\u7684\u771F\u5B9E\u7ECF\u5386\u548C\u8303\u6587\u7247\u6BB5\uFF0C\u5E76\u5199\u6E05\u51FA\u5904\u4E0E\u4E3A\u4EC0\u4E48\u50CF\u6211\u3002", learning: "\u7528\u6709\u6765\u6E90\u7684\u6570\u636E\u89C2\u5BDF\u6307\u5BFC\u4E0B\u4E00\u6B21\u5C0F\u5B9E\u9A8C\uFF1B\u6700\u591A\u4FDD\u7559\u4E09\u4E2A\uFF0C\u8FC7\u65F6\u5C31\u66FF\u6362\u3002" }[profileTab]}</p><textarea id="model-text" rows="15" maxlength="${definition.limit}">${esc(model.modules[profileTab])}</textarea><div class="row"><button id="save-model" class="primary">\u4FDD\u5B58\u5F53\u524D\u6A21\u5757</button><small>${definition.limit} \u5B57\u4EE5\u5185</small></div>${profileTab === "learning" ? `<p class="notice">\u5F53\u524D\u8D26\u53F7\u6709 ${state.metrics.filter((r) => r["\u8D26\u53F7"] === a).length} \u7BC7\u5F52\u6863\u6570\u636E\u3002\u5355\u7BC7\u6CE2\u52A8\u4E0D\u4EE3\u8868\u8868\u8FBE\u65B9\u5F0F\u7684\u56E0\u679C\u6548\u679C\u3002</p>` : ""}${profileTab === "examples" ? `<details><summary>\u67E5\u770B\u65E7 Profile \u8D44\u6599\uFF08\u53EA\u8BFB\uFF09</summary><div class="material-cards">${model.legacy.filter((f) => f.editable).map(
         (f) => `<button class="material-card" data-model-legacy="${esc(f.path)}"><strong>${esc(f.path)}</strong></button>`
-      ).join("")}</div></details>` : ""}` : `<button id="iterate-model" class="primary">${I.sparkles()} \u6839\u636E\u65B0\u6587\u7AE0\u548C\u6570\u636E\u63D0\u51FA\u8C03\u6574</button><p>\u5411\u5F53\u524D ${esc(state.provider)} \u63D0\u4F9B\u672C\u8D26\u53F7\u6A21\u578B\u3001\u6700\u8FD1 12 \u7BC7\u6587\u7AE0\u53CA YAML\uFF1B\u957F\u6587\u6BCF\u7BC7\u524D 3000 \u5B57\u3002\u53EA\u5EFA\u8BAE\u66FF\u6362\u73B0\u6709\u6A21\u5757\u5185\u5BB9\u3002</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} \xB7 ${p.status === "pending" ? "\u5F85\u5BA1\u9605" : p.status === "applied" ? "\u5DF2\u91C7\u7EB3" : "\u5DF2\u4FDD\u7559\u539F\u8BBE\u5B9A"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("\u3001")}</p><button data-model-proposal="${p.id}">\u67E5\u770B\u5EFA\u8BAE</button></div>`).join("") || "<p>\u8FD8\u6CA1\u6709 AI \u8C03\u6574\u5EFA\u8BAE\u3002</p>"}</div><h3>\u5386\u53F2\u7248\u672C</h3>${model.history.map((h2) => `<div class="result-card"><small>${esc(h2.at)} \xB7 ${esc(h2.reason)}</small><details><summary>\u67E5\u770B\u5F53\u65F6\u7684\u8BBE\u5B9A</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h2.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h2.id}">\u6062\u590D\u6B64\u7248\u672C</button></div>`).join("")}`}</div></section>`;
+      ).join("")}</div></details>` : ""}` : `<button id="profile-skills" class="primary">${I.sparkles()} \u914D\u7F6E\u8D26\u53F7\u6280\u80FD</button><p>\u5728\u6280\u80FD\u5DE5\u4F5C\u5BA4\u7EF4\u62A4\u8D26\u53F7\u4E13\u5C5E\u6307\u4EE4\uFF1B\u5386\u53F2\u4EBA\u8BBE\u5EFA\u8BAE\u548C\u7248\u672C\u7EE7\u7EED\u4FDD\u7559\u3002</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} \xB7 ${p.status === "pending" ? "\u5F85\u5BA1\u9605" : p.status === "applied" ? "\u5DF2\u91C7\u7EB3" : "\u5DF2\u4FDD\u7559\u539F\u8BBE\u5B9A"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("\u3001")}</p><button data-model-proposal="${p.id}">\u67E5\u770B\u5EFA\u8BAE</button></div>`).join("") || "<p>\u8FD8\u6CA1\u6709 AI \u8C03\u6574\u5EFA\u8BAE\u3002</p>"}</div><h3>\u5386\u53F2\u7248\u672C</h3>${model.history.map((h2) => `<div class="result-card"><small>${esc(h2.at)} \xB7 ${esc(h2.reason)}</small><details><summary>\u67E5\u770B\u5F53\u65F6\u7684\u8BBE\u5B9A</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h2.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h2.id}">\u6062\u590D\u6B64\u7248\u672C</button></div>`).join("")}`}</div></section>`;
       const save = async () => {
         if (!definition || $("#model-text").value === model.modules[profileTab])
           return true;
@@ -33157,34 +33320,11 @@ async function renderProfile() {
           }
         }
       );
-      if ($("#iterate-model"))
-        $("#iterate-model").onclick = async () => {
-          if (busy) return toast("\u8BF7\u7B49\u5F85\u5F53\u524D AI \u4EFB\u52A1");
-          const b = $("#iterate-model");
-          busy = true;
-          b.disabled = true;
-          b.textContent = "\u6B63\u5728\u751F\u6210\u8C03\u6574\u5EFA\u8BAE\u2026";
-          try {
-            if (!await persist()) return;
-            const proposal = await api("agent", {
-              provider: state.provider,
-              model: state.model,
-              account: a,
-              task: "model-iterate",
-              body: "",
-              instruction: "\u8BA9\u8868\u8FBE\u66F4\u7B26\u5408\u6211\u5B9E\u9645\u5199\u51FA\u7684\u6587\u7AE0\uFF0C\u5E76\u6839\u636E\u539F\u59CB\u6570\u636E\u63D0\u51FA\u5C11\u91CF\u53EF\u68C0\u9A8C\u7684\u8C03\u6574\u3002"
-            });
-            model = await api("model-load", a);
-            showModelProposal(proposal, model);
-          } catch (e) {
-            toast(e.message);
-          } finally {
-            busy = false;
-            if (b.isConnected) {
-              b.disabled = false;
-              b.innerHTML = `${I.sparkles()} \u6839\u636E\u65B0\u6587\u7AE0\u548C\u6570\u636E\u63D0\u51FA\u8C03\u6574`;
-            }
-          }
+      if ($("#profile-skills"))
+        $("#profile-skills").onclick = () => {
+          page = "settings";
+          settingsTab = "skills";
+          render2();
         };
     };
     draw();

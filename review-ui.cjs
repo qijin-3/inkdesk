@@ -18,33 +18,39 @@ const { _electron: electron } = require("@playwright/test"),
     path.join(dir, "workspace.json"),
     JSON.stringify({ source: src }),
   );
-  const env = { ...process.env, INKDESK_DATA: dir };
+  const vaultRoot=path.join(dir,"Content_OS");
+  for(const sub of ["00_Profile","01_Topics","02_Drafts","03_Archive"]) fs.mkdirSync(path.join(vaultRoot,"Demo_AI",sub),{recursive:true});
+  const env = { ...process.env, INKDESK_DATA: dir, INKDESK_VAULT:vaultRoot };
   delete env.ELECTRON_RUN_AS_NODE;
   const app = await electron.launch({ args: [path.resolve("main.cjs")], env });
   try {
     const w = await app.firstWindow();
     w.setDefaultTimeout(6000);
-    await w.locator("#start").click();
+    await w.locator("#new").click();
+    await w.locator("#toggle-assistant").click();
     await app.evaluate(({ ipcMain }) => {
       ipcMain.removeHandler("agent");
       ipcMain.handle("agent", () => "这是更自然的表达。");
     });
     await w.locator(".paper .tiptap").fill("这是原始的表达。");
     await w.locator(".paper .tiptap").press("Meta+a");
-    await w.locator('[data-task="rewrite"]').click();
+    await w.locator("#agent-output").selectOption("rewrite");
+    await w.locator("#send").click();
     await w.waitForTimeout(300);
     await w.locator("#accept").waitFor();
     await w.locator("#reject").click();
     assert.match(await w.locator(".paper .tiptap").textContent(), /原始/);
     await w.locator(".paper .tiptap").click();
     await w.locator(".paper .tiptap").press("Meta+a");
-    await w.locator('[data-task="rewrite"]').click();
+    await w.locator("#agent-output").selectOption("rewrite");
+    await w.locator("#send").click();
     await w.waitForTimeout(300);
     await w.locator("#accept").click();
     assert.match(await w.locator(".paper .tiptap").textContent(), /自然/);
     await w.locator(".paper .tiptap").click();
     await w.locator(".paper .tiptap").press("Meta+a");
-    await w.locator('[data-task="rewrite"]').click();
+    await w.locator("#agent-output").selectOption("rewrite");
+    await w.locator("#send").click();
     await w.waitForTimeout(300);
     await w.locator("#accept").waitFor();
     await w.locator(".paper .tiptap").fill("用户刚刚改过的新正文");

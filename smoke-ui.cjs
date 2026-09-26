@@ -15,7 +15,7 @@ const path = require("node:path");
     const win = await app.firstWindow();
     const errors = [];
     win.on("pageerror", (e) => errors.push(e.message));
-    await win.locator("#start").click();
+    await win.locator("#new").click();
     await win.locator("#title").fill("把写作还给自己");
     await win
       .locator(".paper .tiptap")
@@ -33,7 +33,7 @@ const path = require("node:path");
     });
     assert.match(html, /最近写文章/);
     assert.match(html, /line-height/);
-    await win.locator('[data-tab="titles"]').click();
+    await win.locator("#layout").click();
     await win.screenshot({ path: path.resolve("screenshot-writing.png") });
     await win.locator('[data-page="dashboard"]').click();
     await win.screenshot({ path: path.resolve("screenshot-dashboard.png") });

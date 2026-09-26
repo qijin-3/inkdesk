@@ -112,8 +112,9 @@ p {
   gap: 8px;
 }
 .brand {
-  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia,
-    "Songti SC", serif;
+  font-family:
+    "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Songti SC",
+    serif;
   font-size: 26px;
   font-weight: 600;
   letter-spacing: -0.5px;
@@ -163,7 +164,9 @@ p {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: width 0.15s ease, height 0.15s ease;
+  transition:
+    width 0.15s ease,
+    height 0.15s ease;
 }
 .account-avatar-btn:hover {
   opacity: 0.9;
@@ -1612,7 +1615,9 @@ th {
   margin-top: 3px;
   border-radius: 99px;
   background: #c8c8c8;
-  transition: background 0.15s, height 0.15s;
+  transition:
+    background 0.15s,
+    height 0.15s;
 }
 .outline-row:hover .outline-bar,
 .outline-row:focus-visible .outline-bar {
@@ -2555,10 +2560,11 @@ pre {
   --wechat-blue-soft: rgba(15, 63, 247, 0.2);
   --wechat-ink: #111111;
   --wechat-body: #111111;
-  --wechat-serif: "寒蝉锦书宋Compact", "Songti SC", "STSong", "华文宋体",
-    "宋体", SimSun, serif;
-  --wechat-sans: "OPPO Sans 4.0", "PingFang SC", "Helvetica Neue", Arial,
-    sans-serif;
+  --wechat-serif:
+    "寒蝉锦书宋Compact", "Songti SC", "STSong", "华文宋体", "宋体", SimSun,
+    serif;
+  --wechat-sans:
+    "OPPO Sans 4.0", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
   font-family: var(--wechat-sans);
   color: var(--wechat-body);
   padding-top: 28px;
@@ -2646,8 +2652,9 @@ pre {
 /* 二级标题：蓝底白字，寒蝉 20（含子元素，避免 strong 盖成正文样式） */
 .wechat-preview #article-preview h2,
 .wechat-preview #article-preview h2 * {
-  font-family: "寒蝉锦书宋Compact", "Songti SC", "STSong", "华文宋体", "宋体",
-    SimSun, serif !important;
+  font-family:
+    "寒蝉锦书宋Compact", "Songti SC", "STSong", "华文宋体", "宋体", SimSun,
+    serif !important;
   font-size: 20px !important;
   font-weight: 800 !important;
   color: #ffffff !important;
@@ -2867,3 +2874,233 @@ pre {
   font-variant-numeric: tabular-nums;
   padding: 0 4px;
 }
+/* Shared interaction polish; size rules stay scoped to their components. */
+button,
+input,
+select,
+textarea {
+  transition:
+    border-color 0.15s,
+    background-color 0.15s,
+    box-shadow 0.15s;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #555555;
+  outline-offset: 3px;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.skill-dialog button,
+.skill-manage {
+  min-height: 30px;
+}
+.modal .dialog {
+  max-height: 90vh;
+  overflow: auto;
+  border-radius: 16px;
+  box-shadow: 0 20px 70px #00000020;
+}
+.skill-dialog {
+  width: min(960px, 90vw);
+  max-height: 90vh;
+  border: 1px solid #e0e0e0;
+  border-radius: 16px;
+  padding: 28px;
+  background: #fafafa;
+  color: #333333;
+  box-shadow: 0 24px 80px #33333333;
+}
+.skill-dialog::backdrop {
+  background: #00000040;
+  backdrop-filter: blur(3px);
+}
+.skill-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+.skill-header h2 {
+  margin: 0 0 8px;
+}
+.skill-header p {
+  color: #888888;
+  font-size: 13px;
+}
+.skill-scopes {
+  display: flex;
+  gap: 8px;
+  padding: 18px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+.skill-scopes #skill-new {
+  margin-left: auto;
+}
+.skill-workspace {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 380px;
+  gap: 24px;
+  padding-top: 22px;
+}
+.skill-list {
+  border-right: 1px solid #e0e0e0;
+  padding-right: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skill-list button {
+  text-align: left;
+  padding: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 9px;
+}
+.skill-list button.selected {
+  background: #eeeeee;
+  border-color: #cccccc;
+}
+.skill-list small {
+  display: block;
+  color: #888888;
+  margin-top: 5px;
+}
+.skill-editor label {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+.skill-editor input:not([type="checkbox"]),
+.skill-editor textarea {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  box-sizing: border-box;
+}
+.skill-editor textarea {
+  font: inherit;
+  line-height: 1.7;
+  resize: vertical;
+  padding: 12px;
+}
+.skill-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+.skill-step span {
+  flex: 1;
+}
+.skill-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 16px;
+}
+.skill-actions .danger {
+  margin-left: auto;
+  color: #a5483f;
+}
+.skill-check {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+.skill-check input {
+  margin: 0 !important;
+  width: auto !important;
+}
+.skill-check small {
+  margin-left: auto;
+  color: #888888;
+}
+.skill-empty {
+  padding: 70px 24px;
+  text-align: center;
+  line-height: 2;
+  color: #888888;
+}
+#skill-error {
+  color: #a5483f;
+  font-size: 13px;
+}
+#skill-picker {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+.skill-picker {
+  flex: 1;
+  min-width: 0;
+}
+.skill-picker summary {
+  cursor: pointer;
+  font-size: 12px;
+  padding: 8px;
+  background: #f0f0f0;
+  border-radius: 7px;
+}
+.skill-picker summary span {
+  color: #888888;
+  margin-left: 8px;
+}
+.skill-picker > div {
+  max-height: 180px;
+  overflow: auto;
+}
+.skill-manage {
+  font-size: 11px;
+}
+.agent-output {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #888888;
+  margin-bottom: 8px;
+}
+.agent-output select {
+  font-size: 11px;
+  max-width: 160px;
+}
+@media (prefers-reduced-motion: reduce) {
+  button,
+  input,
+  select,
+  textarea {
+    transition: none;
+  }
+}
+/* Agent conversation: one input surface and a compact contextual toolbar. */
+.agent-composer {margin:12px!important;padding:12px!important;border:1px solid #dedede!important;border-radius:14px;background:#fff;box-shadow:0 2px 8px #00000005;}
+.agent-composer:focus-within {border-color:#aaa!important;box-shadow:0 0 0 2px #00000004;}
+.agent-composer #composer-input {border:0;background:transparent;box-shadow:none;}
+.agent-composer #instruction {min-height:84px;max-height:220px;overflow-y:auto;padding:2px 2px 12px;font-size:13px;line-height:1.65;outline:none;}
+.agent-composer .composer-tools {gap:4px;flex-wrap:nowrap;align-items:center;margin:0;}
+.agent-composer .composer-tools .icon-btn {width:30px;height:30px;padding:6px;border:0;flex-shrink:0;}
+.agent-composer #agent-output {border:0;background:transparent;font-size:11px;max-width:112px;padding:6px;min-width:0;color:#555;}
+.agent-composer #send {margin-left:auto;width:30px;height:30px;border-radius:9px;}
+.agent-composer #skill-picker {display:block;margin:0;position:relative;}
+.chat-skill-menu summary {cursor:pointer;list-style:none;padding:6px 8px;font-size:11px;border-radius:6px;white-space:nowrap;color:#555;}
+.chat-skill-menu summary::-webkit-details-marker {display:none;}
+.chat-skill-menu summary:hover {background:#f0f0f0;}
+.chat-skill-options {position:absolute;bottom:36px;left:0;width:240px;max-height:280px;overflow:auto;z-index:30;padding:12px;background:#fff;border:1px solid #e3e3e3;border-radius:10px;box-shadow:0 8px 28px #00000015;font-size:12px;}
+.chat-skill-options strong {display:block;color:#888;font-size:11px;font-weight:500;margin-bottom:8px;}
+.composer-hint {font-size:10px;color:#aaa;padding-top:9px;}
+#rail .conversation-bar {border-bottom:1px solid #eee;padding:10px 14px;gap:8px;}
+#rail .conversation-bar select {border:0;background:transparent;flex:1;min-width:0;font-size:12px;}
+#rail .conversation-bar button {border:0;background:transparent;font-size:11px;color:#666;}
+#rail .message {padding:14px 16px;margin:0 0 12px;border-radius:12px;line-height:1.75;font-size:13px;}
+#rail .message.user {background:#f2f2f2;margin-left:24px;}
+#rail .message.assistant {background:transparent;padding-left:0;padding-right:0;}
+.message-role {display:block;color:#999;font-size:10px;margin-bottom:6px;}
+.agent-composer #instruction {border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;}

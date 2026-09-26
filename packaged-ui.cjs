@@ -6,7 +6,7 @@ const { _electron: electron } = require("@playwright/test"),
 const pkg = require("./package.json");
 (async () => {
   const asar = path.resolve(
-    "dist-v4/AsIde-darwin-arm64/AsIde.app/Contents/Resources/app.asar",
+    "dist-0.2.2/AsIde-darwin-arm64/AsIde.app/Contents/Resources/app.asar",
   );
   const { listPackage, extractFile } = await import("@electron/asar");
   const files = listPackage(asar);
@@ -34,7 +34,7 @@ const pkg = require("./package.json");
   delete env.ELECTRON_RUN_AS_NODE;
   const app = await electron.launch({
     executablePath: path.resolve(
-      "dist-v4/AsIde-darwin-arm64/AsIde.app/Contents/MacOS/AsIde",
+      "dist-0.2.2/AsIde-darwin-arm64/AsIde.app/Contents/MacOS/AsIde",
     ),
     args: [],
     env,
@@ -60,7 +60,7 @@ const pkg = require("./package.json");
       /独立运行保存成功/,
     );
     const reader = path.resolve(
-      "dist-v4/AsIde-darwin-arm64/AsIde.app/Contents/Resources/reference-reader",
+      "dist-0.2.2/AsIde-darwin-arm64/AsIde.app/Contents/Resources/reference-reader",
     );
     assert(fs.existsSync(reader));
     console.log(
