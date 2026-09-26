@@ -38,6 +38,8 @@ const channels = [
   "copy",
   "metrics",
   "agent",
+  "agent-models",
+  "agent-test",
   "cancel",
   "pick-note-table",
   "import-notes-preview",

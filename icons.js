@@ -38,6 +38,8 @@ import {
   ImageDown,
   ChevronDown,
   ChevronLeft,
+  MessageSquare,
+  PenLine,
 } from "lucide";
 
 /**
@@ -98,4 +100,6 @@ export const I = {
   imageDown: (o) => icon(ImageDown, o),
   chevronDown: (o) => icon(ChevronDown, o),
   chevronLeft: (o) => icon(ChevronLeft, o),
+  chat: (o) => icon(MessageSquare, o),
+  pen: (o) => icon(PenLine, o),
 };

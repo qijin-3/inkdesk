@@ -20,6 +20,8 @@ const defaults = {
   source: "",
   provider: "cursor",
   model: "",
+  /** 各 Agent 用户收藏的模型 ID 列表 */
+  agentModels: {},
   followers: {},
   metricDeltas: {},
   /** 各账号已发布文章的本地备份默认目录（无分组时回退） */
@@ -78,6 +80,8 @@ const API_CHANNELS = [
   "copy",
   "metrics",
   "agent",
+  "agent-models",
+  "agent-test",
   "cancel",
   "pick-note-table",
   "import-notes-preview",
@@ -158,6 +162,10 @@ class DeskCore {
         groups: {
           ...defaults.groups,
           ...(loaded.groups || {}),
+        },
+        agentModels: {
+          ...defaults.agentModels,
+          ...(loaded.agentModels || {}),
         },
         wechat: {
           ...defaults.wechat,
@@ -278,6 +286,10 @@ class DeskCore {
       agents: {
         cursor: !!this.executable("cursor"),
         codex: !!this.executable("codex"),
+        claude: !!this.executable("claude"),
+        zcode: !!this.executable("zcode"),
+        opencode: !!this.executable("opencode"),
+        antigravity: !!this.executable("antigravity"),
       },
     };
   }
@@ -290,6 +302,7 @@ class DeskCore {
       vaultPath: this.store.vaultPath || this.vault?.root || "",
       provider: this.store.provider,
       model: this.store.model,
+      agentModels: this.store.agentModels || {},
       followers: this.store.followers || {},
       metricDeltas: this.store.metricDeltas || {},
       backupPaths: this.store.backupPaths || {},
@@ -324,17 +337,586 @@ class DeskCore {
     return within(this.vault.root, this.vault.p(rel));
   }
 
-  /** 查找 Cursor / Codex CLI */
+  /** 常见 CLI 安装目录，追加到 PATH 探测 */
+  agentPathDirs() {
+    const home = os.homedir();
+    return [
+      path.join(home, ".local/bin"),
+      path.join(home, ".opencode/bin"),
+      "/opt/homebrew/bin",
+      "/usr/local/bin",
+    ];
+  }
+
+  /** 在固定候选与 PATH 中查找可执行文件 */
+  findOnPath(names) {
+    const dirs = [
+      ...this.agentPathDirs(),
+      ...(process.env.PATH || "").split(path.delimiter).filter(Boolean),
+    ];
+    const seen = new Set();
+    for (const dir of dirs) {
+      if (seen.has(dir)) continue;
+      seen.add(dir);
+      for (const name of names) {
+        const p = path.join(dir, name);
+        try {
+          if (fs.existsSync(p) && fs.statSync(p).isFile()) return p;
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 查找 Agent CLI。
+   * @param {"cursor"|"codex"|"claude"|"zcode"|"opencode"|"antigravity"} provider
+   */
   executable(provider) {
-    const candidates =
-      provider === "cursor"
-        ? [path.join(os.homedir(), ".local/bin/agent"), "/usr/local/bin/agent"]
-        : [
-            "/Applications/ChatGPT.app/Contents/Resources/codex",
-            path.join(os.homedir(), ".local/bin/codex"),
-            "/usr/local/bin/codex",
-          ];
-    return candidates.find((p) => fs.existsSync(p));
+    const home = os.homedir();
+    const byProvider = {
+      cursor: [
+        path.join(home, ".local/bin/agent"),
+        "/usr/local/bin/agent",
+        "/opt/homebrew/bin/agent",
+      ],
+      codex: [
+        "/Applications/ChatGPT.app/Contents/Resources/codex",
+        path.join(home, ".local/bin/codex"),
+        "/usr/local/bin/codex",
+        "/opt/homebrew/bin/codex",
+      ],
+      claude: [
+        path.join(home, ".local/bin/claude"),
+        "/usr/local/bin/claude",
+        "/opt/homebrew/bin/claude",
+      ],
+      opencode: [
+        path.join(home, ".opencode/bin/opencode"),
+        path.join(home, ".local/bin/opencode"),
+        "/usr/local/bin/opencode",
+        "/opt/homebrew/bin/opencode",
+      ],
+      zcode: [
+        "/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs",
+        path.join(home, ".local/bin/zcode"),
+        "/usr/local/bin/zcode",
+        "/opt/homebrew/bin/zcode",
+      ],
+      antigravity: [
+        path.join(home, ".local/bin/agy"),
+        "/usr/local/bin/agy",
+        "/opt/homebrew/bin/agy",
+        path.join(home, ".gemini/antigravity-cli/bin/agy"),
+        path.join(home, ".gemini/antigravity/bin/agy"),
+      ],
+    };
+    const candidates = byProvider[provider];
+    if (!candidates) return null;
+    const hit = candidates.find((p) => fs.existsSync(p));
+    if (hit) return hit;
+    const names = {
+      cursor: ["agent"],
+      codex: ["codex"],
+      claude: ["claude"],
+      opencode: ["opencode"],
+      zcode: ["zcode"],
+      antigravity: ["agy"],
+    }[provider];
+    return names ? this.findOnPath(names) : null;
+  }
+
+  /** ZCode.app 内脚本需用 Electron/Node 启动 */
+  zcodeLaunch(exe) {
+    if (exe && exe.endsWith("zcode.cjs") && exe.includes(`${path.sep}ZCode.app${path.sep}`)) {
+      const appRoot = exe.slice(0, exe.indexOf(`${path.sep}Contents${path.sep}`));
+      const binary = path.join(appRoot, "Contents", "MacOS", "ZCode");
+      if (fs.existsSync(binary)) {
+        return {
+          cmd: binary,
+          prefixArgs: [exe],
+          env: { ELECTRON_RUN_AS_NODE: "1" },
+        };
+      }
+    }
+    return { cmd: exe, prefixArgs: [], env: {} };
+  }
+
+  agentEnv(extra = {}) {
+    return {
+      ...process.env,
+      ...extra,
+      PATH:
+        (process.env.PATH || "") +
+        path.delimiter +
+        this.agentPathDirs().join(path.delimiter),
+    };
+  }
+
+  /**
+   * 短时运行 CLI，收集 stdout（用于模型列表等）。
+   * @param {string} cmd
+   * @param {string[]} args
+   * @param {{ timeoutMs?: number, env?: object, cwd?: string }} [opts]
+   */
+  runCliCapture(cmd, args, opts = {}) {
+    const timeoutMs = opts.timeoutMs ?? 12000;
+    return new Promise((resolve) => {
+      let output = "",
+        error = "";
+      let settled = false;
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        resolve(result);
+      };
+      let child;
+      try {
+        child = spawn(cmd, args, {
+          cwd: opts.cwd || os.homedir(),
+          env: this.agentEnv(opts.env || {}),
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+      } catch (e) {
+        return finish({ ok: false, output: "", error: e.message || String(e) });
+      }
+      const timer = setTimeout(() => {
+        try {
+          child.kill("SIGTERM");
+        } catch {
+          /* ignore */
+        }
+        finish({
+          ok: false,
+          output,
+          error: error || "timeout",
+        });
+      }, timeoutMs);
+      child.stdout.on("data", (b) => {
+        output += b.toString();
+      });
+      child.stderr.on("data", (b) => {
+        error += b.toString();
+      });
+      child.on("error", (e) => {
+        clearTimeout(timer);
+        finish({ ok: false, output, error: e.message || String(e) });
+      });
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        finish({
+          ok: code === 0,
+          output,
+          error,
+          code,
+        });
+      });
+    });
+  }
+
+  /** 解析 CLI 文本输出中的模型 ID 行 */
+  parseModelLines(text) {
+    const models = [];
+    const seen = new Set();
+    const skip = /^(available|models?|provider|name|id|codex|claude|cursor|opencode|usage|options?|commands?|flags?|error|failed|warning|unknown|unexpected)\b/i;
+    const cleaned = String(text || "").replace(/\x1b\[[0-9;]*m/g, "");
+    for (const raw of cleaned.split(/\r?\n/)) {
+      let line = raw.trim();
+      if (!line || line.startsWith("#") || skip.test(line)) continue;
+      // 去掉 " - label" / 括号说明
+      line = line.replace(/\s+[—–-].*$/, "").replace(/\s*\(.*\)\s*$/, "").trim();
+      const m =
+        line.match(/^([A-Za-z0-9_./:@+-]+(?:\[[^\]]*\])?)$/) ||
+        line.match(/^\s*[-*]\s+([A-Za-z0-9_./:@+-]+)/);
+      if (!m) continue;
+      const id = m[1];
+      if (id.length < 2 || skip.test(id) || seen.has(id)) continue;
+      // 过滤纯英文标题词
+      if (/^[A-Z][a-z]+$/.test(id) && !/-|\//.test(id)) continue;
+      seen.add(id);
+      models.push(id);
+    }
+    return models;
+  }
+
+  /** 读取 ZCode 当前默认模型（只读，不写配置） */
+  zcodeCurrentModel() {
+    const readJson = (p) => {
+      try {
+        if (!fs.existsSync(p)) return null;
+        return JSON.parse(fs.readFileSync(p, "utf8"));
+      } catch {
+        return null;
+      }
+    };
+    const cli = readJson(path.join(os.homedir(), ".zcode/cli/config.json"));
+    const main = cli?.model?.main;
+    if (typeof main === "string" && main.trim()) return main.trim();
+    if (typeof cli?.model === "string" && cli.model.trim()) return cli.model.trim();
+
+    const v2 = readJson(path.join(os.homedir(), ".zcode/v2/config.json"));
+    const providers = v2?.provider || {};
+    for (const [id, entry] of Object.entries(providers)) {
+      if (entry && entry.enabled === false) continue;
+      const models = entry?.models;
+      if (Array.isArray(models) && models.length) return `${id}/${models[0]}`;
+      if (models && typeof models === "object") {
+        const keys = Object.keys(models);
+        if (keys.length) return `${id}/${keys[0]}`;
+      }
+    }
+    return "";
+  }
+
+  /**
+   * 列出某 Agent 可用模型。
+   * @param {{ provider?: string }} data
+   */
+  async listAgentModels(data = {}) {
+    const provider = this.normalizeProvider(data.provider);
+    const empty = (extra = {}) => ({
+      provider,
+      models: [],
+      current: "",
+      selectable: provider !== "zcode",
+      ...extra,
+    });
+
+    if (provider === "zcode") {
+      const current = this.zcodeCurrentModel();
+      return empty({
+        current,
+        selectable: false,
+        error: current ? "" : "未能读取 ZCode 默认模型",
+      });
+    }
+
+    if (provider === "claude") {
+      let current = "";
+      try {
+        const settingsPath = path.join(os.homedir(), ".claude/settings.json");
+        if (fs.existsSync(settingsPath)) {
+          const s = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+          if (typeof s.model === "string") current = s.model;
+        }
+      } catch {
+        /* ignore */
+      }
+      return {
+        provider,
+        models: ["sonnet", "opus", "haiku"],
+        current,
+        selectable: true,
+      };
+    }
+
+    const exe = this.executable(provider);
+    if (!exe) return empty({ error: "未找到 CLI" });
+
+    if (provider === "cursor") {
+      const r = await this.runCliCapture(exe, ["--list-models"]);
+      const models = this.parseModelLines(r.output);
+      return {
+        provider,
+        models,
+        current: "",
+        selectable: true,
+        error: models.length ? "" : (r.error || "").slice(-400),
+      };
+    }
+
+    if (provider === "codex") {
+      const r = await this.runCliCapture(exe, ["models"]);
+      let models = this.parseModelLines(r.output);
+      // 帮助文本易误匹配，仅保留像模型 ID 的项
+      models = models.filter((m) => /[/-]/.test(m) || /gpt|o[0-9]|codex-/i.test(m));
+      return {
+        provider,
+        models,
+        current: "",
+        selectable: true,
+        error: "",
+      };
+    }
+
+    if (provider === "opencode") {
+      const r = await this.runCliCapture(exe, ["models"], { timeoutMs: 20000 });
+      const models = this.parseModelLines(r.output).filter((m) => m.includes("/"));
+      return {
+        provider,
+        models,
+        current: "",
+        selectable: true,
+        error: models.length ? "" : (r.error || r.output || "").replace(/\x1b\[[0-9;]*m/g, "").slice(-400),
+      };
+    }
+
+    if (provider === "antigravity") {
+      const r = await this.runCliCapture(exe, ["models"], { timeoutMs: 20000 });
+      // agy models 输出多为显示名，整行可用
+      const models = String(r.output || "")
+        .replace(/\x1b\[[0-9;]*m/g, "")
+        .split(/\r?\n/)
+        .map((l) => l.replace(/^\s*[-*•]\s*/, "").trim())
+        .filter((l) => l && !/^(available|models?|error|failed|usage)/i.test(l));
+      let current = "";
+      try {
+        const settingsPath = path.join(
+          os.homedir(),
+          ".gemini/antigravity-cli/settings.json",
+        );
+        if (fs.existsSync(settingsPath)) {
+          const s = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+          if (typeof s.model === "string") current = s.model;
+        }
+      } catch {
+        /* ignore */
+      }
+      return {
+        provider,
+        models,
+        current,
+        selectable: true,
+        error: models.length ? "" : (r.error || "").slice(-400),
+      };
+    }
+
+    return empty();
+  }
+
+  normalizeProvider(raw) {
+    const p = String(raw || "").toLowerCase();
+    if (
+      ["cursor", "codex", "claude", "zcode", "opencode", "antigravity"].includes(
+        p,
+      )
+    )
+      return p;
+    return "cursor";
+  }
+
+  /**
+   * 组装各 CLI 的启动参数。
+   * @returns {{ cmd: string, args: string[], envExtra: object, stdinPrompt: boolean, parseZcodeJson: boolean, streamProgress: boolean, outFile: string|null }}
+   */
+  agentInvokeSpec(provider, exe, prompt, model, cwd) {
+    const outFile = path.join(cwd, "result-" + Date.now() + ".txt");
+    let cmd = exe;
+    let args = [];
+    let envExtra = {};
+    let stdinPrompt = false;
+    let parseZcodeJson = false;
+    let streamProgress = false;
+    const m = provider === "zcode" ? "" : String(model || "").trim();
+
+    if (provider === "cursor") {
+      args = [
+        "--print",
+        "--mode",
+        "ask",
+        "--sandbox",
+        "enabled",
+        "--output-format",
+        "text",
+        "--workspace",
+        cwd,
+      ];
+      if (m) args.push("--model", m);
+      args.push(prompt);
+      streamProgress = true;
+    } else if (provider === "codex") {
+      args = [
+        "exec",
+        "--sandbox",
+        "read-only",
+        "--skip-git-repo-check",
+        "--color",
+        "never",
+        "-C",
+        cwd,
+      ];
+      if (m) args.push("--model", m);
+      args.push("-o", outFile, "-");
+      stdinPrompt = true;
+    } else if (provider === "claude") {
+      args = [
+        "-p",
+        "--output-format",
+        "text",
+        "--tools",
+        "",
+        "--permission-mode",
+        "plan",
+      ];
+      if (m) args.push("--model", m);
+      args.push(prompt);
+    } else if (provider === "opencode") {
+      args = ["run", "--format", "default", "--dir", cwd];
+      if (m) args.push("-m", m);
+      args.push(prompt);
+    } else if (provider === "antigravity") {
+      // --model 需在 -p 之前；显示名与 agy models 输出一致
+      if (m) args.push("--model", m);
+      args.push("-p", prompt);
+    } else if (provider === "zcode") {
+      const launch = this.zcodeLaunch(exe);
+      cmd = launch.cmd;
+      envExtra = launch.env;
+      args = [
+        ...launch.prefixArgs,
+        "--json",
+        "--prompt",
+        prompt,
+        "--mode",
+        "plan",
+        "--cwd",
+        cwd,
+      ];
+      parseZcodeJson = true;
+    }
+
+    return {
+      cmd,
+      args,
+      envExtra,
+      stdinPrompt,
+      parseZcodeJson,
+      streamProgress,
+      outFile: provider === "codex" ? outFile : null,
+    };
+  }
+
+  /**
+   * 执行一次 Agent CLI 调用。
+   * @param {object} spec from agentInvokeSpec
+   * @param {{ cwd: string, prompt: string, timeoutMs?: number, onProgress?: Function, streamProgress?: boolean }} opts
+   */
+  spawnAgent(spec, opts) {
+    const {
+      cwd,
+      prompt,
+      timeoutMs = 180000,
+      onProgress,
+      streamProgress,
+    } = opts;
+    return new Promise((resolve, reject) => {
+      let output = "",
+        error = "";
+      const child = spawn(spec.cmd, spec.args, {
+        cwd,
+        env: this.agentEnv(spec.envExtra),
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      this.active = child;
+      let timeout = false;
+      const timer = setTimeout(() => {
+        timeout = true;
+        child.kill("SIGTERM");
+      }, timeoutMs);
+      child.stdout.on("data", (b) => {
+        output += b.toString();
+        if (onProgress && streamProgress) onProgress(b.toString());
+      });
+      child.stderr.on("data", (b) => {
+        error += b.toString();
+      });
+      child.on("error", (e) => {
+        clearTimeout(timer);
+        if (this.active === child) this.active = null;
+        reject(e);
+      });
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        if (this.active === child) this.active = null;
+        let result = output;
+        if (spec.outFile && fs.existsSync(spec.outFile)) {
+          result = fs.readFileSync(spec.outFile, "utf8");
+          try {
+            fs.unlinkSync(spec.outFile);
+          } catch {
+            /* ignore */
+          }
+        }
+        if (spec.parseZcodeJson) {
+          try {
+            const json = JSON.parse(result.trim());
+            result =
+              json.response ??
+              json.text ??
+              json.message ??
+              (typeof json === "string" ? json : result);
+          } catch {
+            /* keep raw */
+          }
+        }
+        if (code !== 0)
+          reject(
+            Error(
+              timeout
+                ? "请求超时，请缩短文章后重试。"
+                : error.slice(-1800) || "任务已取消或运行失败",
+            ),
+          );
+        else resolve(String(result).trim());
+      });
+      if (spec.stdinPrompt) child.stdin.end(prompt);
+      else child.stdin.end();
+    });
+  }
+
+  /**
+   * 连通性测试：短 prompt，不依赖账号/文章。
+   * @param {{ provider?: string, model?: string }} data
+   */
+  async testAgentConnection(data = {}) {
+    const provider = this.normalizeProvider(data.provider);
+    const exe = this.executable(provider);
+    if (!exe)
+      return {
+        ok: false,
+        provider,
+        installed: false,
+        error: "未找到 CLI",
+      };
+    if (this.active)
+      return {
+        ok: false,
+        provider,
+        installed: true,
+        error: "已有任务运行中",
+      };
+    const cwd = path.join(this.data, "agent-work");
+    fs.mkdirSync(cwd, { recursive: true });
+    const prompt =
+      "请只回复一个词：ok。不要调用工具，不要解释，不要输出其它内容。";
+    const model = provider === "zcode" ? "" : String(data.model || "").trim();
+    const spec = this.agentInvokeSpec(provider, exe, prompt, model, cwd);
+    const started = Date.now();
+    try {
+      const text = await this.spawnAgent(spec, {
+        cwd,
+        prompt,
+        timeoutMs: 90000,
+        streamProgress: false,
+      });
+      return {
+        ok: true,
+        provider,
+        installed: true,
+        preview: String(text || "").slice(0, 120),
+        latencyMs: Date.now() - started,
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        provider,
+        installed: true,
+        error: (e && e.message) || String(e),
+        latencyMs: Date.now() - started,
+      };
+    }
   }
 
   /** 同步保存（页面卸载时） */
@@ -558,6 +1140,10 @@ class DeskCore {
         return true;
       case "agent":
         return this.runAgent(data);
+      case "agent-models":
+        return this.listAgentModels(data);
+      case "agent-test":
+        return this.testAgentConnection(data);
       case "pick-note-table":
         return null;
       case "import-notes-preview":
@@ -1064,14 +1650,14 @@ class DeskCore {
   }
 
   /**
-   * 调用本地 Cursor / Codex CLI。
+   * 调用本地 Agent CLI（Cursor / Codex / Claude / ZCode / OpenCode）。
    * @param {object} req
    * @param {(chunk: string) => void} [onProgress]
    */
   runAgent(req, onProgress) {
     const progress = onProgress || this.onAgentProgress;
     if (this.active) throw Error("已有任务运行中");
-    const provider = req.provider === "codex" ? "codex" : "cursor";
+    const provider = this.normalizeProvider(req.provider);
     const exe = this.executable(provider);
     if (!exe) throw Error("未找到 " + provider + " CLI，请安装并登录后重试。");
     const cwd = path.join(this.data, "agent-work");
@@ -1113,91 +1699,17 @@ class DeskCore {
     prompt += "文章正文：\n" + req.body + "\n";
     if (req.selection) prompt += "当前选区：\n" + req.selection + "\n";
     if (req.task === "rewrite")
-      prompt +=
-        "只输出修改后的" +
-        (req.selection ? "选区" : "全文") +
-        "，不要解释、代码围栏或前言。";
+      prompt += "只输出修改后的全文，不要解释、代码围栏或前言。";
     if (Buffer.byteLength(prompt, "utf8") > 200000)
       throw Error("本次上下文超过 200KB，请减少本次启用的资料或缩短正文");
-    const args =
-      provider === "cursor"
-        ? [
-            "--print",
-            "--mode",
-            "ask",
-            "--sandbox",
-            "enabled",
-            "--output-format",
-            "text",
-            "--workspace",
-            cwd,
-          ]
-        : [
-            "exec",
-            "--sandbox",
-            "read-only",
-            "--skip-git-repo-check",
-            "--color",
-            "never",
-            "-C",
-            cwd,
-          ];
-    if (req.model) args.push("--model", req.model);
-    const outFile = path.join(cwd, "result-" + Date.now() + ".txt");
-    if (provider === "codex") args.push("-o", outFile, "-");
-    else args.push(prompt);
-    return new Promise((resolve, reject) => {
-      let output = "",
-        error = "";
-      const child = spawn(exe, args, {
-        cwd,
-        env: {
-          ...process.env,
-          PATH:
-            process.env.PATH +
-            ":/usr/local/bin:/opt/homebrew/bin:" +
-            path.join(os.homedir(), ".local/bin"),
-        },
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-      this.active = child;
-      let timeout = false;
-      const timer = setTimeout(() => {
-        timeout = true;
-        child.kill("SIGTERM");
-      }, 180000);
-      child.stdout.on("data", (b) => {
-        output += b.toString();
-        if (progress && provider === "cursor") progress(b.toString());
-      });
-      child.stderr.on("data", (b) => {
-        error += b.toString();
-      });
-      child.on("error", (e) => {
-        clearTimeout(timer);
-        if (this.active === child) this.active = null;
-        reject(e);
-      });
-      child.on("close", (code) => {
-        clearTimeout(timer);
-        if (this.active === child) this.active = null;
-        let result = output;
-        if (provider === "codex" && fs.existsSync(outFile)) {
-          result = fs.readFileSync(outFile, "utf8");
-          fs.unlinkSync(outFile);
-        }
-        if (code !== 0)
-          reject(
-            Error(
-              timeout
-                ? "请求超时，请缩短文章后重试。"
-                : error.slice(-1800) || "任务已取消或运行失败",
-            ),
-          );
-        else resolve(result.trim());
-      });
-      if (provider === "codex") child.stdin.end(prompt);
-      else child.stdin.end();
+
+    const model = provider === "zcode" ? "" : String(req.model || "").trim();
+    const spec = this.agentInvokeSpec(provider, exe, prompt, model, cwd);
+    return this.spawnAgent(spec, {
+      cwd,
+      prompt,
+      onProgress: progress,
+      streamProgress: spec.streamProgress,
     });
   }
 

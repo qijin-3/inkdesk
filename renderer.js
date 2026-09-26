@@ -10,7 +10,7 @@ import { TableKit } from "@tiptap/extension-table";
 import { gfm } from "turndown-plugin-gfm";
 import { marked } from "marked";
 import TurndownService from "turndown";
-import { diffWords } from "diff";
+import { diffWords, diffLines } from "diff";
 import { calendar, validDate, publishSummary } from "./calendar.cjs";
 let saveProfileEditor = null;
 let composer = null,
@@ -119,7 +119,9 @@ let state,
   sourceFiles = [],
   selectedText = "",
   selectionContext = null,
-  dirty = false;
+  dirty = false,
+  /** Agent 输出模式：对话 | 编辑全文 */
+  agentMode = "chat";
 let editorHTML = "";
 let previewMode = false;
 let previewDocId = null;
@@ -231,7 +233,7 @@ function conversation(doc = current) {
   if (!doc.conversations.length)
     doc.conversations.push({
       id: crypto.randomUUID(),
-      title: "开始聊这篇",
+      title: "新对话",
       messages: doc.chat || [],
     });
   let c =
@@ -1668,7 +1670,7 @@ function syncAsterFace() {
   else if (
     pending &&
     pending.doc === current?.id &&
-    (pending.edits?.length || pending.next)
+    (pending.hunks?.length || pending.edits?.length || pending.next)
   )
     face = "idea";
   else {
@@ -1795,7 +1797,7 @@ function renderAssistantRail() {
   }
 
   rail.dataset.railMode = "assistant";
-  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<div class="assistant-head-actions"><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select><button type="button" id="close-assistant" class="ghost icon-btn" title="收起" aria-label="收起">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
+  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<div class="assistant-head-actions"><select id="provider">${AGENT_PROVIDERS.map((p) => `<option value="${p.id}">${esc(p.label)}</option>`).join("")}</select><button type="button" id="close-assistant" class="ghost icon-btn" title="收起" aria-label="收起">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
   unmountAsterRail = mountAster($("#aster-rail"));
   syncAsterFace();
 
@@ -1804,6 +1806,12 @@ function renderAssistantRail() {
     provider.value = state.provider;
     provider.onchange = (e) => {
       state.provider = e.target.value;
+      if (state.provider === "zcode") state.model = "";
+      else {
+        const list = getAgentModelList(state.provider);
+        if (state.model && !list.includes(state.model))
+          state.model = list[0] || "";
+      }
       persist();
     };
   }
@@ -2434,6 +2442,157 @@ function bindWorkspaceResize() {
     window.addEventListener("pointerup", onUp);
   };
 }
+
+/** 词级差异 HTML */
+function diffHTML(oldText, nextText) {
+  return diffWords(oldText || "", nextText || "")
+    .map(
+      (p) =>
+        `<${p.added ? "ins" : p.removed ? "del" : "span"}>${esc(p.value)}</${p.added ? "ins" : p.removed ? "del" : "span"}>`,
+    )
+    .join("");
+}
+
+/**
+ * 将全文新旧稿拆成可逐段接受/拒绝的 hunk（行级 diff）。
+ * @param {string} oldText
+ * @param {string} nextText
+ */
+function buildEditHunks(oldText, nextText) {
+  const parts = diffLines(oldText || "", nextText || "");
+  const hunks = [];
+  for (let i = 0; i < parts.length; ) {
+    const p = parts[i];
+    if (!p.added && !p.removed) {
+      hunks.push({ kind: "equal", value: p.value });
+      i += 1;
+      continue;
+    }
+    let old = "",
+      next = "";
+    while (i < parts.length && (parts[i].added || parts[i].removed)) {
+      if (parts[i].removed) old += parts[i].value;
+      if (parts[i].added) next += parts[i].value;
+      i += 1;
+    }
+    hunks.push({
+      kind: "change",
+      id: crypto.randomUUID(),
+      old,
+      next,
+      status: "pending",
+    });
+  }
+  if (!hunks.some((h) => h.kind === "change")) {
+    hunks.length = 0;
+    hunks.push({
+      kind: "change",
+      id: crypto.randomUUID(),
+      old: oldText || "",
+      next: nextText || "",
+      status: "pending",
+    });
+  }
+  return hunks;
+}
+
+/** 按 hunk 决定合成最终正文 */
+function composeHunks(hunks) {
+  return (hunks || [])
+    .map((h) => {
+      if (h.kind === "equal") return h.value;
+      return h.status === "accepted" ? h.next : h.old;
+    })
+    .join("");
+}
+
+/** 修改建议卡片 HTML（支持逐段接受） */
+function reviewCardHTML() {
+  if (
+    !pending ||
+    pending.doc !== current?.id ||
+    pending.conversationId !== conversation().id
+  )
+    return "";
+  const changes = (pending.hunks || []).filter((h) => h.kind === "change");
+  const hunkBlocks = changes.length
+    ? changes
+        .map((h) => {
+          const done = h.status !== "pending";
+          return `<div class="diff-hunk is-${h.status}" data-hunk="${esc(h.id)}"><div class="diff">${diffHTML(h.old, h.next)}</div>${
+            done
+              ? `<div class="diff-hunk-status">${h.status === "accepted" ? "已接受" : "已拒绝"}</div>`
+              : `<div class="row diff-hunk-actions"><button type="button" data-hunk-accept="${esc(h.id)}">接受</button><button type="button" data-hunk-reject="${esc(h.id)}">拒绝</button></div>`
+          }</div>`;
+        })
+        .join("")
+    : `<div class="diff">${diffHTML(pending.old, pending.next)}</div>`;
+  return `<div class="review-card"><div class="review-card-head"><h3>修改建议</h3><div class="row"><button type="button" id="accept" class="primary">全部接受</button><button type="button" id="reject">全部拒绝</button></div></div>${hunkBlocks}</div>`;
+}
+
+/** Agent 模式切换控件（pill） */
+function agentModeHTML() {
+  const edit = agentMode === "edit";
+  const label = edit ? "编辑" : "对话";
+  const modeIcon = edit ? I.pen({ size: 14 }) : I.chat({ size: 14 });
+  return `<div class="agent-mode"><button type="button" id="agent-output" class="agent-mode-trigger" title="${label}" aria-label="输出模式：${label}" aria-haspopup="listbox" aria-expanded="false" data-mode="${agentMode}">${modeIcon}${I.chevronDown({ size: 12 })}</button><div id="agent-mode-menu" class="agent-mode-menu" hidden role="listbox"><button type="button" role="option" data-value="chat" aria-selected="${!edit}">${I.chat({ size: 14 })}<span>对话</span></button><button type="button" role="option" data-value="edit" aria-selected="${edit}">${I.pen({ size: 14 })}<span>编辑</span></button></div></div>`;
+}
+
+/** 将 pending 合成结果写入编辑器 */
+function applyPendingResult(nextText, action) {
+  sync();
+  if (current.body !== pending.base) {
+    toast("正文已变化，请重新生成建议。");
+    pending = null;
+    renderPanel();
+    syncAsterFace();
+    return false;
+  }
+  current.decisions ??= [];
+  current.decisions.push({
+    action,
+    before: pending.old,
+    after: nextText,
+    at: new Date().toISOString(),
+  });
+  if (action === "accepted") {
+    current.snapshots.push({
+      at: new Date().toISOString(),
+      body: current.body,
+    });
+    editor.commands.setContent(safeHTML(nextText));
+    sync();
+    changed();
+    toast("已应用，可用 ⌘Z 撤回");
+  } else {
+    changed();
+  }
+  pending = null;
+  renderPanel();
+  syncAsterFace();
+  return true;
+}
+
+/** 接受/拒绝单个 hunk；全部决定后自动应用 */
+function decideHunk(id, accept) {
+  if (!pending?.hunks) return;
+  const hunk = pending.hunks.find((h) => h.id === id && h.kind === "change");
+  if (!hunk || hunk.status !== "pending") return;
+  hunk.status = accept ? "accepted" : "rejected";
+  const left = pending.hunks.some(
+    (h) => h.kind === "change" && h.status === "pending",
+  );
+  if (left) {
+    renderPanel();
+    return;
+  }
+  const next = composeHunks(pending.hunks);
+  const anyAccepted = pending.hunks.some(
+    (h) => h.kind === "change" && h.status === "accepted",
+  );
+  applyPendingResult(next, anyAccepted ? "accepted" : "rejected");
+}
+
 function renderPanel() {
   if (previewMode) return;
   if (composer) {
@@ -2455,23 +2614,7 @@ function renderPanel() {
         )
         .join("") || "";
   }
-  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" title="为本篇创建新对话">${I.plus()} 新对话</button></div>` : ""}<div class="panel-scroll">${
-    pending &&
-    pending.doc === current.id &&
-    pending.conversationId === conversation().id
-      ? `<div class="review-card"><h3>修改建议</h3><div class="diff">${diffWords(
-          pending.old,
-          pending.next,
-        )
-          .map(
-            (p) =>
-              `<${p.added ? "ins" : p.removed ? "del" : "span"}>${esc(p.value)}</${p.added ? "ins" : p.removed ? "del" : "span"}>`,
-          )
-          .join(
-            "",
-          )}</div><div class="row"><button id="accept" class="primary">接受修改</button><button id="reject">保留原文</button></div></div>`
-      : ""
-  }${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="添加文件" aria-label="添加文件" aria-haspopup="menu">${I.plus()}</button><div id="skill-picker"></div><select id="agent-output" aria-label="对话模式"><option value="chat">对话</option><option value="rewrite-tags">修改标签选段</option><option value="rewrite">修改当前选区</option></select><button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div>`;
+  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" class="icon-btn" title="为本篇创建新对话" aria-label="新对话">${I.plus()}</button></div>` : ""}<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools">${agentModeHTML()}<button id="chat-upload" class="icon-btn" title="添加文件" aria-label="添加文件" aria-haspopup="menu">${I.plus()}</button><div id="skill-picker"></div><button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div>`;
   if (tab === "chat") {
     $("#conversation").value = conversation().id;
     $("#conversation").onchange = (e) => {
@@ -2492,7 +2635,26 @@ function renderPanel() {
     };
   }
   $("#send").onclick = () =>
-    busy ? api("cancel") : runTask($("#agent-output").value);
+    busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
+  const modeBtn = $("#agent-output");
+  const modeMenu = $("#agent-mode-menu");
+  if (modeBtn && modeMenu) {
+    modeBtn.onclick = (e) => {
+      e.stopPropagation();
+      const open = modeMenu.hasAttribute("hidden");
+      if (open) modeMenu.removeAttribute("hidden");
+      else modeMenu.setAttribute("hidden", "");
+      modeBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    };
+    modeMenu.querySelectorAll("[data-value]").forEach((opt) => {
+      opt.onclick = (e) => {
+        e.stopPropagation();
+        agentMode = opt.dataset.value === "edit" ? "edit" : "chat";
+        modeMenu.setAttribute("hidden", "");
+        renderPanel();
+      };
+    });
+  }
   composer = new Composer($("#composer-input"), conversation(), {
     changed: () => {
       dirty = true;
@@ -2535,65 +2697,28 @@ function renderPanel() {
         }
       }),
   );
+  $$("[data-hunk-accept]").forEach(
+    (b) => (b.onclick = () => decideHunk(b.dataset.hunkAccept, true)),
+  );
+  $$("[data-hunk-reject]").forEach(
+    (b) => (b.onclick = () => decideHunk(b.dataset.hunkReject, false)),
+  );
   if ($("#accept"))
     $("#accept").onclick = () => {
-      sync();
-      if (current.body !== pending.base) {
-        toast("正文已变化，请重新生成建议。");
-        pending = null;
-        renderPanel();
-        syncAsterFace();
+      if (!pending) return;
+      if (pending.hunks) {
+        pending.hunks.forEach((h) => {
+          if (h.kind === "change") h.status = "accepted";
+        });
+        applyPendingResult(composeHunks(pending.hunks), "accepted");
         return;
       }
-      current.decisions ??= [];
-      current.decisions.push({
-        action: "accepted",
-        before: pending.old,
-        after: pending.next,
-        at: new Date().toISOString(),
-      });
-      current.snapshots.push({
-        at: new Date().toISOString(),
-        body: current.body,
-      });
-      if (pending.edits) {
-        let chain = editor.chain().focus();
-        for (const e of [...pending.edits].sort((a, b) => b.from - a.from))
-          chain = chain.insertContentAt(
-            { from: e.from, to: e.to },
-            safeHTML(e.next),
-          );
-        chain.run();
-      } else if (pending.from !== pending.to)
-        editor
-          .chain()
-          .focus()
-          .insertContentAt(
-            { from: pending.from, to: pending.to },
-            safeHTML(pending.next),
-          )
-          .run();
-      else editor.commands.setContent(safeHTML(pending.next));
-      sync();
-      changed();
-      pending = null;
-      renderPanel();
-      syncAsterFace();
-      toast("已应用，可用 ⌘Z 撤回");
+      applyPendingResult(pending.next, "accepted");
     };
   if ($("#reject"))
     $("#reject").onclick = () => {
-      current.decisions ??= [];
-      current.decisions.push({
-        action: "rejected",
-        before: pending.old,
-        after: pending.next,
-        at: new Date().toISOString(),
-      });
-      changed();
-      pending = null;
-      renderPanel();
-      syncAsterFace();
+      if (!pending) return;
+      applyPendingResult(pending.old, "rejected");
     };
 }
 async function runTask(task) {
@@ -2624,19 +2749,12 @@ async function runTask(task) {
   const anchors = draft.references.filter((r) => r.kind === "selection");
   if (anchors.some((r) => r.articleId !== doc.id || r.base !== body))
     return toast("引用选段已过期，请删除标签并重新选中添加");
-  if (task === "rewrite-tags") {
-    if (!anchors.length) return toast("请先添加正文选段标签");
-    const sorted = [...anchors].sort((a, b) => a.from - b.from);
-    if (sorted.some((a, i) => i > 0 && a.from < sorted[i - 1].to))
-      return toast("选段有重叠，请保留不重叠的标签");
-  }
-  if (task === "rewrite" && !selection) return toast("请先选中需要修改的段落");
   if (task === "chat" && !instruction && !conversation(doc).skillIds?.length)
     return toast("先写一句想讨论的内容");
+  if (task === "rewrite" && !instruction && !conversation(doc).skillIds?.length)
+    return toast("先写一句修改要求，或选用技能");
   const prompts = {
-    "rewrite-tags":
-      "仅修改标记选段。只返回 JSON 数组 [{id,text}]；每个正文选段恰好一个结果，保持未标记内容不变。",
-    rewrite: "按所选技能和用户要求修改当前选区，只输出修改后的文本。",
+    rewrite: "按所选技能和用户要求修改全文，只输出修改后的完整正文。",
     chat: "",
   };
   const session = conversation(doc);
@@ -2656,8 +2774,7 @@ async function runTask(task) {
   busy = true;
   syncAsterFace();
   await persist();
-  if (["review", "rewrite", "check", "rewrite-tags"].includes(task))
-    tab = "chat";
+  if (["review", "rewrite", "check"].includes(task)) tab = "chat";
   renderPanel();
   const history = session.messages
     .slice(-8, -1)
@@ -2674,51 +2791,21 @@ async function runTask(task) {
       references: draft.references,
       instruction: (prompts[task] || "") + "\n" + instruction,
       body,
-      selection,
+      // 编辑模式始终改全文，不把当前选区当作改写范围
+      selection: task === "rewrite" ? "" : selection,
       history,
     });
     if (!result) throw Error("Agent 未返回正文");
     session.messages.push({ role: "assistant", text: result });
-    if (task === "rewrite-tags") {
-      const results = JSON.parse(
-        result.replace(/^```(?:json)?\s*|\s*```$/g, ""),
-      );
-      if (
-        !Array.isArray(results) ||
-        results.length !== anchors.length ||
-        new Set(results.map((x) => x.id)).size !== anchors.length ||
-        results.some(
-          (x) =>
-            !anchors.some((a) => a.refId === x.id) ||
-            typeof x.text !== "string",
-        )
-      )
-        throw Error("AI 未返回完整的选段建议，正文保持不变");
-      const edits = anchors.map((a) => ({
-        ...a,
-        old: a.text,
-        next: results.find((r) => r.id === a.refId).text,
-      }));
-      if (doc.id === current?.id)
-        pending = {
-          doc: doc.id,
-          conversationId: session.id,
-          base: body,
-          edits,
-          old: edits.map((x) => x.label + "\n" + x.old).join("\n\n"),
-          next: edits.map((x) => x.label + "\n" + x.next).join("\n\n"),
-        };
-    } else if (task === "rewrite") {
-      if (doc.id === current?.id)
-        pending = {
-          doc: doc.id,
-          conversationId: session.id,
-          base: body,
-          old: selection || body,
-          next: result,
-          from,
-          to,
-        };
+    if (task === "rewrite" && doc.id === current?.id) {
+      pending = {
+        doc: doc.id,
+        conversationId: session.id,
+        base: body,
+        old: body,
+        next: result,
+        hunks: buildEditHunks(body, result),
+      };
     }
     await persist();
   } catch (e) {
@@ -3388,10 +3475,349 @@ function settingsField(label, controlHtml) {
   return `<label class="settings-field"><span class="settings-field-label">${esc(label)}</span>${controlHtml}</label>`;
 }
 
+const AGENT_PROVIDERS = [
+  { id: "cursor", label: "Cursor", blurb: "Cursor Agent CLI" },
+  { id: "codex", label: "ChatGPT", blurb: "OpenAI Codex CLI" },
+  { id: "claude", label: "Claude Code", blurb: "Anthropic Claude Code" },
+  { id: "zcode", label: "ZCode", blurb: "Z.ai ZCode（沿用 CLI 默认模型）" },
+  { id: "opencode", label: "OpenCode", blurb: "OpenCode CLI" },
+  { id: "antigravity", label: "Antigravity", blurb: "Google Antigravity（agy）" },
+];
+
+/** 各 CLI 常用模型预设（与发现列表合并后供下拉选择，2026 年初可用） */
+const AGENT_PRESET_MODELS = {
+  cursor: ["auto", "composer-1", "sonnet-4.5", "opus-4.5", "gpt-5.2", "gemini-3-pro"],
+  codex: ["gpt-5.2", "gpt-5.2-codex", "gpt-5.1-codex-max", "gpt-5-mini"],
+  claude: ["sonnet", "opus", "haiku"],
+  zcode: [],
+  opencode: [
+    "anthropic/claude-sonnet-4-5",
+    "anthropic/claude-opus-4-6",
+    "openai/gpt-5-2",
+    "google/gemini-3-pro",
+  ],
+  antigravity: [
+    "Gemini 3 Pro (High)",
+    "Gemini 3 Flash",
+    "Claude Sonnet 4.5 (Thinking)",
+    "Claude Opus 4.5 (Thinking)",
+  ],
+};
+
+function agentLogoSvg(id) {
+  const common =
+    'xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"';
+  if (id === "cursor")
+    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#111"/><path d="M9 7.5 19.5 14 12.8 15.6 11 22.2 9 7.5z" fill="#fff"/><path d="M12.4 14.6h4.2" stroke="#111" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+  if (id === "codex")
+    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#000"/><g fill="none" stroke="#fff" stroke-width="1.7"><circle cx="14" cy="10.2" r="3.1"/><circle cx="10.8" cy="16.2" r="3.1"/><circle cx="17.2" cy="16.2" r="3.1"/><path d="M12.4 12.7l-1 1.7M15.6 12.7l1 1.7" stroke-linecap="round"/></g></svg>`;
+  if (id === "claude")
+    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#d97757"/><path d="M14 5l1.7 3.4 3.2-1.9-.6 3.7 3.7.6-1.9 3.2L23.5 14l-3.4 1.7 1.9 3.2-3.7-.6-.6 3.7-3.2-1.9L14 23.5l-1.7-3.4-3.2 1.9.6-3.7-3.7-.6 1.9-3.2L4.5 14l3.4-1.7-1.9-3.2 3.7.6.6-3.7 3.2 1.9L14 5z" fill="#fff"/><circle cx="14" cy="14" r="2.4" fill="#d97757"/></svg>`;
+  if (id === "zcode")
+    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#2b5cff"/><path d="M8 8.5h12v2.6l-7.4 8.4H20V22H8v-2.6l7.4-8.4H8V8.5z" fill="#fff"/></svg>`;
+  if (id === "opencode")
+    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#151b23"/><rect x="6.5" y="9" width="4.4" height="10" rx="2.2" fill="none" stroke="#3fb950" stroke-width="1.8"/><rect x="17.1" y="9" width="4.4" height="10" rx="2.2" fill="none" stroke="#3fb950" stroke-width="1.8"/><circle cx="8.7" cy="14" r="1.1" fill="#3fb950"/><circle cx="19.3" cy="14" r="1.1" fill="#3fb950"/></svg>`;
+  if (id === "antigravity")
+    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#fff" stroke="#e2e2e2"/><path d="M22.5 14.2c0-.9-.1-1.8-.2-2.6H14v4.9h4.8c-.2 1.1-.9 2-1.8 2.7v2.2h3c1.7-1.6 2.5-3.9 2.5-7.2z" fill="#4285F4"/><path d="M14 23c2.4 0 4.5-.8 6-2.2l-3-2.2c-.8.6-1.9.9-3 .9-2.3 0-4.2-1.5-4.9-3.7H6v2.3C7.5 21.1 10.5 23 14 23z" fill="#34A853"/><path d="M9.1 15.8c-.2-.6-.3-1.2-.3-1.8s.1-1.2.3-1.8V9.9H6C5.4 11.2 5 12.6 5 14s.4 2.8 1 4.1l3.1-2.3z" fill="#FBBC05"/><path d="M14 9.5c1.3 0 2.5.5 3.4 1.3l2.7-2.7C18.5 6.6 16.4 5.7 14 5.7c-3.5 0-6.5 2-8 4.9l3.1 2.6c.7-2.2 2.6-3.7 4.9-3.7z" fill="#EA4335"/></svg>`;
+  return `<svg ${common}><rect width="28" height="28" rx="7" fill="#888"/></svg>`;
+}
+
+function agentInstalled(id) {
+  return !!state.agents?.[id];
+}
+
+function ensureAgentModelsStore() {
+  if (!state.agentModels || typeof state.agentModels !== "object")
+    state.agentModels = {};
+}
+
+function getAgentModelList(provider) {
+  ensureAgentModelsStore();
+  const list = state.agentModels[provider];
+  return Array.isArray(list) ? list.filter(Boolean) : [];
+}
+
+function setAgentModelList(provider, list) {
+  ensureAgentModelsStore();
+  state.agentModels = {
+    ...state.agentModels,
+    [provider]: [...new Set(list.map((x) => String(x).trim()).filter(Boolean))],
+  };
+}
+
+function agentSuggestionIds(provider, discovered = []) {
+  const presets = AGENT_PRESET_MODELS[provider] || [];
+  const saved = getAgentModelList(provider);
+  return [...new Set([...presets, ...discovered, ...saved])];
+}
+
+function agentCardShellHtml(p) {
+  const installed = agentInstalled(p.id);
+  const isDefault = state.provider === p.id;
+  return `<article class="agent-card ${isDefault ? "is-default" : ""} ${installed ? "" : "is-missing"}" data-agent="${p.id}">
+  <div class="agent-card-main">
+    <div class="agent-card-logo">${agentLogoSvg(p.id)}</div>
+    <div class="agent-card-meta">
+      <div class="agent-card-title">
+        <strong>${esc(p.label)}</strong>
+        ${isDefault ? `<span class="agent-badge agent-badge-default">默认</span>` : ""}
+        <span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "已安装" : "未安装"}</span>
+      </div>
+      <p class="agent-card-blurb">${esc(p.blurb)}</p>
+    </div>
+    <div class="agent-card-actions">
+      ${isDefault ? "" : `<button type="button" class="primary" data-agent-default="${p.id}" ${installed ? "" : "disabled"}>设为默认</button>`}
+      <button type="button" class="ghost" data-agent-test-default="${p.id}" ${installed ? "" : "disabled"} title="不指定模型，使用 CLI 默认">测试默认</button>
+    </div>
+  </div>
+  <div class="agent-card-body" data-agent-body="${p.id}">
+    <p class="settings-hint">读取可用模型…</p>
+  </div>
+</article>`;
+}
+
+function agentModelsPanelHtml(p, info) {
+  const installed = agentInstalled(p.id);
+  if (!installed) {
+    return `<p class="settings-hint">安装并登录对应 CLI 后，可添加模型并逐一测试连通。</p>`;
+  }
+  if (p.id === "zcode" || info?.selectable === false) {
+    const current = info?.current || "";
+    return `<div class="agent-model-panel">
+      <p class="settings-hint">${current ? `CLI 默认模型：<code>${esc(current)}</code>` : esc(info?.error || "未能读取默认模型")}</p>
+      <p class="settings-hint">ZCode 不支持按模型切换，连通性请用上方「测试默认」。</p>
+    </div>`;
+  }
+  const saved = getAgentModelList(p.id);
+  if (!saved.length && state.provider === p.id && state.model) {
+    setAgentModelList(p.id, [state.model]);
+  }
+  const list = getAgentModelList(p.id);
+  const suggestions = agentSuggestionIds(p.id, info?.models || []);
+  const rows = list.length
+    ? list
+        .map((m) => {
+          const active = state.provider === p.id && state.model === m;
+          return `<li class="agent-model-item ${active ? "is-active" : ""}" data-model-row="${esc(m)}">
+            <code class="agent-model-id">${esc(m)}</code>
+            ${active ? `<span class="agent-badge agent-badge-default">使用中</span>` : `<button type="button" class="ghost" data-agent-use="${p.id}" data-model="${esc(m)}">使用</button>`}
+            <button type="button" class="ghost" data-agent-test-model="${p.id}" data-model="${esc(m)}">测试</button>
+            <button type="button" class="ghost" data-agent-remove-model="${p.id}" data-model="${esc(m)}">移除</button>
+            <span class="agent-model-row-status" data-model-status="${esc(m)}" role="status"></span>
+          </li>`;
+        })
+        .join("")
+    : `<li class="agent-model-empty settings-hint">尚未添加模型。从下方选择常用 ID，或手填后点「添加」。</li>`;
+
+  return `<div class="agent-model-panel">
+    <div class="agent-model-add">
+      <select class="agent-model-select" data-agent-preset="${p.id}" aria-label="常用模型">
+        <option value="">选择常用模型 ID</option>
+        ${suggestions.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join("")}
+      </select>
+      <input class="agent-model-input" data-agent-pick="${p.id}" placeholder="或手动输入模型 ID" autocomplete="off">
+      <button type="button" class="primary" data-agent-add-model="${p.id}">添加</button>
+    </div>
+    <ul class="agent-model-list">${rows}</ul>
+  </div>`;
+}
+
+function setModelRowStatus(provider, model, text, kind = "") {
+  const card = $(`.agent-card[data-agent="${provider}"]`);
+  if (!card) return;
+  const el = [...card.querySelectorAll("[data-model-status]")].find(
+    (n) => n.getAttribute("data-model-status") === model,
+  );
+  if (!el) return;
+  el.textContent = text || "";
+  el.dataset.kind = kind;
+}
+
+async function persistAgentModels() {
+  ensureAgentModelsStore();
+  await persist();
+}
+
+async function fillAgentCard(p) {
+  const body = $(`[data-agent-body="${p.id}"]`);
+  if (!body) return;
+  if (!agentInstalled(p.id)) {
+    body.innerHTML = agentModelsPanelHtml(p, null);
+    return;
+  }
+  let info = { models: [], selectable: p.id !== "zcode", current: "" };
+  try {
+    info = await api("agent-models", { provider: p.id });
+  } catch (e) {
+    info = {
+      models: [],
+      selectable: p.id !== "zcode",
+      current: "",
+      error: e.message || "读取失败",
+    };
+  }
+  body.innerHTML = agentModelsPanelHtml(p, info);
+  bindAgentModelControls(p);
+}
+
+function bindAgentModelControls(p) {
+  const addBtn = $(`[data-agent-add-model="${p.id}"]`);
+  const pick = $(`[data-agent-pick="${p.id}"]`);
+  const preset = $(`[data-agent-preset="${p.id}"]`);
+  if (preset && pick)
+    preset.onchange = () => {
+      if (preset.value) pick.value = preset.value;
+    };
+  const addModel = async () => {
+    const value = (pick?.value || "").trim();
+    if (!value) return toast("请输入或选择模型 ID");
+    const next = [...getAgentModelList(p.id), value];
+    setAgentModelList(p.id, next);
+    if (state.provider === p.id && !state.model) state.model = value;
+    await persistAgentModels();
+    if (pick) pick.value = "";
+    if (preset) preset.value = "";
+    toast("已添加模型");
+    fillAgentCard(p);
+  };
+  if (addBtn) addBtn.onclick = addModel;
+  if (pick)
+    pick.onkeydown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addModel();
+      }
+    };
+
+  $$(`[data-agent-use="${p.id}"]`).forEach((btn) => {
+    btn.onclick = async () => {
+      const model = btn.dataset.model || "";
+      if (state.provider !== p.id) state.provider = p.id;
+      state.model = model;
+      await persistAgentModels();
+      toast(`已使用 ${model}`);
+      render();
+    };
+  });
+
+  $$(`[data-agent-remove-model="${p.id}"]`).forEach((btn) => {
+    btn.onclick = async () => {
+      const model = btn.dataset.model || "";
+      setAgentModelList(
+        p.id,
+        getAgentModelList(p.id).filter((m) => m !== model),
+      );
+      if (state.provider === p.id && state.model === model) state.model = "";
+      await persistAgentModels();
+      fillAgentCard(p);
+    };
+  });
+
+  $$(`[data-agent-test-model="${p.id}"]`).forEach((btn) => {
+    btn.onclick = async () => {
+      const model = btn.dataset.model || "";
+      btn.disabled = true;
+      setModelRowStatus(p.id, model, "测试中…", "pending");
+      try {
+        const result = await api("agent-test", { provider: p.id, model });
+        if (result.ok) {
+          const ms = result.latencyMs != null ? `${result.latencyMs}ms` : "ok";
+          setModelRowStatus(p.id, model, ms, "ok");
+          toast(`${p.label} · ${model} 连通正常`);
+        } else {
+          setModelRowStatus(p.id, model, result.error || "失败", "err");
+          toast(result.error || "连接失败");
+        }
+      } catch (e) {
+        setModelRowStatus(p.id, model, e.message || "失败", "err");
+        toast(e.message || "连接失败");
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  });
+}
+
+async function runAgentDefaultTest(id) {
+  const p = AGENT_PROVIDERS.find((x) => x.id === id);
+  if (!agentInstalled(id)) return toast("未找到该 CLI");
+  const btn = $(`[data-agent-test-default="${id}"]`);
+  if (btn) btn.disabled = true;
+  toast(`${p?.label || id}：测试 CLI 默认…`);
+  try {
+    const result = await api("agent-test", { provider: id, model: "" });
+    if (result.ok) {
+      toast(
+        `${p?.label || id} 默认连通正常` +
+          (result.latencyMs != null ? ` · ${result.latencyMs}ms` : ""),
+      );
+    } else toast(result.error || "连接失败");
+  } catch (e) {
+    toast(e.message || "连接失败");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function mountAgentsSettings() {
+  try {
+    const next = await api("load");
+    if (next?.agents) state.agents = next.agents;
+    if (next?.agentModels) state.agentModels = next.agentModels;
+  } catch {
+    /* keep cached */
+  }
+  ensureAgentModelsStore();
+
+  for (const p of AGENT_PROVIDERS) {
+    const card = $(`.agent-card[data-agent="${p.id}"]`);
+    if (!card) continue;
+    const installed = agentInstalled(p.id);
+    card.classList.toggle("is-missing", !installed);
+    const badges = card.querySelectorAll(
+      ".agent-badge:not(.agent-badge-default)",
+    );
+    const statusBadge = [...badges].find((b) =>
+      /已安装|未安装/.test(b.textContent || ""),
+    );
+    if (statusBadge) {
+      statusBadge.className = `agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}`;
+      statusBadge.textContent = installed ? "已安装" : "未安装";
+    }
+    const testBtn = card.querySelector(`[data-agent-test-default="${p.id}"]`);
+    const defBtn = card.querySelector(`[data-agent-default="${p.id}"]`);
+    if (testBtn) testBtn.disabled = !installed;
+    if (defBtn) defBtn.disabled = !installed;
+  }
+
+  for (const p of AGENT_PROVIDERS) fillAgentCard(p);
+
+  $$("[data-agent-default]").forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.dataset.agentDefault;
+      if (!agentInstalled(id)) return toast("未找到该 CLI");
+      state.provider = id;
+      const list = getAgentModelList(id);
+      if (id === "zcode") state.model = "";
+      else if (state.model && list.includes(state.model)) {
+        /* keep */
+      } else state.model = list[0] || "";
+      await persistAgentModels();
+      toast(`已设为默认：${AGENT_PROVIDERS.find((x) => x.id === id)?.label || id}`);
+      render();
+    };
+  });
+
+  $$("[data-agent-test-default]").forEach((btn) => {
+    btn.onclick = () => runAgentDefaultTest(btn.dataset.agentTestDefault);
+  });
+}
+
 function renderSettings() {
   const wx = state.wechat || {};
   if (
     settingsTab !== "config" &&
+    settingsTab !== "agents" &&
     settingsTab !== "accounts" &&
     settingsTab !== "groups" &&
     settingsTab !== "skills"
@@ -3399,6 +3825,7 @@ function renderSettings() {
     settingsTab = "config";
   const tabs = [
     { id: "config", title: "配置" },
+    { id: "agents", title: "模型" },
     { id: "accounts", title: "账号" },
     { id: "groups", title: "分组" },
     { id: "skills", title: "技能" },
@@ -3416,20 +3843,6 @@ function renderSettings() {
           (state.vaultLocked
             ? `<p class="settings-hint">当前仓库由环境变量指定，无法在界面中更改。</p>`
             : ""),
-      ),
-    }),
-    settingsSection({
-      title: "Agent 连接",
-      control: settingsPanel(
-        settingsField(
-          "默认 Agent",
-          `<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "· 已找到 CLI" : "· 未安装"}</option><option value="codex">Codex ${state.agents.codex ? "· 已找到 CLI" : "· 未安装"}</option></select>`,
-        ) +
-          settingsField(
-            "模型（留空沿用 CLI 默认）",
-            `<input id="model" value="${esc(state.model)}" placeholder="可选模型 ID" autocomplete="off">`,
-          ) +
-          `<div class="settings-panel-footer"><button type="button" class="primary" id="save-settings">保存</button></div>`,
       ),
     }),
     settingsSection({
@@ -3458,6 +3871,13 @@ function renderSettings() {
       ),
     }),
   ].join("");
+
+  const agentsBody = settingsSection({
+    title: "模型连接",
+    className: "settings-section-agents",
+    control:
+      `<div class="agent-card-list">${AGENT_PROVIDERS.map(agentCardShellHtml).join("")}</div>`,
+  });
 
   const accounts = accountList();
   const accountsBody = settingsSection({
@@ -3499,11 +3919,13 @@ function renderSettings() {
   const body =
     settingsTab === "config"
       ? configBody
-      : settingsTab === "accounts"
-        ? accountsBody
-        : settingsTab === "skills"
-          ? `<div id="skills-settings-root"></div>`
-          : groupsBody;
+      : settingsTab === "agents"
+        ? agentsBody
+        : settingsTab === "accounts"
+          ? accountsBody
+          : settingsTab === "skills"
+            ? `<div id="skills-settings-root"></div>`
+            : groupsBody;
 
   $("#main").innerHTML =
     `<header><div class="header-lead"><h1 class="dashboard-tagline">设置</h1></div></header><section class="dashboard settings"><nav class="settings-tabs" role="tablist">${tabs
@@ -3536,14 +3958,10 @@ function renderSettings() {
       { layout: "sections" },
     );
   }
+  if (settingsTab === "agents") {
+    mountAgentsSettings();
+  }
   if (settingsTab === "config") {
-    $("#setting-provider").value = state.provider;
-    $("#save-settings").onclick = () => {
-      state.provider = $("#setting-provider").value;
-      state.model = $("#model").value.trim();
-      persist();
-      toast("设置已保存");
-    };
     $("#open-releases").onclick = async () => {
       try {
         await api("update-open-releases");

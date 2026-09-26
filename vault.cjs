@@ -573,7 +573,7 @@ class Vault {
             if (!conversations.length)
               conversations.push({
                 id: crypto.randomUUID(),
-                title: "开始聊这篇",
+                title: "新对话",
                 messages: meta.chat || [],
               });
             doc.activeConversationId = conversations.some(

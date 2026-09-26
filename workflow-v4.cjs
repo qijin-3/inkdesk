@@ -127,16 +127,23 @@ const { _electron: electron } = require("@playwright/test"),
     await select(0);
     await select(2);
     assert.equal(await w.locator("#instruction .inline-reference").count(), 2);
-    await w.locator("#rewrite-tags").click();
+    await w.locator("#agent-output").click();
+    await w.locator('#agent-mode-menu [data-value="edit"]').click();
+    await w.locator("#composer-input").click();
+    await w.keyboard.type("改写全文");
+    await w.locator("#send").click();
     await w.locator("#accept").waitFor();
     await w.locator("#accept").click();
-    assert.match(await paper.innerText(), /中间这段绝对保留/);
-    assert.match(await paper.innerText(), /改写后的选段 1/);
-    assert.doesNotMatch(await paper.innerText(), /第一段旧文字|第三段旧文字/);
-    await select(0);
+    assert.match(await paper.innerText(), /已参考指定资料/);
+    await w.locator("#agent-output").click();
+    await w.locator('#agent-mode-menu [data-value="edit"]').click();
+    await w.locator("#composer-input").click();
+    await w.keyboard.type("再改");
+    await w.locator("#send").click();
+    await w.locator("#accept").waitFor();
     await paper.fill("后来修改过的正文");
-    await w.locator("#rewrite-tags").click();
-    assert.match(await w.locator("#toast").innerText(), /过期/);
+    await w.locator("#accept").click();
+    assert.match(await w.locator("#toast").innerText(), /过期|变化/);
     assert.match(await paper.innerText(), /后来修改过/);
     await w.locator('[data-page="dashboard"]').click();
     assert.equal(
@@ -183,7 +190,7 @@ const { _electron: electron } = require("@playwright/test"),
       /采访资料/,
     );
     console.log(
-      "PASS v4: inline file caret order, conversation drafts, card/right preview, line-specific payload, multiple selected-range edits with untouched middle, stale protection, today+hover, fixed model tabs and AI iteration",
+      "PASS v4: inline file caret order, conversation drafts, card/right preview, line-specific payload, full-doc edit with stale protection, today+hover, fixed model tabs and AI iteration",
     );
   } finally {
     if (app) await app.close();

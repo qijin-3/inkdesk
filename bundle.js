@@ -23947,6 +23947,16 @@ var List = [
   ["path", { d: "M8 19h13" }]
 ];
 
+// node_modules/lucide/dist/esm/icons/message-square.mjs
+var MessageSquare = [
+  [
+    "path",
+    {
+      d: "M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"
+    }
+  ]
+];
+
 // node_modules/lucide/dist/esm/icons/panel-right-close.mjs
 var PanelRightClose = [
   ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }],
@@ -23959,6 +23969,17 @@ var PanelRightOpen = [
   ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }],
   ["path", { d: "M15 3v18" }],
   ["path", { d: "m10 15-3-3 3-3" }]
+];
+
+// node_modules/lucide/dist/esm/icons/pen-line.mjs
+var PenLine = [
+  ["path", { d: "M13 21h8" }],
+  [
+    "path",
+    {
+      d: "M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+    }
+  ]
 ];
 
 // node_modules/lucide/dist/esm/icons/pin-off.mjs
@@ -24141,7 +24162,9 @@ var I = {
   copy: (o) => icon(Copy, o),
   imageDown: (o) => icon(ImageDown, o),
   chevronDown: (o) => icon(ChevronDown, o),
-  chevronLeft: (o) => icon(ChevronLeft, o)
+  chevronLeft: (o) => icon(ChevronLeft, o),
+  chat: (o) => icon(MessageSquare, o),
+  pen: (o) => icon(PenLine, o)
 };
 
 // aster.js
@@ -30116,6 +30139,54 @@ function diffWordsWithSpace(oldStr, newStr, options2) {
   return wordsWithSpaceDiff.diff(oldStr, newStr, options2);
 }
 
+// node_modules/diff/libesm/diff/line.js
+var LineDiff = class extends Diff {
+  constructor() {
+    super(...arguments);
+    this.tokenize = tokenize2;
+  }
+  equals(left, right, options2) {
+    if (options2.ignoreWhitespace) {
+      if (!options2.newlineIsToken || !left.includes("\n")) {
+        left = left.trim();
+      }
+      if (!options2.newlineIsToken || !right.includes("\n")) {
+        right = right.trim();
+      }
+    } else if (options2.ignoreNewlineAtEof && !options2.newlineIsToken) {
+      if (left.endsWith("\n")) {
+        left = left.slice(0, -1);
+      }
+      if (right.endsWith("\n")) {
+        right = right.slice(0, -1);
+      }
+    }
+    return super.equals(left, right, options2);
+  }
+};
+var lineDiff = new LineDiff();
+function diffLines(oldStr, newStr, options2) {
+  return lineDiff.diff(oldStr, newStr, options2);
+}
+function tokenize2(value, options2) {
+  if (options2.stripTrailingCr) {
+    value = value.replace(/\r\n/g, "\n");
+  }
+  const retLines = [], linesAndNewlines = value.split(/(\n|\r\n)/);
+  if (!linesAndNewlines[linesAndNewlines.length - 1]) {
+    linesAndNewlines.pop();
+  }
+  for (let i = 0; i < linesAndNewlines.length; i++) {
+    const line = linesAndNewlines[i];
+    if (i % 2 && !options2.newlineIsToken) {
+      retLines[retLines.length - 1] += line;
+    } else {
+      retLines.push(line);
+    }
+  }
+  return retLines;
+}
+
 // renderer.js
 var import_calendar = __toESM(require_calendar());
 var saveProfileEditor = null;
@@ -30202,6 +30273,7 @@ var pending = null;
 var selectedText = "";
 var selectionContext = null;
 var dirty = false;
+var agentMode = "chat";
 var editorHTML = "";
 var previewMode = false;
 var previewDocId = null;
@@ -30261,7 +30333,7 @@ function conversation(doc3 = current) {
   if (!doc3.conversations.length)
     doc3.conversations.push({
       id: crypto.randomUUID(),
-      title: "\u5F00\u59CB\u804A\u8FD9\u7BC7",
+      title: "\u65B0\u5BF9\u8BDD",
       messages: doc3.chat || []
     });
   let c = doc3.conversations.find((c2) => c2.id === doc3.activeConversationId) || doc3.conversations[0];
@@ -31363,7 +31435,7 @@ function bindFinalize() {
 function syncAsterFace() {
   let face = "idle";
   if (busy) face = "thinking";
-  else if (pending && pending.doc === current?.id && (pending.edits?.length || pending.next))
+  else if (pending && pending.doc === current?.id && (pending.hunks?.length || pending.edits?.length || pending.next))
     face = "idea";
   else {
     const sel = editor?.state?.selection;
@@ -31461,7 +31533,7 @@ function renderAssistantRail() {
     return;
   }
   rail.dataset.railMode = "assistant";
-  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<div class="assistant-head-actions"><select id="provider"><option value="cursor">Cursor</option><option value="codex">Codex</option></select><button type="button" id="close-assistant" class="ghost icon-btn" title="\u6536\u8D77" aria-label="\u6536\u8D77">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
+  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<div class="assistant-head-actions"><select id="provider">${AGENT_PROVIDERS.map((p) => `<option value="${p.id}">${esc(p.label)}</option>`).join("")}</select><button type="button" id="close-assistant" class="ghost icon-btn" title="\u6536\u8D77" aria-label="\u6536\u8D77">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
   unmountAsterRail = mountAster($("#aster-rail"));
   syncAsterFace();
   const provider = $("#provider");
@@ -31469,6 +31541,12 @@ function renderAssistantRail() {
     provider.value = state.provider;
     provider.onchange = (e) => {
       state.provider = e.target.value;
+      if (state.provider === "zcode") state.model = "";
+      else {
+        const list2 = getAgentModelList(state.provider);
+        if (state.model && !list2.includes(state.model))
+          state.model = list2[0] || "";
+      }
       persist();
     };
   }
@@ -32008,6 +32086,120 @@ function bindWorkspaceResize() {
     window.addEventListener("pointerup", onUp);
   };
 }
+function diffHTML(oldText, nextText) {
+  return diffWords(oldText || "", nextText || "").map(
+    (p) => `<${p.added ? "ins" : p.removed ? "del" : "span"}>${esc(p.value)}</${p.added ? "ins" : p.removed ? "del" : "span"}>`
+  ).join("");
+}
+function buildEditHunks(oldText, nextText) {
+  const parts = diffLines(oldText || "", nextText || "");
+  const hunks = [];
+  for (let i = 0; i < parts.length; ) {
+    const p = parts[i];
+    if (!p.added && !p.removed) {
+      hunks.push({ kind: "equal", value: p.value });
+      i += 1;
+      continue;
+    }
+    let old = "", next2 = "";
+    while (i < parts.length && (parts[i].added || parts[i].removed)) {
+      if (parts[i].removed) old += parts[i].value;
+      if (parts[i].added) next2 += parts[i].value;
+      i += 1;
+    }
+    hunks.push({
+      kind: "change",
+      id: crypto.randomUUID(),
+      old,
+      next: next2,
+      status: "pending"
+    });
+  }
+  if (!hunks.some((h2) => h2.kind === "change")) {
+    hunks.length = 0;
+    hunks.push({
+      kind: "change",
+      id: crypto.randomUUID(),
+      old: oldText || "",
+      next: nextText || "",
+      status: "pending"
+    });
+  }
+  return hunks;
+}
+function composeHunks(hunks) {
+  return (hunks || []).map((h2) => {
+    if (h2.kind === "equal") return h2.value;
+    return h2.status === "accepted" ? h2.next : h2.old;
+  }).join("");
+}
+function reviewCardHTML() {
+  if (!pending || pending.doc !== current?.id || pending.conversationId !== conversation().id)
+    return "";
+  const changes = (pending.hunks || []).filter((h2) => h2.kind === "change");
+  const hunkBlocks = changes.length ? changes.map((h2) => {
+    const done = h2.status !== "pending";
+    return `<div class="diff-hunk is-${h2.status}" data-hunk="${esc(h2.id)}"><div class="diff">${diffHTML(h2.old, h2.next)}</div>${done ? `<div class="diff-hunk-status">${h2.status === "accepted" ? "\u5DF2\u63A5\u53D7" : "\u5DF2\u62D2\u7EDD"}</div>` : `<div class="row diff-hunk-actions"><button type="button" data-hunk-accept="${esc(h2.id)}">\u63A5\u53D7</button><button type="button" data-hunk-reject="${esc(h2.id)}">\u62D2\u7EDD</button></div>`}</div>`;
+  }).join("") : `<div class="diff">${diffHTML(pending.old, pending.next)}</div>`;
+  return `<div class="review-card"><div class="review-card-head"><h3>\u4FEE\u6539\u5EFA\u8BAE</h3><div class="row"><button type="button" id="accept" class="primary">\u5168\u90E8\u63A5\u53D7</button><button type="button" id="reject">\u5168\u90E8\u62D2\u7EDD</button></div></div>${hunkBlocks}</div>`;
+}
+function agentModeHTML() {
+  const edit2 = agentMode === "edit";
+  const label = edit2 ? "\u7F16\u8F91" : "\u5BF9\u8BDD";
+  const modeIcon = edit2 ? I.pen({ size: 14 }) : I.chat({ size: 14 });
+  return `<div class="agent-mode"><button type="button" id="agent-output" class="agent-mode-trigger" title="${label}" aria-label="\u8F93\u51FA\u6A21\u5F0F\uFF1A${label}" aria-haspopup="listbox" aria-expanded="false" data-mode="${agentMode}">${modeIcon}${I.chevronDown({ size: 12 })}</button><div id="agent-mode-menu" class="agent-mode-menu" hidden role="listbox"><button type="button" role="option" data-value="chat" aria-selected="${!edit2}">${I.chat({ size: 14 })}<span>\u5BF9\u8BDD</span></button><button type="button" role="option" data-value="edit" aria-selected="${edit2}">${I.pen({ size: 14 })}<span>\u7F16\u8F91</span></button></div></div>`;
+}
+function applyPendingResult(nextText, action) {
+  sync();
+  if (current.body !== pending.base) {
+    toast("\u6B63\u6587\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u751F\u6210\u5EFA\u8BAE\u3002");
+    pending = null;
+    renderPanel();
+    syncAsterFace();
+    return false;
+  }
+  current.decisions ??= [];
+  current.decisions.push({
+    action,
+    before: pending.old,
+    after: nextText,
+    at: (/* @__PURE__ */ new Date()).toISOString()
+  });
+  if (action === "accepted") {
+    current.snapshots.push({
+      at: (/* @__PURE__ */ new Date()).toISOString(),
+      body: current.body
+    });
+    editor.commands.setContent(safeHTML(nextText));
+    sync();
+    changed();
+    toast("\u5DF2\u5E94\u7528\uFF0C\u53EF\u7528 \u2318Z \u64A4\u56DE");
+  } else {
+    changed();
+  }
+  pending = null;
+  renderPanel();
+  syncAsterFace();
+  return true;
+}
+function decideHunk(id, accept) {
+  if (!pending?.hunks) return;
+  const hunk = pending.hunks.find((h2) => h2.id === id && h2.kind === "change");
+  if (!hunk || hunk.status !== "pending") return;
+  hunk.status = accept ? "accepted" : "rejected";
+  const left = pending.hunks.some(
+    (h2) => h2.kind === "change" && h2.status === "pending"
+  );
+  if (left) {
+    renderPanel();
+    return;
+  }
+  const next2 = composeHunks(pending.hunks);
+  const anyAccepted = pending.hunks.some(
+    (h2) => h2.kind === "change" && h2.status === "accepted"
+  );
+  applyPendingResult(next2, anyAccepted ? "accepted" : "rejected");
+}
 function renderPanel() {
   if (previewMode) return;
   if (composer) {
@@ -32025,14 +32217,7 @@ function renderPanel() {
       (m) => `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "\u4F60" : "aster"}</small><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? `<span class="inline-reference">${esc(p.label)}</span>` : esc(p.text)).join("") : esc(m.text)}</div></div>`
     ).join("") || "";
   }
-  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" title="\u4E3A\u672C\u7BC7\u521B\u5EFA\u65B0\u5BF9\u8BDD">${I.plus()} \u65B0\u5BF9\u8BDD</button></div>` : ""}<div class="panel-scroll">${pending && pending.doc === current.id && pending.conversationId === conversation().id ? `<div class="review-card"><h3>\u4FEE\u6539\u5EFA\u8BAE</h3><div class="diff">${diffWords(
-    pending.old,
-    pending.next
-  ).map(
-    (p) => `<${p.added ? "ins" : p.removed ? "del" : "span"}>${esc(p.value)}</${p.added ? "ins" : p.removed ? "del" : "span"}>`
-  ).join(
-    ""
-  )}</div><div class="row"><button id="accept" class="primary">\u63A5\u53D7\u4FEE\u6539</button><button id="reject">\u4FDD\u7559\u539F\u6587</button></div></div>` : ""}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0\u6587\u4EF6" aria-label="\u6DFB\u52A0\u6587\u4EF6" aria-haspopup="menu">${I.plus()}</button><div id="skill-picker"></div><select id="agent-output" aria-label="\u5BF9\u8BDD\u6A21\u5F0F"><option value="chat">\u5BF9\u8BDD</option><option value="rewrite-tags">\u4FEE\u6539\u6807\u7B7E\u9009\u6BB5</option><option value="rewrite">\u4FEE\u6539\u5F53\u524D\u9009\u533A</option></select><button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div>`;
+  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" class="icon-btn" title="\u4E3A\u672C\u7BC7\u521B\u5EFA\u65B0\u5BF9\u8BDD" aria-label="\u65B0\u5BF9\u8BDD">${I.plus()}</button></div>` : ""}<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools">${agentModeHTML()}<button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0\u6587\u4EF6" aria-label="\u6DFB\u52A0\u6587\u4EF6" aria-haspopup="menu">${I.plus()}</button><div id="skill-picker"></div><button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div>`;
   if (tab === "chat") {
     $("#conversation").value = conversation().id;
     $("#conversation").onchange = (e) => {
@@ -32052,7 +32237,26 @@ function renderPanel() {
       renderPanel();
     };
   }
-  $("#send").onclick = () => busy ? api("cancel") : runTask($("#agent-output").value);
+  $("#send").onclick = () => busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
+  const modeBtn = $("#agent-output");
+  const modeMenu = $("#agent-mode-menu");
+  if (modeBtn && modeMenu) {
+    modeBtn.onclick = (e) => {
+      e.stopPropagation();
+      const open = modeMenu.hasAttribute("hidden");
+      if (open) modeMenu.removeAttribute("hidden");
+      else modeMenu.setAttribute("hidden", "");
+      modeBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    };
+    modeMenu.querySelectorAll("[data-value]").forEach((opt) => {
+      opt.onclick = (e) => {
+        e.stopPropagation();
+        agentMode = opt.dataset.value === "edit" ? "edit" : "chat";
+        modeMenu.setAttribute("hidden", "");
+        renderPanel();
+      };
+    });
+  }
   composer = new Composer($("#composer-input"), conversation(), {
     changed: () => {
       dirty = true;
@@ -32092,61 +32296,28 @@ function renderPanel() {
       }
     }
   );
+  $$("[data-hunk-accept]").forEach(
+    (b) => b.onclick = () => decideHunk(b.dataset.hunkAccept, true)
+  );
+  $$("[data-hunk-reject]").forEach(
+    (b) => b.onclick = () => decideHunk(b.dataset.hunkReject, false)
+  );
   if ($("#accept"))
     $("#accept").onclick = () => {
-      sync();
-      if (current.body !== pending.base) {
-        toast("\u6B63\u6587\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u751F\u6210\u5EFA\u8BAE\u3002");
-        pending = null;
-        renderPanel();
-        syncAsterFace();
+      if (!pending) return;
+      if (pending.hunks) {
+        pending.hunks.forEach((h2) => {
+          if (h2.kind === "change") h2.status = "accepted";
+        });
+        applyPendingResult(composeHunks(pending.hunks), "accepted");
         return;
       }
-      current.decisions ??= [];
-      current.decisions.push({
-        action: "accepted",
-        before: pending.old,
-        after: pending.next,
-        at: (/* @__PURE__ */ new Date()).toISOString()
-      });
-      current.snapshots.push({
-        at: (/* @__PURE__ */ new Date()).toISOString(),
-        body: current.body
-      });
-      if (pending.edits) {
-        let chain = editor.chain().focus();
-        for (const e of [...pending.edits].sort((a, b) => b.from - a.from))
-          chain = chain.insertContentAt(
-            { from: e.from, to: e.to },
-            safeHTML(e.next)
-          );
-        chain.run();
-      } else if (pending.from !== pending.to)
-        editor.chain().focus().insertContentAt(
-          { from: pending.from, to: pending.to },
-          safeHTML(pending.next)
-        ).run();
-      else editor.commands.setContent(safeHTML(pending.next));
-      sync();
-      changed();
-      pending = null;
-      renderPanel();
-      syncAsterFace();
-      toast("\u5DF2\u5E94\u7528\uFF0C\u53EF\u7528 \u2318Z \u64A4\u56DE");
+      applyPendingResult(pending.next, "accepted");
     };
   if ($("#reject"))
     $("#reject").onclick = () => {
-      current.decisions ??= [];
-      current.decisions.push({
-        action: "rejected",
-        before: pending.old,
-        after: pending.next,
-        at: (/* @__PURE__ */ new Date()).toISOString()
-      });
-      changed();
-      pending = null;
-      renderPanel();
-      syncAsterFace();
+      if (!pending) return;
+      applyPendingResult(pending.old, "rejected");
     };
 }
 async function runTask(task) {
@@ -32172,18 +32343,12 @@ async function runTask(task) {
   const anchors = draft.references.filter((r) => r.kind === "selection");
   if (anchors.some((r) => r.articleId !== doc3.id || r.base !== body))
     return toast("\u5F15\u7528\u9009\u6BB5\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u5220\u9664\u6807\u7B7E\u5E76\u91CD\u65B0\u9009\u4E2D\u6DFB\u52A0");
-  if (task === "rewrite-tags") {
-    if (!anchors.length) return toast("\u8BF7\u5148\u6DFB\u52A0\u6B63\u6587\u9009\u6BB5\u6807\u7B7E");
-    const sorted = [...anchors].sort((a, b) => a.from - b.from);
-    if (sorted.some((a, i) => i > 0 && a.from < sorted[i - 1].to))
-      return toast("\u9009\u6BB5\u6709\u91CD\u53E0\uFF0C\u8BF7\u4FDD\u7559\u4E0D\u91CD\u53E0\u7684\u6807\u7B7E");
-  }
-  if (task === "rewrite" && !selection) return toast("\u8BF7\u5148\u9009\u4E2D\u9700\u8981\u4FEE\u6539\u7684\u6BB5\u843D");
   if (task === "chat" && !instruction && !conversation(doc3).skillIds?.length)
     return toast("\u5148\u5199\u4E00\u53E5\u60F3\u8BA8\u8BBA\u7684\u5185\u5BB9");
+  if (task === "rewrite" && !instruction && !conversation(doc3).skillIds?.length)
+    return toast("\u5148\u5199\u4E00\u53E5\u4FEE\u6539\u8981\u6C42\uFF0C\u6216\u9009\u7528\u6280\u80FD");
   const prompts = {
-    "rewrite-tags": "\u4EC5\u4FEE\u6539\u6807\u8BB0\u9009\u6BB5\u3002\u53EA\u8FD4\u56DE JSON \u6570\u7EC4 [{id,text}]\uFF1B\u6BCF\u4E2A\u6B63\u6587\u9009\u6BB5\u6070\u597D\u4E00\u4E2A\u7ED3\u679C\uFF0C\u4FDD\u6301\u672A\u6807\u8BB0\u5185\u5BB9\u4E0D\u53D8\u3002",
-    rewrite: "\u6309\u6240\u9009\u6280\u80FD\u548C\u7528\u6237\u8981\u6C42\u4FEE\u6539\u5F53\u524D\u9009\u533A\uFF0C\u53EA\u8F93\u51FA\u4FEE\u6539\u540E\u7684\u6587\u672C\u3002",
+    rewrite: "\u6309\u6240\u9009\u6280\u80FD\u548C\u7528\u6237\u8981\u6C42\u4FEE\u6539\u5168\u6587\uFF0C\u53EA\u8F93\u51FA\u4FEE\u6539\u540E\u7684\u5B8C\u6574\u6B63\u6587\u3002",
     chat: ""
   };
   const session = conversation(doc3);
@@ -32203,8 +32368,7 @@ async function runTask(task) {
   busy = true;
   syncAsterFace();
   await persist();
-  if (["review", "rewrite", "check", "rewrite-tags"].includes(task))
-    tab = "chat";
+  if (["review", "rewrite", "check"].includes(task)) tab = "chat";
   renderPanel();
   const history2 = session.messages.slice(-8, -1).map((x) => x.role + ": " + x.text).join("\n");
   try {
@@ -32218,44 +32382,21 @@ async function runTask(task) {
       references: draft.references,
       instruction: (prompts[task] || "") + "\n" + instruction,
       body,
-      selection,
+      // 编辑模式始终改全文，不把当前选区当作改写范围
+      selection: task === "rewrite" ? "" : selection,
       history: history2
     });
     if (!result) throw Error("Agent \u672A\u8FD4\u56DE\u6B63\u6587");
     session.messages.push({ role: "assistant", text: result });
-    if (task === "rewrite-tags") {
-      const results = JSON.parse(
-        result.replace(/^```(?:json)?\s*|\s*```$/g, "")
-      );
-      if (!Array.isArray(results) || results.length !== anchors.length || new Set(results.map((x) => x.id)).size !== anchors.length || results.some(
-        (x) => !anchors.some((a) => a.refId === x.id) || typeof x.text !== "string"
-      ))
-        throw Error("AI \u672A\u8FD4\u56DE\u5B8C\u6574\u7684\u9009\u6BB5\u5EFA\u8BAE\uFF0C\u6B63\u6587\u4FDD\u6301\u4E0D\u53D8");
-      const edits = anchors.map((a) => ({
-        ...a,
-        old: a.text,
-        next: results.find((r) => r.id === a.refId).text
-      }));
-      if (doc3.id === current?.id)
-        pending = {
-          doc: doc3.id,
-          conversationId: session.id,
-          base: body,
-          edits,
-          old: edits.map((x) => x.label + "\n" + x.old).join("\n\n"),
-          next: edits.map((x) => x.label + "\n" + x.next).join("\n\n")
-        };
-    } else if (task === "rewrite") {
-      if (doc3.id === current?.id)
-        pending = {
-          doc: doc3.id,
-          conversationId: session.id,
-          base: body,
-          old: selection || body,
-          next: result,
-          from: from2,
-          to
-        };
+    if (task === "rewrite" && doc3.id === current?.id) {
+      pending = {
+        doc: doc3.id,
+        conversationId: session.id,
+        base: body,
+        old: body,
+        next: result,
+        hunks: buildEditHunks(body, result)
+      };
     }
     await persist();
   } catch (e) {
@@ -32786,12 +32927,318 @@ function settingsPanel(inner, className = "") {
 function settingsField(label, controlHtml) {
   return `<label class="settings-field"><span class="settings-field-label">${esc(label)}</span>${controlHtml}</label>`;
 }
+var AGENT_PROVIDERS = [
+  { id: "cursor", label: "Cursor", blurb: "Cursor Agent CLI" },
+  { id: "codex", label: "ChatGPT", blurb: "OpenAI Codex CLI" },
+  { id: "claude", label: "Claude Code", blurb: "Anthropic Claude Code" },
+  { id: "zcode", label: "ZCode", blurb: "Z.ai ZCode\uFF08\u6CBF\u7528 CLI \u9ED8\u8BA4\u6A21\u578B\uFF09" },
+  { id: "opencode", label: "OpenCode", blurb: "OpenCode CLI" },
+  { id: "antigravity", label: "Antigravity", blurb: "Google Antigravity\uFF08agy\uFF09" }
+];
+var AGENT_PRESET_MODELS = {
+  cursor: ["auto", "composer-1", "sonnet-4.5", "opus-4.5", "gpt-5.2", "gemini-3-pro"],
+  codex: ["gpt-5.2", "gpt-5.2-codex", "gpt-5.1-codex-max", "gpt-5-mini"],
+  claude: ["sonnet", "opus", "haiku"],
+  zcode: [],
+  opencode: [
+    "anthropic/claude-sonnet-4-5",
+    "anthropic/claude-opus-4-6",
+    "openai/gpt-5-2",
+    "google/gemini-3-pro"
+  ],
+  antigravity: [
+    "Gemini 3 Pro (High)",
+    "Gemini 3 Flash",
+    "Claude Sonnet 4.5 (Thinking)",
+    "Claude Opus 4.5 (Thinking)"
+  ]
+};
+function agentLogoSvg(id) {
+  const common = 'xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"';
+  if (id === "cursor")
+    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#111"/><path d="M9 7.5 19.5 14 12.8 15.6 11 22.2 9 7.5z" fill="#fff"/><path d="M12.4 14.6h4.2" stroke="#111" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+  if (id === "codex")
+    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#000"/><g fill="none" stroke="#fff" stroke-width="1.7"><circle cx="14" cy="10.2" r="3.1"/><circle cx="10.8" cy="16.2" r="3.1"/><circle cx="17.2" cy="16.2" r="3.1"/><path d="M12.4 12.7l-1 1.7M15.6 12.7l1 1.7" stroke-linecap="round"/></g></svg>`;
+  if (id === "claude")
+    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#d97757"/><path d="M14 5l1.7 3.4 3.2-1.9-.6 3.7 3.7.6-1.9 3.2L23.5 14l-3.4 1.7 1.9 3.2-3.7-.6-.6 3.7-3.2-1.9L14 23.5l-1.7-3.4-3.2 1.9.6-3.7-3.7-.6 1.9-3.2L4.5 14l3.4-1.7-1.9-3.2 3.7.6.6-3.7 3.2 1.9L14 5z" fill="#fff"/><circle cx="14" cy="14" r="2.4" fill="#d97757"/></svg>`;
+  if (id === "zcode")
+    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#2b5cff"/><path d="M8 8.5h12v2.6l-7.4 8.4H20V22H8v-2.6l7.4-8.4H8V8.5z" fill="#fff"/></svg>`;
+  if (id === "opencode")
+    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#151b23"/><rect x="6.5" y="9" width="4.4" height="10" rx="2.2" fill="none" stroke="#3fb950" stroke-width="1.8"/><rect x="17.1" y="9" width="4.4" height="10" rx="2.2" fill="none" stroke="#3fb950" stroke-width="1.8"/><circle cx="8.7" cy="14" r="1.1" fill="#3fb950"/><circle cx="19.3" cy="14" r="1.1" fill="#3fb950"/></svg>`;
+  if (id === "antigravity")
+    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#fff" stroke="#e2e2e2"/><path d="M22.5 14.2c0-.9-.1-1.8-.2-2.6H14v4.9h4.8c-.2 1.1-.9 2-1.8 2.7v2.2h3c1.7-1.6 2.5-3.9 2.5-7.2z" fill="#4285F4"/><path d="M14 23c2.4 0 4.5-.8 6-2.2l-3-2.2c-.8.6-1.9.9-3 .9-2.3 0-4.2-1.5-4.9-3.7H6v2.3C7.5 21.1 10.5 23 14 23z" fill="#34A853"/><path d="M9.1 15.8c-.2-.6-.3-1.2-.3-1.8s.1-1.2.3-1.8V9.9H6C5.4 11.2 5 12.6 5 14s.4 2.8 1 4.1l3.1-2.3z" fill="#FBBC05"/><path d="M14 9.5c1.3 0 2.5.5 3.4 1.3l2.7-2.7C18.5 6.6 16.4 5.7 14 5.7c-3.5 0-6.5 2-8 4.9l3.1 2.6c.7-2.2 2.6-3.7 4.9-3.7z" fill="#EA4335"/></svg>`;
+  return `<svg ${common}><rect width="28" height="28" rx="7" fill="#888"/></svg>`;
+}
+function agentInstalled(id) {
+  return !!state.agents?.[id];
+}
+function ensureAgentModelsStore() {
+  if (!state.agentModels || typeof state.agentModels !== "object")
+    state.agentModels = {};
+}
+function getAgentModelList(provider) {
+  ensureAgentModelsStore();
+  const list2 = state.agentModels[provider];
+  return Array.isArray(list2) ? list2.filter(Boolean) : [];
+}
+function setAgentModelList(provider, list2) {
+  ensureAgentModelsStore();
+  state.agentModels = {
+    ...state.agentModels,
+    [provider]: [...new Set(list2.map((x) => String(x).trim()).filter(Boolean))]
+  };
+}
+function agentSuggestionIds(provider, discovered = []) {
+  const presets = AGENT_PRESET_MODELS[provider] || [];
+  const saved = getAgentModelList(provider);
+  return [.../* @__PURE__ */ new Set([...presets, ...discovered, ...saved])];
+}
+function agentCardShellHtml(p) {
+  const installed = agentInstalled(p.id);
+  const isDefault = state.provider === p.id;
+  return `<article class="agent-card ${isDefault ? "is-default" : ""} ${installed ? "" : "is-missing"}" data-agent="${p.id}">
+  <div class="agent-card-main">
+    <div class="agent-card-logo">${agentLogoSvg(p.id)}</div>
+    <div class="agent-card-meta">
+      <div class="agent-card-title">
+        <strong>${esc(p.label)}</strong>
+        ${isDefault ? `<span class="agent-badge agent-badge-default">\u9ED8\u8BA4</span>` : ""}
+        <span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "\u5DF2\u5B89\u88C5" : "\u672A\u5B89\u88C5"}</span>
+      </div>
+      <p class="agent-card-blurb">${esc(p.blurb)}</p>
+    </div>
+    <div class="agent-card-actions">
+      ${isDefault ? "" : `<button type="button" class="primary" data-agent-default="${p.id}" ${installed ? "" : "disabled"}>\u8BBE\u4E3A\u9ED8\u8BA4</button>`}
+      <button type="button" class="ghost" data-agent-test-default="${p.id}" ${installed ? "" : "disabled"} title="\u4E0D\u6307\u5B9A\u6A21\u578B\uFF0C\u4F7F\u7528 CLI \u9ED8\u8BA4">\u6D4B\u8BD5\u9ED8\u8BA4</button>
+    </div>
+  </div>
+  <div class="agent-card-body" data-agent-body="${p.id}">
+    <p class="settings-hint">\u8BFB\u53D6\u53EF\u7528\u6A21\u578B\u2026</p>
+  </div>
+</article>`;
+}
+function agentModelsPanelHtml(p, info) {
+  const installed = agentInstalled(p.id);
+  if (!installed) {
+    return `<p class="settings-hint">\u5B89\u88C5\u5E76\u767B\u5F55\u5BF9\u5E94 CLI \u540E\uFF0C\u53EF\u6DFB\u52A0\u6A21\u578B\u5E76\u9010\u4E00\u6D4B\u8BD5\u8FDE\u901A\u3002</p>`;
+  }
+  if (p.id === "zcode" || info?.selectable === false) {
+    const current2 = info?.current || "";
+    return `<div class="agent-model-panel">
+      <p class="settings-hint">${current2 ? `CLI \u9ED8\u8BA4\u6A21\u578B\uFF1A<code>${esc(current2)}</code>` : esc(info?.error || "\u672A\u80FD\u8BFB\u53D6\u9ED8\u8BA4\u6A21\u578B")}</p>
+      <p class="settings-hint">ZCode \u4E0D\u652F\u6301\u6309\u6A21\u578B\u5207\u6362\uFF0C\u8FDE\u901A\u6027\u8BF7\u7528\u4E0A\u65B9\u300C\u6D4B\u8BD5\u9ED8\u8BA4\u300D\u3002</p>
+    </div>`;
+  }
+  const saved = getAgentModelList(p.id);
+  if (!saved.length && state.provider === p.id && state.model) {
+    setAgentModelList(p.id, [state.model]);
+  }
+  const list2 = getAgentModelList(p.id);
+  const suggestions = agentSuggestionIds(p.id, info?.models || []);
+  const rows = list2.length ? list2.map((m) => {
+    const active = state.provider === p.id && state.model === m;
+    return `<li class="agent-model-item ${active ? "is-active" : ""}" data-model-row="${esc(m)}">
+            <code class="agent-model-id">${esc(m)}</code>
+            ${active ? `<span class="agent-badge agent-badge-default">\u4F7F\u7528\u4E2D</span>` : `<button type="button" class="ghost" data-agent-use="${p.id}" data-model="${esc(m)}">\u4F7F\u7528</button>`}
+            <button type="button" class="ghost" data-agent-test-model="${p.id}" data-model="${esc(m)}">\u6D4B\u8BD5</button>
+            <button type="button" class="ghost" data-agent-remove-model="${p.id}" data-model="${esc(m)}">\u79FB\u9664</button>
+            <span class="agent-model-row-status" data-model-status="${esc(m)}" role="status"></span>
+          </li>`;
+  }).join("") : `<li class="agent-model-empty settings-hint">\u5C1A\u672A\u6DFB\u52A0\u6A21\u578B\u3002\u4ECE\u4E0B\u65B9\u9009\u62E9\u5E38\u7528 ID\uFF0C\u6216\u624B\u586B\u540E\u70B9\u300C\u6DFB\u52A0\u300D\u3002</li>`;
+  return `<div class="agent-model-panel">
+    <div class="agent-model-add">
+      <select class="agent-model-select" data-agent-preset="${p.id}" aria-label="\u5E38\u7528\u6A21\u578B">
+        <option value="">\u9009\u62E9\u5E38\u7528\u6A21\u578B ID</option>
+        ${suggestions.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join("")}
+      </select>
+      <input class="agent-model-input" data-agent-pick="${p.id}" placeholder="\u6216\u624B\u52A8\u8F93\u5165\u6A21\u578B ID" autocomplete="off">
+      <button type="button" class="primary" data-agent-add-model="${p.id}">\u6DFB\u52A0</button>
+    </div>
+    <ul class="agent-model-list">${rows}</ul>
+  </div>`;
+}
+function setModelRowStatus(provider, model, text, kind = "") {
+  const card = $(`.agent-card[data-agent="${provider}"]`);
+  if (!card) return;
+  const el = [...card.querySelectorAll("[data-model-status]")].find(
+    (n) => n.getAttribute("data-model-status") === model
+  );
+  if (!el) return;
+  el.textContent = text || "";
+  el.dataset.kind = kind;
+}
+async function persistAgentModels() {
+  ensureAgentModelsStore();
+  await persist();
+}
+async function fillAgentCard(p) {
+  const body = $(`[data-agent-body="${p.id}"]`);
+  if (!body) return;
+  if (!agentInstalled(p.id)) {
+    body.innerHTML = agentModelsPanelHtml(p, null);
+    return;
+  }
+  let info = { models: [], selectable: p.id !== "zcode", current: "" };
+  try {
+    info = await api("agent-models", { provider: p.id });
+  } catch (e) {
+    info = {
+      models: [],
+      selectable: p.id !== "zcode",
+      current: "",
+      error: e.message || "\u8BFB\u53D6\u5931\u8D25"
+    };
+  }
+  body.innerHTML = agentModelsPanelHtml(p, info);
+  bindAgentModelControls(p);
+}
+function bindAgentModelControls(p) {
+  const addBtn = $(`[data-agent-add-model="${p.id}"]`);
+  const pick = $(`[data-agent-pick="${p.id}"]`);
+  const preset = $(`[data-agent-preset="${p.id}"]`);
+  if (preset && pick)
+    preset.onchange = () => {
+      if (preset.value) pick.value = preset.value;
+    };
+  const addModel = async () => {
+    const value = (pick?.value || "").trim();
+    if (!value) return toast("\u8BF7\u8F93\u5165\u6216\u9009\u62E9\u6A21\u578B ID");
+    const next2 = [...getAgentModelList(p.id), value];
+    setAgentModelList(p.id, next2);
+    if (state.provider === p.id && !state.model) state.model = value;
+    await persistAgentModels();
+    if (pick) pick.value = "";
+    if (preset) preset.value = "";
+    toast("\u5DF2\u6DFB\u52A0\u6A21\u578B");
+    fillAgentCard(p);
+  };
+  if (addBtn) addBtn.onclick = addModel;
+  if (pick)
+    pick.onkeydown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addModel();
+      }
+    };
+  $$(`[data-agent-use="${p.id}"]`).forEach((btn) => {
+    btn.onclick = async () => {
+      const model = btn.dataset.model || "";
+      if (state.provider !== p.id) state.provider = p.id;
+      state.model = model;
+      await persistAgentModels();
+      toast(`\u5DF2\u4F7F\u7528 ${model}`);
+      render2();
+    };
+  });
+  $$(`[data-agent-remove-model="${p.id}"]`).forEach((btn) => {
+    btn.onclick = async () => {
+      const model = btn.dataset.model || "";
+      setAgentModelList(
+        p.id,
+        getAgentModelList(p.id).filter((m) => m !== model)
+      );
+      if (state.provider === p.id && state.model === model) state.model = "";
+      await persistAgentModels();
+      fillAgentCard(p);
+    };
+  });
+  $$(`[data-agent-test-model="${p.id}"]`).forEach((btn) => {
+    btn.onclick = async () => {
+      const model = btn.dataset.model || "";
+      btn.disabled = true;
+      setModelRowStatus(p.id, model, "\u6D4B\u8BD5\u4E2D\u2026", "pending");
+      try {
+        const result = await api("agent-test", { provider: p.id, model });
+        if (result.ok) {
+          const ms = result.latencyMs != null ? `${result.latencyMs}ms` : "ok";
+          setModelRowStatus(p.id, model, ms, "ok");
+          toast(`${p.label} \xB7 ${model} \u8FDE\u901A\u6B63\u5E38`);
+        } else {
+          setModelRowStatus(p.id, model, result.error || "\u5931\u8D25", "err");
+          toast(result.error || "\u8FDE\u63A5\u5931\u8D25");
+        }
+      } catch (e) {
+        setModelRowStatus(p.id, model, e.message || "\u5931\u8D25", "err");
+        toast(e.message || "\u8FDE\u63A5\u5931\u8D25");
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  });
+}
+async function runAgentDefaultTest(id) {
+  const p = AGENT_PROVIDERS.find((x) => x.id === id);
+  if (!agentInstalled(id)) return toast("\u672A\u627E\u5230\u8BE5 CLI");
+  const btn = $(`[data-agent-test-default="${id}"]`);
+  if (btn) btn.disabled = true;
+  toast(`${p?.label || id}\uFF1A\u6D4B\u8BD5 CLI \u9ED8\u8BA4\u2026`);
+  try {
+    const result = await api("agent-test", { provider: id, model: "" });
+    if (result.ok) {
+      toast(
+        `${p?.label || id} \u9ED8\u8BA4\u8FDE\u901A\u6B63\u5E38` + (result.latencyMs != null ? ` \xB7 ${result.latencyMs}ms` : "")
+      );
+    } else toast(result.error || "\u8FDE\u63A5\u5931\u8D25");
+  } catch (e) {
+    toast(e.message || "\u8FDE\u63A5\u5931\u8D25");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+async function mountAgentsSettings() {
+  try {
+    const next2 = await api("load");
+    if (next2?.agents) state.agents = next2.agents;
+    if (next2?.agentModels) state.agentModels = next2.agentModels;
+  } catch {
+  }
+  ensureAgentModelsStore();
+  for (const p of AGENT_PROVIDERS) {
+    const card = $(`.agent-card[data-agent="${p.id}"]`);
+    if (!card) continue;
+    const installed = agentInstalled(p.id);
+    card.classList.toggle("is-missing", !installed);
+    const badges = card.querySelectorAll(
+      ".agent-badge:not(.agent-badge-default)"
+    );
+    const statusBadge = [...badges].find(
+      (b) => /已安装|未安装/.test(b.textContent || "")
+    );
+    if (statusBadge) {
+      statusBadge.className = `agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}`;
+      statusBadge.textContent = installed ? "\u5DF2\u5B89\u88C5" : "\u672A\u5B89\u88C5";
+    }
+    const testBtn = card.querySelector(`[data-agent-test-default="${p.id}"]`);
+    const defBtn = card.querySelector(`[data-agent-default="${p.id}"]`);
+    if (testBtn) testBtn.disabled = !installed;
+    if (defBtn) defBtn.disabled = !installed;
+  }
+  for (const p of AGENT_PROVIDERS) fillAgentCard(p);
+  $$("[data-agent-default]").forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.dataset.agentDefault;
+      if (!agentInstalled(id)) return toast("\u672A\u627E\u5230\u8BE5 CLI");
+      state.provider = id;
+      const list2 = getAgentModelList(id);
+      if (id === "zcode") state.model = "";
+      else if (state.model && list2.includes(state.model)) {
+      } else state.model = list2[0] || "";
+      await persistAgentModels();
+      toast(`\u5DF2\u8BBE\u4E3A\u9ED8\u8BA4\uFF1A${AGENT_PROVIDERS.find((x) => x.id === id)?.label || id}`);
+      render2();
+    };
+  });
+  $$("[data-agent-test-default]").forEach((btn) => {
+    btn.onclick = () => runAgentDefaultTest(btn.dataset.agentTestDefault);
+  });
+}
 function renderSettings() {
   const wx = state.wechat || {};
-  if (settingsTab !== "config" && settingsTab !== "accounts" && settingsTab !== "groups" && settingsTab !== "skills")
+  if (settingsTab !== "config" && settingsTab !== "agents" && settingsTab !== "accounts" && settingsTab !== "groups" && settingsTab !== "skills")
     settingsTab = "config";
   const tabs = [
     { id: "config", title: "\u914D\u7F6E" },
+    { id: "agents", title: "\u6A21\u578B" },
     { id: "accounts", title: "\u8D26\u53F7" },
     { id: "groups", title: "\u5206\u7EC4" },
     { id: "skills", title: "\u6280\u80FD" }
@@ -32804,18 +33251,6 @@ function renderSettings() {
           "\u4ED3\u5E93\u8DEF\u5F84",
           `<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="\u9009\u62E9 Content_OS \u76EE\u5F55" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} \u9009\u62E9</button><button type="button" class="ghost" id="refresh-vault">${I.refresh()} \u5237\u65B0</button></span>`
         ) + (state.vaultLocked ? `<p class="settings-hint">\u5F53\u524D\u4ED3\u5E93\u7531\u73AF\u5883\u53D8\u91CF\u6307\u5B9A\uFF0C\u65E0\u6CD5\u5728\u754C\u9762\u4E2D\u66F4\u6539\u3002</p>` : "")
-      )
-    }),
-    settingsSection({
-      title: "Agent \u8FDE\u63A5",
-      control: settingsPanel(
-        settingsField(
-          "\u9ED8\u8BA4 Agent",
-          `<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option><option value="codex">Codex ${state.agents.codex ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option></select>`
-        ) + settingsField(
-          "\u6A21\u578B\uFF08\u7559\u7A7A\u6CBF\u7528 CLI \u9ED8\u8BA4\uFF09",
-          `<input id="model" value="${esc(state.model)}" placeholder="\u53EF\u9009\u6A21\u578B ID" autocomplete="off">`
-        ) + `<div class="settings-panel-footer"><button type="button" class="primary" id="save-settings">\u4FDD\u5B58</button></div>`
       )
     }),
     settingsSection({
@@ -32840,6 +33275,11 @@ function renderSettings() {
       )
     })
   ].join("");
+  const agentsBody = settingsSection({
+    title: "\u6A21\u578B\u8FDE\u63A5",
+    className: "settings-section-agents",
+    control: `<div class="agent-card-list">${AGENT_PROVIDERS.map(agentCardShellHtml).join("")}</div>`
+  });
   const accounts = accountList();
   const accountsBody = settingsSection({
     title: "\u5199\u4F5C\u8D26\u53F7",
@@ -32862,7 +33302,7 @@ function renderSettings() {
       `<p class="settings-empty">\u8FD8\u6CA1\u6709\u5206\u7EC4\u3002\u65B0\u5EFA\u540E\u5373\u53EF\u5728\u6587\u7AE0\u4E2D\u9009\u7528\uFF0C\u5E76\u4E3A\u6BCF\u4E2A\u5206\u7EC4\u8BBE\u7F6E\u9ED8\u8BA4\u540C\u6B65\u8DEF\u5F84\u3002</p>`
     ))
   });
-  const body = settingsTab === "config" ? configBody : settingsTab === "accounts" ? accountsBody : settingsTab === "skills" ? `<div id="skills-settings-root"></div>` : groupsBody;
+  const body = settingsTab === "config" ? configBody : settingsTab === "agents" ? agentsBody : settingsTab === "accounts" ? accountsBody : settingsTab === "skills" ? `<div id="skills-settings-root"></div>` : groupsBody;
   $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BBE\u7F6E</h1></div></header><section class="dashboard settings"><nav class="settings-tabs" role="tablist">${tabs.map(
     (t) => `<button type="button" role="tab" data-settings-tab="${t.id}" aria-selected="${settingsTab === t.id}" class="${settingsTab === t.id ? "active" : ""}">${t.title}</button>`
   ).join("")}</nav><div class="settings-body">${body}</div></section>`;
@@ -32887,14 +33327,10 @@ function renderSettings() {
       { layout: "sections" }
     );
   }
+  if (settingsTab === "agents") {
+    mountAgentsSettings();
+  }
   if (settingsTab === "config") {
-    $("#setting-provider").value = state.provider;
-    $("#save-settings").onclick = () => {
-      state.provider = $("#setting-provider").value;
-      state.model = $("#model").value.trim();
-      persist();
-      toast("\u8BBE\u7F6E\u5DF2\u4FDD\u5B58");
-    };
     $("#open-releases").onclick = async () => {
       try {
         await api("update-open-releases");
@@ -33809,8 +34245,10 @@ lucide/dist/esm/icons/library.mjs:
 lucide/dist/esm/icons/link-2.mjs:
 lucide/dist/esm/icons/list-tree.mjs:
 lucide/dist/esm/icons/list.mjs:
+lucide/dist/esm/icons/message-square.mjs:
 lucide/dist/esm/icons/panel-right-close.mjs:
 lucide/dist/esm/icons/panel-right-open.mjs:
+lucide/dist/esm/icons/pen-line.mjs:
 lucide/dist/esm/icons/pin-off.mjs:
 lucide/dist/esm/icons/pin.mjs:
 lucide/dist/esm/icons/plus.mjs:
