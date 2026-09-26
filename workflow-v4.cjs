@@ -59,6 +59,7 @@ const { _electron: electron } = require("@playwright/test"),
     });
     await w.waitForTimeout(80);
     await w.locator("#chat-upload").click();
+    await w.locator('.context-menu button:has-text("本地选择")').click();
     await w.locator("#instruction .inline-reference").waitFor();
     assert.match(
       await w.locator("#instruction").innerText(),
@@ -72,8 +73,9 @@ const { _electron: electron } = require("@playwright/test"),
     await w.locator("#instruction .inline-reference").click();
     await w.locator("#instruction").press("Backspace");
     assert.equal(await w.locator("#instruction .inline-reference").count(), 0);
-    await w.locator("#chat-reference").click();
-    await w.locator("[data-pick-ref]").first().click();
+    await w.locator("#chat-upload").click();
+    await w.locator('.context-menu button:has-text("素材库")').click();
+    await w.locator("[data-ref-preview]").first().click();
     await w.locator("#send").click();
     await w.locator(".message.assistant").waitFor();
     assert.match(fs.readFileSync(capture, "utf8"), /请对\[引用 [\w-]+\]/);

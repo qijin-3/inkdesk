@@ -31699,7 +31699,7 @@ function renderWrite() {
   }
   unmountAster?.();
   unmountAster = null;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="\u5BA1\u9605" aria-haspopup="true" aria-expanded="false">${I.eye()} \u5BA1\u9605</button><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></div><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div></div>`;
   unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
   editor = new Editor({
@@ -31856,6 +31856,7 @@ function renderWrite() {
     else bar.setAttribute("hidden", "");
     btn.classList.toggle("is-active", open);
     btn.setAttribute("aria-pressed", open ? "true" : "false");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
   };
   $("#toggle-assistant").onclick = () => {
     if (assistantOpen && railMode === "assistant") {
@@ -32021,8 +32022,8 @@ function renderPanel() {
   let content = "";
   if (tab === "chat") {
     content = conversation().messages.map(
-      (m) => `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "\u4F60" : "Agent"}</small><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? `<span class="inline-reference">${esc(p.label)}</span>` : esc(p.text)).join("") : esc(m.text)}</div></div>`
-    ).join("") || '<div class="welcome"><span class="welcome-icon">' + I.sparkles({ size: 22 }) + "</span><h3>\u5148\u4FDD\u7559\u4F60\u7684\u58F0\u97F3\u3002</h3><p>\u4E00\u8D77\u804A\u60F3\u6CD5\uFF0C\u6216\u9009\u4E2D\u4E00\u6BB5\u6587\u5B57\u63A8\u6572\u3002<br>\u4FEE\u6539\u5148\u9884\u89C8\uFF0C\u7531\u4F60\u51B3\u5B9A\u662F\u5426\u91C7\u7528\u3002</p></div>";
+      (m) => `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "\u4F60" : "aster"}</small><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? `<span class="inline-reference">${esc(p.label)}</span>` : esc(p.text)).join("") : esc(m.text)}</div></div>`
+    ).join("") || "";
   }
   panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" title="\u4E3A\u672C\u7BC7\u521B\u5EFA\u65B0\u5BF9\u8BDD">${I.plus()} \u65B0\u5BF9\u8BDD</button></div>` : ""}<div class="panel-scroll">${pending && pending.doc === current.id && pending.conversationId === conversation().id ? `<div class="review-card"><h3>\u4FEE\u6539\u5EFA\u8BAE</h3><div class="diff">${diffWords(
     pending.old,
@@ -32031,7 +32032,7 @@ function renderPanel() {
     (p) => `<${p.added ? "ins" : p.removed ? "del" : "span"}>${esc(p.value)}</${p.added ? "ins" : p.removed ? "del" : "span"}>`
   ).join(
     ""
-  )}</div><div class="row"><button id="accept" class="primary">\u63A5\u53D7\u4FEE\u6539</button><button id="reject">\u4FDD\u7559\u539F\u6587</button></div></div>` : ""}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="\u4E0A\u4F20\u6587\u4EF6" aria-label="\u4E0A\u4F20\u6587\u4EF6">${I.plus()}</button><button id="chat-reference" class="icon-btn" title="\u5F15\u7528\u9879\u76EE\u6587\u4EF6" aria-label="\u5F15\u7528\u9879\u76EE\u6587\u4EF6">${I.at()}</button><div id="skill-picker"></div><select id="agent-output" aria-label="\u5BF9\u8BDD\u6A21\u5F0F"><option value="chat">\u5BF9\u8BDD</option><option value="rewrite-tags">\u4FEE\u6539\u6807\u7B7E\u9009\u6BB5</option><option value="rewrite">\u4FEE\u6539\u5F53\u524D\u9009\u533A</option></select><button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div><div class="composer-hint">\u2318Enter \u53D1\u9001 \xB7 @ \u5F15\u7528\u6587\u4EF6</div></div>`;
+  )}</div><div class="row"><button id="accept" class="primary">\u63A5\u53D7\u4FEE\u6539</button><button id="reject">\u4FDD\u7559\u539F\u6587</button></div></div>` : ""}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0\u6587\u4EF6" aria-label="\u6DFB\u52A0\u6587\u4EF6" aria-haspopup="menu">${I.plus()}</button><div id="skill-picker"></div><select id="agent-output" aria-label="\u5BF9\u8BDD\u6A21\u5F0F"><option value="chat">\u5BF9\u8BDD</option><option value="rewrite-tags">\u4FEE\u6539\u6807\u7B7E\u9009\u6BB5</option><option value="rewrite">\u4FEE\u6539\u5F53\u524D\u9009\u533A</option></select><button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div>`;
   if (tab === "chat") {
     $("#conversation").value = conversation().id;
     $("#conversation").onchange = (e) => {
@@ -32061,10 +32062,15 @@ function renderPanel() {
     send: () => $("#send").click(),
     picker: () => chooseChatFile()
   });
-  $("#chat-reference").onclick = () => chooseChatFile();
-  $("#chat-upload").onclick = uploadChatFiles;
-  for (const id of ["#chat-upload", "#chat-reference"])
-    $(id).onmousedown = (e) => e.preventDefault();
+  $("#chat-upload").onclick = (e) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    showContextMenu(rect.left, Math.max(8, rect.top - 88), [
+      { label: "\u672C\u5730\u9009\u62E9", run: () => uploadChatFiles() },
+      { label: "\u7D20\u6750\u5E93", run: () => chooseChatFile() }
+    ]);
+  };
+  $("#chat-upload").onmousedown = (e) => e.preventDefault();
   $("#skill-picker").addEventListener("skills-change", () => {
     dirty = true;
     persist();
@@ -32182,7 +32188,7 @@ async function runTask(task) {
   };
   const session = conversation(doc3);
   if (!session.messages.length)
-    session.title = (draft.display || "\u8FD0\u884C\u6240\u9009\u6280\u80FD").slice(0, 22);
+    session.title = (draft.display || "\u8FD0\u884C\u6240\u9009\u6280\u80FD").slice(0, 14);
   session.messages.push({
     role: "user",
     text: draft.display || "\u8FD0\u884C\u6240\u9009\u6280\u80FD",
@@ -33333,24 +33339,53 @@ async function chooseChatFile() {
   const doc3 = current, c = conversation(doc3);
   const insertionPosition = c.composerPosition;
   try {
-    const refs = await api("project-refs", doc3.id);
+    const [bound, all] = await Promise.all([
+      api("project-refs", doc3.id),
+      api("materials-list", { account: doc3.account || account })
+    ]);
+    const boundIds = new Set(bound.map((r) => r.id));
+    const merged = [
+      ...bound,
+      ...all.filter((r) => !boundIds.has(r.id))
+    ];
+    const refs = await Promise.all(merged.map(hydrateMaterialPreview));
     const m = document.createElement("div");
     m.className = "modal";
-    m.innerHTML = `<div class="dialog"><div class="row"><h2>\u5728\u5149\u6807\u5904\u5F15\u7528\u6587\u4EF6</h2><button id="close-picker">\u5173\u95ED</button></div><p>\u6709\u6587\u4EF6\u6807\u7B7E\u65F6\uFF0C\u672C\u6B21\u53EA\u4F7F\u7528\u6807\u7B7E\u4E2D\u7684\u6587\u4EF6\u8D44\u6599\u3002</p><input id="reference-search" placeholder="\u641C\u7D22\u672C\u9879\u76EE\u6587\u4EF6"><div id="reference-options" class="material-cards"></div></div>`;
+    m.innerHTML = `<div class="dialog ref-picker-dialog"><div class="row ref-picker-head"><h2>\u5F15\u7528\u7D20\u6750</h2><button id="close-picker">\u5173\u95ED</button></div><input id="reference-search" placeholder="\u641C\u7D22\u7D20\u6750\u5E93"><div id="reference-options"></div></div>`;
     document.body.append(m);
     $("#close-picker").onclick = () => m.remove();
+    const pick = async (id) => {
+      const r = refs.find((x) => x.id === id);
+      if (!r) return;
+      if (r.status !== "ready") return toast(r.error || "\u7D20\u6750\u672A\u5C31\u7EEA");
+      m.remove();
+      try {
+        if (!boundIds.has(r.id)) {
+          await api("materials-link", {
+            articleId: doc3.id,
+            id: r.id
+          });
+        }
+        c.composerPosition = insertionPosition;
+        putTag({ kind: "file", fileId: r.id, label: r.name }, doc3, c);
+      } catch (err) {
+        toast(err.message);
+      }
+    };
     const list2 = () => {
-      $("#reference-options").innerHTML = refs.filter(
-        (r) => r.name.toLowerCase().includes($("#reference-search").value.toLowerCase())
-      ).map(
-        (r) => `<button class="material-card" data-pick-ref="${r.id}" ${r.status === "ready" ? "" : "disabled"}><strong>${esc(r.name)}</strong><small>${r.characters} \u5B57 \xB7 ${r.status === "ready" ? "\u5F15\u7528\u6B64\u6587\u4EF6" : esc(r.error)}</small></button>`
-      ).join("") || "<p>\u6682\u65E0\u6587\u4EF6\uFF0C\u53EF\u5148\u4ECE\u5BF9\u8BDD\u6846\u4E0A\u4F20\u3002</p>";
-      $$("[data-pick-ref]").forEach(
-        (b) => b.onclick = () => {
-          const r = refs.find((r2) => r2.id === b.dataset.pickRef);
-          m.remove();
-          c.composerPosition = insertionPosition;
-          putTag({ kind: "file", fileId: r.id, label: r.name }, doc3, c);
+      const q = $("#reference-search").value.toLowerCase();
+      const match = (r) => r.name.toLowerCase().includes(q);
+      const boundRows = refs.filter((r) => boundIds.has(r.id) && match(r));
+      const otherRows = refs.filter((r) => !boundIds.has(r.id) && match(r));
+      const section = (title, rows) => `<div class="picker-section"><h3>${title}</h3><div class="material-cards">${rows.map((r) => materialPreviewCardHTML(r)).join("")}</div></div>`;
+      const sections = [];
+      if (boundRows.length) sections.push(section("\u672C\u6587\u7D20\u6750", boundRows));
+      if (otherRows.length) sections.push(section("\u7D20\u6750\u5E93", otherRows));
+      $("#reference-options").innerHTML = sections.join("") || "<p>\u6682\u65E0\u7D20\u6750\uFF0C\u53EF\u5148\u672C\u5730\u9009\u62E9\u4E0A\u4F20\uFF0C\u6216\u5230\u7D20\u6750\u5E93\u521B\u5EFA\u3002</p>";
+      $$("#reference-options [data-ref-preview]").forEach(
+        (b) => b.onclick = (e) => {
+          e.preventDefault();
+          pick(b.dataset.refPreview);
         }
       );
     };

@@ -2079,7 +2079,7 @@ function renderWrite() {
   unmountAster?.();
   unmountAster = null;
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="审阅" aria-haspopup="true" aria-expanded="false">${I.eye()} 审阅</button><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></div><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div></div>`;
   unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
   editor = new Editor({
@@ -2237,7 +2237,7 @@ function renderWrite() {
   $("#focus").onclick = () => {
     $(".sidebar").classList.toggle("hidden");
   };
-  /** 切换底部审阅工具条显示 */
+  /** 切换审阅按钮下方工具条显示 */
   $("#toggle-review").onclick = () => {
     const bar = $(".selection-bar");
     const btn = $("#toggle-review");
@@ -2247,6 +2247,7 @@ function renderWrite() {
     else bar.setAttribute("hidden", "");
     btn.classList.toggle("is-active", open);
     btn.setAttribute("aria-pressed", open ? "true" : "false");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
   };
   $("#toggle-assistant").onclick = () => {
     if (assistantOpen && railMode === "assistant") {
@@ -2450,12 +2451,9 @@ function renderPanel() {
       conversation()
         .messages.map(
           (m) =>
-            `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "你" : "Agent"}</small><div>${m.parts ? m.parts.map((p) => (p.kind === "tag" ? `<span class="inline-reference">${esc(p.label)}</span>` : esc(p.text))).join("") : esc(m.text)}</div></div>`,
+            `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "你" : "aster"}</small><div>${m.parts ? m.parts.map((p) => (p.kind === "tag" ? `<span class="inline-reference">${esc(p.label)}</span>` : esc(p.text))).join("") : esc(m.text)}</div></div>`,
         )
-        .join("") ||
-      '<div class="welcome"><span class="welcome-icon">' +
-        I.sparkles({ size: 22 }) +
-        "</span><h3>先保留你的声音。</h3><p>一起聊想法，或选中一段文字推敲。<br>修改先预览，由你决定是否采用。</p></div>";
+        .join("") || "";
   }
   panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" title="为本篇创建新对话">${I.plus()} 新对话</button></div>` : ""}<div class="panel-scroll">${
     pending &&
@@ -2473,7 +2471,7 @@ function renderPanel() {
             "",
           )}</div><div class="row"><button id="accept" class="primary">接受修改</button><button id="reject">保留原文</button></div></div>`
       : ""
-  }${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="上传文件" aria-label="上传文件">${I.plus()}</button><button id="chat-reference" class="icon-btn" title="引用项目文件" aria-label="引用项目文件">${I.at()}</button><div id="skill-picker"></div><select id="agent-output" aria-label="对话模式"><option value="chat">对话</option><option value="rewrite-tags">修改标签选段</option><option value="rewrite">修改当前选区</option></select><button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div><div class="composer-hint">⌘Enter 发送 · @ 引用文件</div></div>`;
+  }${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="添加文件" aria-label="添加文件" aria-haspopup="menu">${I.plus()}</button><div id="skill-picker"></div><select id="agent-output" aria-label="对话模式"><option value="chat">对话</option><option value="rewrite-tags">修改标签选段</option><option value="rewrite">修改当前选区</option></select><button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div>`;
   if (tab === "chat") {
     $("#conversation").value = conversation().id;
     $("#conversation").onchange = (e) => {
@@ -2504,10 +2502,15 @@ function renderPanel() {
     send: () => $("#send").click(),
     picker: () => chooseChatFile(),
   });
-  $("#chat-reference").onclick = () => chooseChatFile();
-  $("#chat-upload").onclick = uploadChatFiles;
-  for (const id of ["#chat-upload", "#chat-reference"])
-    $(id).onmousedown = (e) => e.preventDefault();
+  $("#chat-upload").onclick = (e) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    showContextMenu(rect.left, Math.max(8, rect.top - 88), [
+      { label: "本地选择", run: () => uploadChatFiles() },
+      { label: "素材库", run: () => chooseChatFile() },
+    ]);
+  };
+  $("#chat-upload").onmousedown = (e) => e.preventDefault();
   $("#skill-picker").addEventListener("skills-change",()=>{ dirty=true; persist(); });
   mountSkillPicker($("#skill-picker"), api, account, conversation());
   if ($("#generate")) $("#generate").onclick = () => runTask(tab);
@@ -2638,7 +2641,7 @@ async function runTask(task) {
   };
   const session = conversation(doc);
   if (!session.messages.length)
-    session.title = (draft.display || "运行所选技能").slice(0, 22);
+    session.title = (draft.display || "运行所选技能").slice(0, 14);
   session.messages.push({
     role: "user",
     text: draft.display || "运行所选技能",
@@ -4120,32 +4123,57 @@ async function chooseChatFile() {
     c = conversation(doc);
   const insertionPosition = c.composerPosition;
   try {
-    const refs = await api("project-refs", doc.id);
+    const [bound, all] = await Promise.all([
+      api("project-refs", doc.id),
+      api("materials-list", { account: doc.account || account }),
+    ]);
+    const boundIds = new Set(bound.map((r) => r.id));
+    const merged = [
+      ...bound,
+      ...all.filter((r) => !boundIds.has(r.id)),
+    ];
+    const refs = await Promise.all(merged.map(hydrateMaterialPreview));
     const m = document.createElement("div");
     m.className = "modal";
-    m.innerHTML = `<div class="dialog"><div class="row"><h2>在光标处引用文件</h2><button id="close-picker">关闭</button></div><p>有文件标签时，本次只使用标签中的文件资料。</p><input id="reference-search" placeholder="搜索本项目文件"><div id="reference-options" class="material-cards"></div></div>`;
+    m.innerHTML = `<div class="dialog ref-picker-dialog"><div class="row ref-picker-head"><h2>引用素材</h2><button id="close-picker">关闭</button></div><input id="reference-search" placeholder="搜索素材库"><div id="reference-options"></div></div>`;
     document.body.append(m);
     $("#close-picker").onclick = () => m.remove();
+    const pick = async (id) => {
+      const r = refs.find((x) => x.id === id);
+      if (!r) return;
+      if (r.status !== "ready") return toast(r.error || "素材未就绪");
+      m.remove();
+      try {
+        if (!boundIds.has(r.id)) {
+          await api("materials-link", {
+            articleId: doc.id,
+            id: r.id,
+          });
+        }
+        c.composerPosition = insertionPosition;
+        putTag({ kind: "file", fileId: r.id, label: r.name }, doc, c);
+      } catch (err) {
+        toast(err.message);
+      }
+    };
     const list = () => {
+      const q = $("#reference-search").value.toLowerCase();
+      const match = (r) => r.name.toLowerCase().includes(q);
+      const boundRows = refs.filter((r) => boundIds.has(r.id) && match(r));
+      const otherRows = refs.filter((r) => !boundIds.has(r.id) && match(r));
+      const section = (title, rows) =>
+        `<div class="picker-section"><h3>${title}</h3><div class="material-cards">${rows.map((r) => materialPreviewCardHTML(r)).join("")}</div></div>`;
+      const sections = [];
+      if (boundRows.length) sections.push(section("本文素材", boundRows));
+      if (otherRows.length) sections.push(section("素材库", otherRows));
       $("#reference-options").innerHTML =
-        refs
-          .filter((r) =>
-            r.name
-              .toLowerCase()
-              .includes($("#reference-search").value.toLowerCase()),
-          )
-          .map(
-            (r) =>
-              `<button class="material-card" data-pick-ref="${r.id}" ${r.status === "ready" ? "" : "disabled"}><strong>${esc(r.name)}</strong><small>${r.characters} 字 · ${r.status === "ready" ? "引用此文件" : esc(r.error)}</small></button>`,
-          )
-          .join("") || "<p>暂无文件，可先从对话框上传。</p>";
-      $$("[data-pick-ref]").forEach(
+        sections.join("") ||
+        "<p>暂无素材，可先本地选择上传，或到素材库创建。</p>";
+      $$("#reference-options [data-ref-preview]").forEach(
         (b) =>
-          (b.onclick = () => {
-            const r = refs.find((r) => r.id === b.dataset.pickRef);
-            m.remove();
-            c.composerPosition = insertionPosition;
-            putTag({ kind: "file", fileId: r.id, label: r.name }, doc, c);
+          (b.onclick = (e) => {
+            e.preventDefault();
+            pick(b.dataset.refPreview);
           }),
       );
     };
