@@ -455,11 +455,14 @@ async function socialPages(html2, _title) {
   function font(family, weight, px) {
     ctx.font = `${weight} ${px}px ${family}`;
   }
+  let truncated = false;
   function page2() {
-    if (pages.length >= 17)
-      throw Error(
-        "\u5185\u5BB9\u8D85\u8FC7 17 \u5F20\uFF0C\u8BF7\u7CBE\u7B80\u6B63\u6587\u540E\u91CD\u8BD5\u3002\u672A\u5BFC\u51FA\u622A\u65AD\u5185\u5BB9\u3002"
-      );
+    if (pages.length >= 17) {
+      truncated = true;
+      throw Object.assign(Error("\u5185\u5BB9\u8D85\u8FC7 17 \u5F20\uFF0C\u5DF2\u622A\u65AD"), {
+        code: "SOCIAL_TRUNCATED"
+      });
+    }
     const canvas = document.createElement("canvas");
     canvas.width = W;
     canvas.height = H;
@@ -716,9 +719,14 @@ async function socialPages(html2, _title) {
     if (node.nodeName === "LI") runs.unshift({ text: "\u2022 ", bold: false });
     drawText(runs, { line: bodyLine, after: S(T.bodyAfter) });
   }
-  page2();
-  for (const node of root2.childNodes) await block2(node);
+  try {
+    page2();
+    for (const node of root2.childNodes) await block2(node);
+  } catch (e) {
+    if (e?.code !== "SOCIAL_TRUNCATED") throw e;
+  }
   for (const c of pages) c.toDataURL("image/png");
+  pages.truncated = truncated;
   return pages;
 }
 function openSocialLightbox(canvases, startIndex) {
@@ -830,12 +838,10 @@ function bindSocialPreview(root2, { html: html2, title, api: api2, web }) {
     const exportBtn2 = q("#social-export");
     const status = q("#social-status");
     const list2 = q("#social-pages");
-    const pane = list2?.closest(".preview-pane-social") || q(".preview-pane-social");
     if (!exportBtn2 || !status || !list2) return;
     exportBtn2.disabled = true;
     status.textContent = "\u6B63\u5728\u6392\u7248\u2026";
     status.classList.remove("is-tip");
-    pane?.classList.remove("is-tip-only");
     list2.hidden = false;
     list2.replaceChildren();
     try {
@@ -862,16 +868,14 @@ function bindSocialPreview(root2, { html: html2, title, api: api2, web }) {
         figure.append(c, label);
         list2.append(figure);
       }
-      status.textContent = `\u5171 ${pages.length} \u5F20`;
-      exportBtn2.disabled = false;
+      status.textContent = pages.truncated ? `\u5171 ${pages.length} \u5F20 \xB7 \u5185\u5BB9\u8D85\u8FC7 17 \u5F20\uFF0C\u5DF2\u622A\u65AD` : `\u5171 ${pages.length} \u5F20`;
+      exportBtn2.disabled = !pages.length;
     } catch (e) {
       if (g !== generation) return;
       pages = [];
       list2.replaceChildren();
-      list2.hidden = true;
-      pane?.classList.add("is-tip-only");
       status.classList.add("is-tip");
-      status.textContent = e.message || "\u6392\u7248\u5931\u8D25";
+      status.textContent = "\u6392\u7248\u5931\u8D25\uFF1A" + (e.message || "\u672A\u77E5\u9519\u8BEF");
       exportBtn2.disabled = true;
     }
   }
@@ -24140,6 +24144,66 @@ var I = {
   chevronLeft: (o) => icon(ChevronLeft, o)
 };
 
+// aster.js
+var ASTER_STATES = /* @__PURE__ */ new Set([
+  "idle",
+  "watching",
+  "thinking",
+  "idea",
+  "talking",
+  "success"
+]);
+function asterHtml({
+  size = 40,
+  state: state2 = "idle",
+  label = "\u5199\u4F5C\u4F19\u4F34"
+} = {}) {
+  const s = ASTER_STATES.has(state2) ? state2 : "idle";
+  return `<button type="button" id="toggle-assistant" class="aster aster--${s}" style="--aster-size:${size}px" aria-label="${label}" title="${label}" aria-pressed="false"><span class="aster__halo"></span><span class="aster__body"><span class="aster__surface"></span><span class="aster__light"></span><span class="aster__eyes"><span class="aster__eye"></span><span class="aster__eye"></span></span></span><svg class="aster__orbit" viewBox="0 0 120 120" aria-hidden="true"><ellipse cx="60" cy="60" rx="53" ry="19" fill="none" stroke="currentColor" stroke-width="1.2"/></svg><span class="aster__satellite"></span><span class="aster__spark" hidden>\u2726</span></button>`;
+}
+function mountAster(root2, { interactive = true } = {}) {
+  if (!root2) return () => {
+  };
+  let blinkTimer = 0;
+  let unblinkTimer = 0;
+  const eyes = root2.querySelector(".aster__eyes");
+  const onMove = (event) => {
+    if (!interactive) return;
+    const rect = root2.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = event.clientX - cx;
+    const dy = event.clientY - cy;
+    const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+    const maxMove = 2.4;
+    root2.style.setProperty("--eye-x", `${dx / distance * maxMove}px`);
+    root2.style.setProperty("--eye-y", `${dy / distance * maxMove}px`);
+  };
+  const scheduleBlink = () => {
+    blinkTimer = window.setTimeout(() => {
+      eyes?.classList.add("is-blinking");
+      unblinkTimer = window.setTimeout(() => {
+        eyes?.classList.remove("is-blinking");
+        scheduleBlink();
+      }, 140);
+    }, 2800 + Math.random() * 4200);
+  };
+  if (interactive) window.addEventListener("pointermove", onMove);
+  scheduleBlink();
+  return () => {
+    window.removeEventListener("pointermove", onMove);
+    window.clearTimeout(blinkTimer);
+    window.clearTimeout(unblinkTimer);
+  };
+}
+function setAsterState(root2, state2) {
+  if (!root2) return;
+  const next2 = ASTER_STATES.has(state2) ? state2 : "idle";
+  for (const s of ASTER_STATES) root2.classList.toggle(`aster--${s}`, s === next2);
+  const spark = root2.querySelector(".aster__spark");
+  if (spark) spark.hidden = next2 !== "idea";
+}
+
 // node_modules/@tiptap/extension-image/dist/index.js
 var inputRegex4 = /(?:^|\s)(!\[(.+|:?)]\((\S+)(?:(?:\s+)["'](\S+)["'])?\))$/;
 var Image2 = Node2.create({
@@ -30144,6 +30208,7 @@ var assistantOpen = false;
 var railMode = "assistant";
 var outlinePinned = false;
 var saveConflict = false;
+var unmountAster = null;
 function accountList() {
   return state?.accounts || [];
 }
@@ -30616,6 +30681,8 @@ function render2() {
   ).map(
     (d) => `<button class="doc ${current?.id === d.id ? "selected" : ""}" data-id="${d.id}"><span>${esc(d.title)}</span><small>${new Date(d.updated).toLocaleDateString("zh-CN")} \xB7 ${d.body.length} \u5B57</small></button>`
   ).join("") || '<p class="muted">\u4ECE\u4E00\u4E2A\u60F3\u6CD5\u5F00\u59CB\u3002</p>'}</div></aside><main id="main"></main><div class="workspace-resizer hidden" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant hidden" id="rail"></aside>`;
+  unmountAster?.();
+  unmountAster = null;
   if (page === "write") renderWrite();
   else if (page === "dashboard") renderDashboard();
   else if (page === "published-preview") renderPublishedPreview();
@@ -31286,6 +31353,24 @@ function bindFinalize() {
     }
   };
 }
+function syncAsterFace() {
+  const el = $("#toggle-assistant");
+  if (!el?.classList.contains("aster")) return;
+  if (busy) {
+    setAsterState(el, "thinking");
+    return;
+  }
+  if (pending && pending.doc === current?.id && (pending.edits?.length || pending.next)) {
+    setAsterState(el, "idea");
+    return;
+  }
+  const sel = editor?.state?.selection;
+  if (sel && sel.to > sel.from) {
+    setAsterState(el, "watching");
+    return;
+  }
+  setAsterState(el, "idle");
+}
 function syncRailVisibility() {
   const rail = $("#rail");
   const resizer = $("#workspace-resizer");
@@ -31300,14 +31385,11 @@ function syncRailVisibility() {
   resizer?.classList.toggle("hidden", !assistantOpen);
   const toggle = $("#toggle-assistant");
   if (toggle) {
-    toggle.classList.toggle(
-      "primary",
-      assistantOpen && railMode === "assistant"
-    );
     toggle.setAttribute(
       "aria-pressed",
       assistantOpen && railMode === "assistant" ? "true" : "false"
     );
+    syncAsterFace();
   }
   $("#article-materials")?.classList.toggle(
     "primary",
@@ -31601,7 +31683,11 @@ function renderWrite() {
     renderPreview();
     return;
   }
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</button><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></section></div>`;
+  unmountAster?.();
+  unmountAster = null;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions">${asterHtml({ size: 40, state: "idle" })}<div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></section></div>`;
+  unmountAster = mountAster($("#toggle-assistant"));
+  syncAsterFace();
   editor = new Editor({
     element: $("#editor"),
     extensions: [src_default, src_default2, TableKit],
@@ -31623,6 +31709,7 @@ function renderWrite() {
         };
       selectedText = selectionContext?.text || "";
       $("#selection-label").textContent = selectedText ? "\u5DF2\u9009\u4E2D " + selectedText.length + " \u5B57" : "\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572";
+      syncAsterFace();
     },
     editorProps: {
       handlePaste(view, event) {
@@ -31968,6 +32055,7 @@ function renderPanel() {
         toast("\u6B63\u6587\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u751F\u6210\u5EFA\u8BAE\u3002");
         pending = null;
         renderPanel();
+        syncAsterFace();
         return;
       }
       current.decisions ??= [];
@@ -31999,6 +32087,7 @@ function renderPanel() {
       changed();
       pending = null;
       renderPanel();
+      syncAsterFace();
       toast("\u5DF2\u5E94\u7528\uFF0C\u53EF\u7528 \u2318Z \u64A4\u56DE");
     };
   if ($("#reject"))
@@ -32013,6 +32102,7 @@ function renderPanel() {
       changed();
       pending = null;
       renderPanel();
+      syncAsterFace();
     };
 }
 async function runTask(task) {
@@ -32067,6 +32157,7 @@ async function runTask(task) {
   session.composerRefs = {};
   session.composerPosition = 1;
   busy = true;
+  syncAsterFace();
   await persist();
   if (["review", "rewrite", "check", "rewrite-tags"].includes(task))
     tab = "chat";
@@ -32135,6 +32226,7 @@ async function runTask(task) {
     });
   } finally {
     busy = false;
+    syncAsterFace();
     await persist();
     if (page === "write") renderPanel();
   }

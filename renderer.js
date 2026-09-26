@@ -2,6 +2,7 @@ import { mountSkillPicker, mountSkillsSettings } from "./skills-ui.js";
 import { bindSocialPreview } from "./social-layout.js";
 import { Composer } from "./composer.js";
 import { I } from "./icons.js";
+import { asterHtml, mountAster, setAsterState } from "./aster.js";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
@@ -135,6 +136,8 @@ let railMode = "assistant";
 let outlinePinned = false;
 /** 磁盘冲突中：抑制重复 toast，直到用户刷新或放弃 */
 let saveConflict = false;
+/** Aster 头像卸载（眨眼 / 视线跟随） */
+let unmountAster = null;
 
 /**
  * 当前仓库已注册账号列表。
@@ -813,6 +816,8 @@ function render() {
         )
         .join("") || '<p class="muted">从一个想法开始。</p>'
     }</div></aside><main id="main"></main><div class="workspace-resizer hidden" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant hidden" id="rail"></aside>`;
+  unmountAster?.();
+  unmountAster = null;
   if (page === "write") renderWrite();
   else if (page === "dashboard") renderDashboard();
   else if (page === "published-preview") renderPublishedPreview();
@@ -1650,6 +1655,32 @@ function bindFinalize() {
 }
 
 /**
+ * 按当前上下文同步 Aster 表情：thinking > idea > watching > idle。
+ */
+function syncAsterFace() {
+  const el = $("#toggle-assistant");
+  if (!el?.classList.contains("aster")) return;
+  if (busy) {
+    setAsterState(el, "thinking");
+    return;
+  }
+  if (
+    pending &&
+    pending.doc === current?.id &&
+    (pending.edits?.length || pending.next)
+  ) {
+    setAsterState(el, "idea");
+    return;
+  }
+  const sel = editor?.state?.selection;
+  if (sel && sel.to > sel.from) {
+    setAsterState(el, "watching");
+    return;
+  }
+  setAsterState(el, "idle");
+}
+
+/**
  * 同步右侧栏与分隔条显隐：仅草稿写作可用；写作伙伴默认收起；预览时收起侧栏。
  */
 function syncRailVisibility() {
@@ -1666,14 +1697,11 @@ function syncRailVisibility() {
   resizer?.classList.toggle("hidden", !assistantOpen);
   const toggle = $("#toggle-assistant");
   if (toggle) {
-    toggle.classList.toggle(
-      "primary",
-      assistantOpen && railMode === "assistant",
-    );
     toggle.setAttribute(
       "aria-pressed",
       assistantOpen && railMode === "assistant" ? "true" : "false",
     );
+    syncAsterFace();
   }
   $("#article-materials")?.classList.toggle(
     "primary",
@@ -2034,8 +2062,12 @@ function renderWrite() {
     renderPreview();
     return;
   }
+  unmountAster?.();
+  unmountAster = null;
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></section></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions">${asterHtml({ size: 40, state: "idle" })}<div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></section></div>`;
+  unmountAster = mountAster($("#toggle-assistant"));
+  syncAsterFace();
   editor = new Editor({
     element: $("#editor"),
     extensions: [StarterKit, Image, TableKit],
@@ -2061,6 +2093,7 @@ function renderWrite() {
       $("#selection-label").textContent = selectedText
         ? "已选中 " + selectedText.length + " 字"
         : "选中正文，让 AI 帮你推敲";
+      syncAsterFace();
     },
     editorProps: {
       handlePaste(view, event) {
@@ -2463,6 +2496,7 @@ function renderPanel() {
         toast("正文已变化，请重新生成建议。");
         pending = null;
         renderPanel();
+        syncAsterFace();
         return;
       }
       current.decisions ??= [];
@@ -2498,6 +2532,7 @@ function renderPanel() {
       changed();
       pending = null;
       renderPanel();
+      syncAsterFace();
       toast("已应用，可用 ⌘Z 撤回");
     };
   if ($("#reject"))
@@ -2512,6 +2547,7 @@ function renderPanel() {
       changed();
       pending = null;
       renderPanel();
+      syncAsterFace();
     };
 }
 async function runTask(task) {
@@ -2572,6 +2608,7 @@ async function runTask(task) {
   session.composerRefs = {};
   session.composerPosition = 1;
   busy = true;
+  syncAsterFace();
   await persist();
   if (["review", "rewrite", "check", "rewrite-tags"].includes(task))
     tab = "chat";
@@ -2650,6 +2687,7 @@ async function runTask(task) {
     });
   } finally {
     busy = false;
+    syncAsterFace();
     await persist();
     if (page === "write") renderPanel();
   }

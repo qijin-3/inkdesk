@@ -240,12 +240,16 @@ export async function socialPages(html, _title) {
     ctx.font = `${weight} ${px}px ${family}`;
   }
 
-  /** 新建一页（不画页码；序号只出现在一级标题右侧） */
+  let truncated = false;
+
+  /** 新建一页（不画页码；序号只出现在一级标题右侧）；满 17 张则截断后续内容 */
   function page() {
-    if (pages.length >= 17)
-      throw Error(
-        "内容超过 17 张，请精简正文后重试。未导出截断内容。",
-      );
+    if (pages.length >= 17) {
+      truncated = true;
+      throw Object.assign(Error("内容超过 17 张，已截断"), {
+        code: "SOCIAL_TRUNCATED",
+      });
+    }
     const canvas = document.createElement("canvas");
     canvas.width = W;
     canvas.height = H;
@@ -548,9 +552,14 @@ export async function socialPages(html, _title) {
     drawText(runs, { line: bodyLine, after: S(T.bodyAfter) });
   }
 
-  page();
-  for (const node of root.childNodes) await block(node);
+  try {
+    page();
+    for (const node of root.childNodes) await block(node);
+  } catch (e) {
+    if (e?.code !== "SOCIAL_TRUNCATED") throw e;
+  }
   for (const c of pages) c.toDataURL("image/png");
+  pages.truncated = truncated;
   return pages;
 }
 
@@ -699,12 +708,10 @@ export function bindSocialPreview(root, { html, title, api, web }) {
     const exportBtn = q("#social-export");
     const status = q("#social-status");
     const list = q("#social-pages");
-    const pane = list?.closest(".preview-pane-social") || q(".preview-pane-social");
     if (!exportBtn || !status || !list) return;
     exportBtn.disabled = true;
     status.textContent = "正在排版…";
     status.classList.remove("is-tip");
-    pane?.classList.remove("is-tip-only");
     list.hidden = false;
     list.replaceChildren();
     try {
@@ -735,16 +742,16 @@ export function bindSocialPreview(root, { html, title, api, web }) {
         figure.append(c, label);
         list.append(figure);
       }
-      status.textContent = `共 ${pages.length} 张`;
-      exportBtn.disabled = false;
+      status.textContent = pages.truncated
+        ? `共 ${pages.length} 张 · 内容超过 17 张，已截断`
+        : `共 ${pages.length} 张`;
+      exportBtn.disabled = !pages.length;
     } catch (e) {
       if (g !== generation) return;
       pages = [];
       list.replaceChildren();
-      list.hidden = true;
-      pane?.classList.add("is-tip-only");
       status.classList.add("is-tip");
-      status.textContent = e.message || "排版失败";
+      status.textContent = "排版失败：" + (e.message || "未知错误");
       exportBtn.disabled = true;
     }
   }
