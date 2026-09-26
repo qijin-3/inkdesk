@@ -23778,6 +23778,9 @@ var Bold2 = [
 // node_modules/lucide/dist/esm/icons/chevron-down.mjs
 var ChevronDown = [["path", { d: "m6 9 6 6 6-6" }]];
 
+// node_modules/lucide/dist/esm/icons/chevron-left.mjs
+var ChevronLeft = [["path", { d: "m15 18-6-6 6-6" }]];
+
 // node_modules/lucide/dist/esm/icons/circle-user.mjs
 var CircleUser = [
   ["circle", { cx: "12", cy: "12", r: "10" }],
@@ -24122,7 +24125,8 @@ var I = {
   link: (o) => icon(Link2, o),
   copy: (o) => icon(Copy, o),
   imageDown: (o) => icon(ImageDown, o),
-  chevronDown: (o) => icon(ChevronDown, o)
+  chevronDown: (o) => icon(ChevronDown, o),
+  chevronLeft: (o) => icon(ChevronLeft, o)
 };
 
 // node_modules/@tiptap/extension-image/dist/index.js
@@ -30037,7 +30041,6 @@ function diffWordsWithSpace(oldStr, newStr, options2) {
 var import_calendar = __toESM(require_calendar());
 var saveProfileEditor = null;
 var composer = null;
-var profileTab = "identity";
 var accountDetailTab = "detail";
 var heatmapYear = (/* @__PURE__ */ new Date()).getFullYear();
 var metricsSort = "\u9605\u8BFB";
@@ -32641,7 +32644,6 @@ function renderSettings() {
     { id: "groups", title: "\u5206\u7EC4" },
     { id: "skills", title: "\u6280\u80FD" }
   ];
-  const updateStatus = state._update?.available ? `\u53D1\u73B0\u65B0\u7248\u672C ${esc(state._update.latest)}` : state._update?.latest ? `\u5DF2\u662F\u6700\u65B0\uFF08GitHub ${esc(state._update.latest)}\uFF09` : "\u70B9\u51FB\u68C0\u6D4B GitHub Release";
   const configBody = [
     settingsSection({
       title: "\u5185\u5BB9\u4ED3\u5E93",
@@ -32682,7 +32684,7 @@ function renderSettings() {
     settingsSection({
       title: "\u5E94\u7528\u66F4\u65B0",
       control: settingsPanel(
-        `<div class="settings-status-row"><div><span class="settings-field-label">\u5F53\u524D\u7248\u672C</span><strong class="settings-version">${esc(state._appVersion || "\u2026")}</strong></div><p id="update-status" class="settings-hint">${updateStatus}</p></div><div class="settings-panel-footer"><button type="button" id="open-releases">${I.external()} \u53D1\u5E03\u9875</button><button type="button" id="check-update">${I.refresh()} \u68C0\u6D4B\u66F4\u65B0</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">\u4E0B\u8F7D\u5E76\u5B89\u88C5</button>` : ""}</div>`
+        `<div class="settings-status-row"><div><span class="settings-field-label">\u5F53\u524D\u7248\u672C</span><strong class="settings-version">${esc(state._appVersion || "\u2026")}</strong></div></div><div class="settings-panel-footer"><button type="button" id="open-releases">${I.external()} \u53D1\u5E03\u9875</button><button type="button" id="check-update">${I.refresh()} \u68C0\u6D4B\u66F4\u65B0</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">\u4E0B\u8F7D\u5E76\u5B89\u88C5</button>` : ""}</div>`
       )
     })
   ].join("");
@@ -33367,7 +33369,7 @@ async function renderAccountDetail() {
     { id: "skills", title: "\u6280\u80FD" }
   ];
   const shell = (body) => {
-    $("#main").innerHTML = `<header><div class="header-lead"><button type="button" class="ghost" id="account-detail-back">\u2190 \u8D26\u53F7\u5217\u8868</button><h1 class="dashboard-tagline">${esc(acc.label)}</h1></div></header><section class="dashboard account-detail settings"><nav class="settings-tabs account-detail-tabs" role="tablist">${tabs.map(
+    $("#main").innerHTML = `<header><div class="header-lead account-detail-lead"><button type="button" class="ghost icon-btn" id="account-detail-back" title="\u8D26\u53F7\u5217\u8868" aria-label="\u8FD4\u56DE\u8D26\u53F7\u5217\u8868">${I.chevronLeft({ size: 22 })}</button><h1 class="dashboard-tagline">${esc(acc.label)}</h1></div><div class="header-actions"><button type="button" class="danger" id="account-unregister">\u79FB\u9664\u8D26\u53F7</button></div></header><section class="dashboard account-detail settings"><nav class="settings-tabs account-detail-tabs" role="tablist">${tabs.map(
       (t) => `<button type="button" role="tab" data-account-tab="${t.id}" aria-selected="${accountDetailTab === t.id}" class="${accountDetailTab === t.id ? "active" : ""}">${t.title}</button>`
     ).join("")}</nav><div id="account-detail-body" class="settings-body">${body}</div></section>`;
     $("#account-detail-back").onclick = async () => {
@@ -33375,6 +33377,21 @@ async function renderAccountDetail() {
       page = "settings";
       settingsTab = "accounts";
       render2();
+    };
+    $("#account-unregister").onclick = async () => {
+      const ok = await askConfirm(
+        "\u79FB\u9664\u8D26\u53F7",
+        "\u4EC5\u4ECE\u5217\u8868\u79FB\u9664\uFF0C\u4E0D\u4F1A\u5220\u9664\u78C1\u76D8\u6587\u4EF6\u5939\u3002\u7EE7\u7EED\uFF1F"
+      );
+      if (!ok) return;
+      try {
+        page = "settings";
+        settingsTab = "accounts";
+        applyAccountState(await api("account-unregister", { id: a }));
+        toast("\u5DF2\u79FB\u9664\u8D26\u53F7");
+      } catch (e) {
+        toast(e.message || "\u79FB\u9664\u5931\u8D25");
+      }
     };
     $$("[data-account-tab]").forEach((b) => {
       b.onclick = async () => {
@@ -33403,13 +33420,6 @@ async function renderAccountDetail() {
               `<span class="settings-path-row"><input type="text" value="${esc(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9" readonly><button type="button" id="account-pick-backup">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" id="account-clear-backup">\u6E05\u9664</button>` : ""}</span>`
             )
           )
-        }),
-        settingsSection({
-          title: "\u79FB\u9664\u8D26\u53F7",
-          control: settingsPanel(
-            `<button type="button" class="ghost" id="account-unregister">\u79FB\u9664\u8D26\u53F7</button>`
-          ),
-          className: "settings-section-danger"
         })
       ].join("")
     );
@@ -33426,21 +33436,6 @@ async function renderAccountDetail() {
           toast(e.message || "\u6E05\u9664\u5931\u8D25");
         }
       };
-    $("#account-unregister").onclick = async () => {
-      const ok = await askConfirm(
-        "\u79FB\u9664\u8D26\u53F7",
-        "\u4EC5\u4ECE\u5217\u8868\u79FB\u9664\uFF0C\u4E0D\u4F1A\u5220\u9664\u78C1\u76D8\u6587\u4EF6\u5939\u3002\u7EE7\u7EED\uFF1F"
-      );
-      if (!ok) return;
-      try {
-        page = "settings";
-        settingsTab = "accounts";
-        applyAccountState(await api("account-unregister", { id: a }));
-        toast("\u5DF2\u79FB\u9664\u8D26\u53F7");
-      } catch (e) {
-        toast(e.message || "\u79FB\u9664\u5931\u8D25");
-      }
-    };
     return;
   }
   if (accountDetailTab === "skills") {
@@ -33462,19 +33457,44 @@ async function renderAccountDetail() {
     if (page !== "account" || account !== a || accountDetailTab !== "settings")
       return;
     const draw = () => {
-      const definition = model.definitions.find((d) => d.id === profileTab);
-      const body = `<div class="profile-manager"><nav class="model-tabs">${[...model.definitions, { id: "history", title: "\u8FED\u4EE3\u8BB0\u5F55" }].map((d) => `<button data-model-tab="${d.id}" class="${profileTab === d.id ? "active" : ""}">${d.title}</button>`).join("")}</nav><div id="model-content">${definition ? `<h2>${definition.title}</h2><p>${{ identity: "\u53EA\u7EF4\u62A4\u6211\u662F\u8C01\u3001\u5199\u7ED9\u8C01\u3001\u5E0C\u671B\u63D0\u4F9B\u4EC0\u4E48\u4EF7\u503C\u3002", voice: "\u7EF4\u62A4\u81EA\u7136\u7684\u8868\u8FBE\u504F\u597D\u4E0E\u5FC5\u8981\u8FB9\u754C\uFF0C\u907F\u514D\u628A\u6BCF\u7BC7\u6587\u7AE0\u5199\u6210\u89C4\u5219\u68C0\u67E5\u8868\u3002", examples: "\u4FDD\u7559\u6211\u8BA4\u53EF\u7684\u771F\u5B9E\u7ECF\u5386\u548C\u8303\u6587\u7247\u6BB5\uFF0C\u5E76\u5199\u6E05\u51FA\u5904\u4E0E\u4E3A\u4EC0\u4E48\u50CF\u6211\u3002", learning: "\u7528\u6709\u6765\u6E90\u7684\u6570\u636E\u89C2\u5BDF\u6307\u5BFC\u4E0B\u4E00\u6B21\u5C0F\u5B9E\u9A8C\uFF1B\u6700\u591A\u4FDD\u7559\u4E09\u4E2A\uFF0C\u8FC7\u65F6\u5C31\u66FF\u6362\u3002" }[profileTab]}</p><textarea id="model-text" rows="15" maxlength="${definition.limit}">${esc(model.modules[profileTab])}</textarea><div class="row"><button id="save-model" class="primary">\u4FDD\u5B58\u5F53\u524D\u6A21\u5757</button><small>${definition.limit} \u5B57\u4EE5\u5185</small></div>${profileTab === "learning" ? `<p class="notice">\u5F53\u524D\u8D26\u53F7\u6709 ${state.metrics.filter((r) => r["\u8D26\u53F7"] === a).length} \u7BC7\u5F52\u6863\u6570\u636E\u3002\u5355\u7BC7\u6CE2\u52A8\u4E0D\u4EE3\u8868\u8868\u8FBE\u65B9\u5F0F\u7684\u56E0\u679C\u6548\u679C\u3002</p>` : ""}${profileTab === "examples" ? `<details><summary>\u67E5\u770B\u65E7 Profile \u8D44\u6599\uFF08\u53EA\u8BFB\uFF09</summary><div class="material-cards">${model.legacy.filter((f) => f.editable).map(
-        (f) => `<button class="material-card" data-model-legacy="${esc(f.path)}"><strong>${esc(f.path)}</strong></button>`
-      ).join("")}</div></details>` : ""}` : `<p class="muted">\u4EBA\u8BBE\u8FED\u4EE3\u5EFA\u8BAE\u4E0E\u5386\u53F2\u7248\u672C\u3002\u6280\u80FD\u8BF7\u5207\u6362\u5230\u300C\u6280\u80FD\u300D\u5B50\u9875\u3002</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} \xB7 ${p.status === "pending" ? "\u5F85\u5BA1\u9605" : p.status === "applied" ? "\u5DF2\u91C7\u7EB3" : "\u5DF2\u4FDD\u7559\u539F\u8BBE\u5B9A"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("\u3001")}</p><button data-model-proposal="${p.id}">\u67E5\u770B\u5EFA\u8BAE</button></div>`).join("") || "<p>\u8FD8\u6CA1\u6709 AI \u8C03\u6574\u5EFA\u8BAE\u3002</p>"}</div><h3>\u5386\u53F2\u7248\u672C</h3>${model.history.map((h2) => `<div class="result-card"><small>${esc(h2.at)} \xB7 ${esc(h2.reason)}</small><details><summary>\u67E5\u770B\u5F53\u65F6\u7684\u8BBE\u5B9A</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h2.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h2.id}">\u6062\u590D\u6B64\u7248\u672C</button></div>`).join("")}`}</div></div>`;
+      const metricsCount = state.metrics.filter((r) => r["\u8D26\u53F7"] === a).length;
+      const body = model.definitions.map((d) => {
+        let extra = "";
+        if (d.id === "learning") {
+          extra = `<p class="settings-hint">\u5F53\u524D\u8D26\u53F7\u6709 ${metricsCount} \u7BC7\u5F52\u6863\u6570\u636E\u3002\u5355\u7BC7\u6CE2\u52A8\u4E0D\u4EE3\u8868\u8868\u8FBE\u65B9\u5F0F\u7684\u56E0\u679C\u6548\u679C\u3002</p>`;
+        }
+        if (d.id === "examples" && model.legacy?.some((f) => f.editable)) {
+          extra = `<details class="settings-legacy"><summary>\u67E5\u770B\u65E7 Profile \u8D44\u6599\uFF08\u53EA\u8BFB\uFF09</summary><div class="material-cards">${model.legacy.filter((f) => f.editable).map(
+            (f) => `<button type="button" class="material-card" data-model-legacy="${esc(f.path)}"><strong>${esc(f.path)}</strong></button>`
+          ).join("")}</div></details>`;
+        }
+        return settingsSection({
+          title: d.title,
+          control: settingsPanel(
+            `<textarea id="model-text-${d.id}" class="settings-model-text" rows="8" maxlength="${d.limit}">${esc(model.modules[d.id] || "")}</textarea>` + extra + `<div class="settings-panel-footer settings-panel-footer-split"><small class="settings-hint">${d.limit} \u5B57\u4EE5\u5185</small><button type="button" class="primary" data-save-model="${d.id}">\u4FDD\u5B58</button></div>`
+          )
+        });
+      }).join("");
       shell(body);
+      const collectModules = () => {
+        const next2 = { ...model.modules };
+        let changed2 = false;
+        for (const d of model.definitions) {
+          const el = $(`#model-text-${d.id}`);
+          if (!el || el.value === model.modules[d.id]) continue;
+          next2[d.id] = el.value;
+          changed2 = true;
+        }
+        return { next: next2, changed: changed2 };
+      };
       const save = async () => {
-        if (!definition || $("#model-text").value === model.modules[profileTab])
-          return true;
+        const { next: next2, changed: changed2 } = collectModules();
+        if (!changed2) return true;
         try {
           model = await api("model-save", {
             account: a,
             hash: model.hash,
-            modules: { ...model.modules, [profileTab]: $("#model-text").value }
+            modules: next2
           });
           toast("\u5F53\u524D\u8BBE\u5B9A\u5DF2\u4FDD\u5B58\uFF0C\u4E0A\u4E00\u7248\u5DF2\u7559\u5B58");
           return true;
@@ -33484,14 +33504,11 @@ async function renderAccountDetail() {
         }
       };
       saveProfileEditor = save;
-      $$("[data-model-tab]").forEach(
-        (b) => b.onclick = async () => {
-          if (!await save()) return;
-          profileTab = b.dataset.modelTab;
-          draw();
-        }
-      );
-      if ($("#save-model")) $("#save-model").onclick = save;
+      $$("[data-save-model]").forEach((b) => {
+        b.onclick = async () => {
+          if (await save()) draw();
+        };
+      });
       $$("[data-model-legacy]").forEach(
         (b) => b.onclick = async () => {
           const f = await api("profile-read", {
@@ -33501,69 +33518,10 @@ async function renderAccountDetail() {
           openPreview({ title: f.path, text: f.text });
         }
       );
-      $$("[data-model-proposal]").forEach(
-        (b) => b.onclick = () => showModelProposal(
-          model.proposals.find((p) => p.id === b.dataset.modelProposal),
-          model
-        )
-      );
-      $$("[data-model-restore]").forEach(
-        (b) => b.onclick = async () => {
-          try {
-            model = await api("model-restore", {
-              account: a,
-              hash: model.hash,
-              id: b.dataset.modelRestore
-            });
-            draw();
-            toast("\u5DF2\u6062\u590D\uFF1B\u6062\u590D\u524D\u7684\u8BBE\u5B9A\u4E5F\u5DF2\u4FDD\u7559");
-          } catch (e) {
-            toast(e.message);
-          }
-        }
-      );
     };
     draw();
   } catch (e) {
     toast(e.message);
-  }
-}
-function showModelProposal(p, model) {
-  const m = document.createElement("div");
-  m.className = "modal";
-  m.innerHTML = `<div class="dialog proposal-dialog"><div class="row"><h2>\u8C03\u6574\u73B0\u6709\u8D26\u53F7\u6A21\u5757</h2><button id="close-model-proposal">\u5173\u95ED</button></div>${p.changes.map(
-    (c) => `<h3>${esc(model.definitions.find((d) => d.id === c.module).title)}</h3><p>${esc(c.reason)}</p><small>\u6765\u6E90\uFF1A${c.sources.map(esc).join("\uFF1B")}</small><details><summary>\u67E5\u770B\u5DEE\u5F02</summary><div class="diff">${diffWords(
-      c.before,
-      c.content
-    ).map(
-      (x) => `<${x.added ? "ins" : x.removed ? "del" : "span"}>${esc(x.value)}</${x.added ? "ins" : x.removed ? "del" : "span"}>`
-    ).join(
-      ""
-    )}</div></details><textarea data-model-edit="${c.module}" rows="8" ${p.status !== "pending" ? "readonly" : ""}>${esc(c.content)}</textarea>`
-  ).join(
-    ""
-  )}${p.status === "pending" ? '<div class="row"><button id="reject-model">\u4FDD\u7559\u539F\u8BBE\u5B9A</button><button id="apply-model" class="primary">\u91C7\u7EB3\u4FEE\u6539</button></div>' : ""}</div>`;
-  document.body.append(m);
-  $("#close-model-proposal").onclick = () => m.remove();
-  const decide = async (apply2) => {
-    try {
-      await api("model-decide", {
-        account: p.account,
-        id: p.id,
-        apply: apply2,
-        edits: Object.fromEntries(
-          $$("[data-model-edit]").map((x) => [x.dataset.modelEdit, x.value])
-        )
-      });
-      m.remove();
-      if (page === "account") renderAccountDetail();
-    } catch (e) {
-      toast(e.message);
-    }
-  };
-  if ($("#apply-model")) {
-    $("#apply-model").onclick = () => decide(true);
-    $("#reject-model").onclick = () => decide(false);
   }
 }
 function renderCalendar(rows) {
@@ -33606,13 +33564,7 @@ async function checkForAppUpdate(opts = {}) {
     const info = await api("update-check");
     state._update = info;
     state._appVersion = info.current;
-    if (opts.manual || page === "settings") {
-      const status = $("#update-status");
-      if (status) {
-        status.textContent = info.available ? `\u53D1\u73B0\u65B0\u7248\u672C ${info.latest}` : `\u5DF2\u662F\u6700\u65B0\uFF08GitHub ${info.latest}\uFF09`;
-      }
-      if (opts.manual && page === "settings") render2();
-    }
+    if (opts.manual && page === "settings") render2();
     if (info.available) {
       toast(`\u53D1\u73B0\u65B0\u7248\u672C ${info.latest}\uFF0C\u53EF\u5728\u8BBE\u7F6E\u4E2D\u66F4\u65B0`);
     } else if (opts.manual) {
@@ -33658,6 +33610,7 @@ if (!isWeb()) {
 lucide/dist/esm/icons/at-sign.mjs:
 lucide/dist/esm/icons/bold.mjs:
 lucide/dist/esm/icons/chevron-down.mjs:
+lucide/dist/esm/icons/chevron-left.mjs:
 lucide/dist/esm/icons/circle-user.mjs:
 lucide/dist/esm/icons/copy.mjs:
 lucide/dist/esm/icons/external-link.mjs:

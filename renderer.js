@@ -3312,11 +3312,6 @@ function renderSettings() {
     { id: "groups", title: "分组" },
     { id: "skills", title: "技能" },
   ];
-  const updateStatus = state._update?.available
-    ? `发现新版本 ${esc(state._update.latest)}`
-    : state._update?.latest
-      ? `已是最新（GitHub ${esc(state._update.latest)}）`
-      : "点击检测 GitHub Release";
 
   const configBody = [
     settingsSection({
@@ -3367,7 +3362,7 @@ function renderSettings() {
     settingsSection({
       title: "应用更新",
       control: settingsPanel(
-        `<div class="settings-status-row"><div><span class="settings-field-label">当前版本</span><strong class="settings-version">${esc(state._appVersion || "…")}</strong></div><p id="update-status" class="settings-hint">${updateStatus}</p></div>` +
+        `<div class="settings-status-row"><div><span class="settings-field-label">当前版本</span><strong class="settings-version">${esc(state._appVersion || "…")}</strong></div></div>` +
           `<div class="settings-panel-footer"><button type="button" id="open-releases">${I.external()} 发布页</button><button type="button" id="check-update">${I.refresh()} 检测更新</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">下载并安装</button>` : ""}</div>`,
       ),
     }),
@@ -4252,7 +4247,7 @@ async function renderAccountDetail() {
   ];
   const shell = (body) => {
     $("#main").innerHTML =
-      `<header><div class="header-lead"><button type="button" class="ghost" id="account-detail-back">← 账号列表</button><h1 class="dashboard-tagline">${esc(acc.label)}</h1></div></header><section class="dashboard account-detail settings"><nav class="settings-tabs account-detail-tabs" role="tablist">${tabs
+      `<header><div class="header-lead account-detail-lead"><button type="button" class="ghost icon-btn" id="account-detail-back" title="账号列表" aria-label="返回账号列表">${I.chevronLeft({ size: 22 })}</button><h1 class="dashboard-tagline">${esc(acc.label)}</h1></div><div class="header-actions"><button type="button" class="danger" id="account-unregister">移除账号</button></div></header><section class="dashboard account-detail settings"><nav class="settings-tabs account-detail-tabs" role="tablist">${tabs
         .map(
           (t) =>
             `<button type="button" role="tab" data-account-tab="${t.id}" aria-selected="${accountDetailTab === t.id}" class="${accountDetailTab === t.id ? "active" : ""}">${t.title}</button>`,
@@ -4263,6 +4258,21 @@ async function renderAccountDetail() {
       page = "settings";
       settingsTab = "accounts";
       render();
+    };
+    $("#account-unregister").onclick = async () => {
+      const ok = await askConfirm(
+        "移除账号",
+        "仅从列表移除，不会删除磁盘文件夹。继续？",
+      );
+      if (!ok) return;
+      try {
+        page = "settings";
+        settingsTab = "accounts";
+        applyAccountState(await api("account-unregister", { id: a }));
+        toast("已移除账号");
+      } catch (e) {
+        toast(e.message || "移除失败");
+      }
     };
     $$("[data-account-tab]").forEach((b) => {
       b.onclick = async () => {
@@ -4296,13 +4306,6 @@ async function renderAccountDetail() {
             ),
           ),
         }),
-        settingsSection({
-          title: "移除账号",
-          control: settingsPanel(
-            `<button type="button" class="ghost" id="account-unregister">移除账号</button>`,
-          ),
-          className: "settings-section-danger",
-        }),
       ].join(""),
     );
     $("#account-set-avatar").onclick = () => pickAndSetAccountAvatar(a);
@@ -4318,21 +4321,6 @@ async function renderAccountDetail() {
           toast(e.message || "清除失败");
         }
       };
-    $("#account-unregister").onclick = async () => {
-      const ok = await askConfirm(
-        "移除账号",
-        "仅从列表移除，不会删除磁盘文件夹。继续？",
-      );
-      if (!ok) return;
-      try {
-        page = "settings";
-        settingsTab = "accounts";
-        applyAccountState(await api("account-unregister", { id: a }));
-        toast("已移除账号");
-      } catch (e) {
-        toast(e.message || "移除失败");
-      }
-    };
     return;
   }
   if (accountDetailTab === "skills") {
@@ -4353,31 +4341,53 @@ async function renderAccountDetail() {
     if (page !== "account" || account !== a || accountDetailTab !== "settings")
       return;
     const draw = () => {
-      const definition = model.definitions.find((d) => d.id === profileTab);
-      const body = `<div class="profile-manager"><nav class="model-tabs">${[...model.definitions, { id: "history", title: "迭代记录" }].map((d) => `<button data-model-tab="${d.id}" class="${profileTab === d.id ? "active" : ""}">${d.title}</button>`).join("")}</nav><div id="model-content">${
-        definition
-          ? `<h2>${definition.title}</h2><p>${{ identity: "只维护我是谁、写给谁、希望提供什么价值。", voice: "维护自然的表达偏好与必要边界，避免把每篇文章写成规则检查表。", examples: "保留我认可的真实经历和范文片段，并写清出处与为什么像我。", learning: "用有来源的数据观察指导下一次小实验；最多保留三个，过时就替换。" }[profileTab]}</p><textarea id="model-text" rows="15" maxlength="${definition.limit}">${esc(model.modules[profileTab])}</textarea><div class="row"><button id="save-model" class="primary">保存当前模块</button><small>${definition.limit} 字以内</small></div>${profileTab === "learning" ? `<p class="notice">当前账号有 ${state.metrics.filter((r) => r["账号"] === a).length} 篇归档数据。单篇波动不代表表达方式的因果效果。</p>` : ""}${
-              profileTab === "examples"
-                ? `<details><summary>查看旧 Profile 资料（只读）</summary><div class="material-cards">${model.legacy
-                    .filter((f) => f.editable)
-                    .map(
-                      (f) =>
-                        `<button class="material-card" data-model-legacy="${esc(f.path)}"><strong>${esc(f.path)}</strong></button>`,
-                    )
-                    .join("")}</div></details>`
-                : ""
-            }`
-          : `<p class="muted">人设迭代建议与历史版本。技能请切换到「技能」子页。</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} · ${p.status === "pending" ? "待审阅" : p.status === "applied" ? "已采纳" : "已保留原设定"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("、")}</p><button data-model-proposal="${p.id}">查看建议</button></div>`).join("") || "<p>还没有 AI 调整建议。</p>"}</div><h3>历史版本</h3>${model.history.map((h) => `<div class="result-card"><small>${esc(h.at)} · ${esc(h.reason)}</small><details><summary>查看当时的设定</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h.id}">恢复此版本</button></div>`).join("")}`
-      }</div></div>`;
+      const metricsCount = state.metrics.filter((r) => r["账号"] === a).length;
+      const body = model.definitions
+        .map((d) => {
+          let extra = "";
+          if (d.id === "learning") {
+            extra = `<p class="settings-hint">当前账号有 ${metricsCount} 篇归档数据。单篇波动不代表表达方式的因果效果。</p>`;
+          }
+          if (d.id === "examples" && model.legacy?.some((f) => f.editable)) {
+            extra =
+              `<details class="settings-legacy"><summary>查看旧 Profile 资料（只读）</summary><div class="material-cards">${model.legacy
+                .filter((f) => f.editable)
+                .map(
+                  (f) =>
+                    `<button type="button" class="material-card" data-model-legacy="${esc(f.path)}"><strong>${esc(f.path)}</strong></button>`,
+                )
+                .join("")}</div></details>`;
+          }
+          return settingsSection({
+            title: d.title,
+            control: settingsPanel(
+              `<textarea id="model-text-${d.id}" class="settings-model-text" rows="8" maxlength="${d.limit}">${esc(model.modules[d.id] || "")}</textarea>` +
+                extra +
+                `<div class="settings-panel-footer settings-panel-footer-split"><small class="settings-hint">${d.limit} 字以内</small><button type="button" class="primary" data-save-model="${d.id}">保存</button></div>`,
+            ),
+          });
+        })
+        .join("");
       shell(body);
+      const collectModules = () => {
+        const next = { ...model.modules };
+        let changed = false;
+        for (const d of model.definitions) {
+          const el = $(`#model-text-${d.id}`);
+          if (!el || el.value === model.modules[d.id]) continue;
+          next[d.id] = el.value;
+          changed = true;
+        }
+        return { next, changed };
+      };
       const save = async () => {
-        if (!definition || $("#model-text").value === model.modules[profileTab])
-          return true;
+        const { next, changed } = collectModules();
+        if (!changed) return true;
         try {
           model = await api("model-save", {
             account: a,
             hash: model.hash,
-            modules: { ...model.modules, [profileTab]: $("#model-text").value },
+            modules: next,
           });
           toast("当前设定已保存，上一版已留存");
           return true;
@@ -4387,15 +4397,11 @@ async function renderAccountDetail() {
         }
       };
       saveProfileEditor = save;
-      $$("[data-model-tab]").forEach(
-        (b) =>
-          (b.onclick = async () => {
-            if (!(await save())) return;
-            profileTab = b.dataset.modelTab;
-            draw();
-          }),
-      );
-      if ($("#save-model")) $("#save-model").onclick = save;
+      $$("[data-save-model]").forEach((b) => {
+        b.onclick = async () => {
+          if (await save()) draw();
+        };
+      });
       $$("[data-model-legacy]").forEach(
         (b) =>
           (b.onclick = async () => {
@@ -4404,30 +4410,6 @@ async function renderAccountDetail() {
               path: b.dataset.modelLegacy,
             });
             openPreview({ title: f.path, text: f.text });
-          }),
-      );
-      $$("[data-model-proposal]").forEach(
-        (b) =>
-          (b.onclick = () =>
-            showModelProposal(
-              model.proposals.find((p) => p.id === b.dataset.modelProposal),
-              model,
-            )),
-      );
-      $$("[data-model-restore]").forEach(
-        (b) =>
-          (b.onclick = async () => {
-            try {
-              model = await api("model-restore", {
-                account: a,
-                hash: model.hash,
-                id: b.dataset.modelRestore,
-              });
-              draw();
-              toast("已恢复；恢复前的设定也已保留");
-            } catch (e) {
-              toast(e.message);
-            }
           }),
       );
     };
@@ -4533,15 +4515,7 @@ async function checkForAppUpdate(opts = {}) {
     const info = await api("update-check");
     state._update = info;
     state._appVersion = info.current;
-    if (opts.manual || page === "settings") {
-      const status = $("#update-status");
-      if (status) {
-        status.textContent = info.available
-          ? `发现新版本 ${info.latest}`
-          : `已是最新（GitHub ${info.latest}）`;
-      }
-      if (opts.manual && page === "settings") render();
-    }
+    if (opts.manual && page === "settings") render();
     if (info.available) {
       toast(`发现新版本 ${info.latest}，可在设置中更新`);
     } else if (opts.manual) {
