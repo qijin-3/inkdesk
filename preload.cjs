@@ -38,6 +38,7 @@ const channels = [
   "copy",
   "metrics",
   "agent",
+  "agent-usage",
   "agent-models",
   "agent-test",
   "cancel",

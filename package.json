@@ -1,7 +1,7 @@
 {
   "name": "inkdesk",
   "productName": "AsIde",
-  "version": "0.2.2",
+  "version": "0.2.4",
   "description": "AsIde — local writing desk for Content OS",
   "main": "main.cjs",
   "scripts": {
@@ -9,11 +9,12 @@
     "dev": "node dev.cjs",
     "dev:server": "node server.cjs",
     "build:watch": "esbuild renderer.js --bundle --format=esm --outfile=bundle.js --watch",
-    "test": "node --test test.cjs vault.test.cjs knowledge.test.cjs model.test.cjs note-import.test.cjs skills.test.cjs",
-    "package:mac": "electron-packager . AsIde --platform=darwin --arch=arm64 --out=dist-0.2.2 --overwrite --icon=assets/AsIde.icns --ignore='^/data(/|$)' --ignore='^/dist' --ignore='screenshot-' --ignore='/(vault|development-vault)\\.json$' --ignore='/(vault|knowledge|model|note-import)\\.test\\.cjs$' --ignore='/test\\.cjs$' --ignore='/(smoke|review|social|workflow|packaged|real-vault|live-agent)[^/]*\\.cjs$' --ignore='^/dist-' --ignore='/skills(?:\\.test|-ui-test)\\.cjs$' --extra-resource=assets/reference-reader",
+    "test": "node --test test.cjs vault.test.cjs knowledge.test.cjs model.test.cjs note-import.test.cjs skills.test.cjs agent-models.test.cjs agent-usage.test.cjs",
+    "package:mac": "electron-packager . AsIde --platform=darwin --arch=arm64 --out=dist-0.2.4 --overwrite --icon=assets/AsIde.icns --ignore='^/data(/|$)' --ignore='^/dist' --ignore='screenshot-' --ignore='/(vault|development-vault)\\.json$' --ignore='/(vault|knowledge|model|note-import)\\.test\\.cjs$' --ignore='/test\\.cjs$' --ignore='/(smoke|review|social|workflow|packaged|real-vault|live-agent)[^/]*\\.cjs$' --ignore='^/dist-' --ignore='/skills(?:\\.test|-ui-test)\\.cjs$' --extra-resource=assets/reference-reader",
     "build": "esbuild renderer.js --bundle --format=esm --outfile=bundle.js",
-    "test:ui": "node smoke-ui.cjs && node review-ui.cjs && node skills-ui-test.cjs && node heatmap-ui.cjs",
-    "test:skills": "node skills-ui-test.cjs"
+    "test:ui": "node smoke-ui.cjs && node review-ui.cjs && node skills-ui-test.cjs && node heatmap-ui.cjs && node agents-ui.cjs && node usage-ui.cjs",
+    "test:skills": "node skills-ui-test.cjs",
+    "test:agents": "node agents-ui.cjs"
   },
   "dependencies": {
     "@tiptap/core": "^3.31.3",

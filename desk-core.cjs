@@ -1,3 +1,6 @@
+const { AgentUsage } = require("./agent-usage.cjs");
+const { AgentOutput } = require("./agent-output.cjs");
+const { parseModelLines, codexModels } = require("./agent-models.cjs");
 const { Skills } = require("./skills.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -80,6 +83,7 @@ const API_CHANNELS = [
   "copy",
   "metrics",
   "agent",
+  "agent-usage",
   "agent-models",
   "agent-test",
   "cancel",
@@ -137,6 +141,7 @@ class DeskCore {
   init(options) {
     const { dataDir, projectDir, readerPath } = options;
     this.data = dataDir;
+    this.agentUsage = new AgentUsage(dataDir);
     this.projectDir = projectDir;
     this.readerPath = readerPath;
     fs.mkdirSync(path.join(this.data, "assets"), { recursive: true });
@@ -383,6 +388,7 @@ class DeskCore {
         "/opt/homebrew/bin/agent",
       ],
       codex: [
+        "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
         "/Applications/ChatGPT.app/Contents/Resources/codex",
         path.join(home, ".local/bin/codex"),
         "/usr/local/bin/codex",
@@ -517,29 +523,7 @@ class DeskCore {
   }
 
   /** 解析 CLI 文本输出中的模型 ID 行 */
-  parseModelLines(text) {
-    const models = [];
-    const seen = new Set();
-    const skip = /^(available|models?|provider|name|id|codex|claude|cursor|opencode|usage|options?|commands?|flags?|error|failed|warning|unknown|unexpected)\b/i;
-    const cleaned = String(text || "").replace(/\x1b\[[0-9;]*m/g, "");
-    for (const raw of cleaned.split(/\r?\n/)) {
-      let line = raw.trim();
-      if (!line || line.startsWith("#") || skip.test(line)) continue;
-      // 去掉 " - label" / 括号说明
-      line = line.replace(/\s+[—–-].*$/, "").replace(/\s*\(.*\)\s*$/, "").trim();
-      const m =
-        line.match(/^([A-Za-z0-9_./:@+-]+(?:\[[^\]]*\])?)$/) ||
-        line.match(/^\s*[-*]\s+([A-Za-z0-9_./:@+-]+)/);
-      if (!m) continue;
-      const id = m[1];
-      if (id.length < 2 || skip.test(id) || seen.has(id)) continue;
-      // 过滤纯英文标题词
-      if (/^[A-Z][a-z]+$/.test(id) && !/-|\//.test(id)) continue;
-      seen.add(id);
-      models.push(id);
-    }
-    return models;
-  }
+  parseModelLines(text) { return parseModelLines(text); }
 
   /** 读取 ZCode 当前默认模型（只读，不写配置） */
   zcodeCurrentModel() {
@@ -576,118 +560,50 @@ class DeskCore {
    */
   async listAgentModels(data = {}) {
     const provider = this.normalizeProvider(data.provider);
-    const empty = (extra = {}) => ({
-      provider,
-      models: [],
-      current: "",
-      selectable: provider !== "zcode",
-      ...extra,
-    });
-
-    if (provider === "zcode") {
-      const current = this.zcodeCurrentModel();
-      return empty({
-        current,
-        selectable: false,
-        error: current ? "" : "未能读取 ZCode 默认模型",
-      });
-    }
-
-    if (provider === "claude") {
-      let current = "";
+    this.modelCatalogs ||= new Map();
+    this.modelQueries ||= new Map();
+    const previous = this.modelCatalogs.get(provider);
+    if (!data.refresh && previous && Date.now() - previous.checkedAt < 300000) return previous;
+    if (this.modelQueries.has(provider)) return this.modelQueries.get(provider);
+    const query = (async () => {
+      const base = { provider, models: [], current: "", selectable: provider !== "zcode", source: "", checkedAt: Date.now(), error: "" };
       try {
-        const settingsPath = path.join(os.homedir(), ".claude/settings.json");
-        if (fs.existsSync(settingsPath)) {
-          const s = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-          if (typeof s.model === "string") current = s.model;
+        const exe = this.executable(provider);
+        if (!exe) throw new Error("未找到 CLI，请先安装并登录");
+        if (provider === "zcode") return { ...base, current: this.zcodeCurrentModel(), source: "CLI 默认配置" };
+        if (provider === "claude") {
+          const help = await this.runCliCapture(exe, ["--help"]);
+          if (!help.ok) throw new Error("无法读取 Claude Code，请检查 CLI 状态");
+          const models = ["sonnet", "opus", "haiku"];
+          for (const alias of ["fable", "best"]) if (new RegExp("['\"]" + alias + "['\"]").test(help.output)) models.push(alias);
+          return { ...base, models, source: "CLI 模型别名", notice: "别名跟随 CLI 更新，并非账号实时权限列表；实际可用性取决于 CLI 版本和订阅。" };
         }
-      } catch {
-        /* ignore */
-      }
-      return {
-        provider,
-        models: ["sonnet", "opus", "haiku"],
-        current,
-        selectable: true,
-      };
-    }
-
-    const exe = this.executable(provider);
-    if (!exe) return empty({ error: "未找到 CLI" });
-
-    if (provider === "cursor") {
-      const r = await this.runCliCapture(exe, ["--list-models"]);
-      const models = this.parseModelLines(r.output);
-      return {
-        provider,
-        models,
-        current: "",
-        selectable: true,
-        error: models.length ? "" : (r.error || "").slice(-400),
-      };
-    }
-
-    if (provider === "codex") {
-      const r = await this.runCliCapture(exe, ["models"]);
-      let models = this.parseModelLines(r.output);
-      // 帮助文本易误匹配，仅保留像模型 ID 的项
-      models = models.filter((m) => /[/-]/.test(m) || /gpt|o[0-9]|codex-/i.test(m));
-      return {
-        provider,
-        models,
-        current: "",
-        selectable: true,
-        error: "",
-      };
-    }
-
-    if (provider === "opencode") {
-      const r = await this.runCliCapture(exe, ["models"], { timeoutMs: 20000 });
-      const models = this.parseModelLines(r.output).filter((m) => m.includes("/"));
-      return {
-        provider,
-        models,
-        current: "",
-        selectable: true,
-        error: models.length ? "" : (r.error || r.output || "").replace(/\x1b\[[0-9;]*m/g, "").slice(-400),
-      };
-    }
-
-    if (provider === "antigravity") {
-      const r = await this.runCliCapture(exe, ["models"], { timeoutMs: 20000 });
-      // agy models 输出多为显示名，整行可用
-      const models = String(r.output || "")
-        .replace(/\x1b\[[0-9;]*m/g, "")
-        .split(/\r?\n/)
-        .map((l) => l.replace(/^\s*[-*•]\s*/, "").trim())
-        .filter((l) => l && !/^(available|models?|error|failed|usage)/i.test(l));
-      let current = "";
-      try {
-        const settingsPath = path.join(
-          os.homedir(),
-          ".gemini/antigravity-cli/settings.json",
-        );
-        if (fs.existsSync(settingsPath)) {
-          const s = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-          if (typeof s.model === "string") current = s.model;
+        let models;
+        if (provider === "codex") models = await codexModels(exe, this.agentEnv());
+        else {
+          const args = provider === "cursor" ? ["--list-models"] : ["models", ...(provider === "opencode" && data.refresh ? ["--refresh"] : [])];
+          const result = await this.runCliCapture(exe, args, { timeoutMs: 25000 });
+          if (!result.ok) throw new Error("模型目录读取失败，请检查 CLI 登录状态或网络后重试");
+          models = parseModelLines(provider === "antigravity" ? result.output.replace(/^([a-z0-9][a-z0-9._-]+)\s{2,}.*$/gm, "$1") : result.output);
+          if (provider === "opencode") models = models.filter(m => m.includes("/"));
         }
-      } catch {
-        /* ignore */
+        if (!models.length) throw new Error("CLI 没有返回可识别的模型 ID，请沿用默认模型或刷新重试");
+        return { ...base, models, source: provider === "opencode" ? "OpenCode 模型目录" : "CLI 实时模型目录" };
+      } catch (error) {
+        return { ...(previous || base), error: error.message, stale: !!previous };
       }
-      return {
-        provider,
-        models,
-        current,
-        selectable: true,
-        error: models.length ? "" : (r.error || "").slice(-400),
-      };
-    }
-
-    return empty();
+    })();
+    this.modelQueries.set(provider, query);
+    try {
+      const result = await query;
+      if (!result.error) this.modelCatalogs.set(provider, result);
+      return result;
+    } finally { this.modelQueries.delete(provider); }
   }
 
   normalizeProvider(raw) {
-    const p = String(raw || "").toLowerCase();
+    const value = String(raw || "").toLowerCase();
+    const p = value === "chatgpt" ? "codex" : value;
     if (
       ["cursor", "codex", "claude", "zcode", "opencode", "antigravity"].includes(
         p,
@@ -719,7 +635,7 @@ class DeskCore {
         "--sandbox",
         "enabled",
         "--output-format",
-        "text",
+        "stream-json",
         "--workspace",
         cwd,
       ];
@@ -729,6 +645,7 @@ class DeskCore {
     } else if (provider === "codex") {
       args = [
         "exec",
+        "--json",
         "--sandbox",
         "read-only",
         "--skip-git-repo-check",
@@ -744,7 +661,7 @@ class DeskCore {
       args = [
         "-p",
         "--output-format",
-        "text",
+        "json",
         "--tools",
         "",
         "--permission-mode",
@@ -753,13 +670,13 @@ class DeskCore {
       if (m) args.push("--model", m);
       args.push(prompt);
     } else if (provider === "opencode") {
-      args = ["run", "--format", "default", "--dir", cwd];
+      args = ["run", "--format", "json", "--dir", cwd];
       if (m) args.push("-m", m);
       args.push(prompt);
     } else if (provider === "antigravity") {
-      // --model 需在 -p 之前；显示名与 agy models 输出一致
+      // Use the CLI model slug, never its display label.
       if (m) args.push("--model", m);
-      args.push("-p", prompt);
+      args.push("-p", prompt, "--output-format", "json");
     } else if (provider === "zcode") {
       const launch = this.zcodeLaunch(exe);
       cmd = launch.cmd;
@@ -778,6 +695,7 @@ class DeskCore {
     }
 
     return {
+      provider,
       cmd,
       args,
       envExtra,
@@ -794,75 +712,40 @@ class DeskCore {
    * @param {{ cwd: string, prompt: string, timeoutMs?: number, onProgress?: Function, streamProgress?: boolean }} opts
    */
   spawnAgent(spec, opts) {
-    const {
-      cwd,
-      prompt,
-      timeoutMs = 180000,
-      onProgress,
-      streamProgress,
-    } = opts;
+    const { cwd, prompt, timeoutMs = 180000, onProgress, streamProgress } = opts;
+    const usageId = opts.usageMeta && this.agentUsage?.begin(opts.usageMeta);
     return new Promise((resolve, reject) => {
-      let output = "",
-        error = "";
-      const child = spawn(spec.cmd, spec.args, {
-        cwd,
-        env: this.agentEnv(spec.envExtra),
-        stdio: ["pipe", "pipe", "pipe"],
-      });
+      let output = "", error = "", timeout = false, settled = false, timer;
+      const decoder = new AgentOutput(spec.provider, streamProgress ? onProgress : null);
+      const finish = (status, failure, result) => {
+        if (settled) return;
+        settled = true; clearTimeout(timer);
+        if (usageId) this.agentUsage.end(usageId, status, decoder.usage);
+        failure ? reject(failure) : resolve(String(result || "").trim());
+      };
+      let child;
+      try {
+        child = spawn(spec.cmd, spec.args, { cwd, env: this.agentEnv(spec.envExtra), stdio: ["pipe", "pipe", "pipe"] });
+      } catch (e) { finish("failed", e); return; }
       this.active = child;
-      let timeout = false;
-      const timer = setTimeout(() => {
-        timeout = true;
-        child.kill("SIGTERM");
-      }, timeoutMs);
-      child.stdout.on("data", (b) => {
-        output += b.toString();
-        if (onProgress && streamProgress) onProgress(b.toString());
-      });
-      child.stderr.on("data", (b) => {
-        error += b.toString();
-      });
-      child.on("error", (e) => {
-        clearTimeout(timer);
+      timer = setTimeout(() => { timeout = true; child.kill("SIGTERM"); }, timeoutMs);
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", b => { output += b; decoder.push(b); });
+      child.stderr.on("data", b => { error += b.toString(); });
+      child.stdin.on("error", () => {});
+      child.on("error", e => { if(this.active === child) this.active = null; finish("failed",e); });
+      child.on("close", code => {
         if (this.active === child) this.active = null;
-        reject(e);
-      });
-      child.on("close", (code) => {
-        clearTimeout(timer);
-        if (this.active === child) this.active = null;
-        let result = output;
+        decoder.finish(output);
+        let result = decoder.result();
         if (spec.outFile && fs.existsSync(spec.outFile)) {
-          result = fs.readFileSync(spec.outFile, "utf8");
-          try {
-            fs.unlinkSync(spec.outFile);
-          } catch {
-            /* ignore */
-          }
+          try { result = fs.readFileSync(spec.outFile,"utf8"); fs.unlinkSync(spec.outFile); } catch {}
         }
-        if (spec.parseZcodeJson) {
-          try {
-            const json = JSON.parse(result.trim());
-            result =
-              json.response ??
-              json.text ??
-              json.message ??
-              (typeof json === "string" ? json : result);
-          } catch {
-            /* keep raw */
-          }
-        }
-        if (code !== 0)
-          reject(
-            Error(
-              timeout
-                ? "请求超时，请缩短文章后重试。"
-                : error.slice(-1800) || "任务已取消或运行失败",
-            ),
-          );
-        else resolve(String(result).trim());
+        const status = timeout ? "timeout" : child.asideCancelled ? "cancelled" : code !== 0 || decoder.error || !String(result || "").trim() ? "failed" : "success";
+        const message = timeout ? "请求超时，请缩短文章后重试。" : child.asideCancelled ? "任务已取消" : decoder.error || error.slice(-1800) || "Agent 未返回正文";
+        finish(status, status === "success" ? null : Error(message), result);
       });
-      if (spec.stdinPrompt) child.stdin.end(prompt);
-      else child.stdin.end();
+      child.stdin.end(spec.stdinPrompt ? prompt : undefined);
     });
   }
 
@@ -898,6 +781,7 @@ class DeskCore {
       const text = await this.spawnAgent(spec, {
         cwd,
         prompt,
+        usageMeta: { provider, model, kind: "test" },
         timeoutMs: 90000,
         streamProgress: false,
       });
@@ -1134,12 +1018,15 @@ class DeskCore {
       }
       case "cancel":
         if (this.active) {
+          this.active.asideCancelled = true;
           this.active.kill("SIGTERM");
           this.active = null;
         }
         return true;
       case "agent":
         return this.runAgent(data);
+      case "agent-usage":
+        return this.agentUsage.snapshot(data);
       case "agent-models":
         return this.listAgentModels(data);
       case "agent-test":
@@ -1708,6 +1595,7 @@ class DeskCore {
     return this.spawnAgent(spec, {
       cwd,
       prompt,
+      usageMeta: { provider, model, kind: "writing", account: req.account, articleId: req.articleId, conversationId: req.conversationId },
       onProgress: progress,
       streamProgress: spec.streamProgress,
     });

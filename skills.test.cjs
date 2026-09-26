@@ -20,7 +20,7 @@ function writePack(dir, name, description) {
   );
 }
 
-test("vault .agents/skills scan, symlink mount, drop legacy", () => {
+test("vault .agents/skills scan, symlink mount, bindings", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aside-skills-"));
   const mount = fs.mkdtempSync(path.join(os.tmpdir(), "aside-mount-"));
   try {
@@ -44,7 +44,7 @@ test("vault .agents/skills scan, symlink mount, drop legacy", () => {
     );
     let s = k.list("A");
     assert.equal(s.items.length, 0);
-    assert.deepEqual(s.accounts, {});
+    assert.deepEqual(s.bindings, {});
     assert.equal(s.root, SKILLS_ROOT);
 
     s = k.create({
@@ -56,6 +56,7 @@ test("vault .agents/skills scan, symlink mount, drop legacy", () => {
     assert.ok(
       fs.existsSync(path.join(root, ".agents/skills/fact-check/SKILL.md")),
     );
+    assert.equal(s.bindings["fact-check"], "all");
 
     const src = path.join(root, "incoming", "my-voice");
     writePack(src, "my-voice", "保留语气");
@@ -76,7 +77,31 @@ test("vault .agents/skills scan, symlink mount, drop legacy", () => {
     s = k.configure({
       account: "A",
       revision: s.revision,
-      ids: ["fact-check", "writing/my-voice"],
+      id: "writing/my-voice",
+      binding: ["A"],
+    });
+    assert.deepEqual(s.bindings["writing/my-voice"], ["A"]);
+    assert.equal(s.bindings["fact-check"], "all");
+    assert.ok(s.accounts.A.includes("fact-check"));
+    assert.ok(s.accounts.A.includes("writing/my-voice"));
+
+    s = k.configure({
+      account: "A",
+      revision: s.revision,
+      id: "writing/my-voice",
+      binding: "none",
+    });
+    assert.equal(s.bindings["writing/my-voice"], undefined);
+    assert.equal(
+      s.items.find((x) => x.id === "writing/my-voice")?.binding,
+      "none",
+    );
+
+    s = k.configure({
+      account: "A",
+      revision: s.revision,
+      id: "writing/my-voice",
+      binding: ["A"],
     });
     const mounted = k.mount("A", undefined, mount);
     assert.equal(mounted.length, 2);
@@ -95,8 +120,33 @@ test("vault .agents/skills scan, symlink mount, drop legacy", () => {
       id: "writing/my-voice",
     });
     assert.equal(s.items.some((x) => x.id === "writing/my-voice"), false);
+    assert.equal(s.bindings["writing/my-voice"], undefined);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(mount, { recursive: true, force: true });
+  }
+});
+
+test("migrate legacy accounts map to bindings", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aside-skills-mig-"));
+  try {
+    const k = new Skills(vaultStub(root));
+    writePack(path.join(root, ".agents/skills/alpha"), "alpha", "A skill");
+    writePack(path.join(root, ".agents/skills/beta"), "beta", "B skill");
+    fs.mkdirSync(path.dirname(k.file), { recursive: true });
+    fs.writeFileSync(
+      k.file,
+      JSON.stringify({
+        revision: 1,
+        accounts: { AccA: ["alpha"], AccB: ["alpha", "beta"] },
+      }),
+    );
+    const s = k.list("AccA");
+    assert.deepEqual(s.bindings.alpha, ["AccA", "AccB"]);
+    assert.deepEqual(s.bindings.beta, ["AccB"]);
+    assert.ok(s.accounts.AccA.includes("alpha"));
+    assert.ok(!s.accounts.AccA.includes("beta"));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
   }
 });

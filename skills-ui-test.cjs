@@ -28,9 +28,10 @@ const { _electron: electron } = require("@playwright/test"),
         .querySelector(".skill-tree")
         ?.textContent.includes("fact-check"),
     );
-    await w.locator('[data-default="fact-check"]').check();
     await w.waitForFunction(() =>
-      document.querySelector('[data-default="fact-check"]')?.checked,
+      document
+        .querySelector('[data-skill-accounts="fact-check"] summary')
+        ?.textContent.includes("所有"),
     );
     assert.ok(
       fs.existsSync(
@@ -53,7 +54,7 @@ const { _electron: electron } = require("@playwright/test"),
       await w.locator(".message.assistant").innerText(),
       /收到技能 1/,
     );
-    console.log("PASS skills UI: tree page, defaults, picker, symlink store");
+    console.log("PASS skills UI: tree page, bindings, picker, symlink store");
   } finally {
     if (app) await app.close();
     fs.rmSync(dir, { recursive: true, force: true });

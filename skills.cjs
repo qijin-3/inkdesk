@@ -68,12 +68,82 @@ class Skills {
     return this.vault.p(path.join(this.rootRel, rel));
   }
 
+  /**
+   * 规范化技能账号绑定：`"all"` | `"none"` | 账号 id 数组。
+   * @param {unknown} raw
+   */
+  normalizeBinding(raw) {
+    if (raw === "all" || raw === "none") return raw;
+    if (Array.isArray(raw)) {
+      const ids = [
+        ...new Set(
+          raw.map((x) => String(x || "").trim()).filter(Boolean),
+        ),
+      ];
+      return ids.length ? ids : "none";
+    }
+    return "none";
+  }
+
+  /**
+   * 旧版 accounts: { accountId: skillIds[] } → bindings: { skillId: ... }
+   * @param {Record<string, unknown>} accounts
+   */
+  bindingsFromAccounts(accounts) {
+    const bindings = {};
+    for (const [accountId, skillIds] of Object.entries(accounts || {})) {
+      if (!Array.isArray(skillIds)) continue;
+      for (const id of skillIds) {
+        const skillId = String(id || "").trim();
+        if (!skillId) continue;
+        if (!bindings[skillId]) bindings[skillId] = [];
+        if (!bindings[skillId].includes(accountId))
+          bindings[skillId].push(accountId);
+      }
+    }
+    for (const [id, v] of Object.entries(bindings))
+      bindings[id] = this.normalizeBinding(v);
+    return bindings;
+  }
+
+  /**
+   * 由 bindings 推导「账号 → 可用技能」；供挂载与会话选择器使用。
+   * @param {Record<string, unknown>} bindings
+   * @param {Set<string>} skillIds
+   * @param {string[]} [accountIds]
+   */
+  accountsFromBindings(bindings, skillIds, accountIds = []) {
+    const accounts = {};
+    for (const a of accountIds) accounts[a] = [];
+    for (const [skillId, raw] of Object.entries(bindings || {})) {
+      if (!skillIds.has(skillId)) continue;
+      const b = this.normalizeBinding(raw);
+      if (b === "none") continue;
+      if (b === "all") {
+        for (const a of Object.keys(accounts)) accounts[a].push(skillId);
+        continue;
+      }
+      for (const a of b) {
+        if (!accounts[a]) accounts[a] = [];
+        if (!accounts[a].includes(skillId)) accounts[a].push(skillId);
+      }
+    }
+    return accounts;
+  }
+
+  skillAvailableFor(binding, account) {
+    const b = this.normalizeBinding(binding);
+    if (b === "all") return true;
+    if (b === "none") return false;
+    return b.includes(account);
+  }
+
   readRegistry() {
     if (!fs.existsSync(this.file))
-      return { revision: 0, accounts: {} };
+      return { revision: 0, bindings: {} };
     const s = JSON.parse(fs.readFileSync(this.file, "utf8"));
     if (!s || typeof s !== "object")
-      return { revision: 0, accounts: {} };
+      return { revision: 0, bindings: {} };
     const items = Array.isArray(s.items) ? s.items : [];
     const legacy = items.some(
       (x) =>
@@ -83,12 +153,18 @@ class Skills {
           x.scope === "account" ||
           x.scope === "global"),
     );
-    if (legacy)
-      return { revision: Number(s.revision) || 0, accounts: {} };
+    if (legacy) return { revision: Number(s.revision) || 0, bindings: {} };
+    if (s.bindings && typeof s.bindings === "object") {
+      const bindings = {};
+      for (const [id, v] of Object.entries(s.bindings))
+        bindings[id] = this.normalizeBinding(v);
+      return { revision: Number(s.revision) || 0, bindings };
+    }
     return {
       revision: Number(s.revision) || 0,
-      accounts:
+      bindings: this.bindingsFromAccounts(
         s.accounts && typeof s.accounts === "object" ? s.accounts : {},
+      ),
     };
   }
 
@@ -145,18 +221,32 @@ class Skills {
   list(account) {
     account = this.vault.resolveAccountId(account);
     const reg = this.readRegistry();
-    const items = this.scan();
-    const ids = new Set(items.map((x) => x.id));
-    const accounts = {};
-    for (const [k, v] of Object.entries(reg.accounts)) {
-      accounts[k] = (Array.isArray(v) ? v : []).filter((id) => ids.has(id));
+    const scanned = this.scan();
+    const ids = new Set(scanned.map((x) => x.id));
+    const bindings = {};
+    for (const [k, v] of Object.entries(reg.bindings)) {
+      if (!ids.has(k)) continue;
+      bindings[k] = this.normalizeBinding(v);
     }
+    const accountIds = new Set([
+      account,
+      ...Object.keys(reg.bindings).flatMap((skillId) => {
+        const b = this.normalizeBinding(reg.bindings[skillId]);
+        return Array.isArray(b) ? b : [];
+      }),
+    ]);
+    const accounts = this.accountsFromBindings(bindings, ids, [...accountIds]);
+    const items = scanned.map((x) => ({
+      ...x,
+      binding: bindings[x.id] ?? "none",
+    }));
     return {
       revision: reg.revision,
       account,
       root: this.rootRel,
       items,
       tree: this.treeFrom(items),
+      bindings,
       accounts,
     };
   }
@@ -183,7 +273,7 @@ class Skills {
     fs.writeFileSync(
       tmp,
       JSON.stringify(
-        { revision: reg.revision, accounts: reg.accounts },
+        { revision: reg.revision, bindings: reg.bindings },
         null,
         2,
       ),
@@ -221,7 +311,7 @@ class Skills {
   }
 
   import(p) {
-    return this.change(p.account, p.revision, () => {
+    return this.change(p.account, p.revision, (reg) => {
       const src = path.resolve(String(p.sourcePath || ""));
       if (!src || !fs.existsSync(src) || !fs.statSync(src).isDirectory())
         throw Error("请选择有效的技能文件夹");
@@ -232,11 +322,12 @@ class Skills {
       if (fs.existsSync(dest)) throw Error("技能目录已存在：" + id);
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       copyDir(src, dest);
+      reg.bindings[id] = "all";
     });
   }
 
   create(p) {
-    return this.change(p.account, p.revision, () => {
+    return this.change(p.account, p.revision, (reg) => {
       const name = String(p.name || "")
         .trim()
         .toLowerCase();
@@ -252,6 +343,7 @@ class Skills {
         path.join(dest, "SKILL.md"),
         `---\nname: ${name}\ndescription: ${description}\n---\n\n# ${name}\n\n在此编写技能说明。需要时把参考资料放到 references/，脚本放到 scripts/。\n`,
       );
+      reg.bindings[id] = "all";
     });
   }
 
@@ -261,21 +353,26 @@ class Skills {
       if (!fs.existsSync(path.join(abs, "SKILL.md")))
         throw Error("技能不存在");
       rmrf(abs);
-      for (const k of Object.keys(reg.accounts))
-        reg.accounts[k] = (reg.accounts[k] || []).filter((id) => id !== p.id);
+      delete reg.bindings[p.id];
     });
   }
 
+  /**
+   * 设置单个技能的账号绑定。
+   * @param {{ account: string, revision: number, id: string, binding: "all"|"none"|string[] }} p
+   */
   configure(p) {
-    return this.change(p.account, p.revision, (reg, a) => {
-      const ids = Array.isArray(p.ids) ? [...new Set(p.ids)] : [];
-      if (ids.length > 30) throw Error("一次最多启用 30 个技能");
+    return this.change(p.account, p.revision, (reg) => {
+      const id = String(p.id || "").trim();
+      if (!id) throw Error("缺少技能 id");
       const known = new Set(this.scan().map((x) => x.id));
-      for (const id of ids) {
-        if (!known.has(id)) throw Error("引用的技能不存在：" + id);
-        this.readSkillDir(this.packAbs(id));
-      }
-      reg.accounts[a] = ids;
+      if (!known.has(id)) throw Error("引用的技能不存在：" + id);
+      this.readSkillDir(this.packAbs(id));
+      const binding = this.normalizeBinding(p.binding);
+      if (Array.isArray(binding) && binding.length > 30)
+        throw Error("一个技能最多绑定 30 个账号");
+      if (binding === "none") delete reg.bindings[id];
+      else reg.bindings[id] = binding;
     });
   }
 
@@ -286,7 +383,14 @@ class Skills {
   mount(account, ids, destRoot) {
     account = this.vault.resolveAccountId(account);
     const reg = this.readRegistry();
-    const selected = ids ?? reg.accounts[account] ?? [];
+    const scanned = this.scan();
+    const skillIds = new Set(scanned.map((x) => x.id));
+    const available = scanned
+      .filter((x) =>
+        this.skillAvailableFor(reg.bindings[x.id] ?? "none", account),
+      )
+      .map((x) => x.id);
+    const selected = ids ?? available;
     if (!Array.isArray(selected) || selected.length > 30)
       throw Error("一次最多使用 30 个技能");
     const mountDir = path.join(destRoot, SKILLS_ROOT);
@@ -295,6 +399,7 @@ class Skills {
     const mounted = [];
     const usedNames = new Set();
     for (const id of selected) {
+      if (!skillIds.has(id)) throw Error("引用的技能不存在：" + id);
       const src = this.packAbs(id);
       const meta = this.readSkillDir(src);
       if (usedNames.has(meta.name))

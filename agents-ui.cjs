@@ -1,0 +1,23 @@
+const {_electron:electron}=require('@playwright/test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+(async()=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'aside-agents-'));let app;try{
+ const root=path.join(dir,'Content_OS');for(const sub of ['00_Profile','01_Topics','02_Drafts','03_Archive'])fs.mkdirSync(path.join(root,'Demo_AI',sub),{recursive:true});
+ const bin=path.join(dir,'bin');fs.mkdirSync(bin);
+ for(const name of ['cursor','codex','claude','zcode','opencode','antigravity'])fs.writeFileSync(path.join(bin,name),'#!/bin/sh\nexit 0\n',{mode:0o755});
+ const env={...process.env,INKDESK_DATA:dir,INKDESK_VAULT:root,PATH:`${bin}${path.delimiter}${process.env.PATH||''}`};delete env.ELECTRON_RUN_AS_NODE;
+ app=await electron.launch({...(process.env.ASIDE_TEST_APP ? {executablePath:process.env.ASIDE_TEST_APP,args:[]} : {args:[path.resolve('main.cjs')]}),env});const w=await app.firstWindow();
+ await app.evaluate(({ipcMain})=>{ipcMain.removeHandler('agent-models');ipcMain.handle('agent-models',(_,req)=>({models:[req.provider==='codex'?'gpt-current':'claude-current'],source:'CLI 实时模型目录',checkedAt:Date.now(),selectable:req.provider!=='zcode'}));});
+ await w.locator('[data-page="settings"]').click();await w.locator('[data-settings-tab="agents"]').click();
+ assert.equal(await w.locator('[data-open-agent="codex"] .agent-card-title strong').textContent(),'ChatGPT');
+ assert.equal(await w.locator('[data-open-agent="claude"] .agent-card-title strong').textContent(),'Claude Code');
+ const images=await w.locator('.agent-card-logo img').evaluateAll(async imgs=>{await Promise.all(imgs.map(i=>i.decode()));return imgs.map(i=>i.naturalWidth)});assert.equal(images.length,6);assert(images.every(n=>n>0));
+ await w.locator('[data-open-agent="codex"]').click();
+ await w.locator('[data-agent-refresh="codex"]').waitFor();
+ assert.equal(await w.locator('.dashboard-tagline').textContent(),'ChatGPT');
+ await w.locator('[data-agent-refresh="codex"]').click();await w.locator('[data-agent-refresh="codex"]:not([disabled])').waitFor();
+ await w.locator('[data-agent-preset="codex"]').selectOption('gpt-current');await w.locator('[data-agent-add-model="codex"]').click();await w.locator('[data-agent-use="codex"]').click();
+ await w.locator('#agent-detail-back').click();
+ await w.locator('[data-open-agent="claude"]').click();
+ await w.locator('#agent-set-default').click();
+ const stored=JSON.parse(fs.readFileSync(path.join(dir,'workspace.json'),'utf8'));assert.equal(stored.provider,'claude');assert.equal(stored.model,'');
+ await w.screenshot({path:'/tmp/aside-agents.png',fullPage:true});console.log('PASS Agent names, six real logos, refresh/add/select and provider isolation');
+ }finally{if(app)await app.close();fs.rmSync(dir,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -152,7 +152,7 @@ const passthrough = new Set([
   "project-read",
   "project-toggle",
   "metrics",
-  "agent",
+  "agent-usage",
   "agent-models",
   "agent-test",
   "cancel",

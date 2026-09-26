@@ -85,6 +85,63 @@ var require_calendar = __commonJS({
   }
 });
 
+// agent-usage-ui.js
+var fmt = (n) => Number(n || 0).toLocaleString("zh-CN");
+var esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+function mountAgentUsage(root2, api2, providers, opts = {}) {
+  if (!root2) return;
+  const mode = opts.mode === "detail" ? "detail" : "overview";
+  const lockedProvider = mode === "detail" && providers.some((p) => p.id === opts.provider) ? opts.provider : "all";
+  let days = 30, provider = lockedProvider, metric = "calls", request = 0;
+  const title = mode === "detail" ? `${esc(providers.find((p) => p.id === provider)?.label || provider)} \u8C03\u7528\u660E\u7EC6` : "\u603B\u89C8";
+  const hint = mode === "detail" ? "\u4EC5\u7EDF\u8BA1\u901A\u8FC7 AsIde \u53D1\u8D77\u7684\u8C03\u7528\uFF0C\u4ECE\u542F\u7528\u6B64\u7248\u672C\u540E\u5F00\u59CB\u8BB0\u5F55\u3002" : "\u4EC5\u7EDF\u8BA1\u901A\u8FC7 AsIde \u53D1\u8D77\u7684\u8C03\u7528\uFF0C\u4ECE\u542F\u7528\u6B64\u7248\u672C\u540E\u5F00\u59CB\u8BB0\u5F55\u3002\u8FDB\u5165\u4E0B\u65B9\u6A21\u578B\u5361\u7247\u53EF\u67E5\u770B\u5404 Agent \u660E\u7EC6\u4E0E\u8FDE\u63A5\u914D\u7F6E\u3002";
+  root2.innerHTML = `<div class="usage-head"><div><h3>${title}</h3><p class="settings-hint">${hint}</p></div><div class="usage-filters"><select aria-label="\u7EDF\u8BA1\u5468\u671F" id="usage-days"><option value="7">\u8FD1 7 \u5929</option><option value="30" selected>\u8FD1 30 \u5929</option><option value="90">\u8FD1 90 \u5929</option></select><button type="button" class="ghost" id="usage-refresh">\u5237\u65B0</button></div></div><div id="usage-content" aria-live="polite">\u8BFB\u53D6\u7EDF\u8BA1\u2026</div>`;
+  const content = root2.querySelector("#usage-content");
+  async function load() {
+    const id = ++request;
+    const refresh = root2.querySelector("#usage-refresh");
+    refresh.disabled = true;
+    try {
+      const data = await api2("agent-usage", { days, provider });
+      if (id !== request || !root2.isConnected) return;
+      const t = data.total;
+      content.innerHTML = `${data.error ? `<p class="usage-error">${esc(data.error)}</p>` : ""}<div class="usage-summary">
+     <div><span>\u5199\u4F5C\u8C03\u7528</span><strong>${fmt(t.calls)}</strong><small>\u6210\u529F ${fmt(t.success)} \xB7 \u5931\u8D25 ${fmt(t.failed)}</small></div>
+     <div><span>\u53C2\u4E0E\u5BF9\u8BDD</span><strong>${fmt(t.conversations)}</strong><small>\u540C\u4E00\u5BF9\u8BDD\u591A\u8F6E\u53EA\u8BA1\u4E00\u6B21</small></div>
+     <div><span>\u5DF2\u8BB0\u5F55 Token</span><strong>${t.tokenCalls ? fmt(t.tokens) : "\u2014"}</strong><small>${fmt(t.tokenCalls)} / ${fmt(t.calls)} \u6B21\u8C03\u7528\u8FD4\u56DE\u7528\u91CF</small></div>
+     <div><span>\u8FDE\u901A\u6027\u6D4B\u8BD5</span><strong>${fmt(t.tests)}</strong><small>\u4E0D\u8BA1\u5165\u5199\u4F5C\u8C03\u7528\u53CA Token</small></div>
+    </div><div class="usage-chart-head"><strong>\u6BCF\u65E5\u8D8B\u52BF</strong><select id="usage-metric" aria-label="\u56FE\u8868\u6307\u6807"><option value="calls">\u8C03\u7528\u6B21\u6570</option><option value="conversations">\u5BF9\u8BDD\u6B21\u6570</option><option value="tokens">\u5DF2\u8BB0\u5F55 Token</option></select></div><div id="usage-chart"></div>
+    <p class="settings-hint">${t.calls ? "" : "\u6682\u65E0\u5199\u4F5C\u8C03\u7528\uFF0C\u53D1\u9001\u7B2C\u4E00\u6761\u6D88\u606F\u540E\u8FD9\u91CC\u4F1A\u81EA\u52A8\u7D2F\u8BA1\u3002"}${t.cancelled || t.timeout || t.interrupted || t.running ? ` \u53D6\u6D88 ${fmt(t.cancelled)} \xB7 \u8D85\u65F6 ${fmt(t.timeout)} \xB7 \u4E2D\u65AD ${fmt(t.interrupted)} \xB7 \u8FDB\u884C\u4E2D ${fmt(t.running)}` : ""}</p>
+    ${mode === "detail" ? `<p class="settings-hint">\u8C03\u7528\u5305\u542B\u6210\u529F\u3001\u5931\u8D25\u548C\u53D6\u6D88\u7B49\u5DF2\u542F\u52A8\u8BF7\u6C42\uFF1B\u5BF9\u8BDD\u6309\u6587\u7AE0\u4E0E\u5BF9\u8BDD\u6807\u8BC6\u53BB\u91CD\u3002Token \u4EC5\u6C47\u603B CLI \u8FD4\u56DE\u503C\uFF0C\u672A\u8FD4\u56DE\u4E0D\u7B49\u4E8E 0\uFF0C\u4E5F\u4E0D\u4EE3\u8868\u8BA2\u9605\u4F59\u989D\u3002${data.firstAt ? ` \u9996\u6761\u8BB0\u5F55\uFF1A${esc(new Date(data.firstAt).toLocaleString("zh-CN"))}\u3002` : ""}</p>` : ""}`;
+      const select = content.querySelector("#usage-metric");
+      select.value = metric;
+      select.onchange = () => {
+        metric = select.value;
+        chart(data.daily);
+      };
+      chart(data.daily);
+    } catch (e) {
+      if (id === request) content.textContent = "\u7EDF\u8BA1\u8BFB\u53D6\u5931\u8D25\uFF1A" + (e.message || "\u8BF7\u5237\u65B0\u91CD\u8BD5");
+    } finally {
+      if (id === request) refresh.disabled = false;
+    }
+  }
+  function chart(daily) {
+    const max = Math.max(1, ...daily.map((d) => d[metric]));
+    const label = { calls: "\u8C03\u7528", conversations: "\u5BF9\u8BDD", tokens: "\u5DF2\u8BB0\u5F55 Token" }[metric];
+    content.querySelector("#usage-chart").innerHTML = `<div class="usage-scale">${fmt(max)} ${label}</div><div class="usage-bars" role="group" aria-label="\u6BCF\u65E5${label}\u8D8B\u52BF">${daily.map((d) => {
+      const title2 = `${d.date} \xB7 ${fmt(d[metric])} ${label}${metric === "tokens" ? ` \xB7 ${d.tokenCalls}/${d.calls} \u6B21\u6709\u7528\u91CF` : ""}`;
+      return `<div class="usage-bar-slot" tabindex="0" role="img" aria-label="${esc(title2)}" title="${esc(title2)}"><div class="usage-bar ${d[metric] ? "" : "is-zero"}" style="height:${d[metric] ? Math.max(2, d[metric] / max * 100) : 1}%"></div><span class="usage-tooltip">${esc(title2)}</span></div>`;
+    }).join("")}</div><div class="usage-axis"><span>${daily[0].date}</span><span>${daily[daily.length - 1].date}</span></div>`;
+  }
+  root2.querySelector("#usage-days").onchange = (e) => {
+    days = Number(e.target.value);
+    load();
+  };
+  root2.querySelector("#usage-refresh").onclick = load;
+  load();
+}
+
 // skills-ui.js
 var escape = (s) => String(s ?? "").replace(
   /[&<>"']/g,
@@ -123,6 +180,50 @@ function askLine(title, placeholder = "", { allowEmpty = false } = {}) {
     input.focus();
   });
 }
+function normalizeBinding(raw) {
+  if (raw === "all" || raw === "none") return raw;
+  if (Array.isArray(raw)) {
+    const ids = [
+      ...new Set(raw.map((x) => String(x || "").trim()).filter(Boolean))
+    ];
+    return ids.length ? ids : "none";
+  }
+  return "none";
+}
+function skillAvailableFor(binding, account2) {
+  const b = normalizeBinding(binding);
+  if (b === "all") return true;
+  if (b === "none") return false;
+  return b.includes(account2);
+}
+function bindingLabel(binding, accounts) {
+  const b = normalizeBinding(binding);
+  if (b === "all") return "\u6240\u6709";
+  if (b === "none") return "\u4E0D\u542F\u7528";
+  const labels = b.map(
+    (id) => accounts.find((a) => a.id === id)?.label || id
+  );
+  if (!labels.length) return "\u4E0D\u542F\u7528";
+  if (labels.length <= 2) return labels.join("\u3001");
+  return `${labels.slice(0, 2).join("\u3001")} \u7B49 ${labels.length} \u4E2A`;
+}
+function bindingMenuHtml(skillId, binding, accounts) {
+  const b = normalizeBinding(binding);
+  const allOn = b === "all";
+  const noneOn = b === "none";
+  const selected = Array.isArray(b) ? new Set(b) : /* @__PURE__ */ new Set();
+  const accountRows = accounts.map(
+    (a) => `<label class="skill-accounts-option"><input type="checkbox" data-skill-bind="${escape(skillId)}" data-bind-value="${escape(a.id)}" ${!allOn && !noneOn && selected.has(a.id) ? "checked" : ""}><span>${escape(a.label)}</span></label>`
+  ).join("");
+  return `<details class="skill-accounts" data-skill-accounts="${escape(skillId)}"><summary title="\u652F\u6301\u7684\u8D26\u53F7">${escape(bindingLabel(b, accounts))}</summary><div class="skill-accounts-menu"><label class="skill-accounts-option"><input type="checkbox" data-skill-bind="${escape(skillId)}" data-bind-value="all" ${allOn ? "checked" : ""}><span>\u6240\u6709</span></label>${accountRows}<label class="skill-accounts-option"><input type="checkbox" data-skill-bind="${escape(skillId)}" data-bind-value="none" ${noneOn ? "checked" : ""}><span>\u4E0D\u542F\u7528</span></label></div></details>`;
+}
+function readBindingFromMenu(menu) {
+  const checked = [...menu.querySelectorAll("input[data-bind-value]:checked")];
+  const values = checked.map((el) => el.getAttribute("data-bind-value"));
+  if (values.includes("none") && values.length === 1) return "none";
+  if (values.includes("all")) return "all";
+  return values.filter((v) => v !== "all" && v !== "none");
+}
 async function mountSkillsSettings(root2, api2, account2, accounts, onRefresh = () => {
 }, opts = {}) {
   let state2;
@@ -131,38 +232,37 @@ async function mountSkillsSettings(root2, api2, account2, accounts, onRefresh = 
     if (el) el.textContent = msg || "";
   };
   const load = async () => {
-    if (!account2) {
-      root2.innerHTML = '<p class="muted">\u8BF7\u5148\u6DFB\u52A0\u8D26\u53F7\uFF0C\u518D\u7BA1\u7406\u6280\u80FD\u9ED8\u8BA4\u542F\u7528\u9879\u3002</p>';
+    if (!accounts.length) {
+      root2.innerHTML = '<p class="muted">\u8BF7\u5148\u6DFB\u52A0\u8D26\u53F7\uFF0C\u518D\u7BA1\u7406\u6280\u80FD\u4E0E\u8D26\u53F7\u7ED1\u5B9A\u3002</p>';
       return;
     }
-    state2 = await api2("skills-list", { account: account2 });
+    state2 = await api2("skills-list", { account: account2 || accounts[0].id });
     draw();
   };
+  const visibleTree = () => {
+    if (!opts.lockAccount) return state2.tree;
+    return state2.tree.map((g) => ({
+      ...g,
+      skills: g.skills.filter(
+        (x) => skillAvailableFor(x.binding ?? state2.bindings?.[x.id], state2.account)
+      )
+    })).filter((g) => g.skills.length);
+  };
   const draw = () => {
-    const defaults2 = state2.accounts[state2.account] || [];
-    const accountOpts = accounts.map(
-      (a) => `<option value="${escape(a.id)}" ${a.id === state2.account ? "selected" : ""}>${escape(a.label)}</option>`
-    ).join("");
-    const treeHtml = state2.tree.length ? state2.tree.map((g) => {
+    const tree = visibleTree();
+    const treeHtml = tree.length ? tree.map((g) => {
       const rows = g.skills.map((x) => {
-        const enabled = defaults2.includes(x.id);
-        return `<div class="skill-tree-row" data-skill-id="${escape(x.id)}"><div class="skill-tree-main"><strong>${escape(x.name)}</strong><span class="muted">${escape(x.description || "")}</span>${x.missing ? '<span class="notice">\u76EE\u5F55\u5F02\u5E38</span>' : ""}</div><div class="skill-tree-actions"><label class="skill-check"><input type="checkbox" data-default="${escape(x.id)}" ${enabled ? "checked" : ""}> \u9ED8\u8BA4\u542F\u7528</label><button type="button" class="ghost" data-reveal="${escape(x.id)}">\u8BBF\u8FBE</button><button type="button" class="ghost danger" data-remove="${escape(x.id)}">\u5220\u9664</button></div></div>`;
+        const binding = x.binding ?? state2.bindings?.[x.id] ?? "none";
+        return `<div class="skill-tree-row" data-skill-id="${escape(x.id)}"><div class="skill-tree-main"><strong>${escape(x.name)}</strong><span class="muted">${escape(x.description || "")}</span>${x.missing ? '<span class="notice">\u76EE\u5F55\u5F02\u5E38</span>' : ""}</div><div class="skill-tree-actions">${bindingMenuHtml(x.id, binding, accounts)}<button type="button" class="ghost" data-reveal="${escape(x.id)}">\u8BBF\u8FBE</button><button type="button" class="ghost danger" data-remove="${escape(x.id)}">\u5220\u9664</button></div></div>`;
       }).join("");
       return `<details class="skill-tree-group" open><summary><span class="skill-tree-group-label">${escape(g.label)}</span><span class="muted">${g.skills.length}</span></summary><div class="skill-tree-list">${rows}</div></details>`;
-    }).join("") : '<p class="settings-empty">\u8FD8\u6CA1\u6709\u6280\u80FD\u3002\u5C06\u542B SKILL.md \u7684\u6587\u4EF6\u5939\u653E\u5230\u4ED3\u5E93 <code>.agents/skills</code>\uFF0C\u6216\u4F7F\u7528\u5BFC\u5165 / \u65B0\u5EFA\u3002</p>';
+    }).join("") : opts.lockAccount ? '<p class="settings-empty">\u5F53\u524D\u8D26\u53F7\u6682\u65E0\u53EF\u7528\u6280\u80FD\u3002\u8BF7\u5230\u8BBE\u7F6E \u2192 \u6280\u80FD\u5E93\uFF0C\u5C06\u6280\u80FD\u7ED1\u5B9A\u5230\u300C\u6240\u6709\u300D\u6216\u672C\u8D26\u53F7\u3002</p>' : '<p class="settings-empty">\u8FD8\u6CA1\u6709\u6280\u80FD\u3002\u5C06\u542B SKILL.md \u7684\u6587\u4EF6\u5939\u653E\u5230\u4ED3\u5E93 <code>.agents/skills</code>\uFF0C\u6216\u4F7F\u7528\u5BFC\u5165 / \u65B0\u5EFA\u3002</p>';
     if (opts.layout === "sections") {
-      const accountLabel = accounts.find((a) => a.id === state2.account)?.label || "\u5F53\u524D\u8D26\u53F7";
-      root2.innerHTML = `<section class="settings-section"><h3 class="settings-section-title">\u6280\u80FD\u5E93</h3><div class="settings-section-control"><div class="settings-panel-toolbar"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div><div class="settings-panel settings-panel-flush"><div class="skill-tree">${treeHtml}</div></div></div></section><section class="settings-section"><h3 class="settings-section-title">\u9ED8\u8BA4\u542F\u7528</h3><div class="settings-section-control"><div class="settings-panel">${opts.lockAccount ? `<p class="settings-hint">\u6B63\u5728\u914D\u7F6E\u300C${escape(accountLabel)}\u300D</p>` : `<label class="settings-field"><span class="settings-field-label">\u8D26\u53F7</span><select id="skill-account">${accountOpts}</select></label>`}<p id="skill-page-error" role="status"></p></div></div></section>`;
+      root2.innerHTML = `<section class="settings-section"><h3 class="settings-section-title">\u6280\u80FD\u5E93</h3><div class="settings-section-control"><div class="settings-panel-toolbar"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div><div class="settings-panel settings-panel-flush"><div class="skill-tree">${treeHtml}</div></div><p id="skill-page-error" role="status"></p></div></section>`;
     } else {
-      const head = opts.compact ? `<div class="settings-card-actions skill-compact-actions"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div><p class="muted">\u4ED3\u5E93 <code>${escape(state2.root)}</code> \xB7 \u52FE\u9009\u5373\u4E3A\u300C${escape(accounts[0]?.label || "\u5F53\u524D\u8D26\u53F7")}\u300D\u9ED8\u8BA4\u542F\u7528\u3002</p>` : `<div class="settings-card-head accounts-toolbar"><h3>\u6280\u80FD</h3><div class="settings-card-actions"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div></div><p class="muted">\u6280\u80FD\u5B58\u653E\u4E8E\u4ED3\u5E93 <code>${escape(state2.root)}</code>\uFF1B\u8FD0\u884C\u65F6\u4EE5\u8F6F\u94FE\u63A5\u6302\u5230 Agent \u5DE5\u4F5C\u533A\u540C\u540D\u8DEF\u5F84\u3002</p>`;
-      const accountField = opts.lockAccount ? "" : `<label class="skill-default-account">\u9ED8\u8BA4\u542F\u7528\u8D26\u53F7<select id="skill-account">${accountOpts}</select></label>`;
-      root2.innerHTML = `${head}${accountField}<div class="skill-tree">${treeHtml}</div><p id="skill-page-error" role="status"></p>`;
+      const head = opts.compact ? `<div class="settings-card-actions skill-compact-actions"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div><p class="muted">\u4ED3\u5E93 <code>${escape(state2.root)}</code> \xB7 \u4E3A\u6BCF\u4E2A\u6280\u80FD\u9009\u62E9\u652F\u6301\u7684\u8D26\u53F7\u3002</p>` : `<div class="settings-card-head accounts-toolbar"><h3>\u6280\u80FD</h3><div class="settings-card-actions"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div></div><p class="muted">\u6280\u80FD\u5B58\u653E\u4E8E\u4ED3\u5E93 <code>${escape(state2.root)}</code>\uFF1B\u8FD0\u884C\u65F6\u4EE5\u8F6F\u94FE\u63A5\u6302\u5230 Agent \u5DE5\u4F5C\u533A\u540C\u540D\u8DEF\u5F84\u3002</p>`;
+      root2.innerHTML = `${head}<div class="skill-tree">${treeHtml}</div><p id="skill-page-error" role="status"></p>`;
     }
-    const accountSelect = root2.querySelector("#skill-account");
-    if (accountSelect)
-      accountSelect.onchange = (e) => {
-        onRefresh(e.target.value);
-      };
     root2.querySelector("#skill-reveal-root").onclick = async () => {
       try {
         await api2("skills-reveal", { account: state2.account });
@@ -211,23 +311,65 @@ async function mountSkillsSettings(root2, api2, account2, accounts, onRefresh = 
         err(e.message);
       }
     };
-    root2.querySelectorAll("[data-default]").forEach((input) => {
-      input.onchange = async () => {
-        try {
-          const ids = [
-            ...root2.querySelectorAll("[data-default]:checked")
-          ].map((el) => el.getAttribute("data-default"));
-          state2 = await api2("skills-configure", {
-            account: state2.account,
-            revision: state2.revision,
-            ids
-          });
-          draw();
-        } catch (e) {
-          err(e.message);
-          input.checked = !input.checked;
+    root2.querySelectorAll("[data-skill-accounts]").forEach((details) => {
+      const skillId = details.getAttribute("data-skill-accounts");
+      const menu = details.querySelector(".skill-accounts-menu");
+      const applyExclusive = (changed2) => {
+        const value = changed2.getAttribute("data-bind-value");
+        if (!changed2.checked) {
+          if (value === "all" || value === "none") return;
+          const anyAccount = [
+            ...menu.querySelectorAll(
+              'input[data-bind-value]:not([data-bind-value="all"]):not([data-bind-value="none"])'
+            )
+          ].some((el) => el.checked);
+          if (!anyAccount) {
+            const none3 = menu.querySelector('input[data-bind-value="none"]');
+            if (none3) none3.checked = true;
+          }
+          return;
         }
+        if (value === "all" || value === "none") {
+          menu.querySelectorAll("input[data-bind-value]").forEach((el) => {
+            el.checked = el === changed2;
+          });
+          return;
+        }
+        const all = menu.querySelector('input[data-bind-value="all"]');
+        const none2 = menu.querySelector('input[data-bind-value="none"]');
+        if (all) all.checked = false;
+        if (none2) none2.checked = false;
       };
+      menu.querySelectorAll("input[data-bind-value]").forEach((input) => {
+        input.onchange = async () => {
+          applyExclusive(input);
+          const binding = readBindingFromMenu(menu);
+          const nextBinding = Array.isArray(binding) && binding.length === 0 ? "none" : binding;
+          const summary = details.querySelector("summary");
+          if (summary) summary.textContent = bindingLabel(nextBinding, accounts);
+          try {
+            state2 = await api2("skills-configure", {
+              account: state2.account,
+              revision: state2.revision,
+              id: skillId,
+              binding: nextBinding
+            });
+            draw();
+          } catch (e) {
+            draw();
+            err(e.message || "\u4FDD\u5B58\u5931\u8D25");
+          }
+        };
+      });
+      details.addEventListener("toggle", () => {
+        if (!details.open) return;
+        const close2 = (e) => {
+          if (details.contains(e.target)) return;
+          details.open = false;
+          document.removeEventListener("pointerdown", close2, true);
+        };
+        document.addEventListener("pointerdown", close2, true);
+      });
     });
     root2.querySelectorAll("[data-reveal]").forEach((b) => {
       b.onclick = async () => {
@@ -269,17 +411,27 @@ async function mountSkillPicker(root2, api2, account2, session) {
   try {
     data = await api2("skills-list", { account: account2 });
     if (!root2.isConnected) return;
-    const ids = session.skillIds ?? data.accounts[data.account] ?? [];
+    const available = (data.items || []).filter(
+      (x) => skillAvailableFor(x.binding ?? data.bindings?.[x.id], data.account)
+    );
+    const availableIds = new Set(available.map((x) => x.id));
+    const defaults2 = data.accounts[data.account] || available.map((x) => x.id);
+    const ids = (session.skillIds ?? defaults2).filter(
+      (id) => availableIds.has(id)
+    );
     session.skillIds = [...ids];
     const draw = () => {
       const selected = session.skillIds || [];
-      const byGroup = data.tree?.length ? data.tree : [{ group: "", label: "\u6280\u80FD", skills: data.items || [] }];
+      const byGroup = (data.tree || []).map((g) => ({
+        ...g,
+        skills: g.skills.filter((x) => availableIds.has(x.id))
+      })).filter((g) => g.skills.length);
       root2.innerHTML = `<details class="chat-skill-menu"><summary title="\u9009\u62E9\u672C\u6B21\u6280\u80FD">\u6280\u80FD${selected.length ? ` \xB7 ${selected.length}` : ""}</summary><div class="chat-skill-options"><strong>\u672C\u6B21\u4F7F\u7528</strong>${byGroup.map((g) => {
         const rows = g.skills.map(
           (x) => `<label class="skill-check"><input type="checkbox" value="${escape(x.id)}" ${selected.includes(x.id) ? "checked" : ""}>${escape(x.name)}${g.group ? `<small>${escape(g.group)}</small>` : ""}</label>`
         ).join("");
         return g.group ? `<div class="chat-skill-group"><span>${escape(g.label)}</span>${rows}</div>` : rows;
-      }).join("") || "<p>\u8FD8\u6CA1\u6709\u6280\u80FD\uFF0C\u8BF7\u5728\u8BBE\u7F6E \u2192 \u6280\u80FD\u4E2D\u914D\u7F6E\u3002</p>"}</div></details>`;
+      }).join("") || "<p>\u8FD8\u6CA1\u6709\u53EF\u7528\u6280\u80FD\uFF0C\u8BF7\u5728\u8BBE\u7F6E \u2192 \u6280\u80FD\u4E2D\u7ED1\u5B9A\u8D26\u53F7\u3002</p>"}</div></details>`;
       root2.querySelectorAll("input").forEach(
         (x) => x.onchange = () => {
           session.skillIds = [...root2.querySelectorAll("input:checked")].map(
@@ -30256,7 +30408,7 @@ async function pickImagePayload() {
     type: f.type
   };
 }
-var esc = (s) => String(s ?? "").replace(
+var esc2 = (s) => String(s ?? "").replace(
   /[&<>"']/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
 );
@@ -30266,6 +30418,8 @@ var page = "dashboard";
 var tab = "chat";
 var account = "";
 var settingsTab = "config";
+var agentDetailId = null;
+var agentDetailTab = "connection";
 var current;
 var saveTimer;
 var busy = false;
@@ -30315,9 +30469,9 @@ function accountInitial(label) {
 function accountAvatarHtml(a, extraClass = "") {
   if (a.avatar) {
     const src = assetUrl("inkasset://vault/" + encodeURIComponent(a.avatar));
-    return `<img class="account-avatar-img ${extraClass}" src="${esc(src)}" alt="" draggable="false">`;
+    return `<img class="account-avatar-img ${extraClass}" src="${esc2(src)}" alt="" draggable="false">`;
   }
-  return `<span class="account-avatar-fallback ${extraClass}" aria-hidden="true">${esc(accountInitial(a.label))}</span>`;
+  return `<span class="account-avatar-fallback ${extraClass}" aria-hidden="true">${esc2(accountInitial(a.label))}</span>`;
 }
 function ensureAccount() {
   const list2 = accountList();
@@ -30546,21 +30700,21 @@ function materialPreviewCardHTML(r, opts = {}) {
     const src = assetUrl(
       r.asset || (r.path ? "inkasset://vault/" + encodeURIComponent(r.path) : "")
     );
-    body = src ? `<div class="mat-preview-media"><img src="${esc(src)}" alt="" loading="lazy"></div>` : `<div class="mat-preview-placeholder">\u56FE\u7247</div>`;
+    body = src ? `<div class="mat-preview-media"><img src="${esc2(src)}" alt="" loading="lazy"></div>` : `<div class="mat-preview-placeholder">\u56FE\u7247</div>`;
   } else if (kind === "markdown") {
     body = `<div class="mat-preview-body is-md">${safeHTML(r.preview || "")}</div>`;
   } else if (kind === "html") {
     body = `<div class="mat-preview-body is-html">${sanitizeHtmlPreview(r.preview || "")}</div>`;
   } else if (kind === "json") {
-    body = `<pre class="mat-preview-body is-code">${esc(formatJsonPreview(r.preview || ""))}</pre>`;
+    body = `<pre class="mat-preview-body is-code">${esc2(formatJsonPreview(r.preview || ""))}</pre>`;
   } else if (kind === "text") {
-    body = `<pre class="mat-preview-body is-code">${esc(r.preview || "")}</pre>`;
+    body = `<pre class="mat-preview-body is-code">${esc2(r.preview || "")}</pre>`;
   } else {
-    body = `<div class="mat-preview-placeholder">${esc((r.name.split(".").pop() || "FILE").toUpperCase())}</div>`;
+    body = `<div class="mat-preview-placeholder">${esc2((r.name.split(".").pop() || "FILE").toUpperCase())}</div>`;
   }
   const refCount = Number(r.refCount) || 0;
   const refBadge = opts.showRefCount ? `<span class="mat-preview-refs" title="\u88AB ${refCount} \u7BC7\u6587\u7AE0\u5F15\u7528">${I.link({ size: 12 })}<em>${refCount}</em></span>` : "";
-  return `<article class="material-card material-preview-card" data-material="${r.id}" title="${esc(r.name)}"><button type="button" class="card-open" data-ref-preview="${r.id}" aria-label="${esc(r.name)}"><div class="mat-preview-frame">${body}</div><span class="mat-preview-name">${esc(r.name)}</span>${refBadge}</button></article>`;
+  return `<article class="material-card material-preview-card" data-material="${r.id}" title="${esc2(r.name)}"><button type="button" class="card-open" data-ref-preview="${r.id}" aria-label="${esc2(r.name)}"><div class="mat-preview-frame">${body}</div><span class="mat-preview-name">${esc2(r.name)}</span>${refBadge}</button></article>`;
 }
 function materialDrawerBodyHTML(r) {
   const kind = r.kind || inferMaterialKind(r.name) || "binary";
@@ -30569,17 +30723,17 @@ function materialDrawerBodyHTML(r) {
     const src = assetUrl(
       r.asset || (r.path ? "inkasset://vault/" + encodeURIComponent(r.path) : "")
     );
-    return src ? `<img class="preview-image" src="${esc(src)}" alt="${esc(r.name)}">` : `<p class="muted">\u65E0\u6CD5\u9884\u89C8\u56FE\u7247</p>`;
+    return src ? `<img class="preview-image" src="${esc2(src)}" alt="${esc2(r.name)}">` : `<p class="muted">\u65E0\u6CD5\u9884\u89C8\u56FE\u7247</p>`;
   }
   if (kind === "markdown")
     return `<div id="reference-text" class="material-preview is-md">${safeHTML(text)}</div>`;
   if (kind === "html")
     return `<div id="reference-text" class="material-preview is-html">${sanitizeHtmlPreview(text)}</div>`;
   if (kind === "json")
-    return `<pre id="reference-text" class="material-preview is-code">${esc(formatJsonPreview(text))}</pre>`;
+    return `<pre id="reference-text" class="material-preview is-code">${esc2(formatJsonPreview(text))}</pre>`;
   if (kind === "text")
-    return `<pre id="reference-text" class="material-preview is-code">${esc(text)}</pre>`;
-  return `<p class="muted">\u5DF2\u4FDD\u7559\u539F\u6587\u4EF6\uFF0C\u5F53\u524D\u683C\u5F0F\u6682\u4E0D\u652F\u6301\u5185\u5D4C\u9884\u89C8\u3002</p><pre id="reference-text" class="material-preview is-code">${esc(text)}</pre>`;
+    return `<pre id="reference-text" class="material-preview is-code">${esc2(text)}</pre>`;
+  return `<p class="muted">\u5DF2\u4FDD\u7559\u539F\u6587\u4EF6\uFF0C\u5F53\u524D\u683C\u5F0F\u6682\u4E0D\u652F\u6301\u5185\u5D4C\u9884\u89C8\u3002</p><pre id="reference-text" class="material-preview is-code">${esc2(text)}</pre>`;
 }
 var toastTimer = 0;
 function toast(t, opts) {
@@ -30601,7 +30755,7 @@ function promptText(title, opts = {}) {
     const m = document.createElement("div");
     m.id = "text-prompt-modal";
     m.className = "modal";
-    m.innerHTML = `<div class="dialog" style="width:min(420px,92vw)"><h2>${esc(title)}</h2><input id="text-prompt-input" type="text" value="${esc(opts.value || "")}" placeholder="${esc(opts.placeholder || "")}" autocomplete="off"><div class="row"><button type="button" id="text-prompt-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="text-prompt-ok">${esc(opts.okLabel || "\u786E\u5B9A")}</button></div></div>`;
+    m.innerHTML = `<div class="dialog" style="width:min(420px,92vw)"><h2>${esc2(title)}</h2><input id="text-prompt-input" type="text" value="${esc2(opts.value || "")}" placeholder="${esc2(opts.placeholder || "")}" autocomplete="off"><div class="row"><button type="button" id="text-prompt-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="text-prompt-ok">${esc2(opts.okLabel || "\u786E\u5B9A")}</button></div></div>`;
     document.body.append(m);
     const input = $("#text-prompt-input");
     const done = (value) => {
@@ -30753,11 +30907,11 @@ function render2() {
   }
   if (page !== "published-preview") publishedPreview = null;
   $("#app").innerHTML = `<aside class="sidebar"><div class="brand-row"><div class="brand"><img class="brand-icon" src="assets/brand-icon.png" alt="" width="28" height="28" /> AsIde</div><button type="button" data-page="settings" class="ghost icon-btn brand-settings" title="\u8BBE\u7F6E" aria-label="\u8BBE\u7F6E">${I.settings({ size: 18 })}</button></div><div class="account">${accountList().map(
-    (a) => `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc(a.id)}" title="${esc(a.label)}" aria-label="${esc(a.label)}">${accountAvatarHtml(a)}</button>`
+    (a) => `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc2(a.id)}" title="${esc2(a.label)}" aria-label="${esc2(a.label)}">${accountAvatarHtml(a)}</button>`
   ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>\u9009\u9898</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></div><div class="docs">${state.documents.filter(
     (d) => sameAccount(d.account, account) && d.status !== "final" && d.status !== "archive"
   ).map(
-    (d) => `<button class="doc ${current?.id === d.id ? "selected" : ""}" data-id="${d.id}"><span>${esc(d.title)}</span><small>${new Date(d.updated).toLocaleDateString("zh-CN")} \xB7 ${d.body.length} \u5B57</small></button>`
+    (d) => `<button class="doc ${current?.id === d.id ? "selected" : ""}" data-id="${d.id}"><span>${esc2(d.title)}</span><small>${new Date(d.updated).toLocaleDateString("zh-CN")} \xB7 ${d.body.length} \u5B57</small></button>`
   ).join("") || '<p class="muted">\u4ECE\u4E00\u4E2A\u60F3\u6CD5\u5F00\u59CB\u3002</p>'}</div></aside><main id="main"></main><div class="workspace-resizer hidden" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant hidden" id="rail"></aside>`;
   unmountAster?.();
   unmountAster = null;
@@ -30768,6 +30922,7 @@ function render2() {
   else if (page === "topics") renderTopics();
   else if (page === "materials") renderMaterials();
   else if (page === "account") renderAccountDetail();
+  else if (page === "agent") renderAgentDetail();
   else renderSettings();
   if (page !== "write" && page !== "published-preview") renderAssistantRail();
   bindWorkspaceResize();
@@ -30846,7 +31001,7 @@ function showContextMenu(x, y, items) {
   menu.style.left = Math.min(x, window.innerWidth - 180) + "px";
   menu.style.top = Math.min(y, window.innerHeight - 80) + "px";
   menu.innerHTML = items.map(
-    (it, i) => `<button type="button" data-ctx="${i}" class="${it.danger ? "danger" : ""}">${esc(it.label)}</button>`
+    (it, i) => `<button type="button" data-ctx="${i}" class="${it.danger ? "danger" : ""}">${esc2(it.label)}</button>`
   ).join("");
   document.body.append(menu);
   const close2 = () => {
@@ -31350,7 +31505,7 @@ async function openVersionHistoryMenu() {
   menu.className = "version-dropdown";
   const snaps = current.snapshots || [];
   menu.innerHTML = `<div class="version-dropdown-head"><strong>\u7248\u672C\u5386\u53F2</strong></div><div class="history-items">${snaps.map(
-    (x, i) => `<div class="version-dropdown-item"><small>${esc(new Date(x.at).toLocaleString("zh-CN"))}</small><button type="button" data-restore="${i}">\u6062\u590D</button></div>`
+    (x, i) => `<div class="version-dropdown-item"><small>${esc2(new Date(x.at).toLocaleString("zh-CN"))}</small><button type="button" data-restore="${i}">\u6062\u590D</button></div>`
   ).reverse().join("") || '<p class="muted version-dropdown-empty">\u8FD8\u6CA1\u6709\u7248\u672C\u3002\u70B9\u51FB\u300C\u4FDD\u5B58\u300D\u4F1A\u7559\u4E0B\u5FEB\u7167\u3002</p>'}</div>`;
   document.body.append(menu);
   menu.onclick = (e) => e.stopPropagation();
@@ -31533,7 +31688,7 @@ function renderAssistantRail() {
     return;
   }
   rail.dataset.railMode = "assistant";
-  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<div class="assistant-head-actions"><select id="provider">${AGENT_PROVIDERS.map((p) => `<option value="${p.id}">${esc(p.label)}</option>`).join("")}</select><button type="button" id="close-assistant" class="ghost icon-btn" title="\u6536\u8D77" aria-label="\u6536\u8D77">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
+  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<div class="assistant-head-actions"><select id="provider">${AGENT_PROVIDERS.map((p) => `<option value="${p.id}">${esc2(p.label)}</option>`).join("")}</select><button type="button" id="close-assistant" class="ghost icon-btn" title="\u6536\u8D77" aria-label="\u6536\u8D77">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
   unmountAsterRail = mountAster($("#aster-rail"));
   syncAsterFace();
   const provider = $("#provider");
@@ -31541,12 +31696,7 @@ function renderAssistantRail() {
     provider.value = state.provider;
     provider.onchange = (e) => {
       state.provider = e.target.value;
-      if (state.provider === "zcode") state.model = "";
-      else {
-        const list2 = getAgentModelList(state.provider);
-        if (state.model && !list2.includes(state.model))
-          state.model = list2[0] || "";
-      }
+      state.model = "";
       persist();
     };
   }
@@ -31710,7 +31860,7 @@ function renderPreview() {
   previewDocId = current.id;
   removeArticleOutline();
   if (previewPane !== "social") previewPane = "wechat";
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
   bindArticleHeader();
   bindFinalize();
   enhanceWechatPreview();
@@ -31739,7 +31889,7 @@ function renderPublishedPreview() {
     body: publishedPreview.body
   };
   const html2 = publishedSourceHTML(doc3.body);
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${esc(publishedPreview.path.split("/").pop())} <span>${(doc3.body || "").length} \u5B57</span></div></div><div class="header-actions"><button type="button" id="published-backup">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" id="published-to-draft">\u79FB\u56DE\u8349\u7A3F</button><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${html2}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${esc2(publishedPreview.path.split("/").pop())} <span>${(doc3.body || "").length} \u5B57</span></div></div><div class="header-actions"><button type="button" id="published-backup">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" id="published-to-draft">\u79FB\u56DE\u8349\u7A3F</button><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc2(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${html2}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
   $("#layout").onclick = () => {
     publishedPreview = null;
     page = "dashboard";
@@ -31777,7 +31927,7 @@ function renderWrite() {
   }
   unmountAster?.();
   unmountAster = null;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="\u5BA1\u9605" aria-haspopup="true" aria-expanded="false">${I.eye()} \u5BA1\u9605</button><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></div><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="\u5BA1\u9605" aria-haspopup="true" aria-expanded="false">${I.eye()} \u5BA1\u9605</button><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></div><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc2(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div></div>`;
   unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
   editor = new Editor({
@@ -32016,7 +32166,7 @@ function mountArticleOutline() {
     const rows = headings.map((h2, i) => {
       const isTop = h2.level === topLevel;
       const hidden = !outlineExpanded && !isTop ? " hidden" : "";
-      return `<button type="button" class="outline-row level-${h2.level}${isTop ? " is-top" : ""}"${hidden} data-heading="${i}" title="${esc(h2.text)}"><span class="outline-label">${esc(h2.text)}</span></button>`;
+      return `<button type="button" class="outline-row level-${h2.level}${isTop ? " is-top" : ""}"${hidden} data-heading="${i}" title="${esc2(h2.text)}"><span class="outline-label">${esc2(h2.text)}</span></button>`;
     }).join("");
     const deeperToggle = hasDeeper ? `<button type="button" class="outline-toggle" aria-expanded="${outlineExpanded ? "true" : "false"}" title="${outlineExpanded ? "\u6536\u8D77\u4E0B\u7EA7\u6807\u9898" : "\u5C55\u5F00\u5168\u90E8\u6807\u9898"}" aria-label="${outlineExpanded ? "\u6536\u8D77\u4E0B\u7EA7\u6807\u9898" : "\u5C55\u5F00\u5168\u90E8\u6807\u9898"}">${I.chevronDown({ size: 14 })}</button>` : "";
     nav2.innerHTML = `<div class="outline-head"><span class="outline-title">\u5927\u7EB2</span><button type="button" class="outline-collapse" title="\u6536\u8D77\u5927\u7EB2" aria-label="\u6536\u8D77\u5927\u7EB2">${I.chevronDown({ size: 14 })}</button></div><div class="outline-track">${rows}</div>${deeperToggle}`;
@@ -32088,7 +32238,7 @@ function bindWorkspaceResize() {
 }
 function diffHTML(oldText, nextText) {
   return diffWords(oldText || "", nextText || "").map(
-    (p) => `<${p.added ? "ins" : p.removed ? "del" : "span"}>${esc(p.value)}</${p.added ? "ins" : p.removed ? "del" : "span"}>`
+    (p) => `<${p.added ? "ins" : p.removed ? "del" : "span"}>${esc2(p.value)}</${p.added ? "ins" : p.removed ? "del" : "span"}>`
   ).join("");
 }
 function buildEditHunks(oldText, nextText) {
@@ -32139,7 +32289,7 @@ function reviewCardHTML() {
   const changes = (pending.hunks || []).filter((h2) => h2.kind === "change");
   const hunkBlocks = changes.length ? changes.map((h2) => {
     const done = h2.status !== "pending";
-    return `<div class="diff-hunk is-${h2.status}" data-hunk="${esc(h2.id)}"><div class="diff">${diffHTML(h2.old, h2.next)}</div>${done ? `<div class="diff-hunk-status">${h2.status === "accepted" ? "\u5DF2\u63A5\u53D7" : "\u5DF2\u62D2\u7EDD"}</div>` : `<div class="row diff-hunk-actions"><button type="button" data-hunk-accept="${esc(h2.id)}">\u63A5\u53D7</button><button type="button" data-hunk-reject="${esc(h2.id)}">\u62D2\u7EDD</button></div>`}</div>`;
+    return `<div class="diff-hunk is-${h2.status}" data-hunk="${esc2(h2.id)}"><div class="diff">${diffHTML(h2.old, h2.next)}</div>${done ? `<div class="diff-hunk-status">${h2.status === "accepted" ? "\u5DF2\u63A5\u53D7" : "\u5DF2\u62D2\u7EDD"}</div>` : `<div class="row diff-hunk-actions"><button type="button" data-hunk-accept="${esc2(h2.id)}">\u63A5\u53D7</button><button type="button" data-hunk-reject="${esc2(h2.id)}">\u62D2\u7EDD</button></div>`}</div>`;
   }).join("") : `<div class="diff">${diffHTML(pending.old, pending.next)}</div>`;
   return `<div class="review-card"><div class="review-card-head"><h3>\u4FEE\u6539\u5EFA\u8BAE</h3><div class="row"><button type="button" id="accept" class="primary">\u5168\u90E8\u63A5\u53D7</button><button type="button" id="reject">\u5168\u90E8\u62D2\u7EDD</button></div></div>${hunkBlocks}</div>`;
 }
@@ -32214,10 +32364,10 @@ function renderPanel() {
   let content = "";
   if (tab === "chat") {
     content = conversation().messages.map(
-      (m) => `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "\u4F60" : "aster"}</small><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? `<span class="inline-reference">${esc(p.label)}</span>` : esc(p.text)).join("") : esc(m.text)}</div></div>`
+      (m) => `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "\u4F60" : "aster"}</small><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? `<span class="inline-reference">${esc2(p.label)}</span>` : esc2(p.text)).join("") : esc2(m.text)}</div></div>`
     ).join("") || "";
   }
-  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" class="icon-btn" title="\u4E3A\u672C\u7BC7\u521B\u5EFA\u65B0\u5BF9\u8BDD" aria-label="\u65B0\u5BF9\u8BDD">${I.plus()}</button></div>` : ""}<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools">${agentModeHTML()}<button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0\u6587\u4EF6" aria-label="\u6DFB\u52A0\u6587\u4EF6" aria-haspopup="menu">${I.plus()}</button><div id="skill-picker"></div><button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div>`;
+  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc2(c.id)}">${esc2(c.title)}</option>`).join("")}</select><button id="new-conversation" class="icon-btn" title="\u4E3A\u672C\u7BC7\u521B\u5EFA\u65B0\u5BF9\u8BDD" aria-label="\u65B0\u5BF9\u8BDD">${I.plus()}</button></div>` : ""}<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools">${agentModeHTML()}<button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0\u6587\u4EF6" aria-label="\u6DFB\u52A0\u6587\u4EF6" aria-haspopup="menu">${I.plus()}</button><div id="skill-picker"></div><button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div>`;
   if (tab === "chat") {
     $("#conversation").value = conversation().id;
     $("#conversation").onchange = (e) => {
@@ -32378,6 +32528,7 @@ async function runTask(task) {
       account: doc3.account,
       task,
       articleId: doc3.id,
+      conversationId: session.id,
       skillIds: session.skillIds,
       references: draft.references,
       instruction: (prompts[task] || "") + "\n" + instruction,
@@ -32468,7 +32619,7 @@ function askFollowers(defaultVal) {
   return new Promise((resolve) => {
     const m = document.createElement("div");
     m.className = "modal";
-    m.innerHTML = `<div class="dialog"><h2>\u66F4\u65B0\u8D26\u53F7\u6570\u636E</h2><p>\u8BF7\u8F93\u5165\u5F53\u524D\u7C89\u4E1D\u91CF\uFF08\u5C06\u663E\u793A\u5728\u4EEA\u8868\u76D8\uFF09</p><input id="follower-input" type="number" min="0" step="1" value="${esc(defaultVal ?? "")}" placeholder="\u4F8B\u5982 12000"><div class="row"><button type="button" id="cancel-followers">\u53D6\u6D88</button><button type="button" id="confirm-followers" class="primary">\u7EE7\u7EED</button></div></div>`;
+    m.innerHTML = `<div class="dialog"><h2>\u66F4\u65B0\u8D26\u53F7\u6570\u636E</h2><p>\u8BF7\u8F93\u5165\u5F53\u524D\u7C89\u4E1D\u91CF\uFF08\u5C06\u663E\u793A\u5728\u4EEA\u8868\u76D8\uFF09</p><input id="follower-input" type="number" min="0" step="1" value="${esc2(defaultVal ?? "")}" placeholder="\u4F8B\u5982 12000"><div class="row"><button type="button" id="cancel-followers">\u53D6\u6D88</button><button type="button" id="confirm-followers" class="primary">\u7EE7\u7EED</button></div></div>`;
     document.body.append(m);
     const input = $("#follower-input");
     input.focus();
@@ -32526,13 +32677,13 @@ function showUnmatchedMatcher(preview) {
       }
       const preferred = u.suggestions?.[0]?.path || "";
       return `<option value="">\u8DF3\u8FC7</option>` + merged.map(
-        (a) => `<option value="${esc(a.path)}" ${a.path === preferred ? "selected" : ""}>${esc(a.title)}${a.date ? " \xB7 " + esc(String(a.date).slice(0, 10)) : ""}${a.hint ? " \xB7 " + a.hint : ""}</option>`
+        (a) => `<option value="${esc2(a.path)}" ${a.path === preferred ? "selected" : ""}>${esc2(a.title)}${a.date ? " \xB7 " + esc2(String(a.date).slice(0, 10)) : ""}${a.hint ? " \xB7 " + a.hint : ""}</option>`
       ).join("");
     };
     const m = document.createElement("div");
     m.className = "modal";
     m.innerHTML = `<div class="dialog import-dialog"><div class="row"><h2>\u672A\u80FD\u81EA\u52A8\u5339\u914D\u7684\u7B14\u8BB0</h2><button type="button" id="close-unmatched">\u5173\u95ED</button></div><p>\u5DF2\u6309\u76F8\u4F3C\u5EA6\u7ED9\u51FA\u5EFA\u8BAE\uFF1B\u5217\u8868\u9ED8\u8BA4\u8FD1\u534A\u5E74\uFF0C\u4E5F\u53EF\u641C\u7D22\u5168\u90E8\u5F52\u6863\u3002</p>${preview.unmatched.map(
-      (u) => `<div class="match-row" data-index="${u.index}"><p><strong>${esc(u.row.title)}</strong>${u.row["\u9996\u6B21\u53D1\u5E03\u65F6\u95F4"] ? `<small>${esc(u.row["\u9996\u6B21\u53D1\u5E03\u65F6\u95F4"])}</small>` : ""}</p><input class="match-search" type="search" placeholder="\u641C\u7D22\u5F52\u6863\u6587\u7AE0\u2026"><select class="match-pick" aria-label="\u5339\u914D\u5F52\u6863">${optionsHtml(u)}</select></div>`
+      (u) => `<div class="match-row" data-index="${u.index}"><p><strong>${esc2(u.row.title)}</strong>${u.row["\u9996\u6B21\u53D1\u5E03\u65F6\u95F4"] ? `<small>${esc2(u.row["\u9996\u6B21\u53D1\u5E03\u65F6\u95F4"])}</small>` : ""}</p><input class="match-search" type="search" placeholder="\u641C\u7D22\u5F52\u6863\u6587\u7AE0\u2026"><select class="match-pick" aria-label="\u5339\u914D\u5F52\u6863">${optionsHtml(u)}</select></div>`
     ).join(
       ""
     )}<div class="row"><button type="button" id="cancel-unmatched">\u53D6\u6D88\u5BFC\u5165</button><button type="button" id="confirm-unmatched" class="primary">\u786E\u8BA4\u5339\u914D</button></div></div>`;
@@ -32652,7 +32803,7 @@ function renderDashboard() {
   )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>\u5DF2\u53D1\u5E03</h3><div id="published-bulk" class="published-bulk" ${selectedCount ? "" : "hidden"}><span class="published-bulk-count">\u5DF2\u9009 ${selectedCount}</span><button type="button" id="bulk-group">${I.tags()} \u8BBE\u7F6E\u5206\u7EC4</button><button type="button" id="bulk-backup">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" id="bulk-to-draft">\u79FB\u56DE\u8349\u7A3F</button><button type="button" class="ghost" id="bulk-clear">\u53D6\u6D88\u9009\u62E9</button></div><select id="metrics-sort" aria-label="\u6587\u7AE0\u6392\u5E8F\u65B9\u5F0F">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${rows.length ? `<table class="published-table"><thead><tr><th class="published-check"><input type="checkbox" id="published-select-all" aria-label="\u5168\u9009" ${allSelected ? "checked" : ""} ${selectedCount && !allSelected ? 'data-indeterminate="1"' : ""}></th><th>\u6587\u7AE0</th><th>\u5206\u7EC4</th><th>\u65E5\u671F</th><th>\u9605\u8BFB</th><th>\u70B9\u8D5E</th><th>\u6536\u85CF</th><th>\u6DA8\u7C89</th></tr></thead><tbody>${sorted.map((r) => {
     const on = publishedSelection.has(r.path);
     const g = typeof r["\u5206\u7EC4"] === "string" && r["\u5206\u7EC4"].trim() ? r["\u5206\u7EC4"].trim() : "";
-    return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc(r.path)}" aria-label="\u9009\u62E9 ${esc(r["\u6807\u9898"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc(r.path)}">${esc(r["\u6807\u9898"])}</button></td><td class="published-group">${g ? `<span class="group-chip">${esc(g)}</span>` : "\u2014"}</td><td>${esc(r["\u65E5\u671F"])}</td><td>${r["\u9605\u8BFB"] ?? "\u2014"}${cellDelta(r.path, "\u9605\u8BFB")}</td><td>${r["\u70B9\u8D5E"] ?? "\u2014"}${cellDelta(r.path, "\u70B9\u8D5E")}</td><td>${r["\u6536\u85CF"] ?? "\u2014"}${cellDelta(r.path, "\u6536\u85CF")}</td><td>${r["\u6DA8\u7C89"] ?? "\u2014"}${cellDelta(r.path, "\u6DA8\u7C89")}</td></tr>`;
+    return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc2(r.path)}" aria-label="\u9009\u62E9 ${esc2(r["\u6807\u9898"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc2(r.path)}">${esc2(r["\u6807\u9898"])}</button></td><td class="published-group">${g ? `<span class="group-chip">${esc2(g)}</span>` : "\u2014"}</td><td>${esc2(r["\u65E5\u671F"])}</td><td>${r["\u9605\u8BFB"] ?? "\u2014"}${cellDelta(r.path, "\u9605\u8BFB")}</td><td>${r["\u70B9\u8D5E"] ?? "\u2014"}${cellDelta(r.path, "\u70B9\u8D5E")}</td><td>${r["\u6536\u85CF"] ?? "\u2014"}${cellDelta(r.path, "\u6536\u85CF")}</td><td>${r["\u6DA8\u7C89"] ?? "\u2014"}${cellDelta(r.path, "\u6DA8\u7C89")}</td></tr>`;
   }).join("")}</tbody></table>` : '<div class="empty-data">\u8FD8\u6CA1\u6709\u6570\u636E\u3002<p>\u6587\u7AE0\u5F52\u6863\u540E\uFF0C\u5728 YAML \u4E2D\u586B\u5199\u5E73\u53F0\u6570\u636E\u5373\u53EF\u67E5\u770B\u3002</p></div>'}</div></section>`;
   renderCalendar(rows);
   $("#metrics-sort").onchange = (e) => {
@@ -32807,7 +32958,7 @@ async function backupPublishedArticle(paths) {
   m.className = "modal";
   const canRemember = !mixedGroups;
   const showDefaultBtn = mixedGroups ? allHaveDefault : !!defaultPath;
-  m.innerHTML = `<div class="dialog"><h2>\u672C\u5730\u540C\u6B65</h2><p>\u5C06${label}\u5907\u4EFD\u4E3A Markdown \u5230\u672C\u673A\u6587\u4EF6\u5939\u3002</p><p class="muted">\u9ED8\u8BA4\u8DEF\u5F84\uFF1A${esc(defaultHint)}</p>${canRemember ? `<label class="backup-remember"><input type="checkbox" id="backup-remember" ${defaultPath ? "" : "checked"}> \u5C06\u672C\u6B21\u9009\u62E9\u7684\u8DEF\u5F84\u8BBE\u4E3A${esc(rememberTarget)}\u9ED8\u8BA4</label>` : ""}<div class="row"><button type="button" id="backup-cancel">\u53D6\u6D88</button>${showDefaultBtn ? `<button type="button" id="backup-pick">${I.folder()} \u9009\u62E9\u5176\u4ED6\u8DEF\u5F84</button><button type="button" class="primary" id="backup-default">${mixedGroups ? "\u6309\u5206\u7EC4\u540C\u6B65\u5230\u9ED8\u8BA4" : "\u540C\u6B65\u5230\u9ED8\u8BA4"}</button>` : `<button type="button" class="primary" id="backup-pick">${I.folder()} \u9009\u62E9\u5E76\u540C\u6B65</button>`}</div></div>`;
+  m.innerHTML = `<div class="dialog"><h2>\u672C\u5730\u540C\u6B65</h2><p>\u5C06${label}\u5907\u4EFD\u4E3A Markdown \u5230\u672C\u673A\u6587\u4EF6\u5939\u3002</p><p class="muted">\u9ED8\u8BA4\u8DEF\u5F84\uFF1A${esc2(defaultHint)}</p>${canRemember ? `<label class="backup-remember"><input type="checkbox" id="backup-remember" ${defaultPath ? "" : "checked"}> \u5C06\u672C\u6B21\u9009\u62E9\u7684\u8DEF\u5F84\u8BBE\u4E3A${esc2(rememberTarget)}\u9ED8\u8BA4</label>` : ""}<div class="row"><button type="button" id="backup-cancel">\u53D6\u6D88</button>${showDefaultBtn ? `<button type="button" id="backup-pick">${I.folder()} \u9009\u62E9\u5176\u4ED6\u8DEF\u5F84</button><button type="button" class="primary" id="backup-default">${mixedGroups ? "\u6309\u5206\u7EC4\u540C\u6B65\u5230\u9ED8\u8BA4" : "\u540C\u6B65\u5230\u9ED8\u8BA4"}</button>` : `<button type="button" class="primary" id="backup-pick">${I.folder()} \u9009\u62E9\u5E76\u540C\u6B65</button>`}</div></div>`;
   document.body.append(m);
   const remember = () => !!$("#backup-remember")?.checked;
   $("#backup-cancel").onclick = () => m.remove();
@@ -32908,7 +33059,7 @@ function renderTopics() {
   const docs = state.documents.filter(
     (d) => sameAccount(d.account, account) && d.topics?.length
   );
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u9009\u9898\u548C\u7075\u611F</h1></div></header><section class="dashboard"><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc(d.title)}</h3><div>${esc(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">\u7EE7\u7EED\u8FD9\u7BC7\u6587\u7AE0 \u2192</button></div>`).join("") || '<div class="empty-state"><img src="assets/empty-topics.png" alt="" class="empty-state-img" /><p class="empty-state-text">\u7A7A\u7A7A\u5982\u4E5F</p></div>'}</div></section>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u9009\u9898\u548C\u7075\u611F</h1></div></header><section class="dashboard"><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc2(d.title)}</h3><div>${esc2(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">\u7EE7\u7EED\u8FD9\u7BC7\u6587\u7AE0 \u2192</button></div>`).join("") || '<div class="empty-state"><img src="assets/empty-topics.png" alt="" class="empty-state-img" /><p class="empty-state-text">\u7A7A\u7A7A\u5982\u4E5F</p></div>'}</div></section>`;
   $$("[data-open]").forEach(
     (b) => b.onclick = () => {
       current = state.documents.find((d) => d.id === b.dataset.open);
@@ -32919,13 +33070,13 @@ function renderTopics() {
   );
 }
 function settingsSection({ title, control, className = "" }) {
-  return `<section class="settings-section ${className}"><h3 class="settings-section-title">${esc(title)}</h3><div class="settings-section-control">${control}</div></section>`;
+  return `<section class="settings-section ${className}"><h3 class="settings-section-title">${esc2(title)}</h3><div class="settings-section-control">${control}</div></section>`;
 }
 function settingsPanel(inner, className = "") {
   return `<div class="settings-panel ${className}">${inner}</div>`;
 }
 function settingsField(label, controlHtml) {
-  return `<label class="settings-field"><span class="settings-field-label">${esc(label)}</span>${controlHtml}</label>`;
+  return `<label class="settings-field"><span class="settings-field-label">${esc2(label)}</span>${controlHtml}</label>`;
 }
 var AGENT_PROVIDERS = [
   { id: "cursor", label: "Cursor", blurb: "Cursor Agent CLI" },
@@ -32935,39 +33086,9 @@ var AGENT_PROVIDERS = [
   { id: "opencode", label: "OpenCode", blurb: "OpenCode CLI" },
   { id: "antigravity", label: "Antigravity", blurb: "Google Antigravity\uFF08agy\uFF09" }
 ];
-var AGENT_PRESET_MODELS = {
-  cursor: ["auto", "composer-1", "sonnet-4.5", "opus-4.5", "gpt-5.2", "gemini-3-pro"],
-  codex: ["gpt-5.2", "gpt-5.2-codex", "gpt-5.1-codex-max", "gpt-5-mini"],
-  claude: ["sonnet", "opus", "haiku"],
-  zcode: [],
-  opencode: [
-    "anthropic/claude-sonnet-4-5",
-    "anthropic/claude-opus-4-6",
-    "openai/gpt-5-2",
-    "google/gemini-3-pro"
-  ],
-  antigravity: [
-    "Gemini 3 Pro (High)",
-    "Gemini 3 Flash",
-    "Claude Sonnet 4.5 (Thinking)",
-    "Claude Opus 4.5 (Thinking)"
-  ]
-};
 function agentLogoSvg(id) {
-  const common = 'xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"';
-  if (id === "cursor")
-    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#111"/><path d="M9 7.5 19.5 14 12.8 15.6 11 22.2 9 7.5z" fill="#fff"/><path d="M12.4 14.6h4.2" stroke="#111" stroke-width="1.4" stroke-linecap="round"/></svg>`;
-  if (id === "codex")
-    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#000"/><g fill="none" stroke="#fff" stroke-width="1.7"><circle cx="14" cy="10.2" r="3.1"/><circle cx="10.8" cy="16.2" r="3.1"/><circle cx="17.2" cy="16.2" r="3.1"/><path d="M12.4 12.7l-1 1.7M15.6 12.7l1 1.7" stroke-linecap="round"/></g></svg>`;
-  if (id === "claude")
-    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#d97757"/><path d="M14 5l1.7 3.4 3.2-1.9-.6 3.7 3.7.6-1.9 3.2L23.5 14l-3.4 1.7 1.9 3.2-3.7-.6-.6 3.7-3.2-1.9L14 23.5l-1.7-3.4-3.2 1.9.6-3.7-3.7-.6 1.9-3.2L4.5 14l3.4-1.7-1.9-3.2 3.7.6.6-3.7 3.2 1.9L14 5z" fill="#fff"/><circle cx="14" cy="14" r="2.4" fill="#d97757"/></svg>`;
-  if (id === "zcode")
-    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#2b5cff"/><path d="M8 8.5h12v2.6l-7.4 8.4H20V22H8v-2.6l7.4-8.4H8V8.5z" fill="#fff"/></svg>`;
-  if (id === "opencode")
-    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#151b23"/><rect x="6.5" y="9" width="4.4" height="10" rx="2.2" fill="none" stroke="#3fb950" stroke-width="1.8"/><rect x="17.1" y="9" width="4.4" height="10" rx="2.2" fill="none" stroke="#3fb950" stroke-width="1.8"/><circle cx="8.7" cy="14" r="1.1" fill="#3fb950"/><circle cx="19.3" cy="14" r="1.1" fill="#3fb950"/></svg>`;
-  if (id === "antigravity")
-    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#fff" stroke="#e2e2e2"/><path d="M22.5 14.2c0-.9-.1-1.8-.2-2.6H14v4.9h4.8c-.2 1.1-.9 2-1.8 2.7v2.2h3c1.7-1.6 2.5-3.9 2.5-7.2z" fill="#4285F4"/><path d="M14 23c2.4 0 4.5-.8 6-2.2l-3-2.2c-.8.6-1.9.9-3 .9-2.3 0-4.2-1.5-4.9-3.7H6v2.3C7.5 21.1 10.5 23 14 23z" fill="#34A853"/><path d="M9.1 15.8c-.2-.6-.3-1.2-.3-1.8s.1-1.2.3-1.8V9.9H6C5.4 11.2 5 12.6 5 14s.4 2.8 1 4.1l3.1-2.3z" fill="#FBBC05"/><path d="M14 9.5c1.3 0 2.5.5 3.4 1.3l2.7-2.7C18.5 6.6 16.4 5.7 14 5.7c-3.5 0-6.5 2-8 4.9l3.1 2.6c.7-2.2 2.6-3.7 4.9-3.7z" fill="#EA4335"/></svg>`;
-  return `<svg ${common}><rect width="28" height="28" rx="7" fill="#888"/></svg>`;
+  const extensions = { cursor: "png", codex: "png", claude: "ico", zcode: "png", opencode: "svg", antigravity: "ico" };
+  return extensions[id] ? `<img src="assets/agents/${id}.${extensions[id]}" width="28" height="28" style="object-fit:contain" alt="">` : "";
 }
 function agentInstalled(id) {
   return !!state.agents?.[id];
@@ -32989,33 +33110,30 @@ function setAgentModelList(provider, list2) {
   };
 }
 function agentSuggestionIds(provider, discovered = []) {
-  const presets = AGENT_PRESET_MODELS[provider] || [];
   const saved = getAgentModelList(provider);
-  return [.../* @__PURE__ */ new Set([...presets, ...discovered, ...saved])];
+  return [.../* @__PURE__ */ new Set([...discovered, ...saved])];
 }
-function agentCardShellHtml(p) {
+function openAgentDetail(id, tab2 = "connection") {
+  agentDetailId = id;
+  agentDetailTab = tab2;
+  page = "agent";
+  render2();
+}
+function agentListItemHtml(p) {
   const installed = agentInstalled(p.id);
   const isDefault = state.provider === p.id;
-  return `<article class="agent-card ${isDefault ? "is-default" : ""} ${installed ? "" : "is-missing"}" data-agent="${p.id}">
-  <div class="agent-card-main">
-    <div class="agent-card-logo">${agentLogoSvg(p.id)}</div>
-    <div class="agent-card-meta">
-      <div class="agent-card-title">
-        <strong>${esc(p.label)}</strong>
-        ${isDefault ? `<span class="agent-badge agent-badge-default">\u9ED8\u8BA4</span>` : ""}
-        <span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "\u5DF2\u5B89\u88C5" : "\u672A\u5B89\u88C5"}</span>
-      </div>
-      <p class="agent-card-blurb">${esc(p.blurb)}</p>
-    </div>
-    <div class="agent-card-actions">
-      ${isDefault ? "" : `<button type="button" class="primary" data-agent-default="${p.id}" ${installed ? "" : "disabled"}>\u8BBE\u4E3A\u9ED8\u8BA4</button>`}
-      <button type="button" class="ghost" data-agent-test-default="${p.id}" ${installed ? "" : "disabled"} title="\u4E0D\u6307\u5B9A\u6A21\u578B\uFF0C\u4F7F\u7528 CLI \u9ED8\u8BA4">\u6D4B\u8BD5\u9ED8\u8BA4</button>
-    </div>
-  </div>
-  <div class="agent-card-body" data-agent-body="${p.id}">
-    <p class="settings-hint">\u8BFB\u53D6\u53EF\u7528\u6A21\u578B\u2026</p>
-  </div>
-</article>`;
+  return `<button type="button" class="agent-list-item ${isDefault ? "is-default" : ""} ${installed ? "" : "is-missing"}" data-open-agent="${p.id}">
+  <div class="agent-card-logo">${agentLogoSvg(p.id)}</div>
+  <span class="agent-list-main">
+    <span class="agent-card-title">
+      <strong>${esc2(p.label)}</strong>
+      ${isDefault ? `<span class="agent-badge agent-badge-default">\u9ED8\u8BA4</span>` : ""}
+      <span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "\u5DF2\u5B89\u88C5" : "\u672A\u5B89\u88C5"}</span>
+    </span>
+    <span class="agent-card-blurb">${esc2(p.blurb)}</span>
+  </span>
+  <span class="account-list-chevron" aria-hidden="true">\u203A</span>
+</button>`;
 }
 function agentModelsPanelHtml(p, info) {
   const installed = agentInstalled(p.id);
@@ -33025,8 +33143,8 @@ function agentModelsPanelHtml(p, info) {
   if (p.id === "zcode" || info?.selectable === false) {
     const current2 = info?.current || "";
     return `<div class="agent-model-panel">
-      <p class="settings-hint">${current2 ? `CLI \u9ED8\u8BA4\u6A21\u578B\uFF1A<code>${esc(current2)}</code>` : esc(info?.error || "\u672A\u80FD\u8BFB\u53D6\u9ED8\u8BA4\u6A21\u578B")}</p>
-      <p class="settings-hint">ZCode \u4E0D\u652F\u6301\u6309\u6A21\u578B\u5207\u6362\uFF0C\u8FDE\u901A\u6027\u8BF7\u7528\u4E0A\u65B9\u300C\u6D4B\u8BD5\u9ED8\u8BA4\u300D\u3002</p>
+      <p class="settings-hint">${current2 ? `CLI \u9ED8\u8BA4\u6A21\u578B\uFF1A<code>${esc2(current2)}</code>` : esc2(info?.error || "\u672A\u80FD\u8BFB\u53D6\u9ED8\u8BA4\u6A21\u578B")}</p>
+      <p class="settings-hint">${esc2(p.label)} \u6CBF\u7528 CLI \u9ED8\u8BA4\u6A21\u578B\uFF0C\u8FDE\u901A\u6027\u8BF7\u7528\u53F3\u4E0A\u89D2\u300C\u6D4B\u8BD5\u9ED8\u8BA4\u300D\u3002</p>
     </div>`;
   }
   const saved = getAgentModelList(p.id);
@@ -33037,19 +33155,22 @@ function agentModelsPanelHtml(p, info) {
   const suggestions = agentSuggestionIds(p.id, info?.models || []);
   const rows = list2.length ? list2.map((m) => {
     const active = state.provider === p.id && state.model === m;
-    return `<li class="agent-model-item ${active ? "is-active" : ""}" data-model-row="${esc(m)}">
-            <code class="agent-model-id">${esc(m)}</code>
-            ${active ? `<span class="agent-badge agent-badge-default">\u4F7F\u7528\u4E2D</span>` : `<button type="button" class="ghost" data-agent-use="${p.id}" data-model="${esc(m)}">\u4F7F\u7528</button>`}
-            <button type="button" class="ghost" data-agent-test-model="${p.id}" data-model="${esc(m)}">\u6D4B\u8BD5</button>
-            <button type="button" class="ghost" data-agent-remove-model="${p.id}" data-model="${esc(m)}">\u79FB\u9664</button>
-            <span class="agent-model-row-status" data-model-status="${esc(m)}" role="status"></span>
+    return `<li class="agent-model-item ${active ? "is-active" : ""}" data-model-row="${esc2(m)}">
+            <code class="agent-model-id">${esc2(m)}</code>${!(info?.models || []).includes(m) ? `<span class="agent-badge">\u81EA\u5B9A\u4E49 \xB7 \u672A\u6838\u9A8C</span>` : ""}
+            ${active ? `<span class="agent-badge agent-badge-default">\u4F7F\u7528\u4E2D</span>` : `<button type="button" class="ghost" data-agent-use="${p.id}" data-model="${esc2(m)}">\u4F7F\u7528</button>`}
+            <button type="button" class="ghost" data-agent-test-model="${p.id}" data-model="${esc2(m)}">\u6D4B\u8BD5</button>
+            <button type="button" class="ghost" data-agent-remove-model="${p.id}" data-model="${esc2(m)}">\u79FB\u9664</button>
+            <span class="agent-model-row-status" data-model-status="${esc2(m)}" role="status"></span>
           </li>`;
-  }).join("") : `<li class="agent-model-empty settings-hint">\u5C1A\u672A\u6DFB\u52A0\u6A21\u578B\u3002\u4ECE\u4E0B\u65B9\u9009\u62E9\u5E38\u7528 ID\uFF0C\u6216\u624B\u586B\u540E\u70B9\u300C\u6DFB\u52A0\u300D\u3002</li>`;
+  }).join("") : `<li class="agent-model-empty settings-hint">\u5C1A\u672A\u6DFB\u52A0\u6A21\u578B\u3002\u4ECE\u4E0B\u65B9\u9009\u62E9\u6A21\u578B ID\uFF0C\u6216\u624B\u586B\u540E\u70B9\u300C\u6DFB\u52A0\u300D\u3002</li>`;
   return `<div class="agent-model-panel">
+    <p class="settings-hint" role="status">${esc2(info?.source || "\u5C1A\u672A\u8BFB\u53D6\u6A21\u578B\u76EE\u5F55")}${info?.checkedAt ? ` \xB7 ${new Date(info.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}${info?.stale ? " \xB7 \u4E0A\u6B21\u6210\u529F\u7ED3\u679C" : ""}</p>
+    ${info?.error || info?.notice ? `<p class="settings-hint">${esc2(info.error || info.notice)}</p>` : ""}
+    <div class="agent-card-actions"><button type="button" class="ghost" data-agent-refresh="${p.id}">\u5237\u65B0\u6A21\u578B</button><button type="button" class="ghost" data-agent-cli-default="${p.id}">\u4F7F\u7528 CLI \u9ED8\u8BA4\u6A21\u578B</button></div>
     <div class="agent-model-add">
       <select class="agent-model-select" data-agent-preset="${p.id}" aria-label="\u5E38\u7528\u6A21\u578B">
-        <option value="">\u9009\u62E9\u5E38\u7528\u6A21\u578B ID</option>
-        ${suggestions.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join("")}
+        <option value="">\u9009\u62E9\u6A21\u578B ID</option>
+        ${suggestions.map((m) => `<option value="${esc2(m)}">${esc2(m)}${!(info?.models || []).includes(m) ? " \xB7 \u5DF2\u4FDD\u5B58\uFF0C\u672A\u6838\u9A8C" : ""}</option>`).join("")}
       </select>
       <input class="agent-model-input" data-agent-pick="${p.id}" placeholder="\u6216\u624B\u52A8\u8F93\u5165\u6A21\u578B ID" autocomplete="off">
       <button type="button" class="primary" data-agent-add-model="${p.id}">\u6DFB\u52A0</button>
@@ -33058,9 +33179,8 @@ function agentModelsPanelHtml(p, info) {
   </div>`;
 }
 function setModelRowStatus(provider, model, text, kind = "") {
-  const card = $(`.agent-card[data-agent="${provider}"]`);
-  if (!card) return;
-  const el = [...card.querySelectorAll("[data-model-status]")].find(
+  const root2 = $(`[data-agent-body="${provider}"]`) || $(`.agent-card[data-agent="${provider}"]`) || document;
+  const el = [...root2.querySelectorAll("[data-model-status]")].find(
     (n) => n.getAttribute("data-model-status") === model
   );
   if (!el) return;
@@ -33071,7 +33191,7 @@ async function persistAgentModels() {
   ensureAgentModelsStore();
   await persist();
 }
-async function fillAgentCard(p) {
+async function fillAgentCard(p, refresh = false) {
   const body = $(`[data-agent-body="${p.id}"]`);
   if (!body) return;
   if (!agentInstalled(p.id)) {
@@ -33080,7 +33200,7 @@ async function fillAgentCard(p) {
   }
   let info = { models: [], selectable: p.id !== "zcode", current: "" };
   try {
-    info = await api("agent-models", { provider: p.id });
+    info = await api("agent-models", { provider: p.id, refresh });
   } catch (e) {
     info = {
       models: [],
@@ -33093,6 +33213,19 @@ async function fillAgentCard(p) {
   bindAgentModelControls(p);
 }
 function bindAgentModelControls(p) {
+  const refresh = $(`[data-agent-refresh="${p.id}"]`);
+  if (refresh) refresh.onclick = async () => {
+    refresh.disabled = true;
+    refresh.textContent = "\u5237\u65B0\u4E2D\u2026";
+    await fillAgentCard(p, true);
+  };
+  const useDefault = $(`[data-agent-cli-default="${p.id}"]`);
+  if (useDefault) useDefault.onclick = async () => {
+    state.provider = p.id;
+    state.model = "";
+    await persistAgentModels();
+    render2();
+  };
   const addBtn = $(`[data-agent-add-model="${p.id}"]`);
   const pick = $(`[data-agent-pick="${p.id}"]`);
   const preset = $(`[data-agent-preset="${p.id}"]`);
@@ -33105,7 +33238,6 @@ function bindAgentModelControls(p) {
     if (!value) return toast("\u8BF7\u8F93\u5165\u6216\u9009\u62E9\u6A21\u578B ID");
     const next2 = [...getAgentModelList(p.id), value];
     setAgentModelList(p.id, next2);
-    if (state.provider === p.id && !state.model) state.model = value;
     await persistAgentModels();
     if (pick) pick.value = "";
     if (preset) preset.value = "";
@@ -33169,7 +33301,7 @@ function bindAgentModelControls(p) {
 async function runAgentDefaultTest(id) {
   const p = AGENT_PROVIDERS.find((x) => x.id === id);
   if (!agentInstalled(id)) return toast("\u672A\u627E\u5230\u8BE5 CLI");
-  const btn = $(`[data-agent-test-default="${id}"]`);
+  const btn = $(`[data-agent-test-default="${id}"]`) || $("#agent-test-default");
   if (btn) btn.disabled = true;
   toast(`${p?.label || id}\uFF1A\u6D4B\u8BD5 CLI \u9ED8\u8BA4\u2026`);
   try {
@@ -33193,44 +33325,103 @@ async function mountAgentsSettings() {
   } catch {
   }
   ensureAgentModelsStore();
-  for (const p of AGENT_PROVIDERS) {
-    const card = $(`.agent-card[data-agent="${p.id}"]`);
-    if (!card) continue;
-    const installed = agentInstalled(p.id);
-    card.classList.toggle("is-missing", !installed);
-    const badges = card.querySelectorAll(
-      ".agent-badge:not(.agent-badge-default)"
-    );
-    const statusBadge = [...badges].find(
-      (b) => /已安装|未安装/.test(b.textContent || "")
-    );
-    if (statusBadge) {
-      statusBadge.className = `agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}`;
-      statusBadge.textContent = installed ? "\u5DF2\u5B89\u88C5" : "\u672A\u5B89\u88C5";
-    }
-    const testBtn = card.querySelector(`[data-agent-test-default="${p.id}"]`);
-    const defBtn = card.querySelector(`[data-agent-default="${p.id}"]`);
-    if (testBtn) testBtn.disabled = !installed;
-    if (defBtn) defBtn.disabled = !installed;
+  $$("[data-open-agent]").forEach((btn) => {
+    btn.onclick = () => openAgentDetail(btn.dataset.openAgent);
+  });
+  mountAgentUsage($("#agent-usage"), api, AGENT_PROVIDERS, {
+    mode: "overview"
+  });
+}
+async function renderAgentDetail() {
+  const p = AGENT_PROVIDERS.find((x) => x.id === agentDetailId);
+  if (!p) {
+    page = "settings";
+    settingsTab = "agents";
+    agentDetailId = null;
+    render2();
+    return;
   }
-  for (const p of AGENT_PROVIDERS) fillAgentCard(p);
-  $$("[data-agent-default]").forEach((btn) => {
-    btn.onclick = async () => {
-      const id = btn.dataset.agentDefault;
-      if (!agentInstalled(id)) return toast("\u672A\u627E\u5230\u8BE5 CLI");
-      state.provider = id;
-      const list2 = getAgentModelList(id);
-      if (id === "zcode") state.model = "";
-      else if (state.model && list2.includes(state.model)) {
-      } else state.model = list2[0] || "";
-      await persistAgentModels();
-      toast(`\u5DF2\u8BBE\u4E3A\u9ED8\u8BA4\uFF1A${AGENT_PROVIDERS.find((x) => x.id === id)?.label || id}`);
+  try {
+    const next2 = await api("load");
+    if (next2?.agents) state.agents = next2.agents;
+    if (next2?.agentModels) state.agentModels = next2.agentModels;
+  } catch {
+  }
+  ensureAgentModelsStore();
+  if (!["connection", "usage"].includes(agentDetailTab))
+    agentDetailTab = "connection";
+  const installed = agentInstalled(p.id);
+  const isDefault = state.provider === p.id;
+  const tabs = [
+    { id: "connection", title: "\u8FDE\u63A5" },
+    { id: "usage", title: "\u4F7F\u7528\u7EDF\u8BA1" }
+  ];
+  const actions = [
+    isDefault ? "" : `<button type="button" class="primary" id="agent-set-default" ${installed ? "" : "disabled"}>\u8BBE\u4E3A\u9ED8\u8BA4</button>`,
+    `<button type="button" class="ghost" id="agent-test-default" ${installed ? "" : "disabled"} title="\u4E0D\u6307\u5B9A\u6A21\u578B\uFF0C\u4F7F\u7528 CLI \u9ED8\u8BA4">\u6D4B\u8BD5\u9ED8\u8BA4</button>`
+  ].filter(Boolean).join("");
+  const shell = (body) => {
+    $("#main").innerHTML = `<header><div class="header-lead account-detail-lead"><button type="button" class="ghost icon-btn" id="agent-detail-back" title="\u8FD4\u56DE\u6A21\u578B\u5217\u8868" aria-label="\u8FD4\u56DE\u6A21\u578B\u5217\u8868">${I.chevronLeft({ size: 22 })}</button><h1 class="dashboard-tagline">${esc2(p.label)}</h1></div><div class="header-actions">${actions}</div></header><section class="dashboard account-detail settings agent-detail"><nav class="settings-tabs account-detail-tabs" role="tablist">${tabs.map(
+      (t) => `<button type="button" role="tab" data-agent-tab="${t.id}" aria-selected="${agentDetailTab === t.id}" class="${agentDetailTab === t.id ? "active" : ""}">${t.title}</button>`
+    ).join("")}</nav><div id="agent-detail-body" class="settings-body">${body}</div></section>`;
+    $("#agent-detail-back").onclick = () => {
+      page = "settings";
+      settingsTab = "agents";
+      agentDetailId = null;
       render2();
     };
-  });
-  $$("[data-agent-test-default]").forEach((btn) => {
-    btn.onclick = () => runAgentDefaultTest(btn.dataset.agentTestDefault);
-  });
+    const setDefault = $("#agent-set-default");
+    if (setDefault)
+      setDefault.onclick = async () => {
+        if (!agentInstalled(p.id)) return toast("\u672A\u627E\u5230\u8BE5 CLI");
+        state.provider = p.id;
+        state.model = "";
+        await persistAgentModels();
+        toast(`\u5DF2\u8BBE\u4E3A\u9ED8\u8BA4\uFF1A${p.label}`);
+        render2();
+      };
+    const testDefault = $("#agent-test-default");
+    if (testDefault)
+      testDefault.onclick = () => runAgentDefaultTest(p.id);
+    $$("[data-agent-tab]").forEach((b) => {
+      b.onclick = () => {
+        agentDetailTab = b.dataset.agentTab;
+        render2();
+      };
+    });
+  };
+  if (agentDetailTab === "usage") {
+    shell(
+      settingsSection({
+        title: "\u8C03\u7528\u660E\u7EC6",
+        className: "settings-section-agents",
+        control: `<section id="agent-usage" class="agent-usage"></section>`
+      })
+    );
+    mountAgentUsage($("#agent-usage"), api, AGENT_PROVIDERS, {
+      mode: "detail",
+      provider: p.id
+    });
+    return;
+  }
+  shell(
+    [
+      settingsSection({
+        title: "\u57FA\u672C\u4FE1\u606F",
+        control: settingsPanel(
+          `<div class="account-overview-top agent-overview-top"><div class="agent-card-logo agent-overview-logo">${agentLogoSvg(p.id)}</div><div class="account-overview-info"><h2>${esc2(p.label)}</h2><div class="account-stat-meta"><span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "\u5DF2\u5B89\u88C5" : "\u672A\u5B89\u88C5"}</span>${isDefault ? `<span class="agent-badge agent-badge-default">\u9ED8\u8BA4</span>` : ""}<span>${esc2(p.blurb)}</span></div></div></div>`
+        )
+      }),
+      settingsSection({
+        title: "\u6A21\u578B",
+        className: "settings-section-agents",
+        control: settingsPanel(
+          `<div data-agent-body="${p.id}"><p class="settings-hint">\u8BFB\u53D6\u53EF\u7528\u6A21\u578B\u2026</p></div>`
+        )
+      })
+    ].join("")
+  );
+  await fillAgentCard(p);
 }
 function renderSettings() {
   const wx = state.wechat || {};
@@ -33247,9 +33438,9 @@ function renderSettings() {
     settingsSection({
       title: "\u5185\u5BB9\u4ED3\u5E93",
       control: settingsPanel(
-        `${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}` + settingsField(
+        `${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc2).join("<br>")}</p>` : ""}` + settingsField(
           "\u4ED3\u5E93\u8DEF\u5F84",
-          `<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="\u9009\u62E9 Content_OS \u76EE\u5F55" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} \u9009\u62E9</button><button type="button" class="ghost" id="refresh-vault">${I.refresh()} \u5237\u65B0</button></span>`
+          `<span class="settings-path-row"><input id="vault-path" value="${esc2(state.vaultPath || state.source || "")}" placeholder="\u9009\u62E9 Content_OS \u76EE\u5F55" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} \u9009\u62E9</button><button type="button" class="ghost" id="refresh-vault">${I.refresh()} \u5237\u65B0</button></span>`
         ) + (state.vaultLocked ? `<p class="settings-hint">\u5F53\u524D\u4ED3\u5E93\u7531\u73AF\u5883\u53D8\u91CF\u6307\u5B9A\uFF0C\u65E0\u6CD5\u5728\u754C\u9762\u4E2D\u66F4\u6539\u3002</p>` : "")
       )
     }),
@@ -33258,33 +33449,40 @@ function renderSettings() {
       control: settingsPanel(
         settingsField(
           "AppID",
-          `<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx\u2026" autocomplete="off">`
+          `<input id="wechat-appid" value="${esc2(wx.appId || "")}" placeholder="wx\u2026" autocomplete="off">`
         ) + settingsField(
           "AppSecret",
-          `<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="\u5BC6\u94A5" autocomplete="off">`
+          `<input id="wechat-secret" type="password" value="${esc2(wx.appSecret || "")}" placeholder="\u5BC6\u94A5" autocomplete="off">`
         ) + settingsField(
           "\u9ED8\u8BA4\u4F5C\u8005",
-          `<input id="wechat-author" value="${esc(wx.author || "")}" placeholder="\u53EF\u9009" autocomplete="off">`
+          `<input id="wechat-author" value="${esc2(wx.author || "")}" placeholder="\u53EF\u9009" autocomplete="off">`
         ) + `<div class="settings-panel-footer"><button type="button" id="wechat-test">\u6D4B\u8BD5\u8FDE\u63A5</button><button type="button" class="primary" id="save-wechat">\u4FDD\u5B58</button></div>`
       )
     }),
     settingsSection({
       title: "\u5E94\u7528\u66F4\u65B0",
       control: settingsPanel(
-        `<div class="settings-status-row"><div><span class="settings-field-label">\u5F53\u524D\u7248\u672C</span><strong class="settings-version">${esc(state._appVersion || "\u2026")}</strong></div></div><div class="settings-panel-footer"><button type="button" id="open-releases">${I.external()} \u53D1\u5E03\u9875</button><button type="button" id="check-update">${I.refresh()} \u68C0\u6D4B\u66F4\u65B0</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">\u4E0B\u8F7D\u5E76\u5B89\u88C5</button>` : ""}</div>`
+        `<div class="settings-status-row"><div><span class="settings-field-label">\u5F53\u524D\u7248\u672C</span><strong class="settings-version">${esc2(state._appVersion || "\u2026")}</strong></div></div><div class="settings-panel-footer"><button type="button" id="open-releases">${I.external()} \u53D1\u5E03\u9875</button><button type="button" id="check-update">${I.refresh()} \u68C0\u6D4B\u66F4\u65B0</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">\u4E0B\u8F7D\u5E76\u5B89\u88C5</button>` : ""}</div>`
       )
     })
   ].join("");
-  const agentsBody = settingsSection({
-    title: "\u6A21\u578B\u8FDE\u63A5",
-    className: "settings-section-agents",
-    control: `<div class="agent-card-list">${AGENT_PROVIDERS.map(agentCardShellHtml).join("")}</div>`
-  });
+  const agentsBody = [
+    settingsSection({
+      title: "\u4F7F\u7528\u7EDF\u8BA1",
+      className: "settings-section-agents",
+      control: `<section id="agent-usage" class="agent-usage"></section>`
+    }),
+    settingsSection({
+      title: "\u6A21\u578B\u8FDE\u63A5",
+      className: "settings-section-agents",
+      control: `<div class="agent-card-list">${AGENT_PROVIDERS.map(agentListItemHtml).join("")}</div>`
+    })
+  ].join("");
   const accounts = accountList();
   const accountsBody = settingsSection({
     title: "\u5199\u4F5C\u8D26\u53F7",
     control: `<div class="settings-panel-toolbar"><button type="button" id="register-account">${I.folder()} \u9009\u62E9\u6587\u4EF6\u5939</button><button type="button" class="primary" id="create-account">${I.plus()} \u65B0\u5EFA\u8D26\u53F7</button></div>` + (accounts.length ? `<div class="account-list">${accounts.map(
-      (a) => `<button type="button" class="account-list-item" data-open-account="${esc(a.id)}"><span class="account-avatar-btn account-avatar-md" aria-hidden="true">${accountAvatarHtml(a)}</span><span class="account-list-main"><strong>${esc(a.label)}</strong><span class="muted">${a.drafts ?? 0} \u8349\u7A3F \xB7 ${a.archives ?? 0} \u5F52\u6863 \xB7 ${formatBytes(a.bytes)}</span></span><span class="account-list-chevron" aria-hidden="true">\u203A</span></button>`
+      (a) => `<button type="button" class="account-list-item" data-open-account="${esc2(a.id)}"><span class="account-avatar-btn account-avatar-md" aria-hidden="true">${accountAvatarHtml(a)}</span><span class="account-list-main"><strong>${esc2(a.label)}</strong><span class="muted">${a.drafts ?? 0} \u8349\u7A3F \xB7 ${a.archives ?? 0} \u5F52\u6863 \xB7 ${formatBytes(a.bytes)}</span></span><span class="account-list-chevron" aria-hidden="true">\u203A</span></button>`
     ).join("")}</div>` : settingsPanel(
       `<p class="settings-empty">\u5C1A\u672A\u6DFB\u52A0\u8D26\u53F7\u3002\u53EF\u9009\u62E9\u4ED3\u5E93\u5185\u5DF2\u6709\u6587\u4EF6\u5939\uFF0C\u6216\u65B0\u5EFA\u8D26\u53F7\u3002</p>`
     ))
@@ -33295,7 +33493,7 @@ function renderSettings() {
     control: `<div class="settings-panel-toolbar"><button type="button" class="primary" id="create-group">${I.plus()} \u65B0\u5EFA\u5206\u7EC4</button></div>` + (groups.length ? settingsPanel(
       `<table class="groups-table"><thead><tr><th>\u5206\u7EC4</th><th>\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84</th><th class="groups-actions-col">\u64CD\u4F5C</th></tr></thead><tbody>${groups.map((name) => {
         const backup = state.groups?.[name]?.backupPath || "";
-        return `<tr><td><span class="group-chip">${esc(name)}</span></td><td><span class="settings-path-row groups-path-row"><input type="text" value="${esc(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9\u5E76\u8BB0\u4F4F" readonly><button type="button" data-pick-group-backup="${esc(name)}">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" data-clear-group-backup="${esc(name)}">\u6E05\u9664</button>` : ""}</span></td><td class="groups-actions-col"><button type="button" class="ghost" data-rename-group="${esc(name)}">\u91CD\u547D\u540D</button><button type="button" class="ghost" data-delete-group="${esc(name)}">\u5220\u9664</button></td></tr>`;
+        return `<tr><td><span class="group-chip">${esc2(name)}</span></td><td><span class="settings-path-row groups-path-row"><input type="text" value="${esc2(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9\u5E76\u8BB0\u4F4F" readonly><button type="button" data-pick-group-backup="${esc2(name)}">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" data-clear-group-backup="${esc2(name)}">\u6E05\u9664</button>` : ""}</span></td><td class="groups-actions-col"><button type="button" class="ghost" data-rename-group="${esc2(name)}">\u91CD\u547D\u540D</button><button type="button" class="ghost" data-delete-group="${esc2(name)}">\u5220\u9664</button></td></tr>`;
       }).join("")}</tbody></table>`,
       "settings-panel-flush"
     ) : settingsPanel(
@@ -33309,6 +33507,7 @@ function renderSettings() {
   $$("[data-settings-tab]").forEach(
     (b) => b.onclick = () => {
       settingsTab = b.dataset.settingsTab;
+      agentDetailId = null;
       render2();
     }
   );
@@ -33320,9 +33519,7 @@ function renderSettings() {
       api,
       skillAccount,
       list2,
-      (nextAccount) => {
-        if (nextAccount) account = nextAccount;
-        render2();
+      () => {
       },
       { layout: "sections" }
     );
@@ -33510,10 +33707,10 @@ function groupOptionsHtml(selected, opts = {}) {
   const cur = typeof selected === "string" ? selected.trim() : "";
   const names = new Set(groupNames());
   if (cur) names.add(cur);
-  return `${allowEmpty ? `<option value="">${esc(emptyLabel)}</option>` : ""}${[
+  return `${allowEmpty ? `<option value="">${esc2(emptyLabel)}</option>` : ""}${[
     ...names
   ].sort((a, b) => a.localeCompare(b, "zh")).map(
-    (n) => `<option value="${esc(n)}" ${n === cur ? "selected" : ""}>${esc(n)}</option>`
+    (n) => `<option value="${esc2(n)}" ${n === cur ? "selected" : ""}>${esc2(n)}</option>`
   ).join("")}`;
 }
 async function pickAccountBackupPath(accountId) {
@@ -33586,7 +33783,7 @@ function askText(title, hint, value = "") {
   return new Promise((resolve) => {
     const m = document.createElement("div");
     m.className = "modal";
-    m.innerHTML = `<div class="dialog"><h2>${esc(title)}</h2><p>${esc(hint)}</p><input id="ask-text-input" value="${esc(value)}" autocomplete="off"><div class="row"><button type="button" id="ask-text-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="ask-text-ok">\u786E\u5B9A</button></div></div>`;
+    m.innerHTML = `<div class="dialog"><h2>${esc2(title)}</h2><p>${esc2(hint)}</p><input id="ask-text-input" value="${esc2(value)}" autocomplete="off"><div class="row"><button type="button" id="ask-text-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="ask-text-ok">\u786E\u5B9A</button></div></div>`;
     document.body.append(m);
     const input = $("#ask-text-input");
     input?.focus();
@@ -33607,7 +33804,7 @@ function askConfirm(title, message) {
   return new Promise((resolve) => {
     const m = document.createElement("div");
     m.className = "modal";
-    m.innerHTML = `<div class="dialog"><h2>${esc(title)}</h2><p>${esc(message)}</p><div class="row"><button type="button" id="ask-confirm-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="ask-confirm-ok">\u786E\u5B9A</button></div></div>`;
+    m.innerHTML = `<div class="dialog"><h2>${esc2(title)}</h2><p>${esc2(message)}</p><div class="row"><button type="button" id="ask-confirm-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="ask-confirm-ok">\u786E\u5B9A</button></div></div>`;
     document.body.append(m);
     $("#ask-confirm-cancel").onclick = () => {
       m.remove();
@@ -33646,7 +33843,7 @@ async function pickAccountFolderOnWeb() {
     const m = document.createElement("div");
     m.className = "modal";
     m.innerHTML = `<div class="dialog"><h2>\u9009\u62E9\u8D26\u53F7\u6587\u4EF6\u5939</h2><p>\u4EE5\u4E0B\u4E3A\u5F53\u524D\u5185\u5BB9\u4ED3\u5E93\u5185\u5C1A\u672A\u6CE8\u518C\u7684\u4E00\u7EA7\u76EE\u5F55\u3002</p><div class="folder-pick-list">${folders.map(
-      (f) => `<button type="button" class="folder-pick-item" data-folder="${esc(f.name)}"><strong>${esc(f.label)}</strong><small>${esc(f.name)}</small></button>`
+      (f) => `<button type="button" class="folder-pick-item" data-folder="${esc2(f.name)}"><strong>${esc2(f.label)}</strong><small>${esc2(f.name)}</small></button>`
     ).join(
       ""
     )}</div><div class="row"><button type="button" id="cancel-folder-pick">\u53D6\u6D88</button></div></div>`;
@@ -33853,7 +34050,7 @@ function openPreview({
   n.className = "reference-drawer";
   const kind = r.kind || inferMaterialKind(r.name);
   const headActions = reference ? `<button type="button" id="cite-file" class="ghost">\u5F15\u7528\u6587\u4EF6</button>` : "";
-  n.innerHTML = `<div class="row reference-drawer-head"><h3>${esc(title)}</h3><div class="reference-drawer-toolbar">${headActions}<button type="button" id="close-drawer" class="ghost icon-btn" title="\u5173\u95ED" aria-label="\u5173\u95ED">${I.close({ size: 18 })}</button></div></div><div class="reference-drawer-body">${materialDrawerBodyHTML({ ...r, kind, text: text || r.text, path: rel || r.path })}</div>`;
+  n.innerHTML = `<div class="row reference-drawer-head"><h3>${esc2(title)}</h3><div class="reference-drawer-toolbar">${headActions}<button type="button" id="close-drawer" class="ghost icon-btn" title="\u5173\u95ED" aria-label="\u5173\u95ED">${I.close({ size: 18 })}</button></div></div><div class="reference-drawer-body">${materialDrawerBodyHTML({ ...r, kind, text: text || r.text, path: rel || r.path })}</div>`;
   document.body.append(n);
   $("#close-drawer").onclick = () => n.remove();
   if (reference) {
@@ -33871,7 +34068,7 @@ async function renderMaterials() {
   if (materialsFilter !== "all" && !drafts.some((d) => d.id === materialsFilter))
     materialsFilter = "all";
   const uploadTarget = materialsFilter !== "all" ? drafts.find((d) => d.id === materialsFilter) : sameAccount(current?.account, account) ? current : drafts[0];
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7D20\u6750\u5E93</h1></div><div class="header-actions"><select id="material-filter" aria-label="\u6309\u6587\u7AE0\u7B5B\u9009\u7D20\u6750"><option value="all">\u5168\u90E8\u7D20\u6750</option>${drafts.map((d) => `<option value="${d.id}">${esc(d.title)}</option>`).join("")}</select><button id="upload-reference" class="primary" ${uploadTarget ? "" : "disabled"}>${I.upload()} \u4E0A\u4F20\u6587\u4EF6</button></div></header><section class="dashboard"><div id="project-files" class="material-cards"></div></section>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7D20\u6750\u5E93</h1></div><div class="header-actions"><select id="material-filter" aria-label="\u6309\u6587\u7AE0\u7B5B\u9009\u7D20\u6750"><option value="all">\u5168\u90E8\u7D20\u6750</option>${drafts.map((d) => `<option value="${d.id}">${esc2(d.title)}</option>`).join("")}</select><button id="upload-reference" class="primary" ${uploadTarget ? "" : "disabled"}>${I.upload()} \u4E0A\u4F20\u6587\u4EF6</button></div></header><section class="dashboard"><div id="project-files" class="material-cards"></div></section>`;
   $("#material-filter").value = materialsFilter;
   $("#material-filter").onchange = (e) => {
     materialsFilter = e.target.value;
@@ -33986,7 +34183,7 @@ async function renderAccountDetail() {
     { id: "skills", title: "\u6280\u80FD" }
   ];
   const shell = (body) => {
-    $("#main").innerHTML = `<header><div class="header-lead account-detail-lead"><button type="button" class="ghost icon-btn" id="account-detail-back" title="\u8D26\u53F7\u5217\u8868" aria-label="\u8FD4\u56DE\u8D26\u53F7\u5217\u8868">${I.chevronLeft({ size: 22 })}</button><h1 class="dashboard-tagline">${esc(acc.label)}</h1></div><div class="header-actions"><button type="button" class="danger" id="account-unregister">\u79FB\u9664\u8D26\u53F7</button></div></header><section class="dashboard account-detail settings"><nav class="settings-tabs account-detail-tabs" role="tablist">${tabs.map(
+    $("#main").innerHTML = `<header><div class="header-lead account-detail-lead"><button type="button" class="ghost icon-btn" id="account-detail-back" title="\u8D26\u53F7\u5217\u8868" aria-label="\u8FD4\u56DE\u8D26\u53F7\u5217\u8868">${I.chevronLeft({ size: 22 })}</button><h1 class="dashboard-tagline">${esc2(acc.label)}</h1></div><div class="header-actions"><button type="button" class="danger" id="account-unregister">\u79FB\u9664\u8D26\u53F7</button></div></header><section class="dashboard account-detail settings"><nav class="settings-tabs account-detail-tabs" role="tablist">${tabs.map(
       (t) => `<button type="button" role="tab" data-account-tab="${t.id}" aria-selected="${accountDetailTab === t.id}" class="${accountDetailTab === t.id ? "active" : ""}">${t.title}</button>`
     ).join("")}</nav><div id="account-detail-body" class="settings-body">${body}</div></section>`;
     $("#account-detail-back").onclick = async () => {
@@ -34026,7 +34223,7 @@ async function renderAccountDetail() {
         settingsSection({
           title: "\u57FA\u672C\u4FE1\u606F",
           control: settingsPanel(
-            `<div class="account-overview-top"><button type="button" class="account-avatar-btn account-avatar-lg" id="account-set-avatar" title="${acc.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}" aria-label="\u4E3A ${esc(acc.label)} ${acc.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}">${accountAvatarHtml(acc, "lg")}</button><div class="account-overview-info"><h2>${esc(acc.label)}</h2><div class="account-stat-meta"><span>${acc.drafts ?? 0} \u8349\u7A3F</span><span>${acc.archives ?? 0} \u5F52\u6863</span><span>${acc.files ?? 0} \u6587\u4EF6</span><span>${formatBytes(acc.bytes)}</span></div></div></div>`
+            `<div class="account-overview-top"><button type="button" class="account-avatar-btn account-avatar-lg" id="account-set-avatar" title="${acc.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}" aria-label="\u4E3A ${esc2(acc.label)} ${acc.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}">${accountAvatarHtml(acc, "lg")}</button><div class="account-overview-info"><h2>${esc2(acc.label)}</h2><div class="account-stat-meta"><span>${acc.drafts ?? 0} \u8349\u7A3F</span><span>${acc.archives ?? 0} \u5F52\u6863</span><span>${acc.files ?? 0} \u6587\u4EF6</span><span>${formatBytes(acc.bytes)}</span></div></div></div>`
           )
         }),
         settingsSection({
@@ -34034,7 +34231,7 @@ async function renderAccountDetail() {
           control: settingsPanel(
             settingsField(
               "\u5907\u4EFD\u8DEF\u5F84",
-              `<span class="settings-path-row"><input type="text" value="${esc(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9" readonly><button type="button" id="account-pick-backup">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" id="account-clear-backup">\u6E05\u9664</button>` : ""}</span>`
+              `<span class="settings-path-row"><input type="text" value="${esc2(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9" readonly><button type="button" id="account-pick-backup">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" id="account-clear-backup">\u6E05\u9664</button>` : ""}</span>`
             )
           )
         })
@@ -34061,7 +34258,7 @@ async function renderAccountDetail() {
       $("#account-skills-root"),
       api,
       a,
-      accountList().filter((x) => x.id === a),
+      accountList(),
       () => {
       },
       { lockAccount: true, layout: "sections" }
@@ -34082,13 +34279,13 @@ async function renderAccountDetail() {
         }
         if (d.id === "examples" && model.legacy?.some((f) => f.editable)) {
           extra = `<details class="settings-legacy"><summary>\u67E5\u770B\u65E7 Profile \u8D44\u6599\uFF08\u53EA\u8BFB\uFF09</summary><div class="material-cards">${model.legacy.filter((f) => f.editable).map(
-            (f) => `<button type="button" class="material-card" data-model-legacy="${esc(f.path)}"><strong>${esc(f.path)}</strong></button>`
+            (f) => `<button type="button" class="material-card" data-model-legacy="${esc2(f.path)}"><strong>${esc2(f.path)}</strong></button>`
           ).join("")}</div></details>`;
         }
         return settingsSection({
           title: d.title,
           control: settingsPanel(
-            `<textarea id="model-text-${d.id}" class="settings-model-text" rows="8" maxlength="${d.limit}">${esc(model.modules[d.id] || "")}</textarea>` + extra + `<div class="settings-panel-footer settings-panel-footer-split"><small class="settings-hint">${d.limit} \u5B57\u4EE5\u5185</small><button type="button" class="primary" data-save-model="${d.id}">\u4FDD\u5B58</button></div>`
+            `<textarea id="model-text-${d.id}" class="settings-model-text" rows="8" maxlength="${d.limit}">${esc2(model.modules[d.id] || "")}</textarea>` + extra + `<div class="settings-panel-footer settings-panel-footer-split"><small class="settings-hint">${d.limit} \u5B57\u4EE5\u5185</small><button type="button" class="primary" data-save-model="${d.id}">\u4FDD\u5B58</button></div>`
           )
         });
       }).join("");
@@ -34162,7 +34359,7 @@ function renderCalendar(rows) {
   };
   const summary = (0, import_calendar.publishSummary)(rows, today);
   const summaryText = summary ? `\u60A8\u5DF2\u5199\u4F5C ${summary.writingDays} \u5929\uFF0C\u5171\u53D1\u5E03 ${summary.published} \u7BC7\uFF0C\u5E73\u5747 ${summary.avgDays} \u5929\u53D1\u5E03\u4E00\u7BC7\uFF0C\u4E0A\u4E00\u6B21\u66F4\u65B0\u662F\u5728 ${summary.daysSinceLast} \u5929\u524D` : "\u6682\u65E0\u6709\u6548\u53D1\u5E03\u8BB0\u5F55";
-  node.innerHTML = `<div class="row"><h3>\u53D1\u5E03\u70ED\u529B\u56FE</h3><select id="heatmap-year" aria-label="\u70ED\u529B\u56FE\u5E74\u4EFD">${years.map((y) => `<option ${y === heatmapYear ? "selected" : ""}>${y}</option>`).join("")}</select></div><p>${summaryText}</p><div class="heatmap-scroll"><div class="heatmap-grid" role="group" aria-label="\u6BCF\u65E5\u53D1\u5E03\u6570\u91CF">${"<span></span>".repeat(c.offset)}${c.days.map((d) => `<button class="heatmap-day level-${Math.min(d.count, 4)} ${d.future ? "future" : ""} ${d.date === today ? "is-today" : ""}" ${d.date === today ? 'aria-current="date"' : ""} data-heat-date="${d.date}" title="${esc(heatTip(d))}" aria-label="${esc(heatTip(d).replace(/\n/g, "\uFF0C"))}"></button>`).join("")}</div></div>`;
+  node.innerHTML = `<div class="row"><h3>\u53D1\u5E03\u70ED\u529B\u56FE</h3><select id="heatmap-year" aria-label="\u70ED\u529B\u56FE\u5E74\u4EFD">${years.map((y) => `<option ${y === heatmapYear ? "selected" : ""}>${y}</option>`).join("")}</select></div><p>${summaryText}</p><div class="heatmap-scroll"><div class="heatmap-grid" role="group" aria-label="\u6BCF\u65E5\u53D1\u5E03\u6570\u91CF">${"<span></span>".repeat(c.offset)}${c.days.map((d) => `<button class="heatmap-day level-${Math.min(d.count, 4)} ${d.future ? "future" : ""} ${d.date === today ? "is-today" : ""}" ${d.date === today ? 'aria-current="date"' : ""} data-heat-date="${d.date}" title="${esc2(heatTip(d))}" aria-label="${esc2(heatTip(d).replace(/\n/g, "\uFF0C"))}"></button>`).join("")}</div></div>`;
   $("#heatmap-year").onchange = (e) => {
     heatmapYear = +e.target.value;
     renderCalendar(rows);

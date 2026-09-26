@@ -1,3 +1,4 @@
+import { mountAgentUsage } from "./agent-usage-ui.js";
 import { mountSkillPicker, mountSkillsSettings } from "./skills-ui.js";
 import { bindSocialPreview } from "./social-layout.js";
 import { Composer } from "./composer.js";
@@ -112,6 +113,10 @@ let state,
   account = "",
   /** 设置页子 Tab：配置 | 账号 */
   settingsTab = "config",
+  /** 模型设置子页：当前打开的 Agent id，null 为总览 */
+  agentDetailId = null,
+  /** 模型子页 Tab：连接 | 使用统计 */
+  agentDetailTab = "connection",
   current,
   saveTimer,
   busy = false,
@@ -831,6 +836,7 @@ function render() {
   else if (page === "topics") renderTopics();
   else if (page === "materials") renderMaterials();
   else if (page === "account") renderAccountDetail();
+  else if (page === "agent") renderAgentDetail();
   else renderSettings();
   // 写作预览 / 已发布预览自行收起侧栏并绑定小红书；勿再 destroy 掉进行中的排版
   if (page !== "write" && page !== "published-preview") renderAssistantRail();
@@ -1806,12 +1812,7 @@ function renderAssistantRail() {
     provider.value = state.provider;
     provider.onchange = (e) => {
       state.provider = e.target.value;
-      if (state.provider === "zcode") state.model = "";
-      else {
-        const list = getAgentModelList(state.provider);
-        if (state.model && !list.includes(state.model))
-          state.model = list[0] || "";
-      }
+      state.model = "";
       persist();
     };
   }
@@ -2787,6 +2788,7 @@ async function runTask(task) {
       account: doc.account,
       task,
       articleId: doc.id,
+      conversationId: session.id,
       skillIds: session.skillIds,
       references: draft.references,
       instruction: (prompts[task] || "") + "\n" + instruction,
@@ -3484,42 +3486,9 @@ const AGENT_PROVIDERS = [
   { id: "antigravity", label: "Antigravity", blurb: "Google Antigravity（agy）" },
 ];
 
-/** 各 CLI 常用模型预设（与发现列表合并后供下拉选择，2026 年初可用） */
-const AGENT_PRESET_MODELS = {
-  cursor: ["auto", "composer-1", "sonnet-4.5", "opus-4.5", "gpt-5.2", "gemini-3-pro"],
-  codex: ["gpt-5.2", "gpt-5.2-codex", "gpt-5.1-codex-max", "gpt-5-mini"],
-  claude: ["sonnet", "opus", "haiku"],
-  zcode: [],
-  opencode: [
-    "anthropic/claude-sonnet-4-5",
-    "anthropic/claude-opus-4-6",
-    "openai/gpt-5-2",
-    "google/gemini-3-pro",
-  ],
-  antigravity: [
-    "Gemini 3 Pro (High)",
-    "Gemini 3 Flash",
-    "Claude Sonnet 4.5 (Thinking)",
-    "Claude Opus 4.5 (Thinking)",
-  ],
-};
-
 function agentLogoSvg(id) {
-  const common =
-    'xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"';
-  if (id === "cursor")
-    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#111"/><path d="M9 7.5 19.5 14 12.8 15.6 11 22.2 9 7.5z" fill="#fff"/><path d="M12.4 14.6h4.2" stroke="#111" stroke-width="1.4" stroke-linecap="round"/></svg>`;
-  if (id === "codex")
-    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#000"/><g fill="none" stroke="#fff" stroke-width="1.7"><circle cx="14" cy="10.2" r="3.1"/><circle cx="10.8" cy="16.2" r="3.1"/><circle cx="17.2" cy="16.2" r="3.1"/><path d="M12.4 12.7l-1 1.7M15.6 12.7l1 1.7" stroke-linecap="round"/></g></svg>`;
-  if (id === "claude")
-    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#d97757"/><path d="M14 5l1.7 3.4 3.2-1.9-.6 3.7 3.7.6-1.9 3.2L23.5 14l-3.4 1.7 1.9 3.2-3.7-.6-.6 3.7-3.2-1.9L14 23.5l-1.7-3.4-3.2 1.9.6-3.7-3.7-.6 1.9-3.2L4.5 14l3.4-1.7-1.9-3.2 3.7.6.6-3.7 3.2 1.9L14 5z" fill="#fff"/><circle cx="14" cy="14" r="2.4" fill="#d97757"/></svg>`;
-  if (id === "zcode")
-    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#2b5cff"/><path d="M8 8.5h12v2.6l-7.4 8.4H20V22H8v-2.6l7.4-8.4H8V8.5z" fill="#fff"/></svg>`;
-  if (id === "opencode")
-    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#151b23"/><rect x="6.5" y="9" width="4.4" height="10" rx="2.2" fill="none" stroke="#3fb950" stroke-width="1.8"/><rect x="17.1" y="9" width="4.4" height="10" rx="2.2" fill="none" stroke="#3fb950" stroke-width="1.8"/><circle cx="8.7" cy="14" r="1.1" fill="#3fb950"/><circle cx="19.3" cy="14" r="1.1" fill="#3fb950"/></svg>`;
-  if (id === "antigravity")
-    return `<svg ${common}><rect width="28" height="28" rx="7" fill="#fff" stroke="#e2e2e2"/><path d="M22.5 14.2c0-.9-.1-1.8-.2-2.6H14v4.9h4.8c-.2 1.1-.9 2-1.8 2.7v2.2h3c1.7-1.6 2.5-3.9 2.5-7.2z" fill="#4285F4"/><path d="M14 23c2.4 0 4.5-.8 6-2.2l-3-2.2c-.8.6-1.9.9-3 .9-2.3 0-4.2-1.5-4.9-3.7H6v2.3C7.5 21.1 10.5 23 14 23z" fill="#34A853"/><path d="M9.1 15.8c-.2-.6-.3-1.2-.3-1.8s.1-1.2.3-1.8V9.9H6C5.4 11.2 5 12.6 5 14s.4 2.8 1 4.1l3.1-2.3z" fill="#FBBC05"/><path d="M14 9.5c1.3 0 2.5.5 3.4 1.3l2.7-2.7C18.5 6.6 16.4 5.7 14 5.7c-3.5 0-6.5 2-8 4.9l3.1 2.6c.7-2.2 2.6-3.7 4.9-3.7z" fill="#EA4335"/></svg>`;
-  return `<svg ${common}><rect width="28" height="28" rx="7" fill="#888"/></svg>`;
+  const extensions = {cursor:"png",codex:"png",claude:"ico",zcode:"png",opencode:"svg",antigravity:"ico"};
+  return extensions[id] ? `<img src="assets/agents/${id}.${extensions[id]}" width="28" height="28" style="object-fit:contain" alt="">` : "";
 }
 
 function agentInstalled(id) {
@@ -3546,34 +3515,32 @@ function setAgentModelList(provider, list) {
 }
 
 function agentSuggestionIds(provider, discovered = []) {
-  const presets = AGENT_PRESET_MODELS[provider] || [];
   const saved = getAgentModelList(provider);
-  return [...new Set([...presets, ...discovered, ...saved])];
+  return [...new Set([...discovered, ...saved])];
 }
 
-function agentCardShellHtml(p) {
+function openAgentDetail(id, tab = "connection") {
+  agentDetailId = id;
+  agentDetailTab = tab;
+  page = "agent";
+  render();
+}
+
+function agentListItemHtml(p) {
   const installed = agentInstalled(p.id);
   const isDefault = state.provider === p.id;
-  return `<article class="agent-card ${isDefault ? "is-default" : ""} ${installed ? "" : "is-missing"}" data-agent="${p.id}">
-  <div class="agent-card-main">
-    <div class="agent-card-logo">${agentLogoSvg(p.id)}</div>
-    <div class="agent-card-meta">
-      <div class="agent-card-title">
-        <strong>${esc(p.label)}</strong>
-        ${isDefault ? `<span class="agent-badge agent-badge-default">默认</span>` : ""}
-        <span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "已安装" : "未安装"}</span>
-      </div>
-      <p class="agent-card-blurb">${esc(p.blurb)}</p>
-    </div>
-    <div class="agent-card-actions">
-      ${isDefault ? "" : `<button type="button" class="primary" data-agent-default="${p.id}" ${installed ? "" : "disabled"}>设为默认</button>`}
-      <button type="button" class="ghost" data-agent-test-default="${p.id}" ${installed ? "" : "disabled"} title="不指定模型，使用 CLI 默认">测试默认</button>
-    </div>
-  </div>
-  <div class="agent-card-body" data-agent-body="${p.id}">
-    <p class="settings-hint">读取可用模型…</p>
-  </div>
-</article>`;
+  return `<button type="button" class="agent-list-item ${isDefault ? "is-default" : ""} ${installed ? "" : "is-missing"}" data-open-agent="${p.id}">
+  <div class="agent-card-logo">${agentLogoSvg(p.id)}</div>
+  <span class="agent-list-main">
+    <span class="agent-card-title">
+      <strong>${esc(p.label)}</strong>
+      ${isDefault ? `<span class="agent-badge agent-badge-default">默认</span>` : ""}
+      <span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "已安装" : "未安装"}</span>
+    </span>
+    <span class="agent-card-blurb">${esc(p.blurb)}</span>
+  </span>
+  <span class="account-list-chevron" aria-hidden="true">›</span>
+</button>`;
 }
 
 function agentModelsPanelHtml(p, info) {
@@ -3585,7 +3552,7 @@ function agentModelsPanelHtml(p, info) {
     const current = info?.current || "";
     return `<div class="agent-model-panel">
       <p class="settings-hint">${current ? `CLI 默认模型：<code>${esc(current)}</code>` : esc(info?.error || "未能读取默认模型")}</p>
-      <p class="settings-hint">ZCode 不支持按模型切换，连通性请用上方「测试默认」。</p>
+      <p class="settings-hint">${esc(p.label)} 沿用 CLI 默认模型，连通性请用右上角「测试默认」。</p>
     </div>`;
   }
   const saved = getAgentModelList(p.id);
@@ -3599,7 +3566,7 @@ function agentModelsPanelHtml(p, info) {
         .map((m) => {
           const active = state.provider === p.id && state.model === m;
           return `<li class="agent-model-item ${active ? "is-active" : ""}" data-model-row="${esc(m)}">
-            <code class="agent-model-id">${esc(m)}</code>
+            <code class="agent-model-id">${esc(m)}</code>${!(info?.models || []).includes(m) ? `<span class="agent-badge">自定义 · 未核验</span>` : ""}
             ${active ? `<span class="agent-badge agent-badge-default">使用中</span>` : `<button type="button" class="ghost" data-agent-use="${p.id}" data-model="${esc(m)}">使用</button>`}
             <button type="button" class="ghost" data-agent-test-model="${p.id}" data-model="${esc(m)}">测试</button>
             <button type="button" class="ghost" data-agent-remove-model="${p.id}" data-model="${esc(m)}">移除</button>
@@ -3607,13 +3574,16 @@ function agentModelsPanelHtml(p, info) {
           </li>`;
         })
         .join("")
-    : `<li class="agent-model-empty settings-hint">尚未添加模型。从下方选择常用 ID，或手填后点「添加」。</li>`;
+    : `<li class="agent-model-empty settings-hint">尚未添加模型。从下方选择模型 ID，或手填后点「添加」。</li>`;
 
   return `<div class="agent-model-panel">
+    <p class="settings-hint" role="status">${esc(info?.source || "尚未读取模型目录")}${info?.checkedAt ? ` · ${new Date(info.checkedAt).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}` : ""}${info?.stale ? " · 上次成功结果" : ""}</p>
+    ${info?.error || info?.notice ? `<p class="settings-hint">${esc(info.error || info.notice)}</p>` : ""}
+    <div class="agent-card-actions"><button type="button" class="ghost" data-agent-refresh="${p.id}">刷新模型</button><button type="button" class="ghost" data-agent-cli-default="${p.id}">使用 CLI 默认模型</button></div>
     <div class="agent-model-add">
       <select class="agent-model-select" data-agent-preset="${p.id}" aria-label="常用模型">
-        <option value="">选择常用模型 ID</option>
-        ${suggestions.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join("")}
+        <option value="">选择模型 ID</option>
+        ${suggestions.map((m) => `<option value="${esc(m)}">${esc(m)}${!(info?.models || []).includes(m) ? " · 已保存，未核验" : ""}</option>`).join("")}
       </select>
       <input class="agent-model-input" data-agent-pick="${p.id}" placeholder="或手动输入模型 ID" autocomplete="off">
       <button type="button" class="primary" data-agent-add-model="${p.id}">添加</button>
@@ -3623,9 +3593,11 @@ function agentModelsPanelHtml(p, info) {
 }
 
 function setModelRowStatus(provider, model, text, kind = "") {
-  const card = $(`.agent-card[data-agent="${provider}"]`);
-  if (!card) return;
-  const el = [...card.querySelectorAll("[data-model-status]")].find(
+  const root =
+    $(`[data-agent-body="${provider}"]`) ||
+    $(`.agent-card[data-agent="${provider}"]`) ||
+    document;
+  const el = [...root.querySelectorAll("[data-model-status]")].find(
     (n) => n.getAttribute("data-model-status") === model,
   );
   if (!el) return;
@@ -3638,7 +3610,7 @@ async function persistAgentModels() {
   await persist();
 }
 
-async function fillAgentCard(p) {
+async function fillAgentCard(p, refresh = false) {
   const body = $(`[data-agent-body="${p.id}"]`);
   if (!body) return;
   if (!agentInstalled(p.id)) {
@@ -3647,7 +3619,7 @@ async function fillAgentCard(p) {
   }
   let info = { models: [], selectable: p.id !== "zcode", current: "" };
   try {
-    info = await api("agent-models", { provider: p.id });
+    info = await api("agent-models", { provider: p.id, refresh });
   } catch (e) {
     info = {
       models: [],
@@ -3661,6 +3633,11 @@ async function fillAgentCard(p) {
 }
 
 function bindAgentModelControls(p) {
+  const refresh = $(`[data-agent-refresh="${p.id}"]`);
+  if (refresh) refresh.onclick = async () => { refresh.disabled = true; refresh.textContent = "刷新中…"; await fillAgentCard(p, true); };
+  const useDefault = $(`[data-agent-cli-default="${p.id}"]`);
+  if (useDefault) useDefault.onclick = async () => { state.provider = p.id; state.model = ""; await persistAgentModels(); render(); };
+
   const addBtn = $(`[data-agent-add-model="${p.id}"]`);
   const pick = $(`[data-agent-pick="${p.id}"]`);
   const preset = $(`[data-agent-preset="${p.id}"]`);
@@ -3673,7 +3650,6 @@ function bindAgentModelControls(p) {
     if (!value) return toast("请输入或选择模型 ID");
     const next = [...getAgentModelList(p.id), value];
     setAgentModelList(p.id, next);
-    if (state.provider === p.id && !state.model) state.model = value;
     await persistAgentModels();
     if (pick) pick.value = "";
     if (preset) preset.value = "";
@@ -3741,7 +3717,8 @@ function bindAgentModelControls(p) {
 async function runAgentDefaultTest(id) {
   const p = AGENT_PROVIDERS.find((x) => x.id === id);
   if (!agentInstalled(id)) return toast("未找到该 CLI");
-  const btn = $(`[data-agent-test-default="${id}"]`);
+  const btn =
+    $(`[data-agent-test-default="${id}"]`) || $("#agent-test-default");
   if (btn) btn.disabled = true;
   toast(`${p?.label || id}：测试 CLI 默认…`);
   try {
@@ -3769,48 +3746,117 @@ async function mountAgentsSettings() {
   }
   ensureAgentModelsStore();
 
-  for (const p of AGENT_PROVIDERS) {
-    const card = $(`.agent-card[data-agent="${p.id}"]`);
-    if (!card) continue;
-    const installed = agentInstalled(p.id);
-    card.classList.toggle("is-missing", !installed);
-    const badges = card.querySelectorAll(
-      ".agent-badge:not(.agent-badge-default)",
-    );
-    const statusBadge = [...badges].find((b) =>
-      /已安装|未安装/.test(b.textContent || ""),
-    );
-    if (statusBadge) {
-      statusBadge.className = `agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}`;
-      statusBadge.textContent = installed ? "已安装" : "未安装";
-    }
-    const testBtn = card.querySelector(`[data-agent-test-default="${p.id}"]`);
-    const defBtn = card.querySelector(`[data-agent-default="${p.id}"]`);
-    if (testBtn) testBtn.disabled = !installed;
-    if (defBtn) defBtn.disabled = !installed;
+  $$("[data-open-agent]").forEach((btn) => {
+    btn.onclick = () => openAgentDetail(btn.dataset.openAgent);
+  });
+  mountAgentUsage($("#agent-usage"), api, AGENT_PROVIDERS, {
+    mode: "overview",
+  });
+}
+
+async function renderAgentDetail() {
+  const p = AGENT_PROVIDERS.find((x) => x.id === agentDetailId);
+  if (!p) {
+    page = "settings";
+    settingsTab = "agents";
+    agentDetailId = null;
+    render();
+    return;
   }
+  try {
+    const next = await api("load");
+    if (next?.agents) state.agents = next.agents;
+    if (next?.agentModels) state.agentModels = next.agentModels;
+  } catch {
+    /* keep cached */
+  }
+  ensureAgentModelsStore();
+  if (!["connection", "usage"].includes(agentDetailTab))
+    agentDetailTab = "connection";
 
-  for (const p of AGENT_PROVIDERS) fillAgentCard(p);
+  const installed = agentInstalled(p.id);
+  const isDefault = state.provider === p.id;
+  const tabs = [
+    { id: "connection", title: "连接" },
+    { id: "usage", title: "使用统计" },
+  ];
+  const actions = [
+    isDefault
+      ? ""
+      : `<button type="button" class="primary" id="agent-set-default" ${installed ? "" : "disabled"}>设为默认</button>`,
+    `<button type="button" class="ghost" id="agent-test-default" ${installed ? "" : "disabled"} title="不指定模型，使用 CLI 默认">测试默认</button>`,
+  ]
+    .filter(Boolean)
+    .join("");
 
-  $$("[data-agent-default]").forEach((btn) => {
-    btn.onclick = async () => {
-      const id = btn.dataset.agentDefault;
-      if (!agentInstalled(id)) return toast("未找到该 CLI");
-      state.provider = id;
-      const list = getAgentModelList(id);
-      if (id === "zcode") state.model = "";
-      else if (state.model && list.includes(state.model)) {
-        /* keep */
-      } else state.model = list[0] || "";
-      await persistAgentModels();
-      toast(`已设为默认：${AGENT_PROVIDERS.find((x) => x.id === id)?.label || id}`);
+  const shell = (body) => {
+    $("#main").innerHTML =
+      `<header><div class="header-lead account-detail-lead"><button type="button" class="ghost icon-btn" id="agent-detail-back" title="返回模型列表" aria-label="返回模型列表">${I.chevronLeft({ size: 22 })}</button><h1 class="dashboard-tagline">${esc(p.label)}</h1></div><div class="header-actions">${actions}</div></header><section class="dashboard account-detail settings agent-detail"><nav class="settings-tabs account-detail-tabs" role="tablist">${tabs
+        .map(
+          (t) =>
+            `<button type="button" role="tab" data-agent-tab="${t.id}" aria-selected="${agentDetailTab === t.id}" class="${agentDetailTab === t.id ? "active" : ""}">${t.title}</button>`,
+        )
+        .join("")}</nav><div id="agent-detail-body" class="settings-body">${body}</div></section>`;
+    $("#agent-detail-back").onclick = () => {
+      page = "settings";
+      settingsTab = "agents";
+      agentDetailId = null;
       render();
     };
-  });
+    const setDefault = $("#agent-set-default");
+    if (setDefault)
+      setDefault.onclick = async () => {
+        if (!agentInstalled(p.id)) return toast("未找到该 CLI");
+        state.provider = p.id;
+        state.model = "";
+        await persistAgentModels();
+        toast(`已设为默认：${p.label}`);
+        render();
+      };
+    const testDefault = $("#agent-test-default");
+    if (testDefault)
+      testDefault.onclick = () => runAgentDefaultTest(p.id);
+    $$("[data-agent-tab]").forEach((b) => {
+      b.onclick = () => {
+        agentDetailTab = b.dataset.agentTab;
+        render();
+      };
+    });
+  };
 
-  $$("[data-agent-test-default]").forEach((btn) => {
-    btn.onclick = () => runAgentDefaultTest(btn.dataset.agentTestDefault);
-  });
+  if (agentDetailTab === "usage") {
+    shell(
+      settingsSection({
+        title: "调用明细",
+        className: "settings-section-agents",
+        control: `<section id="agent-usage" class="agent-usage"></section>`,
+      }),
+    );
+    mountAgentUsage($("#agent-usage"), api, AGENT_PROVIDERS, {
+      mode: "detail",
+      provider: p.id,
+    });
+    return;
+  }
+
+  shell(
+    [
+      settingsSection({
+        title: "基本信息",
+        control: settingsPanel(
+          `<div class="account-overview-top agent-overview-top"><div class="agent-card-logo agent-overview-logo">${agentLogoSvg(p.id)}</div><div class="account-overview-info"><h2>${esc(p.label)}</h2><div class="account-stat-meta"><span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "已安装" : "未安装"}</span>${isDefault ? `<span class="agent-badge agent-badge-default">默认</span>` : ""}<span>${esc(p.blurb)}</span></div></div></div>`,
+        ),
+      }),
+      settingsSection({
+        title: "模型",
+        className: "settings-section-agents",
+        control: settingsPanel(
+          `<div data-agent-body="${p.id}"><p class="settings-hint">读取可用模型…</p></div>`,
+        ),
+      }),
+    ].join(""),
+  );
+  await fillAgentCard(p);
 }
 
 function renderSettings() {
@@ -3872,12 +3918,18 @@ function renderSettings() {
     }),
   ].join("");
 
-  const agentsBody = settingsSection({
-    title: "模型连接",
-    className: "settings-section-agents",
-    control:
-      `<div class="agent-card-list">${AGENT_PROVIDERS.map(agentCardShellHtml).join("")}</div>`,
-  });
+  const agentsBody = [
+    settingsSection({
+      title: "使用统计",
+      className: "settings-section-agents",
+      control: `<section id="agent-usage" class="agent-usage"></section>`,
+    }),
+    settingsSection({
+      title: "模型连接",
+      className: "settings-section-agents",
+      control: `<div class="agent-card-list">${AGENT_PROVIDERS.map(agentListItemHtml).join("")}</div>`,
+    }),
+  ].join("");
 
   const accounts = accountList();
   const accountsBody = settingsSection({
@@ -3938,6 +3990,7 @@ function renderSettings() {
     (b) =>
       (b.onclick = () => {
         settingsTab = b.dataset.settingsTab;
+        agentDetailId = null;
         render();
       }),
   );
@@ -3951,10 +4004,7 @@ function renderSettings() {
       api,
       skillAccount,
       list,
-      (nextAccount) => {
-        if (nextAccount) account = nextAccount;
-        render();
-      },
+      () => {},
       { layout: "sections" },
     );
   }
@@ -4863,7 +4913,7 @@ async function renderAccountDetail() {
       $("#account-skills-root"),
       api,
       a,
-      accountList().filter((x) => x.id === a),
+      accountList(),
       () => {},
       { lockAccount: true, layout: "sections" },
     );

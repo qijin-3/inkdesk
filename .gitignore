@@ -1,20 +1,13 @@
 node_modules/
 data/
-dist/
 .DS_Store
-dist-v2/
 development-vault.json
 vault.json
-dist-v3/
-dist-v4/
-dist-social/
-dist-social-portrait/
 *.zip
 
-# Local Agent + Skill preview builds and UI verification captures
-dist-agent-skills/
+# Electron packaging / preview builds
+dist/
+dist-*/
+
+# Local UI verification captures
 screenshot-*.png
-
-dist-0.2.1/
-
-dist-0.2.2/
