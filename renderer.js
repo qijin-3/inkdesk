@@ -13,7 +13,9 @@ import { diffWords } from "diff";
 import { calendar, validDate, publishSummary } from "./calendar.cjs";
 let saveProfileEditor = null;
 let composer = null,
-  profileTab = "identity";
+  profileTab = "identity",
+  /** 账号详情子页：详情(人设) | 设定 | 技能 */
+  accountDetailTab = "detail";
 let heatmapYear = new Date().getFullYear();
 let metricsSort = "阅读";
 /** 仪表盘已发布文章多选路径 */
@@ -150,6 +152,20 @@ function accountLabelOf(id) {
     accountList().find((a) => a.id === id)?.label ||
     String(id || "").replace(/_/g, " ")
   );
+}
+
+/**
+ * 打开账号详情页并切到指定子 tab。
+ * @param {string} accountId
+ * @param {"detail"|"settings"|"skills"} [tab]
+ */
+async function openAccountDetail(accountId, tab = "detail") {
+  if (page === "account" && saveProfileEditor && !(await saveProfileEditor()))
+    return;
+  account = accountId;
+  accountDetailTab = tab;
+  page = "account";
+  render();
 }
 
 /**
@@ -785,7 +801,7 @@ function render() {
             `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc(a.id)}" title="${esc(a.label)}" aria-label="${esc(a.label)}">${accountAvatarHtml(a)}</button>`,
         )
         .join("") || `<p class="account-empty">请在设置中添加账号</p>`
-    }</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>选题与灵感</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="profile" class="${page === "profile" ? "chosen" : ""}">${I.user()} <span>账号人设</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></div><div class="docs">${
+    }</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>选题</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></div><div class="docs">${
       state.documents
         .filter(
           (d) =>
@@ -804,7 +820,7 @@ function render() {
   else if (page === "published-preview") renderPublishedPreview();
   else if (page === "topics") renderTopics();
   else if (page === "materials") renderMaterials();
-  else if (page === "profile") renderProfile();
+  else if (page === "account") renderAccountDetail();
   else renderSettings();
   // 写作预览 / 已发布预览自行收起侧栏并绑定小红书；勿再 destroy 掉进行中的排版
   if (page !== "write" && page !== "published-preview") renderAssistantRail();
@@ -813,7 +829,7 @@ function render() {
     (b) =>
       (b.onclick = async () => {
         if (
-          page === "profile" &&
+          page === "account" &&
           saveProfileEditor &&
           !(await saveProfileEditor())
         )
@@ -824,29 +840,46 @@ function render() {
         render();
       }),
   );
-  $$("[data-account]").forEach(
-    (b) =>
-      (b.onclick = async () => {
-        if (
-          page === "profile" &&
-          saveProfileEditor &&
-          !(await saveProfileEditor())
-        )
-          return;
-        sync();
-        persist();
-        account = b.dataset.account;
-        publishedSelection = new Set();
-        current = state.documents.find((d) => sameAccount(d.account, account));
-        pending = null;
-        render();
-      }),
-  );
+  $$("[data-account]").forEach((b) => {
+    b.onclick = async () => {
+      if (
+        page === "account" &&
+        saveProfileEditor &&
+        !(await saveProfileEditor())
+      )
+        return;
+      sync();
+      persist();
+      account = b.dataset.account;
+      publishedSelection = new Set();
+      current = state.documents.find((d) => sameAccount(d.account, account));
+      pending = null;
+      render();
+    };
+    b.oncontextmenu = (e) => {
+      e.preventDefault();
+      const id = b.dataset.account;
+      showContextMenu(e.clientX, e.clientY, [
+        {
+          label: "详情",
+          run: () => openAccountDetail(id, "detail"),
+        },
+        {
+          label: "设定",
+          run: () => openAccountDetail(id, "settings"),
+        },
+        {
+          label: "技能",
+          run: () => openAccountDetail(id, "skills"),
+        },
+      ]);
+    };
+  });
   $$("[data-id]").forEach(
     (b) =>
       (b.onclick = async () => {
         if (
-          page === "profile" &&
+          page === "account" &&
           saveProfileEditor &&
           !(await saveProfileEditor())
         )
@@ -1920,7 +1953,7 @@ function renderPreview() {
   previewDocId = current.id;
   if (previewPane !== "social") previewPane = "wechat";
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">退出预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} 导出图片</button><button type="button" id="copy-publish">${I.copy()} 复制排版</button><button type="button" id="push-wechat">${I.send()} 推送到公众号</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">正在排版…</p><div id="social-pages"></div></div></section></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">退出预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} 导出图片</button><button type="button" id="copy-publish">${I.copy()} 复制排版</button><button type="button" id="push-wechat">${I.send()} 推送到公众号</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">正在排版…</p><div id="social-pages"></div></div></section></div>`;
   bindArticleHeader();
   bindFinalize();
   enhanceWechatPreview();
@@ -1995,7 +2028,7 @@ function renderWrite() {
     return;
   }
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1><div class="byline">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></section></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} 写作伙伴</button><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [StarterKit, Image, TableKit],
@@ -2878,7 +2911,7 @@ function renderDashboard() {
   const selectedCount = publishedSelection.size;
   const allSelected = sorted.length > 0 && selectedCount === sorted.length;
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">让每一次表达，都有回响。</h1><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><div class="header-actions"><button type="button" id="refresh-dashboard" class="ghost icon-btn" title="从磁盘同步本地数据" aria-label="刷新">${I.refresh({ size: 18 })}</button><button id="import-notes" class="primary">更新数据</button></div></header><section class="dashboard"><div class="stats">${[
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">让每一次表达，都有回响。</h1></div><div class="header-actions"><button type="button" id="refresh-dashboard" class="ghost icon-btn" title="从磁盘同步本地数据" aria-label="刷新">${I.refresh({ size: 18 })}</button><button id="import-notes" class="primary">更新数据</button></div></header><section class="dashboard"><div class="stats">${[
       ["粉丝量", "粉丝量"],
       ["阅读", "总阅读"],
       ["点赞", "总点赞"],
@@ -3235,7 +3268,7 @@ function renderTopics() {
     (d) => sameAccount(d.account, account) && d.topics?.length,
   );
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">值得继续聊的想法。</h1><span class="eyebrow">IDEAS TO COME BACK TO</span></div></header><section class="dashboard"><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc(d.title)}</h3><div>${esc(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">继续这篇文章 →</button></div>`).join("") || '<div class="empty-data">打开一篇文章，在「思路」面板生成或讨论选题。</div>'}</div></section>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">选题和灵感</h1></div></header><section class="dashboard"><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc(d.title)}</h3><div>${esc(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">继续这篇文章 →</button></div>`).join("") || '<div class="empty-data">打开一篇文章，在「思路」面板生成或讨论选题。</div>'}</div></section>`;
   $$("[data-open]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -3246,6 +3279,24 @@ function renderTopics() {
       }),
   );
 }
+/**
+ * 设置页分区：标题在卡片上方，下方为控件。
+ * @param {{ title: string, control: string, className?: string }} opts
+ */
+function settingsSection({ title, control, className = "" }) {
+  return `<section class="settings-section ${className}"><h3 class="settings-section-title">${esc(title)}</h3><div class="settings-section-control">${control}</div></section>`;
+}
+
+/** 右侧白底面板 */
+function settingsPanel(inner, className = "") {
+  return `<div class="settings-panel ${className}">${inner}</div>`;
+}
+
+/** 面板内表单字段 */
+function settingsField(label, controlHtml) {
+  return `<label class="settings-field"><span class="settings-field-label">${esc(label)}</span>${controlHtml}</label>`;
+}
+
 function renderSettings() {
   const wx = state.wechat || {};
   if (
@@ -3266,37 +3317,115 @@ function renderSettings() {
     : state._update?.latest
       ? `已是最新（GitHub ${esc(state._update.latest)}）`
       : "点击检测 GitHub Release";
-  const configBody = `<div class="dashboard-card"><div class="settings-card-head"><h3>应用更新</h3><div class="settings-card-actions"><button type="button" id="open-releases">${I.external()} 发布页</button><button type="button" id="check-update">${I.refresh()} 检测更新</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">下载并安装</button>` : ""}</div></div><p class="update-version-line">当前版本 <strong>${esc(state._appVersion || "…")}</strong> · <span id="update-status">${updateStatus}</span></p><p class="muted">从公开 GitHub Release 检测并安装更新。</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>Agent 连接</h3><div class="settings-card-actions"><button class="primary" id="save-settings">保存设置</button></div></div><label>默认 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "· 已找到 CLI" : "· 未安装"}</option><option value="codex">Codex ${state.agents.codex ? "· 已找到 CLI" : "· 未安装"}</option></select></label><label>模型（留空沿用 CLI 默认）<input id="model" value="${esc(state.model)}" placeholder="可选模型 ID"></label><p>复用 CLI 登录。若未登录，请先在终端执行 agent login 或 codex login。此版本不保存账号凭据。</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>微信公众号</h3><div class="settings-card-actions"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存公众号设置</button></div></div><p>用于一键推送到草稿箱。AppSecret 仅保存在本机 workspace.json。</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx…" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="密钥" autocomplete="off"></label><label>默认作者<input id="wechat-author" value="${esc(wx.author || "")}" placeholder="可选"></label></div><div class="dashboard-card"><div class="settings-card-head"><h3>内容仓库</h3><div class="settings-card-actions"><button type="button" id="refresh-vault">${I.refresh()} 刷新</button></div></div>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<label class="settings-path-field">仓库路径<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="选择 Content_OS 目录" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} 选择文件夹</button></span></label></div>`;
-  const accountsBody = `<div class="settings-card-head accounts-toolbar"><h3>账号</h3><div class="settings-card-actions"><button type="button" id="register-account">${I.folder()} 选择文件夹</button><button type="button" class="primary" id="create-account">${I.plus()} 新建账号</button></div></div>${
-    accountList().length
-      ? `<div class="account-card-grid">${accountList()
-          .map((a) => {
-            const backup = state.backupPaths?.[a.id] || "";
-            return `<div class="dashboard-card account-card"><div class="account-card-top"><button type="button" class="account-avatar-btn account-avatar-lg" data-set-avatar="${esc(a.id)}" title="${a.avatar ? "更换头像" : "添加头像"}" aria-label="为 ${esc(a.label)} ${a.avatar ? "更换头像" : "添加头像"}">${accountAvatarHtml(a, "lg")}</button><div class="account-card-info"><h3>${esc(a.label)}</h3></div></div><div class="account-stat-meta"><span>${a.drafts ?? 0} 草稿</span><span>${a.archives ?? 0} 归档</span><span>${a.files ?? 0} 文件</span><span>${formatBytes(a.bytes)}</span></div><label class="settings-path-field account-backup-field">本地备份路径（无分组时回退）<span class="settings-path-row"><input type="text" value="${esc(backup)}" placeholder="未设置，同步时可选择" readonly><button type="button" data-pick-backup="${esc(a.id)}">${I.folder()} 选择</button>${backup ? `<button type="button" class="ghost" data-clear-backup="${esc(a.id)}">清除</button>` : ""}</span></label><button type="button" class="ghost account-card-remove" data-unregister-account="${esc(a.id)}">移除</button></div>`;
-          })
-          .join("")}</div>`
-      : '<p class="muted">尚未添加账号。可选择仓库内已有文件夹，或新建账号。</p>'
-  }`;
+
+  const configBody = [
+    settingsSection({
+      title: "内容仓库",
+      control: settingsPanel(
+        `${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}` +
+          settingsField(
+            "仓库路径",
+            `<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="选择 Content_OS 目录" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} 选择</button><button type="button" class="ghost" id="refresh-vault">${I.refresh()} 刷新</button></span>`,
+          ) +
+          (state.vaultLocked
+            ? `<p class="settings-hint">当前仓库由环境变量指定，无法在界面中更改。</p>`
+            : ""),
+      ),
+    }),
+    settingsSection({
+      title: "Agent 连接",
+      control: settingsPanel(
+        settingsField(
+          "默认 Agent",
+          `<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "· 已找到 CLI" : "· 未安装"}</option><option value="codex">Codex ${state.agents.codex ? "· 已找到 CLI" : "· 未安装"}</option></select>`,
+        ) +
+          settingsField(
+            "模型（留空沿用 CLI 默认）",
+            `<input id="model" value="${esc(state.model)}" placeholder="可选模型 ID" autocomplete="off">`,
+          ) +
+          `<div class="settings-panel-footer"><button type="button" class="primary" id="save-settings">保存</button></div>`,
+      ),
+    }),
+    settingsSection({
+      title: "微信公众号",
+      control: settingsPanel(
+        settingsField(
+          "AppID",
+          `<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx…" autocomplete="off">`,
+        ) +
+          settingsField(
+            "AppSecret",
+            `<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="密钥" autocomplete="off">`,
+          ) +
+          settingsField(
+            "默认作者",
+            `<input id="wechat-author" value="${esc(wx.author || "")}" placeholder="可选" autocomplete="off">`,
+          ) +
+          `<div class="settings-panel-footer"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存</button></div>`,
+      ),
+    }),
+    settingsSection({
+      title: "应用更新",
+      control: settingsPanel(
+        `<div class="settings-status-row"><div><span class="settings-field-label">当前版本</span><strong class="settings-version">${esc(state._appVersion || "…")}</strong></div><p id="update-status" class="settings-hint">${updateStatus}</p></div>` +
+          `<div class="settings-panel-footer"><button type="button" id="open-releases">${I.external()} 发布页</button><button type="button" id="check-update">${I.refresh()} 检测更新</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">下载并安装</button>` : ""}</div>`,
+      ),
+    }),
+  ].join("");
+
+  const accounts = accountList();
+  const accountsBody = settingsSection({
+    title: "写作账号",
+    control:
+      `<div class="settings-panel-toolbar"><button type="button" id="register-account">${I.folder()} 选择文件夹</button><button type="button" class="primary" id="create-account">${I.plus()} 新建账号</button></div>` +
+      (accounts.length
+        ? `<div class="account-list">${accounts
+            .map(
+              (a) =>
+                `<button type="button" class="account-list-item" data-open-account="${esc(a.id)}"><span class="account-avatar-btn account-avatar-md" aria-hidden="true">${accountAvatarHtml(a)}</span><span class="account-list-main"><strong>${esc(a.label)}</strong><span class="muted">${a.drafts ?? 0} 草稿 · ${a.archives ?? 0} 归档 · ${formatBytes(a.bytes)}</span></span><span class="account-list-chevron" aria-hidden="true">›</span></button>`,
+            )
+            .join("")}</div>`
+        : settingsPanel(
+            `<p class="settings-empty">尚未添加账号。可选择仓库内已有文件夹，或新建账号。</p>`,
+          )),
+  });
+
   const groups = groupNames();
-  const groupsBody = `<div class="settings-card-head accounts-toolbar"><h3>文章分组</h3><div class="settings-card-actions"><button type="button" class="primary" id="create-group">${I.plus()} 新建分组</button></div></div><p class="muted">为不同分组配置本地同步默认路径。文章可在写稿页或已发布列表中指定分组。</p>${
-    groups.length
-      ? `<div class="dashboard-card groups-table-wrap"><table class="groups-table"><thead><tr><th>分组</th><th>本地同步默认路径</th><th class="groups-actions-col">操作</th></tr></thead><tbody>${groups
-          .map((name) => {
-            const backup = state.groups?.[name]?.backupPath || "";
-            return `<tr><td><span class="group-chip">${esc(name)}</span></td><td><span class="settings-path-row groups-path-row"><input type="text" value="${esc(backup)}" placeholder="未设置，同步时可选择并记住" readonly><button type="button" data-pick-group-backup="${esc(name)}">${I.folder()} 选择</button>${backup ? `<button type="button" class="ghost" data-clear-group-backup="${esc(name)}">清除</button>` : ""}</span></td><td class="groups-actions-col"><button type="button" class="ghost" data-rename-group="${esc(name)}">重命名</button><button type="button" class="ghost" data-delete-group="${esc(name)}">删除</button></td></tr>`;
-          })
-          .join("")}</tbody></table></div>`
-      : '<p class="muted">还没有分组。新建后即可在文章中选用，并为每个分组设置默认同步路径。</p>'
-  }`;
+  const groupsBody = settingsSection({
+    title: "文章分组",
+    control:
+      `<div class="settings-panel-toolbar"><button type="button" class="primary" id="create-group">${I.plus()} 新建分组</button></div>` +
+      (groups.length
+        ? settingsPanel(
+            `<table class="groups-table"><thead><tr><th>分组</th><th>本地同步默认路径</th><th class="groups-actions-col">操作</th></tr></thead><tbody>${groups
+              .map((name) => {
+                const backup = state.groups?.[name]?.backupPath || "";
+                return `<tr><td><span class="group-chip">${esc(name)}</span></td><td><span class="settings-path-row groups-path-row"><input type="text" value="${esc(backup)}" placeholder="未设置，同步时可选择并记住" readonly><button type="button" data-pick-group-backup="${esc(name)}">${I.folder()} 选择</button>${backup ? `<button type="button" class="ghost" data-clear-group-backup="${esc(name)}">清除</button>` : ""}</span></td><td class="groups-actions-col"><button type="button" class="ghost" data-rename-group="${esc(name)}">重命名</button><button type="button" class="ghost" data-delete-group="${esc(name)}">删除</button></td></tr>`;
+              })
+              .join("")}</tbody></table>`,
+            "settings-panel-flush",
+          )
+        : settingsPanel(
+            `<p class="settings-empty">还没有分组。新建后即可在文章中选用，并为每个分组设置默认同步路径。</p>`,
+          )),
+  });
+
+  const body =
+    settingsTab === "config"
+      ? configBody
+      : settingsTab === "accounts"
+        ? accountsBody
+        : settingsTab === "skills"
+          ? `<div id="skills-settings-root"></div>`
+          : groupsBody;
+
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">设置</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><nav class="settings-tabs">${tabs
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">设置</h1></div></header><section class="dashboard settings"><nav class="settings-tabs" role="tablist">${tabs
       .map(
         (t) =>
-          `<button type="button" data-settings-tab="${t.id}" class="${settingsTab === t.id ? "active" : ""}">${t.title}</button>`,
+          `<button type="button" role="tab" data-settings-tab="${t.id}" aria-selected="${settingsTab === t.id}" class="${settingsTab === t.id ? "active" : ""}">${t.title}</button>`,
       )
-      .join(
-        "",
-      )}</nav>${settingsTab === "config" ? configBody : settingsTab === "accounts" ? accountsBody : settingsTab === "skills" ? `<div id="skills-settings-root"></div>` : groupsBody}</section>`;
+      .join("")}</nav><div class="settings-body">${body}</div></section>`;
   $$("[data-settings-tab]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -3305,19 +3434,20 @@ function renderSettings() {
       }),
   );
   if (settingsTab === "skills") {
-    const accounts = accountList();
-    const skillAccount = accounts.some((a) => a.id === account)
+    const list = accountList();
+    const skillAccount = list.some((a) => a.id === account)
       ? account
-      : accounts[0]?.id;
+      : list[0]?.id;
     mountSkillsSettings(
       $("#skills-settings-root"),
       api,
       skillAccount,
-      accounts,
+      list,
       (nextAccount) => {
         if (nextAccount) account = nextAccount;
         render();
       },
+      { layout: "sections" },
     );
   }
   if (settingsTab === "config") {
@@ -3338,7 +3468,6 @@ function renderSettings() {
     $("#check-update").onclick = () => checkForAppUpdate({ manual: true });
     const installBtn = $("#install-update");
     if (installBtn) installBtn.onclick = () => installAppUpdate();
-    /** 把表单写回 state.wechat */
     const readWechatForm = () => {
       state.wechat = {
         appId: $("#wechat-appid").value.trim(),
@@ -3376,7 +3505,7 @@ function renderSettings() {
       }
     };
     $("#refresh-vault").onclick = () => refreshVault();
-  } else {
+  } else if (settingsTab === "accounts") {
     const createBtn = $("#create-account");
     const registerBtn = $("#register-account");
     if (createBtn)
@@ -3395,45 +3524,8 @@ function renderSettings() {
         }
       };
     if (registerBtn) registerBtn.onclick = () => pickAndRegisterAccountFolder();
-    $$("[data-unregister-account]").forEach((b) => {
-      b.onclick = async () => {
-        const ok = await askConfirm(
-          "移除账号",
-          "仅从列表移除，不会删除磁盘文件夹。继续？",
-        );
-        if (!ok) return;
-        try {
-          applyAccountState(
-            await api("account-unregister", {
-              id: b.dataset.unregisterAccount,
-            }),
-          );
-          toast("已移除账号");
-        } catch (e) {
-          toast(e.message || "移除失败");
-        }
-      };
-    });
-    $$("[data-set-avatar]").forEach((b) => {
-      b.onclick = () => pickAndSetAccountAvatar(b.dataset.setAvatar);
-    });
-    $$("[data-pick-backup]").forEach((b) => {
-      b.onclick = () => pickAccountBackupPath(b.dataset.pickBackup);
-    });
-    $$("[data-clear-backup]").forEach((b) => {
-      b.onclick = async () => {
-        try {
-          applyAccountState(
-            await api("account-set-backup-path", {
-              id: b.dataset.clearBackup,
-              path: "",
-            }),
-          );
-          toast("已清除默认备份路径");
-        } catch (e) {
-          toast(e.message || "清除失败");
-        }
-      };
+    $$("[data-open-account]").forEach((b) => {
+      b.onclick = () => openAccountDetail(b.dataset.openAccount, "detail");
     });
   }
   if (settingsTab === "groups") {
@@ -4032,7 +4124,7 @@ async function renderMaterials() {
         ? current
         : drafts[0];
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">素材库</h1><span class="eyebrow">WRITING MATERIALS</span></div><div class="header-actions"><select id="material-filter" aria-label="按文章筛选素材"><option value="all">全部素材</option>${drafts.map((d) => `<option value="${d.id}">${esc(d.title)}</option>`).join("")}</select><button id="upload-reference" class="primary" ${uploadTarget ? "" : "disabled"}>${I.upload()} 上传文件</button></div></header><section class="dashboard"><div id="project-files" class="material-cards"></div></section>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">素材库</h1></div><div class="header-actions"><select id="material-filter" aria-label="按文章筛选素材"><option value="all">全部素材</option>${drafts.map((d) => `<option value="${d.id}">${esc(d.title)}</option>`).join("")}</select><button id="upload-reference" class="primary" ${uploadTarget ? "" : "disabled"}>${I.upload()} 上传文件</button></div></header><section class="dashboard"><div id="project-files" class="material-cards"></div></section>`;
   $("#material-filter").value = materialsFilter;
   $("#material-filter").onchange = (e) => {
     materialsFilter = e.target.value;
@@ -4142,30 +4234,142 @@ async function renderMaterials() {
     toast(e.message);
   }
 }
-async function renderProfile() {
+async function renderAccountDetail() {
   const a = account;
-  $("#main").innerHTML = '<section class="dashboard">读取账号模型…</section>';
+  const acc = accountList().find((x) => x.id === a);
+  if (!acc) {
+    page = "settings";
+    settingsTab = "accounts";
+    render();
+    return;
+  }
+  if (!["detail", "settings", "skills"].includes(accountDetailTab))
+    accountDetailTab = "detail";
+  const tabs = [
+    { id: "detail", title: "详情" },
+    { id: "settings", title: "设定" },
+    { id: "skills", title: "技能" },
+  ];
+  const shell = (body) => {
+    $("#main").innerHTML =
+      `<header><div class="header-lead"><button type="button" class="ghost" id="account-detail-back">← 账号列表</button><h1 class="dashboard-tagline">${esc(acc.label)}</h1></div></header><section class="dashboard account-detail settings"><nav class="settings-tabs account-detail-tabs" role="tablist">${tabs
+        .map(
+          (t) =>
+            `<button type="button" role="tab" data-account-tab="${t.id}" aria-selected="${accountDetailTab === t.id}" class="${accountDetailTab === t.id ? "active" : ""}">${t.title}</button>`,
+        )
+        .join("")}</nav><div id="account-detail-body" class="settings-body">${body}</div></section>`;
+    $("#account-detail-back").onclick = async () => {
+      if (saveProfileEditor && !(await saveProfileEditor())) return;
+      page = "settings";
+      settingsTab = "accounts";
+      render();
+    };
+    $$("[data-account-tab]").forEach((b) => {
+      b.onclick = async () => {
+        if (
+          accountDetailTab === "settings" &&
+          saveProfileEditor &&
+          !(await saveProfileEditor())
+        )
+          return;
+        accountDetailTab = b.dataset.accountTab;
+        render();
+      };
+    });
+  };
+  if (accountDetailTab === "detail") {
+    const backup = state.backupPaths?.[a.id] || "";
+    shell(
+      [
+        settingsSection({
+          title: "基本信息",
+          control: settingsPanel(
+            `<div class="account-overview-top"><button type="button" class="account-avatar-btn account-avatar-lg" id="account-set-avatar" title="${acc.avatar ? "更换头像" : "添加头像"}" aria-label="为 ${esc(acc.label)} ${acc.avatar ? "更换头像" : "添加头像"}">${accountAvatarHtml(acc, "lg")}</button><div class="account-overview-info"><h2>${esc(acc.label)}</h2><div class="account-stat-meta"><span>${acc.drafts ?? 0} 草稿</span><span>${acc.archives ?? 0} 归档</span><span>${acc.files ?? 0} 文件</span><span>${formatBytes(acc.bytes)}</span></div></div></div>`,
+          ),
+        }),
+        settingsSection({
+          title: "本地备份",
+          control: settingsPanel(
+            settingsField(
+              "备份路径",
+              `<span class="settings-path-row"><input type="text" value="${esc(backup)}" placeholder="未设置，同步时可选择" readonly><button type="button" id="account-pick-backup">${I.folder()} 选择</button>${backup ? `<button type="button" class="ghost" id="account-clear-backup">清除</button>` : ""}</span>`,
+            ),
+          ),
+        }),
+        settingsSection({
+          title: "移除账号",
+          control: settingsPanel(
+            `<button type="button" class="ghost" id="account-unregister">移除账号</button>`,
+          ),
+          className: "settings-section-danger",
+        }),
+      ].join(""),
+    );
+    $("#account-set-avatar").onclick = () => pickAndSetAccountAvatar(a);
+    $("#account-pick-backup").onclick = () => pickAccountBackupPath(a);
+    if ($("#account-clear-backup"))
+      $("#account-clear-backup").onclick = async () => {
+        try {
+          applyAccountState(
+            await api("account-set-backup-path", { id: a, path: "" }),
+          );
+          toast("已清除默认备份路径");
+        } catch (e) {
+          toast(e.message || "清除失败");
+        }
+      };
+    $("#account-unregister").onclick = async () => {
+      const ok = await askConfirm(
+        "移除账号",
+        "仅从列表移除，不会删除磁盘文件夹。继续？",
+      );
+      if (!ok) return;
+      try {
+        page = "settings";
+        settingsTab = "accounts";
+        applyAccountState(await api("account-unregister", { id: a }));
+        toast("已移除账号");
+      } catch (e) {
+        toast(e.message || "移除失败");
+      }
+    };
+    return;
+  }
+  if (accountDetailTab === "skills") {
+    shell(`<div id="account-skills-root"></div>`);
+    mountSkillsSettings(
+      $("#account-skills-root"),
+      api,
+      a,
+      accountList().filter((x) => x.id === a),
+      () => {},
+      { lockAccount: true, layout: "sections" },
+    );
+    return;
+  }
+  shell('<p class="muted">读取账号模型…</p>');
   try {
     let model = await api("model-load", a);
-    if (page !== "profile" || account !== a) return;
+    if (page !== "account" || account !== a || accountDetailTab !== "settings")
+      return;
     const draw = () => {
       const definition = model.definitions.find((d) => d.id === profileTab);
-      $("#main").innerHTML =
-        `<header><div class="header-lead"><h1 class="dashboard-tagline">保持自己的声音，逐步验证有效的表达。</h1><span class="eyebrow">${esc(accountLabelOf(a))} · 账号模型</span></div></header><section class="dashboard profile-manager"><nav class="model-tabs">${[...model.definitions, { id: "history", title: "迭代记录" }].map((d) => `<button data-model-tab="${d.id}" class="${profileTab === d.id ? "active" : ""}">${d.title}</button>`).join("")}</nav><div id="model-content">${
-          definition
-            ? `<h2>${definition.title}</h2><p>${{ identity: "只维护我是谁、写给谁、希望提供什么价值。", voice: "维护自然的表达偏好与必要边界，避免把每篇文章写成规则检查表。", examples: "保留我认可的真实经历和范文片段，并写清出处与为什么像我。", learning: "用有来源的数据观察指导下一次小实验；最多保留三个，过时就替换。" }[profileTab]}</p><textarea id="model-text" rows="15" maxlength="${definition.limit}">${esc(model.modules[profileTab])}</textarea><div class="row"><button id="save-model" class="primary">保存当前模块</button><small>${definition.limit} 字以内</small></div>${profileTab === "learning" ? `<p class="notice">当前账号有 ${state.metrics.filter((r) => r["账号"] === a).length} 篇归档数据。单篇波动不代表表达方式的因果效果。</p>` : ""}${
-                profileTab === "examples"
-                  ? `<details><summary>查看旧 Profile 资料（只读）</summary><div class="material-cards">${model.legacy
-                      .filter((f) => f.editable)
-                      .map(
-                        (f) =>
-                          `<button class="material-card" data-model-legacy="${esc(f.path)}"><strong>${esc(f.path)}</strong></button>`,
-                      )
-                      .join("")}</div></details>`
-                  : ""
-              }`
-            : `<button id="profile-skills" class="primary">${I.sparkles()} 配置账号技能</button><p>在设置 → 技能中维护仓库 <code>.agents/skills</code> 技能包与默认启用；历史人设建议和版本继续保留。</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} · ${p.status === "pending" ? "待审阅" : p.status === "applied" ? "已采纳" : "已保留原设定"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("、")}</p><button data-model-proposal="${p.id}">查看建议</button></div>`).join("") || "<p>还没有 AI 调整建议。</p>"}</div><h3>历史版本</h3>${model.history.map((h) => `<div class="result-card"><small>${esc(h.at)} · ${esc(h.reason)}</small><details><summary>查看当时的设定</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h.id}">恢复此版本</button></div>`).join("")}`
-        }</div></section>`;
+      const body = `<div class="profile-manager"><nav class="model-tabs">${[...model.definitions, { id: "history", title: "迭代记录" }].map((d) => `<button data-model-tab="${d.id}" class="${profileTab === d.id ? "active" : ""}">${d.title}</button>`).join("")}</nav><div id="model-content">${
+        definition
+          ? `<h2>${definition.title}</h2><p>${{ identity: "只维护我是谁、写给谁、希望提供什么价值。", voice: "维护自然的表达偏好与必要边界，避免把每篇文章写成规则检查表。", examples: "保留我认可的真实经历和范文片段，并写清出处与为什么像我。", learning: "用有来源的数据观察指导下一次小实验；最多保留三个，过时就替换。" }[profileTab]}</p><textarea id="model-text" rows="15" maxlength="${definition.limit}">${esc(model.modules[profileTab])}</textarea><div class="row"><button id="save-model" class="primary">保存当前模块</button><small>${definition.limit} 字以内</small></div>${profileTab === "learning" ? `<p class="notice">当前账号有 ${state.metrics.filter((r) => r["账号"] === a).length} 篇归档数据。单篇波动不代表表达方式的因果效果。</p>` : ""}${
+              profileTab === "examples"
+                ? `<details><summary>查看旧 Profile 资料（只读）</summary><div class="material-cards">${model.legacy
+                    .filter((f) => f.editable)
+                    .map(
+                      (f) =>
+                        `<button class="material-card" data-model-legacy="${esc(f.path)}"><strong>${esc(f.path)}</strong></button>`,
+                    )
+                    .join("")}</div></details>`
+                : ""
+            }`
+          : `<p class="muted">人设迭代建议与历史版本。技能请切换到「技能」子页。</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} · ${p.status === "pending" ? "待审阅" : p.status === "applied" ? "已采纳" : "已保留原设定"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("、")}</p><button data-model-proposal="${p.id}">查看建议</button></div>`).join("") || "<p>还没有 AI 调整建议。</p>"}</div><h3>历史版本</h3>${model.history.map((h) => `<div class="result-card"><small>${esc(h.at)} · ${esc(h.reason)}</small><details><summary>查看当时的设定</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h.id}">恢复此版本</button></div>`).join("")}`
+      }</div></div>`;
+      shell(body);
       const save = async () => {
         if (!definition || $("#model-text").value === model.modules[profileTab])
           return true;
@@ -4226,8 +4430,6 @@ async function renderProfile() {
             }
           }),
       );
-      if ($("#profile-skills"))
-        $("#profile-skills").onclick = () => { page="settings"; settingsTab="skills"; render(); };
     };
     draw();
   } catch (e) {
@@ -4268,7 +4470,7 @@ function showModelProposal(p, model) {
         ),
       });
       m.remove();
-      if (page === "profile") renderProfile();
+      if (page === "account") renderAccountDetail();
     } catch (e) {
       toast(e.message);
     }

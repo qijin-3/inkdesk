@@ -124,7 +124,7 @@ function askLine(title, placeholder = "", { allowEmpty = false } = {}) {
   });
 }
 async function mountSkillsSettings(root2, api2, account2, accounts, onRefresh = () => {
-}) {
+}, opts = {}) {
   let state2;
   const err = (msg) => {
     const el = root2.querySelector("#skill-page-error");
@@ -149,11 +149,20 @@ async function mountSkillsSettings(root2, api2, account2, accounts, onRefresh = 
         return `<div class="skill-tree-row" data-skill-id="${escape(x.id)}"><div class="skill-tree-main"><strong>${escape(x.name)}</strong><span class="muted">${escape(x.description || "")}</span>${x.missing ? '<span class="notice">\u76EE\u5F55\u5F02\u5E38</span>' : ""}</div><div class="skill-tree-actions"><label class="skill-check"><input type="checkbox" data-default="${escape(x.id)}" ${enabled ? "checked" : ""}> \u9ED8\u8BA4\u542F\u7528</label><button type="button" class="ghost" data-reveal="${escape(x.id)}">\u8BBF\u8FBE</button><button type="button" class="ghost danger" data-remove="${escape(x.id)}">\u5220\u9664</button></div></div>`;
       }).join("");
       return `<details class="skill-tree-group" open><summary><span class="skill-tree-group-label">${escape(g.label)}</span><span class="muted">${g.skills.length}</span></summary><div class="skill-tree-list">${rows}</div></details>`;
-    }).join("") : '<p class="muted">\u8FD8\u6CA1\u6709\u6280\u80FD\u3002\u5C06\u542B SKILL.md \u7684\u6587\u4EF6\u5939\u653E\u5230\u4ED3\u5E93 <code>.agents/skills</code>\uFF0C\u6216\u4F7F\u7528\u5BFC\u5165 / \u65B0\u5EFA\u3002</p>';
-    root2.innerHTML = `<div class="settings-card-head accounts-toolbar"><h3>\u6280\u80FD</h3><div class="settings-card-actions"><button type="button" id="skill-reveal-root">${escape("\u8BBF\u8FBE")}</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div></div><p class="muted">\u6280\u80FD\u5B58\u653E\u4E8E\u4ED3\u5E93 <code>${escape(state2.root)}</code>\uFF1B\u8FD0\u884C\u65F6\u4EE5\u8F6F\u94FE\u63A5\u6302\u5230 Agent \u5DE5\u4F5C\u533A\u540C\u540D\u8DEF\u5F84\u3002\u4E0B\u65B9\u6309\u6587\u4EF6\u5939\u5206\u7EC4\u5E73\u94FA\u5168\u90E8\u6280\u80FD\u3002</p><label class="skill-default-account">\u9ED8\u8BA4\u542F\u7528\u8D26\u53F7<select id="skill-account">${accountOpts}</select></label><div class="skill-tree">${treeHtml}</div><p id="skill-page-error" role="status"></p>`;
-    root2.querySelector("#skill-account").onchange = async (e) => {
-      onRefresh(e.target.value);
-    };
+    }).join("") : '<p class="settings-empty">\u8FD8\u6CA1\u6709\u6280\u80FD\u3002\u5C06\u542B SKILL.md \u7684\u6587\u4EF6\u5939\u653E\u5230\u4ED3\u5E93 <code>.agents/skills</code>\uFF0C\u6216\u4F7F\u7528\u5BFC\u5165 / \u65B0\u5EFA\u3002</p>';
+    if (opts.layout === "sections") {
+      const accountLabel = accounts.find((a) => a.id === state2.account)?.label || "\u5F53\u524D\u8D26\u53F7";
+      root2.innerHTML = `<section class="settings-section"><h3 class="settings-section-title">\u6280\u80FD\u5E93</h3><div class="settings-section-control"><div class="settings-panel-toolbar"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div><div class="settings-panel settings-panel-flush"><div class="skill-tree">${treeHtml}</div></div></div></section><section class="settings-section"><h3 class="settings-section-title">\u9ED8\u8BA4\u542F\u7528</h3><div class="settings-section-control"><div class="settings-panel">${opts.lockAccount ? `<p class="settings-hint">\u6B63\u5728\u914D\u7F6E\u300C${escape(accountLabel)}\u300D</p>` : `<label class="settings-field"><span class="settings-field-label">\u8D26\u53F7</span><select id="skill-account">${accountOpts}</select></label>`}<p id="skill-page-error" role="status"></p></div></div></section>`;
+    } else {
+      const head = opts.compact ? `<div class="settings-card-actions skill-compact-actions"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div><p class="muted">\u4ED3\u5E93 <code>${escape(state2.root)}</code> \xB7 \u52FE\u9009\u5373\u4E3A\u300C${escape(accounts[0]?.label || "\u5F53\u524D\u8D26\u53F7")}\u300D\u9ED8\u8BA4\u542F\u7528\u3002</p>` : `<div class="settings-card-head accounts-toolbar"><h3>\u6280\u80FD</h3><div class="settings-card-actions"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div></div><p class="muted">\u6280\u80FD\u5B58\u653E\u4E8E\u4ED3\u5E93 <code>${escape(state2.root)}</code>\uFF1B\u8FD0\u884C\u65F6\u4EE5\u8F6F\u94FE\u63A5\u6302\u5230 Agent \u5DE5\u4F5C\u533A\u540C\u540D\u8DEF\u5F84\u3002</p>`;
+      const accountField = opts.lockAccount ? "" : `<label class="skill-default-account">\u9ED8\u8BA4\u542F\u7528\u8D26\u53F7<select id="skill-account">${accountOpts}</select></label>`;
+      root2.innerHTML = `${head}${accountField}<div class="skill-tree">${treeHtml}</div><p id="skill-page-error" role="status"></p>`;
+    }
+    const accountSelect = root2.querySelector("#skill-account");
+    if (accountSelect)
+      accountSelect.onchange = (e) => {
+        onRefresh(e.target.value);
+      };
     root2.querySelector("#skill-reveal-root").onclick = async () => {
       try {
         await api2("skills-reveal", { account: state2.account });
@@ -30029,6 +30038,7 @@ var import_calendar = __toESM(require_calendar());
 var saveProfileEditor = null;
 var composer = null;
 var profileTab = "identity";
+var accountDetailTab = "detail";
 var heatmapYear = (/* @__PURE__ */ new Date()).getFullYear();
 var metricsSort = "\u9605\u8BFB";
 var publishedSelection = /* @__PURE__ */ new Set();
@@ -30123,8 +30133,13 @@ var saveConflict = false;
 function accountList() {
   return state?.accounts || [];
 }
-function accountLabelOf(id) {
-  return accountList().find((a) => a.id === id)?.label || String(id || "").replace(/_/g, " ");
+async function openAccountDetail(accountId, tab2 = "detail") {
+  if (page === "account" && saveProfileEditor && !await saveProfileEditor())
+    return;
+  account = accountId;
+  accountDetailTab = tab2;
+  page = "account";
+  render2();
 }
 function sameAccount(a, b) {
   if (!a || !b) return false;
@@ -30584,7 +30599,7 @@ function render2() {
   if (page !== "published-preview") publishedPreview = null;
   $("#app").innerHTML = `<aside class="sidebar"><div class="brand-row"><div class="brand"><img class="brand-icon" src="assets/brand-icon.png" alt="" width="28" height="28" /> AsIde</div><button type="button" data-page="settings" class="ghost icon-btn brand-settings" title="\u8BBE\u7F6E" aria-label="\u8BBE\u7F6E">${I.settings({ size: 18 })}</button></div><div class="account">${accountList().map(
     (a) => `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc(a.id)}" title="${esc(a.label)}" aria-label="${esc(a.label)}">${accountAvatarHtml(a)}</button>`
-  ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>\u9009\u9898\u4E0E\u7075\u611F</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button><button data-page="profile" class="${page === "profile" ? "chosen" : ""}">${I.user()} <span>\u8D26\u53F7\u4EBA\u8BBE</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></div><div class="docs">${state.documents.filter(
+  ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>\u9009\u9898</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></div><div class="docs">${state.documents.filter(
     (d) => sameAccount(d.account, account) && d.status !== "final" && d.status !== "archive"
   ).map(
     (d) => `<button class="doc ${current?.id === d.id ? "selected" : ""}" data-id="${d.id}"><span>${esc(d.title)}</span><small>${new Date(d.updated).toLocaleDateString("zh-CN")} \xB7 ${d.body.length} \u5B57</small></button>`
@@ -30594,13 +30609,13 @@ function render2() {
   else if (page === "published-preview") renderPublishedPreview();
   else if (page === "topics") renderTopics();
   else if (page === "materials") renderMaterials();
-  else if (page === "profile") renderProfile();
+  else if (page === "account") renderAccountDetail();
   else renderSettings();
   if (page !== "write" && page !== "published-preview") renderAssistantRail();
   bindWorkspaceResize();
   $$("[data-page]").forEach(
     (b) => b.onclick = async () => {
-      if (page === "profile" && saveProfileEditor && !await saveProfileEditor())
+      if (page === "account" && saveProfileEditor && !await saveProfileEditor())
         return;
       sync();
       persist();
@@ -30608,9 +30623,9 @@ function render2() {
       render2();
     }
   );
-  $$("[data-account]").forEach(
-    (b) => b.onclick = async () => {
-      if (page === "profile" && saveProfileEditor && !await saveProfileEditor())
+  $$("[data-account]").forEach((b) => {
+    b.onclick = async () => {
+      if (page === "account" && saveProfileEditor && !await saveProfileEditor())
         return;
       sync();
       persist();
@@ -30619,11 +30634,29 @@ function render2() {
       current = state.documents.find((d) => sameAccount(d.account, account));
       pending = null;
       render2();
-    }
-  );
+    };
+    b.oncontextmenu = (e) => {
+      e.preventDefault();
+      const id = b.dataset.account;
+      showContextMenu(e.clientX, e.clientY, [
+        {
+          label: "\u8BE6\u60C5",
+          run: () => openAccountDetail(id, "detail")
+        },
+        {
+          label: "\u8BBE\u5B9A",
+          run: () => openAccountDetail(id, "settings")
+        },
+        {
+          label: "\u6280\u80FD",
+          run: () => openAccountDetail(id, "skills")
+        }
+      ]);
+    };
+  });
   $$("[data-id]").forEach(
     (b) => b.onclick = async () => {
-      if (page === "profile" && saveProfileEditor && !await saveProfileEditor())
+      if (page === "account" && saveProfileEditor && !await saveProfileEditor())
         return;
       sync();
       persist();
@@ -31485,7 +31518,7 @@ function setPreviewPane(pane) {
 function renderPreview() {
   previewDocId = current.id;
   if (previewPane !== "social") previewPane = "wechat";
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
   bindArticleHeader();
   bindFinalize();
   enhanceWechatPreview();
@@ -31549,7 +31582,7 @@ function renderWrite() {
     renderPreview();
     return;
   }
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</button><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><section class="paper-wrap"><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><button type="button" id="toggle-assistant">${I.sparkles()} \u5199\u4F5C\u4F19\u4F34</button><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></section></div>`;
   editor = new Editor({
     element: $("#editor"),
     extensions: [src_default, src_default2, TableKit],
@@ -32308,7 +32341,7 @@ function renderDashboard() {
   );
   const selectedCount = publishedSelection.size;
   const allSelected = sorted.length > 0 && selectedCount === sorted.length;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BA9\u6BCF\u4E00\u6B21\u8868\u8FBE\uFF0C\u90FD\u6709\u56DE\u54CD\u3002</h1><span class="eyebrow">YOUR WRITING, IN PERSPECTIVE</span></div><div class="header-actions"><button type="button" id="refresh-dashboard" class="ghost icon-btn" title="\u4ECE\u78C1\u76D8\u540C\u6B65\u672C\u5730\u6570\u636E" aria-label="\u5237\u65B0">${I.refresh({ size: 18 })}</button><button id="import-notes" class="primary">\u66F4\u65B0\u6570\u636E</button></div></header><section class="dashboard"><div class="stats">${[
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BA9\u6BCF\u4E00\u6B21\u8868\u8FBE\uFF0C\u90FD\u6709\u56DE\u54CD\u3002</h1></div><div class="header-actions"><button type="button" id="refresh-dashboard" class="ghost icon-btn" title="\u4ECE\u78C1\u76D8\u540C\u6B65\u672C\u5730\u6570\u636E" aria-label="\u5237\u65B0">${I.refresh({ size: 18 })}</button><button id="import-notes" class="primary">\u66F4\u65B0\u6570\u636E</button></div></header><section class="dashboard"><div class="stats">${[
     ["\u7C89\u4E1D\u91CF", "\u7C89\u4E1D\u91CF"],
     ["\u9605\u8BFB", "\u603B\u9605\u8BFB"],
     ["\u70B9\u8D5E", "\u603B\u70B9\u8D5E"],
@@ -32579,7 +32612,7 @@ function renderTopics() {
   const docs = state.documents.filter(
     (d) => sameAccount(d.account, account) && d.topics?.length
   );
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u503C\u5F97\u7EE7\u7EED\u804A\u7684\u60F3\u6CD5\u3002</h1><span class="eyebrow">IDEAS TO COME BACK TO</span></div></header><section class="dashboard"><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc(d.title)}</h3><div>${esc(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">\u7EE7\u7EED\u8FD9\u7BC7\u6587\u7AE0 \u2192</button></div>`).join("") || '<div class="empty-data">\u6253\u5F00\u4E00\u7BC7\u6587\u7AE0\uFF0C\u5728\u300C\u601D\u8DEF\u300D\u9762\u677F\u751F\u6210\u6216\u8BA8\u8BBA\u9009\u9898\u3002</div>'}</div></section>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u9009\u9898\u548C\u7075\u611F</h1></div></header><section class="dashboard"><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc(d.title)}</h3><div>${esc(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">\u7EE7\u7EED\u8FD9\u7BC7\u6587\u7AE0 \u2192</button></div>`).join("") || '<div class="empty-data">\u6253\u5F00\u4E00\u7BC7\u6587\u7AE0\uFF0C\u5728\u300C\u601D\u8DEF\u300D\u9762\u677F\u751F\u6210\u6216\u8BA8\u8BBA\u9009\u9898\u3002</div>'}</div></section>`;
   $$("[data-open]").forEach(
     (b) => b.onclick = () => {
       current = state.documents.find((d) => d.id === b.dataset.open);
@@ -32588,6 +32621,15 @@ function renderTopics() {
       render2();
     }
   );
+}
+function settingsSection({ title, control, className = "" }) {
+  return `<section class="settings-section ${className}"><h3 class="settings-section-title">${esc(title)}</h3><div class="settings-section-control">${control}</div></section>`;
+}
+function settingsPanel(inner, className = "") {
+  return `<div class="settings-panel ${className}">${inner}</div>`;
+}
+function settingsField(label, controlHtml) {
+  return `<label class="settings-field"><span class="settings-field-label">${esc(label)}</span>${controlHtml}</label>`;
 }
 function renderSettings() {
   const wx = state.wechat || {};
@@ -32600,21 +32642,76 @@ function renderSettings() {
     { id: "skills", title: "\u6280\u80FD" }
   ];
   const updateStatus = state._update?.available ? `\u53D1\u73B0\u65B0\u7248\u672C ${esc(state._update.latest)}` : state._update?.latest ? `\u5DF2\u662F\u6700\u65B0\uFF08GitHub ${esc(state._update.latest)}\uFF09` : "\u70B9\u51FB\u68C0\u6D4B GitHub Release";
-  const configBody = `<div class="dashboard-card"><div class="settings-card-head"><h3>\u5E94\u7528\u66F4\u65B0</h3><div class="settings-card-actions"><button type="button" id="open-releases">${I.external()} \u53D1\u5E03\u9875</button><button type="button" id="check-update">${I.refresh()} \u68C0\u6D4B\u66F4\u65B0</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">\u4E0B\u8F7D\u5E76\u5B89\u88C5</button>` : ""}</div></div><p class="update-version-line">\u5F53\u524D\u7248\u672C <strong>${esc(state._appVersion || "\u2026")}</strong> \xB7 <span id="update-status">${updateStatus}</span></p><p class="muted">\u4ECE\u516C\u5F00 GitHub Release \u68C0\u6D4B\u5E76\u5B89\u88C5\u66F4\u65B0\u3002</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>Agent \u8FDE\u63A5</h3><div class="settings-card-actions"><button class="primary" id="save-settings">\u4FDD\u5B58\u8BBE\u7F6E</button></div></div><label>\u9ED8\u8BA4 Agent<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option><option value="codex">Codex ${state.agents.codex ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option></select></label><label>\u6A21\u578B\uFF08\u7559\u7A7A\u6CBF\u7528 CLI \u9ED8\u8BA4\uFF09<input id="model" value="${esc(state.model)}" placeholder="\u53EF\u9009\u6A21\u578B ID"></label><p>\u590D\u7528 CLI \u767B\u5F55\u3002\u82E5\u672A\u767B\u5F55\uFF0C\u8BF7\u5148\u5728\u7EC8\u7AEF\u6267\u884C agent login \u6216 codex login\u3002\u6B64\u7248\u672C\u4E0D\u4FDD\u5B58\u8D26\u53F7\u51ED\u636E\u3002</p></div><div class="dashboard-card"><div class="settings-card-head"><h3>\u5FAE\u4FE1\u516C\u4F17\u53F7</h3><div class="settings-card-actions"><button type="button" id="wechat-test">\u6D4B\u8BD5\u8FDE\u63A5</button><button type="button" class="primary" id="save-wechat">\u4FDD\u5B58\u516C\u4F17\u53F7\u8BBE\u7F6E</button></div></div><p>\u7528\u4E8E\u4E00\u952E\u63A8\u9001\u5230\u8349\u7A3F\u7BB1\u3002AppSecret \u4EC5\u4FDD\u5B58\u5728\u672C\u673A workspace.json\u3002</p><label>AppID<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx\u2026" autocomplete="off"></label><label>AppSecret<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="\u5BC6\u94A5" autocomplete="off"></label><label>\u9ED8\u8BA4\u4F5C\u8005<input id="wechat-author" value="${esc(wx.author || "")}" placeholder="\u53EF\u9009"></label></div><div class="dashboard-card"><div class="settings-card-head"><h3>\u5185\u5BB9\u4ED3\u5E93</h3><div class="settings-card-actions"><button type="button" id="refresh-vault">${I.refresh()} \u5237\u65B0</button></div></div>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}<label class="settings-path-field">\u4ED3\u5E93\u8DEF\u5F84<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="\u9009\u62E9 Content_OS \u76EE\u5F55" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} \u9009\u62E9\u6587\u4EF6\u5939</button></span></label></div>`;
-  const accountsBody = `<div class="settings-card-head accounts-toolbar"><h3>\u8D26\u53F7</h3><div class="settings-card-actions"><button type="button" id="register-account">${I.folder()} \u9009\u62E9\u6587\u4EF6\u5939</button><button type="button" class="primary" id="create-account">${I.plus()} \u65B0\u5EFA\u8D26\u53F7</button></div></div>${accountList().length ? `<div class="account-card-grid">${accountList().map((a) => {
-    const backup = state.backupPaths?.[a.id] || "";
-    return `<div class="dashboard-card account-card"><div class="account-card-top"><button type="button" class="account-avatar-btn account-avatar-lg" data-set-avatar="${esc(a.id)}" title="${a.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}" aria-label="\u4E3A ${esc(a.label)} ${a.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}">${accountAvatarHtml(a, "lg")}</button><div class="account-card-info"><h3>${esc(a.label)}</h3></div></div><div class="account-stat-meta"><span>${a.drafts ?? 0} \u8349\u7A3F</span><span>${a.archives ?? 0} \u5F52\u6863</span><span>${a.files ?? 0} \u6587\u4EF6</span><span>${formatBytes(a.bytes)}</span></div><label class="settings-path-field account-backup-field">\u672C\u5730\u5907\u4EFD\u8DEF\u5F84\uFF08\u65E0\u5206\u7EC4\u65F6\u56DE\u9000\uFF09<span class="settings-path-row"><input type="text" value="${esc(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9" readonly><button type="button" data-pick-backup="${esc(a.id)}">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" data-clear-backup="${esc(a.id)}">\u6E05\u9664</button>` : ""}</span></label><button type="button" class="ghost account-card-remove" data-unregister-account="${esc(a.id)}">\u79FB\u9664</button></div>`;
-  }).join("")}</div>` : '<p class="muted">\u5C1A\u672A\u6DFB\u52A0\u8D26\u53F7\u3002\u53EF\u9009\u62E9\u4ED3\u5E93\u5185\u5DF2\u6709\u6587\u4EF6\u5939\uFF0C\u6216\u65B0\u5EFA\u8D26\u53F7\u3002</p>'}`;
+  const configBody = [
+    settingsSection({
+      title: "\u5185\u5BB9\u4ED3\u5E93",
+      control: settingsPanel(
+        `${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}` + settingsField(
+          "\u4ED3\u5E93\u8DEF\u5F84",
+          `<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="\u9009\u62E9 Content_OS \u76EE\u5F55" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} \u9009\u62E9</button><button type="button" class="ghost" id="refresh-vault">${I.refresh()} \u5237\u65B0</button></span>`
+        ) + (state.vaultLocked ? `<p class="settings-hint">\u5F53\u524D\u4ED3\u5E93\u7531\u73AF\u5883\u53D8\u91CF\u6307\u5B9A\uFF0C\u65E0\u6CD5\u5728\u754C\u9762\u4E2D\u66F4\u6539\u3002</p>` : "")
+      )
+    }),
+    settingsSection({
+      title: "Agent \u8FDE\u63A5",
+      control: settingsPanel(
+        settingsField(
+          "\u9ED8\u8BA4 Agent",
+          `<select id="setting-provider"><option value="cursor">Cursor ${state.agents.cursor ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option><option value="codex">Codex ${state.agents.codex ? "\xB7 \u5DF2\u627E\u5230 CLI" : "\xB7 \u672A\u5B89\u88C5"}</option></select>`
+        ) + settingsField(
+          "\u6A21\u578B\uFF08\u7559\u7A7A\u6CBF\u7528 CLI \u9ED8\u8BA4\uFF09",
+          `<input id="model" value="${esc(state.model)}" placeholder="\u53EF\u9009\u6A21\u578B ID" autocomplete="off">`
+        ) + `<div class="settings-panel-footer"><button type="button" class="primary" id="save-settings">\u4FDD\u5B58</button></div>`
+      )
+    }),
+    settingsSection({
+      title: "\u5FAE\u4FE1\u516C\u4F17\u53F7",
+      control: settingsPanel(
+        settingsField(
+          "AppID",
+          `<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx\u2026" autocomplete="off">`
+        ) + settingsField(
+          "AppSecret",
+          `<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="\u5BC6\u94A5" autocomplete="off">`
+        ) + settingsField(
+          "\u9ED8\u8BA4\u4F5C\u8005",
+          `<input id="wechat-author" value="${esc(wx.author || "")}" placeholder="\u53EF\u9009" autocomplete="off">`
+        ) + `<div class="settings-panel-footer"><button type="button" id="wechat-test">\u6D4B\u8BD5\u8FDE\u63A5</button><button type="button" class="primary" id="save-wechat">\u4FDD\u5B58</button></div>`
+      )
+    }),
+    settingsSection({
+      title: "\u5E94\u7528\u66F4\u65B0",
+      control: settingsPanel(
+        `<div class="settings-status-row"><div><span class="settings-field-label">\u5F53\u524D\u7248\u672C</span><strong class="settings-version">${esc(state._appVersion || "\u2026")}</strong></div><p id="update-status" class="settings-hint">${updateStatus}</p></div><div class="settings-panel-footer"><button type="button" id="open-releases">${I.external()} \u53D1\u5E03\u9875</button><button type="button" id="check-update">${I.refresh()} \u68C0\u6D4B\u66F4\u65B0</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">\u4E0B\u8F7D\u5E76\u5B89\u88C5</button>` : ""}</div>`
+      )
+    })
+  ].join("");
+  const accounts = accountList();
+  const accountsBody = settingsSection({
+    title: "\u5199\u4F5C\u8D26\u53F7",
+    control: `<div class="settings-panel-toolbar"><button type="button" id="register-account">${I.folder()} \u9009\u62E9\u6587\u4EF6\u5939</button><button type="button" class="primary" id="create-account">${I.plus()} \u65B0\u5EFA\u8D26\u53F7</button></div>` + (accounts.length ? `<div class="account-list">${accounts.map(
+      (a) => `<button type="button" class="account-list-item" data-open-account="${esc(a.id)}"><span class="account-avatar-btn account-avatar-md" aria-hidden="true">${accountAvatarHtml(a)}</span><span class="account-list-main"><strong>${esc(a.label)}</strong><span class="muted">${a.drafts ?? 0} \u8349\u7A3F \xB7 ${a.archives ?? 0} \u5F52\u6863 \xB7 ${formatBytes(a.bytes)}</span></span><span class="account-list-chevron" aria-hidden="true">\u203A</span></button>`
+    ).join("")}</div>` : settingsPanel(
+      `<p class="settings-empty">\u5C1A\u672A\u6DFB\u52A0\u8D26\u53F7\u3002\u53EF\u9009\u62E9\u4ED3\u5E93\u5185\u5DF2\u6709\u6587\u4EF6\u5939\uFF0C\u6216\u65B0\u5EFA\u8D26\u53F7\u3002</p>`
+    ))
+  });
   const groups = groupNames();
-  const groupsBody = `<div class="settings-card-head accounts-toolbar"><h3>\u6587\u7AE0\u5206\u7EC4</h3><div class="settings-card-actions"><button type="button" class="primary" id="create-group">${I.plus()} \u65B0\u5EFA\u5206\u7EC4</button></div></div><p class="muted">\u4E3A\u4E0D\u540C\u5206\u7EC4\u914D\u7F6E\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84\u3002\u6587\u7AE0\u53EF\u5728\u5199\u7A3F\u9875\u6216\u5DF2\u53D1\u5E03\u5217\u8868\u4E2D\u6307\u5B9A\u5206\u7EC4\u3002</p>${groups.length ? `<div class="dashboard-card groups-table-wrap"><table class="groups-table"><thead><tr><th>\u5206\u7EC4</th><th>\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84</th><th class="groups-actions-col">\u64CD\u4F5C</th></tr></thead><tbody>${groups.map((name) => {
-    const backup = state.groups?.[name]?.backupPath || "";
-    return `<tr><td><span class="group-chip">${esc(name)}</span></td><td><span class="settings-path-row groups-path-row"><input type="text" value="${esc(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9\u5E76\u8BB0\u4F4F" readonly><button type="button" data-pick-group-backup="${esc(name)}">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" data-clear-group-backup="${esc(name)}">\u6E05\u9664</button>` : ""}</span></td><td class="groups-actions-col"><button type="button" class="ghost" data-rename-group="${esc(name)}">\u91CD\u547D\u540D</button><button type="button" class="ghost" data-delete-group="${esc(name)}">\u5220\u9664</button></td></tr>`;
-  }).join("")}</tbody></table></div>` : '<p class="muted">\u8FD8\u6CA1\u6709\u5206\u7EC4\u3002\u65B0\u5EFA\u540E\u5373\u53EF\u5728\u6587\u7AE0\u4E2D\u9009\u7528\uFF0C\u5E76\u4E3A\u6BCF\u4E2A\u5206\u7EC4\u8BBE\u7F6E\u9ED8\u8BA4\u540C\u6B65\u8DEF\u5F84\u3002</p>'}`;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BBE\u7F6E</h1><span class="eyebrow">YOUR TOOLS, YOUR CHOICE</span></div></header><section class="dashboard settings"><nav class="settings-tabs">${tabs.map(
-    (t) => `<button type="button" data-settings-tab="${t.id}" class="${settingsTab === t.id ? "active" : ""}">${t.title}</button>`
-  ).join(
-    ""
-  )}</nav>${settingsTab === "config" ? configBody : settingsTab === "accounts" ? accountsBody : settingsTab === "skills" ? `<div id="skills-settings-root"></div>` : groupsBody}</section>`;
+  const groupsBody = settingsSection({
+    title: "\u6587\u7AE0\u5206\u7EC4",
+    control: `<div class="settings-panel-toolbar"><button type="button" class="primary" id="create-group">${I.plus()} \u65B0\u5EFA\u5206\u7EC4</button></div>` + (groups.length ? settingsPanel(
+      `<table class="groups-table"><thead><tr><th>\u5206\u7EC4</th><th>\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84</th><th class="groups-actions-col">\u64CD\u4F5C</th></tr></thead><tbody>${groups.map((name) => {
+        const backup = state.groups?.[name]?.backupPath || "";
+        return `<tr><td><span class="group-chip">${esc(name)}</span></td><td><span class="settings-path-row groups-path-row"><input type="text" value="${esc(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9\u5E76\u8BB0\u4F4F" readonly><button type="button" data-pick-group-backup="${esc(name)}">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" data-clear-group-backup="${esc(name)}">\u6E05\u9664</button>` : ""}</span></td><td class="groups-actions-col"><button type="button" class="ghost" data-rename-group="${esc(name)}">\u91CD\u547D\u540D</button><button type="button" class="ghost" data-delete-group="${esc(name)}">\u5220\u9664</button></td></tr>`;
+      }).join("")}</tbody></table>`,
+      "settings-panel-flush"
+    ) : settingsPanel(
+      `<p class="settings-empty">\u8FD8\u6CA1\u6709\u5206\u7EC4\u3002\u65B0\u5EFA\u540E\u5373\u53EF\u5728\u6587\u7AE0\u4E2D\u9009\u7528\uFF0C\u5E76\u4E3A\u6BCF\u4E2A\u5206\u7EC4\u8BBE\u7F6E\u9ED8\u8BA4\u540C\u6B65\u8DEF\u5F84\u3002</p>`
+    ))
+  });
+  const body = settingsTab === "config" ? configBody : settingsTab === "accounts" ? accountsBody : settingsTab === "skills" ? `<div id="skills-settings-root"></div>` : groupsBody;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BBE\u7F6E</h1></div></header><section class="dashboard settings"><nav class="settings-tabs" role="tablist">${tabs.map(
+    (t) => `<button type="button" role="tab" data-settings-tab="${t.id}" aria-selected="${settingsTab === t.id}" class="${settingsTab === t.id ? "active" : ""}">${t.title}</button>`
+  ).join("")}</nav><div class="settings-body">${body}</div></section>`;
   $$("[data-settings-tab]").forEach(
     (b) => b.onclick = () => {
       settingsTab = b.dataset.settingsTab;
@@ -32622,17 +32719,18 @@ function renderSettings() {
     }
   );
   if (settingsTab === "skills") {
-    const accounts = accountList();
-    const skillAccount = accounts.some((a) => a.id === account) ? account : accounts[0]?.id;
+    const list2 = accountList();
+    const skillAccount = list2.some((a) => a.id === account) ? account : list2[0]?.id;
     mountSkillsSettings(
       $("#skills-settings-root"),
       api,
       skillAccount,
-      accounts,
+      list2,
       (nextAccount) => {
         if (nextAccount) account = nextAccount;
         render2();
-      }
+      },
+      { layout: "sections" }
     );
   }
   if (settingsTab === "config") {
@@ -32690,7 +32788,7 @@ function renderSettings() {
       }
     };
     $("#refresh-vault").onclick = () => refreshVault();
-  } else {
+  } else if (settingsTab === "accounts") {
     const createBtn = $("#create-account");
     const registerBtn = $("#register-account");
     if (createBtn)
@@ -32709,45 +32807,8 @@ function renderSettings() {
         }
       };
     if (registerBtn) registerBtn.onclick = () => pickAndRegisterAccountFolder();
-    $$("[data-unregister-account]").forEach((b) => {
-      b.onclick = async () => {
-        const ok = await askConfirm(
-          "\u79FB\u9664\u8D26\u53F7",
-          "\u4EC5\u4ECE\u5217\u8868\u79FB\u9664\uFF0C\u4E0D\u4F1A\u5220\u9664\u78C1\u76D8\u6587\u4EF6\u5939\u3002\u7EE7\u7EED\uFF1F"
-        );
-        if (!ok) return;
-        try {
-          applyAccountState(
-            await api("account-unregister", {
-              id: b.dataset.unregisterAccount
-            })
-          );
-          toast("\u5DF2\u79FB\u9664\u8D26\u53F7");
-        } catch (e) {
-          toast(e.message || "\u79FB\u9664\u5931\u8D25");
-        }
-      };
-    });
-    $$("[data-set-avatar]").forEach((b) => {
-      b.onclick = () => pickAndSetAccountAvatar(b.dataset.setAvatar);
-    });
-    $$("[data-pick-backup]").forEach((b) => {
-      b.onclick = () => pickAccountBackupPath(b.dataset.pickBackup);
-    });
-    $$("[data-clear-backup]").forEach((b) => {
-      b.onclick = async () => {
-        try {
-          applyAccountState(
-            await api("account-set-backup-path", {
-              id: b.dataset.clearBackup,
-              path: ""
-            })
-          );
-          toast("\u5DF2\u6E05\u9664\u9ED8\u8BA4\u5907\u4EFD\u8DEF\u5F84");
-        } catch (e) {
-          toast(e.message || "\u6E05\u9664\u5931\u8D25");
-        }
-      };
+    $$("[data-open-account]").forEach((b) => {
+      b.onclick = () => openAccountDetail(b.dataset.openAccount, "detail");
     });
   }
   if (settingsTab === "groups") {
@@ -33191,7 +33252,7 @@ async function renderMaterials() {
   if (materialsFilter !== "all" && !drafts.some((d) => d.id === materialsFilter))
     materialsFilter = "all";
   const uploadTarget = materialsFilter !== "all" ? drafts.find((d) => d.id === materialsFilter) : sameAccount(current?.account, account) ? current : drafts[0];
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7D20\u6750\u5E93</h1><span class="eyebrow">WRITING MATERIALS</span></div><div class="header-actions"><select id="material-filter" aria-label="\u6309\u6587\u7AE0\u7B5B\u9009\u7D20\u6750"><option value="all">\u5168\u90E8\u7D20\u6750</option>${drafts.map((d) => `<option value="${d.id}">${esc(d.title)}</option>`).join("")}</select><button id="upload-reference" class="primary" ${uploadTarget ? "" : "disabled"}>${I.upload()} \u4E0A\u4F20\u6587\u4EF6</button></div></header><section class="dashboard"><div id="project-files" class="material-cards"></div></section>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7D20\u6750\u5E93</h1></div><div class="header-actions"><select id="material-filter" aria-label="\u6309\u6587\u7AE0\u7B5B\u9009\u7D20\u6750"><option value="all">\u5168\u90E8\u7D20\u6750</option>${drafts.map((d) => `<option value="${d.id}">${esc(d.title)}</option>`).join("")}</select><button id="upload-reference" class="primary" ${uploadTarget ? "" : "disabled"}>${I.upload()} \u4E0A\u4F20\u6587\u4EF6</button></div></header><section class="dashboard"><div id="project-files" class="material-cards"></div></section>`;
   $("#material-filter").value = materialsFilter;
   $("#material-filter").onchange = (e) => {
     materialsFilter = e.target.value;
@@ -33289,17 +33350,123 @@ async function renderMaterials() {
     toast(e.message);
   }
 }
-async function renderProfile() {
+async function renderAccountDetail() {
   const a = account;
-  $("#main").innerHTML = '<section class="dashboard">\u8BFB\u53D6\u8D26\u53F7\u6A21\u578B\u2026</section>';
+  const acc = accountList().find((x) => x.id === a);
+  if (!acc) {
+    page = "settings";
+    settingsTab = "accounts";
+    render2();
+    return;
+  }
+  if (!["detail", "settings", "skills"].includes(accountDetailTab))
+    accountDetailTab = "detail";
+  const tabs = [
+    { id: "detail", title: "\u8BE6\u60C5" },
+    { id: "settings", title: "\u8BBE\u5B9A" },
+    { id: "skills", title: "\u6280\u80FD" }
+  ];
+  const shell = (body) => {
+    $("#main").innerHTML = `<header><div class="header-lead"><button type="button" class="ghost" id="account-detail-back">\u2190 \u8D26\u53F7\u5217\u8868</button><h1 class="dashboard-tagline">${esc(acc.label)}</h1></div></header><section class="dashboard account-detail settings"><nav class="settings-tabs account-detail-tabs" role="tablist">${tabs.map(
+      (t) => `<button type="button" role="tab" data-account-tab="${t.id}" aria-selected="${accountDetailTab === t.id}" class="${accountDetailTab === t.id ? "active" : ""}">${t.title}</button>`
+    ).join("")}</nav><div id="account-detail-body" class="settings-body">${body}</div></section>`;
+    $("#account-detail-back").onclick = async () => {
+      if (saveProfileEditor && !await saveProfileEditor()) return;
+      page = "settings";
+      settingsTab = "accounts";
+      render2();
+    };
+    $$("[data-account-tab]").forEach((b) => {
+      b.onclick = async () => {
+        if (accountDetailTab === "settings" && saveProfileEditor && !await saveProfileEditor())
+          return;
+        accountDetailTab = b.dataset.accountTab;
+        render2();
+      };
+    });
+  };
+  if (accountDetailTab === "detail") {
+    const backup = state.backupPaths?.[a.id] || "";
+    shell(
+      [
+        settingsSection({
+          title: "\u57FA\u672C\u4FE1\u606F",
+          control: settingsPanel(
+            `<div class="account-overview-top"><button type="button" class="account-avatar-btn account-avatar-lg" id="account-set-avatar" title="${acc.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}" aria-label="\u4E3A ${esc(acc.label)} ${acc.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}">${accountAvatarHtml(acc, "lg")}</button><div class="account-overview-info"><h2>${esc(acc.label)}</h2><div class="account-stat-meta"><span>${acc.drafts ?? 0} \u8349\u7A3F</span><span>${acc.archives ?? 0} \u5F52\u6863</span><span>${acc.files ?? 0} \u6587\u4EF6</span><span>${formatBytes(acc.bytes)}</span></div></div></div>`
+          )
+        }),
+        settingsSection({
+          title: "\u672C\u5730\u5907\u4EFD",
+          control: settingsPanel(
+            settingsField(
+              "\u5907\u4EFD\u8DEF\u5F84",
+              `<span class="settings-path-row"><input type="text" value="${esc(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9" readonly><button type="button" id="account-pick-backup">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" id="account-clear-backup">\u6E05\u9664</button>` : ""}</span>`
+            )
+          )
+        }),
+        settingsSection({
+          title: "\u79FB\u9664\u8D26\u53F7",
+          control: settingsPanel(
+            `<button type="button" class="ghost" id="account-unregister">\u79FB\u9664\u8D26\u53F7</button>`
+          ),
+          className: "settings-section-danger"
+        })
+      ].join("")
+    );
+    $("#account-set-avatar").onclick = () => pickAndSetAccountAvatar(a);
+    $("#account-pick-backup").onclick = () => pickAccountBackupPath(a);
+    if ($("#account-clear-backup"))
+      $("#account-clear-backup").onclick = async () => {
+        try {
+          applyAccountState(
+            await api("account-set-backup-path", { id: a, path: "" })
+          );
+          toast("\u5DF2\u6E05\u9664\u9ED8\u8BA4\u5907\u4EFD\u8DEF\u5F84");
+        } catch (e) {
+          toast(e.message || "\u6E05\u9664\u5931\u8D25");
+        }
+      };
+    $("#account-unregister").onclick = async () => {
+      const ok = await askConfirm(
+        "\u79FB\u9664\u8D26\u53F7",
+        "\u4EC5\u4ECE\u5217\u8868\u79FB\u9664\uFF0C\u4E0D\u4F1A\u5220\u9664\u78C1\u76D8\u6587\u4EF6\u5939\u3002\u7EE7\u7EED\uFF1F"
+      );
+      if (!ok) return;
+      try {
+        page = "settings";
+        settingsTab = "accounts";
+        applyAccountState(await api("account-unregister", { id: a }));
+        toast("\u5DF2\u79FB\u9664\u8D26\u53F7");
+      } catch (e) {
+        toast(e.message || "\u79FB\u9664\u5931\u8D25");
+      }
+    };
+    return;
+  }
+  if (accountDetailTab === "skills") {
+    shell(`<div id="account-skills-root"></div>`);
+    mountSkillsSettings(
+      $("#account-skills-root"),
+      api,
+      a,
+      accountList().filter((x) => x.id === a),
+      () => {
+      },
+      { lockAccount: true, layout: "sections" }
+    );
+    return;
+  }
+  shell('<p class="muted">\u8BFB\u53D6\u8D26\u53F7\u6A21\u578B\u2026</p>');
   try {
     let model = await api("model-load", a);
-    if (page !== "profile" || account !== a) return;
+    if (page !== "account" || account !== a || accountDetailTab !== "settings")
+      return;
     const draw = () => {
       const definition = model.definitions.find((d) => d.id === profileTab);
-      $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u4FDD\u6301\u81EA\u5DF1\u7684\u58F0\u97F3\uFF0C\u9010\u6B65\u9A8C\u8BC1\u6709\u6548\u7684\u8868\u8FBE\u3002</h1><span class="eyebrow">${esc(accountLabelOf(a))} \xB7 \u8D26\u53F7\u6A21\u578B</span></div></header><section class="dashboard profile-manager"><nav class="model-tabs">${[...model.definitions, { id: "history", title: "\u8FED\u4EE3\u8BB0\u5F55" }].map((d) => `<button data-model-tab="${d.id}" class="${profileTab === d.id ? "active" : ""}">${d.title}</button>`).join("")}</nav><div id="model-content">${definition ? `<h2>${definition.title}</h2><p>${{ identity: "\u53EA\u7EF4\u62A4\u6211\u662F\u8C01\u3001\u5199\u7ED9\u8C01\u3001\u5E0C\u671B\u63D0\u4F9B\u4EC0\u4E48\u4EF7\u503C\u3002", voice: "\u7EF4\u62A4\u81EA\u7136\u7684\u8868\u8FBE\u504F\u597D\u4E0E\u5FC5\u8981\u8FB9\u754C\uFF0C\u907F\u514D\u628A\u6BCF\u7BC7\u6587\u7AE0\u5199\u6210\u89C4\u5219\u68C0\u67E5\u8868\u3002", examples: "\u4FDD\u7559\u6211\u8BA4\u53EF\u7684\u771F\u5B9E\u7ECF\u5386\u548C\u8303\u6587\u7247\u6BB5\uFF0C\u5E76\u5199\u6E05\u51FA\u5904\u4E0E\u4E3A\u4EC0\u4E48\u50CF\u6211\u3002", learning: "\u7528\u6709\u6765\u6E90\u7684\u6570\u636E\u89C2\u5BDF\u6307\u5BFC\u4E0B\u4E00\u6B21\u5C0F\u5B9E\u9A8C\uFF1B\u6700\u591A\u4FDD\u7559\u4E09\u4E2A\uFF0C\u8FC7\u65F6\u5C31\u66FF\u6362\u3002" }[profileTab]}</p><textarea id="model-text" rows="15" maxlength="${definition.limit}">${esc(model.modules[profileTab])}</textarea><div class="row"><button id="save-model" class="primary">\u4FDD\u5B58\u5F53\u524D\u6A21\u5757</button><small>${definition.limit} \u5B57\u4EE5\u5185</small></div>${profileTab === "learning" ? `<p class="notice">\u5F53\u524D\u8D26\u53F7\u6709 ${state.metrics.filter((r) => r["\u8D26\u53F7"] === a).length} \u7BC7\u5F52\u6863\u6570\u636E\u3002\u5355\u7BC7\u6CE2\u52A8\u4E0D\u4EE3\u8868\u8868\u8FBE\u65B9\u5F0F\u7684\u56E0\u679C\u6548\u679C\u3002</p>` : ""}${profileTab === "examples" ? `<details><summary>\u67E5\u770B\u65E7 Profile \u8D44\u6599\uFF08\u53EA\u8BFB\uFF09</summary><div class="material-cards">${model.legacy.filter((f) => f.editable).map(
+      const body = `<div class="profile-manager"><nav class="model-tabs">${[...model.definitions, { id: "history", title: "\u8FED\u4EE3\u8BB0\u5F55" }].map((d) => `<button data-model-tab="${d.id}" class="${profileTab === d.id ? "active" : ""}">${d.title}</button>`).join("")}</nav><div id="model-content">${definition ? `<h2>${definition.title}</h2><p>${{ identity: "\u53EA\u7EF4\u62A4\u6211\u662F\u8C01\u3001\u5199\u7ED9\u8C01\u3001\u5E0C\u671B\u63D0\u4F9B\u4EC0\u4E48\u4EF7\u503C\u3002", voice: "\u7EF4\u62A4\u81EA\u7136\u7684\u8868\u8FBE\u504F\u597D\u4E0E\u5FC5\u8981\u8FB9\u754C\uFF0C\u907F\u514D\u628A\u6BCF\u7BC7\u6587\u7AE0\u5199\u6210\u89C4\u5219\u68C0\u67E5\u8868\u3002", examples: "\u4FDD\u7559\u6211\u8BA4\u53EF\u7684\u771F\u5B9E\u7ECF\u5386\u548C\u8303\u6587\u7247\u6BB5\uFF0C\u5E76\u5199\u6E05\u51FA\u5904\u4E0E\u4E3A\u4EC0\u4E48\u50CF\u6211\u3002", learning: "\u7528\u6709\u6765\u6E90\u7684\u6570\u636E\u89C2\u5BDF\u6307\u5BFC\u4E0B\u4E00\u6B21\u5C0F\u5B9E\u9A8C\uFF1B\u6700\u591A\u4FDD\u7559\u4E09\u4E2A\uFF0C\u8FC7\u65F6\u5C31\u66FF\u6362\u3002" }[profileTab]}</p><textarea id="model-text" rows="15" maxlength="${definition.limit}">${esc(model.modules[profileTab])}</textarea><div class="row"><button id="save-model" class="primary">\u4FDD\u5B58\u5F53\u524D\u6A21\u5757</button><small>${definition.limit} \u5B57\u4EE5\u5185</small></div>${profileTab === "learning" ? `<p class="notice">\u5F53\u524D\u8D26\u53F7\u6709 ${state.metrics.filter((r) => r["\u8D26\u53F7"] === a).length} \u7BC7\u5F52\u6863\u6570\u636E\u3002\u5355\u7BC7\u6CE2\u52A8\u4E0D\u4EE3\u8868\u8868\u8FBE\u65B9\u5F0F\u7684\u56E0\u679C\u6548\u679C\u3002</p>` : ""}${profileTab === "examples" ? `<details><summary>\u67E5\u770B\u65E7 Profile \u8D44\u6599\uFF08\u53EA\u8BFB\uFF09</summary><div class="material-cards">${model.legacy.filter((f) => f.editable).map(
         (f) => `<button class="material-card" data-model-legacy="${esc(f.path)}"><strong>${esc(f.path)}</strong></button>`
-      ).join("")}</div></details>` : ""}` : `<button id="profile-skills" class="primary">${I.sparkles()} \u914D\u7F6E\u8D26\u53F7\u6280\u80FD</button><p>\u5728\u8BBE\u7F6E \u2192 \u6280\u80FD\u4E2D\u7EF4\u62A4\u4ED3\u5E93 <code>.agents/skills</code> \u6280\u80FD\u5305\u4E0E\u9ED8\u8BA4\u542F\u7528\uFF1B\u5386\u53F2\u4EBA\u8BBE\u5EFA\u8BAE\u548C\u7248\u672C\u7EE7\u7EED\u4FDD\u7559\u3002</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} \xB7 ${p.status === "pending" ? "\u5F85\u5BA1\u9605" : p.status === "applied" ? "\u5DF2\u91C7\u7EB3" : "\u5DF2\u4FDD\u7559\u539F\u8BBE\u5B9A"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("\u3001")}</p><button data-model-proposal="${p.id}">\u67E5\u770B\u5EFA\u8BAE</button></div>`).join("") || "<p>\u8FD8\u6CA1\u6709 AI \u8C03\u6574\u5EFA\u8BAE\u3002</p>"}</div><h3>\u5386\u53F2\u7248\u672C</h3>${model.history.map((h2) => `<div class="result-card"><small>${esc(h2.at)} \xB7 ${esc(h2.reason)}</small><details><summary>\u67E5\u770B\u5F53\u65F6\u7684\u8BBE\u5B9A</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h2.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h2.id}">\u6062\u590D\u6B64\u7248\u672C</button></div>`).join("")}`}</div></section>`;
+      ).join("")}</div></details>` : ""}` : `<p class="muted">\u4EBA\u8BBE\u8FED\u4EE3\u5EFA\u8BAE\u4E0E\u5386\u53F2\u7248\u672C\u3002\u6280\u80FD\u8BF7\u5207\u6362\u5230\u300C\u6280\u80FD\u300D\u5B50\u9875\u3002</p><div>${model.proposals.map((p) => `<div class="result-card"><small>${esc(p.at)} \xB7 ${p.status === "pending" ? "\u5F85\u5BA1\u9605" : p.status === "applied" ? "\u5DF2\u91C7\u7EB3" : "\u5DF2\u4FDD\u7559\u539F\u8BBE\u5B9A"}</small><p>${p.changes.map((c) => esc(model.definitions.find((d) => d.id === c.module)?.title)).join("\u3001")}</p><button data-model-proposal="${p.id}">\u67E5\u770B\u5EFA\u8BAE</button></div>`).join("") || "<p>\u8FD8\u6CA1\u6709 AI \u8C03\u6574\u5EFA\u8BAE\u3002</p>"}</div><h3>\u5386\u53F2\u7248\u672C</h3>${model.history.map((h2) => `<div class="result-card"><small>${esc(h2.at)} \xB7 ${esc(h2.reason)}</small><details><summary>\u67E5\u770B\u5F53\u65F6\u7684\u8BBE\u5B9A</summary><pre>${esc(model.definitions.map((d) => d.title + "\n" + h2.modules[d.id]).join("\n\n"))}</pre></details><button data-model-restore="${h2.id}">\u6062\u590D\u6B64\u7248\u672C</button></div>`).join("")}`}</div></div>`;
+      shell(body);
       const save = async () => {
         if (!definition || $("#model-text").value === model.modules[profileTab])
           return true;
@@ -33355,12 +33522,6 @@ async function renderProfile() {
           }
         }
       );
-      if ($("#profile-skills"))
-        $("#profile-skills").onclick = () => {
-          page = "settings";
-          settingsTab = "skills";
-          render2();
-        };
     };
     draw();
   } catch (e) {
@@ -33395,7 +33556,7 @@ function showModelProposal(p, model) {
         )
       });
       m.remove();
-      if (page === "profile") renderProfile();
+      if (page === "account") renderAccountDetail();
     } catch (e) {
       toast(e.message);
     }

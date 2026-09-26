@@ -87,7 +87,9 @@ const { _electron: electron } = require("@playwright/test"),
       await w.locator(`[data-heat-date="${year}-01-10"]`).getAttribute("title"),
       /2 篇[\s\S]*第一篇/,
     );
-    await w.locator('[data-page="profile"]').click();
+    await w.locator('[data-page="settings"]').click();
+    await w.locator('[data-settings-tab="accounts"]').click();
+    await w.locator('[data-open-account]').first().click();
     await w.locator('[data-profile-file="Author_DNA/语言风格.md"]').click();
     assert.match(await w.locator("#profile-text").inputValue(), /讲人话/);
     await w.locator("#profile-text").fill("# 语言\n我喜欢自然的表达。");

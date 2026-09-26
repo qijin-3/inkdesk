@@ -87,7 +87,9 @@ const assert = require("node:assert/strict"),
       decodeURIComponent(image),
       /Attachment\/工作台闭环测试\/file-\d{17}\.png/,
     );
-    await w.locator('[data-page="profile"]').click();
+    await w.locator('[data-page="settings"]').click();
+    await w.locator('[data-settings-tab="accounts"]').click();
+    await w.locator('[data-open-account]').first().click();
     await w.locator("#profile-contract").waitFor();
     await w
       .locator("#profile-contract")

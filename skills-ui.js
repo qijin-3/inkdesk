@@ -47,7 +47,8 @@ function askLine(title, placeholder = "", { allowEmpty = false } = {}) {
  * @param {(name: string, data?: object) => Promise<any>} api
  * @param {string} account 当前用于默认启用的账号
  * @param {{ id: string, label: string }[]} accounts
- * @param {() => void} [onRefresh]
+ * @param {(id?: string) => void} [onRefresh]
+ * @param {{ lockAccount?: boolean, compact?: boolean, layout?: "sections" }} [opts]
  */
 export async function mountSkillsSettings(
   root,
@@ -55,6 +56,7 @@ export async function mountSkillsSettings(
   account,
   accounts,
   onRefresh = () => {},
+  opts = {},
 ) {
   let state;
   const err = (msg) => {
@@ -90,11 +92,25 @@ export async function mountSkillsSettings(
             return `<details class="skill-tree-group" open><summary><span class="skill-tree-group-label">${escape(g.label)}</span><span class="muted">${g.skills.length}</span></summary><div class="skill-tree-list">${rows}</div></details>`;
           })
           .join("")
-      : '<p class="muted">还没有技能。将含 SKILL.md 的文件夹放到仓库 <code>.agents/skills</code>，或使用导入 / 新建。</p>';
-    root.innerHTML = `<div class="settings-card-head accounts-toolbar"><h3>技能</h3><div class="settings-card-actions"><button type="button" id="skill-reveal-root">${escape("访达")}</button><button type="button" id="skill-import">导入文件夹</button><button type="button" class="primary" id="skill-new">＋ 新建</button></div></div><p class="muted">技能存放于仓库 <code>${escape(state.root)}</code>；运行时以软链接挂到 Agent 工作区同名路径。下方按文件夹分组平铺全部技能。</p><label class="skill-default-account">默认启用账号<select id="skill-account">${accountOpts}</select></label><div class="skill-tree">${treeHtml}</div><p id="skill-page-error" role="status"></p>`;
-    root.querySelector("#skill-account").onchange = async (e) => {
-      onRefresh(e.target.value);
-    };
+      : '<p class="settings-empty">还没有技能。将含 SKILL.md 的文件夹放到仓库 <code>.agents/skills</code>，或使用导入 / 新建。</p>';
+    if (opts.layout === "sections") {
+      const accountLabel =
+        accounts.find((a) => a.id === state.account)?.label || "当前账号";
+      root.innerHTML = `<section class="settings-section"><h3 class="settings-section-title">技能库</h3><div class="settings-section-control"><div class="settings-panel-toolbar"><button type="button" id="skill-reveal-root">访达</button><button type="button" id="skill-import">导入文件夹</button><button type="button" class="primary" id="skill-new">＋ 新建</button></div><div class="settings-panel settings-panel-flush"><div class="skill-tree">${treeHtml}</div></div></div></section><section class="settings-section"><h3 class="settings-section-title">默认启用</h3><div class="settings-section-control"><div class="settings-panel">${opts.lockAccount ? `<p class="settings-hint">正在配置「${escape(accountLabel)}」</p>` : `<label class="settings-field"><span class="settings-field-label">账号</span><select id="skill-account">${accountOpts}</select></label>`}<p id="skill-page-error" role="status"></p></div></div></section>`;
+    } else {
+      const head = opts.compact
+        ? `<div class="settings-card-actions skill-compact-actions"><button type="button" id="skill-reveal-root">访达</button><button type="button" id="skill-import">导入文件夹</button><button type="button" class="primary" id="skill-new">＋ 新建</button></div><p class="muted">仓库 <code>${escape(state.root)}</code> · 勾选即为「${escape(accounts[0]?.label || "当前账号")}」默认启用。</p>`
+        : `<div class="settings-card-head accounts-toolbar"><h3>技能</h3><div class="settings-card-actions"><button type="button" id="skill-reveal-root">访达</button><button type="button" id="skill-import">导入文件夹</button><button type="button" class="primary" id="skill-new">＋ 新建</button></div></div><p class="muted">技能存放于仓库 <code>${escape(state.root)}</code>；运行时以软链接挂到 Agent 工作区同名路径。</p>`;
+      const accountField = opts.lockAccount
+        ? ""
+        : `<label class="skill-default-account">默认启用账号<select id="skill-account">${accountOpts}</select></label>`;
+      root.innerHTML = `${head}${accountField}<div class="skill-tree">${treeHtml}</div><p id="skill-page-error" role="status"></p>`;
+    }
+    const accountSelect = root.querySelector("#skill-account");
+    if (accountSelect)
+      accountSelect.onchange = (e) => {
+        onRefresh(e.target.value);
+      };
     root.querySelector("#skill-reveal-root").onclick = async () => {
       try {
         await api("skills-reveal", { account: state.account });

@@ -55,7 +55,9 @@ function hashes(dir, result = {}) {
     await w.screenshot({ path: "screenshot-writing.png" });
     await w.locator('[data-page="dashboard"]').click();
     await w.screenshot({ path: "screenshot-dashboard.png" });
-    await w.locator('[data-page="profile"]').click();
+    await w.locator('[data-page="settings"]').click();
+    await w.locator('[data-settings-tab="accounts"]').click();
+    await w.locator('[data-open-account]').first().click();
     await w.locator("[data-model-tab]").first().waitFor();
     await w.locator("[data-model-tab]").first().click();
     await w.screenshot({ path: "screenshot-profile.png" });
