@@ -30210,7 +30210,8 @@ var previewPane = "wechat";
 var publishedPreview = null;
 var assistantOpen = false;
 var railMode = "assistant";
-var outlinePinned = false;
+var outlineOpen = false;
+var outlineExpanded = false;
 var saveConflict = false;
 var unmountAster = null;
 var unmountAsterRail = null;
@@ -31620,13 +31621,18 @@ function setPreviewPane(pane) {
 function removeArticleOutline() {
   const outline = $("#article-outline");
   outline?._teardown?.();
-  outline?.remove();
+  if (outline) {
+    outline.hidden = true;
+    outline.innerHTML = "";
+    delete outline._teardown;
+    delete outline._place;
+  }
 }
 function renderPreview() {
   previewDocId = current.id;
   removeArticleOutline();
   if (previewPane !== "social") previewPane = "wechat";
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
   bindArticleHeader();
   bindFinalize();
   enhanceWechatPreview();
@@ -31693,7 +31699,7 @@ function renderWrite() {
   }
   unmountAster?.();
   unmountAster = null;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="\u5BA1\u9605">${I.eye()} \u5BA1\u9605</button><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div></div>`;
   unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
   editor = new Editor({
@@ -31879,45 +31885,78 @@ function renderWrite() {
   renderAssistantRail();
 }
 function mountArticleOutline() {
-  const wrap2 = $(".paper-wrap");
-  const stage = $(".paper-stage") || wrap2;
-  if (!wrap2 || !stage || !editor) return;
-  const prev = $("#article-outline");
-  prev?._teardown?.();
-  prev?.remove();
-  const nav2 = document.createElement("aside");
-  nav2.id = "article-outline";
-  nav2.className = "article-outline" + (outlinePinned ? " is-pinned" : "");
-  stage.appendChild(nav2);
-  const place = () => {
+  const stack = $(".paper-meta-stack");
+  if (!stack || !editor) return;
+  let nav2 = $("#article-outline");
+  if (!nav2) {
+    nav2 = document.createElement("aside");
+    nav2.id = "article-outline";
+    stack.prepend(nav2);
+  }
+  nav2._teardown?.();
+  const syncChipWidth = () => {
+    const byline = stack.querySelector(".paper-meta.byline");
+    if (!byline) {
+      nav2.style.minWidth = "";
+      nav2.style.width = "";
+      return;
+    }
+    const w = Math.round(byline.getBoundingClientRect().width);
+    nav2.style.minWidth = w + "px";
+    nav2.style.width = outlineOpen ? "" : w + "px";
   };
-  nav2._place = place;
   const refresh = () => {
     const root2 = $("#editor");
     if (!root2) return;
-    const headings = [...root2.querySelectorAll("h1, h2, h3")];
+    const headings = [...root2.querySelectorAll("h1, h2, h3")].map((el) => ({
+      el,
+      level: el.tagName === "H1" ? 1 : el.tagName === "H2" ? 2 : 3,
+      text: el.textContent.trim() || "\uFF08\u7A7A\u6807\u9898\uFF09"
+    }));
     if (!headings.length) {
       nav2.hidden = true;
       nav2.innerHTML = "";
+      nav2.style.width = "";
+      nav2.style.minWidth = "";
       return;
     }
+    const topLevel = Math.min(...headings.map((h2) => h2.level));
+    const hasDeeper = headings.some((h2) => h2.level > topLevel);
     nav2.hidden = false;
-    nav2.classList.toggle("is-pinned", outlinePinned);
-    nav2.innerHTML = `<button type="button" class="outline-pin" title="${outlinePinned ? "\u53D6\u6D88\u56FA\u5B9A" : "\u56FA\u5B9A\u5927\u7EB2"}" aria-label="${outlinePinned ? "\u53D6\u6D88\u56FA\u5B9A" : "\u56FA\u5B9A\u5927\u7EB2"}">${outlinePinned ? I.pinOff({ size: 14 }) : I.pin({ size: 14 })}</button><div class="outline-track">${headings.map((el, i) => {
-      const level = el.tagName === "H1" ? 1 : el.tagName === "H2" ? 2 : 3;
-      const text = el.textContent.trim() || "\uFF08\u7A7A\u6807\u9898\uFF09";
-      return `<button type="button" class="outline-row level-${level}" data-heading="${i}" title="${esc(text)}"><span class="outline-bar" aria-hidden="true"></span><span class="outline-label">${esc(text)}</span></button>`;
-    }).join("")}</div>`;
-    nav2.querySelector(".outline-pin").onclick = (e) => {
+    nav2.className = "article-outline" + (outlineOpen ? "" : " is-collapsed") + (outlineExpanded ? " is-expanded" : "");
+    if (!outlineOpen) {
+      nav2.innerHTML = `<button type="button" class="outline-chip" title="\u5C55\u5F00\u5927\u7EB2" aria-label="\u5C55\u5F00\u5927\u7EB2" aria-expanded="false">${I.outline({ size: 14 })} \u5927\u7EB2</button>`;
+      nav2.querySelector(".outline-chip").onclick = (e) => {
+        e.stopPropagation();
+        outlineOpen = true;
+        refresh();
+      };
+      requestAnimationFrame(syncChipWidth);
+      return;
+    }
+    const rows = headings.map((h2, i) => {
+      const isTop = h2.level === topLevel;
+      const hidden = !outlineExpanded && !isTop ? " hidden" : "";
+      return `<button type="button" class="outline-row level-${h2.level}${isTop ? " is-top" : ""}"${hidden} data-heading="${i}" title="${esc(h2.text)}"><span class="outline-label">${esc(h2.text)}</span></button>`;
+    }).join("");
+    const deeperToggle = hasDeeper ? `<button type="button" class="outline-toggle" aria-expanded="${outlineExpanded ? "true" : "false"}" title="${outlineExpanded ? "\u6536\u8D77\u4E0B\u7EA7\u6807\u9898" : "\u5C55\u5F00\u5168\u90E8\u6807\u9898"}" aria-label="${outlineExpanded ? "\u6536\u8D77\u4E0B\u7EA7\u6807\u9898" : "\u5C55\u5F00\u5168\u90E8\u6807\u9898"}">${I.chevronDown({ size: 14 })}</button>` : "";
+    nav2.innerHTML = `<div class="outline-head"><span class="outline-title">\u5927\u7EB2</span><button type="button" class="outline-collapse" title="\u6536\u8D77\u5927\u7EB2" aria-label="\u6536\u8D77\u5927\u7EB2">${I.chevronDown({ size: 14 })}</button></div><div class="outline-track">${rows}</div>${deeperToggle}`;
+    requestAnimationFrame(syncChipWidth);
+    nav2.querySelector(".outline-collapse").onclick = (e) => {
       e.stopPropagation();
-      outlinePinned = !outlinePinned;
-      nav2.classList.toggle("is-pinned", outlinePinned);
+      outlineOpen = false;
+      outlineExpanded = false;
       refresh();
     };
+    nav2.querySelector(".outline-toggle")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      outlineExpanded = !outlineExpanded;
+      refresh();
+    });
     nav2.querySelectorAll("[data-heading]").forEach((b) => {
       b.onclick = (e) => {
         e.stopPropagation();
-        headings[+b.dataset.heading]?.scrollIntoView({
+        headings[+b.dataset.heading]?.el?.scrollIntoView({
           behavior: "smooth",
           block: "start"
         });
@@ -31926,6 +31965,7 @@ function mountArticleOutline() {
   };
   nav2._teardown = () => {
   };
+  nav2._place = syncChipWidth;
   editor.on("update", refresh);
   refresh();
 }
@@ -32721,7 +32761,7 @@ function renderTopics() {
   const docs = state.documents.filter(
     (d) => sameAccount(d.account, account) && d.topics?.length
   );
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u9009\u9898\u548C\u7075\u611F</h1></div></header><section class="dashboard"><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc(d.title)}</h3><div>${esc(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">\u7EE7\u7EED\u8FD9\u7BC7\u6587\u7AE0 \u2192</button></div>`).join("") || '<div class="empty-data">\u6253\u5F00\u4E00\u7BC7\u6587\u7AE0\uFF0C\u5728\u300C\u601D\u8DEF\u300D\u9762\u677F\u751F\u6210\u6216\u8BA8\u8BBA\u9009\u9898\u3002</div>'}</div></section>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u9009\u9898\u548C\u7075\u611F</h1></div></header><section class="dashboard"><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc(d.title)}</h3><div>${esc(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">\u7EE7\u7EED\u8FD9\u7BC7\u6587\u7AE0 \u2192</button></div>`).join("") || '<div class="empty-state"><img src="assets/empty-topics.png" alt="" class="empty-state-img" /><p class="empty-state-text">\u7A7A\u7A7A\u5982\u4E5F</p></div>'}</div></section>`;
   $$("[data-open]").forEach(
     (b) => b.onclick = () => {
       current = state.documents.find((d) => d.id === b.dataset.open);
@@ -33376,7 +33416,7 @@ async function renderMaterials() {
       (m) => (m.usedBy || []).some((u) => u.id === materialsFilter)
     );
     const rows = await Promise.all(filtered.map(hydrateMaterialPreview));
-    $("#project-files").innerHTML = rows.map((r) => materialPreviewCardHTML(r, { showRefCount: true })).join("") || '<p class="empty-data">\u8FD8\u6CA1\u6709\u7D20\u6750\u3002\u4E0A\u4F20\u540E\u53EF\u5728\u591A\u7BC7\u6587\u7AE0\u95F4\u5171\u7528\u3002</p>';
+    $("#project-files").innerHTML = rows.map((r) => materialPreviewCardHTML(r, { showRefCount: true })).join("") || '<div class="empty-state"><img src="assets/empty-materials.png" alt="" class="empty-state-img" /><p class="empty-state-text">\u7A7A\u7A7A\u5982\u4E5F</p></div>';
     $$("#project-files [data-ref-preview]").forEach(
       (b) => b.onclick = async () => {
         try {

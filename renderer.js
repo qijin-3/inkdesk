@@ -132,8 +132,10 @@ let publishedPreview = null;
 let assistantOpen = false;
 /** 右侧栏模式：写作伙伴 / 本文素材 */
 let railMode = "assistant";
-/** 文章大纲是否固定展开 */
-let outlinePinned = false;
+/** 文章大纲面板是否打开（关闭时为与 byline 同宽的小卡片） */
+let outlineOpen = false;
+/** 文章大纲是否展开全部层级（默认仅最高级） */
+let outlineExpanded = false;
 /** 磁盘冲突中：抑制重复 toast，直到用户刷新或放弃 */
 let saveConflict = false;
 /** Aster FAB 卸载（眨眼 / 视线跟随） */
@@ -1979,11 +1981,16 @@ function setPreviewPane(pane) {
   });
 }
 
-/** 移除正文右侧大纲（预览态不展示）。 */
+/** 移除正文大纲（预览态不展示）。 */
 function removeArticleOutline() {
   const outline = $("#article-outline");
   outline?._teardown?.();
-  outline?.remove();
+  if (outline) {
+    outline.hidden = true;
+    outline.innerHTML = "";
+    delete outline._teardown;
+    delete outline._place;
+  }
 }
 
 /**
@@ -1994,7 +2001,7 @@ function renderPreview() {
   removeArticleOutline();
   if (previewPane !== "social") previewPane = "wechat";
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">退出预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} 导出图片</button><button type="button" id="copy-publish">${I.copy()} 复制排版</button><button type="button" id="push-wechat">${I.send()} 推送到公众号</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">正在排版…</p><div id="social-pages"></div></div></section></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">退出预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div></div><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} 导出图片</button><button type="button" id="copy-publish">${I.copy()} 复制排版</button><button type="button" id="push-wechat">${I.send()} 推送到公众号</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(current.title || "未命名文章")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">正在排版…</p><div id="social-pages"></div></div></section></div>`;
   bindArticleHeader();
   bindFinalize();
   enhanceWechatPreview();
@@ -2072,7 +2079,7 @@ function renderWrite() {
   unmountAster?.();
   unmountAster = null;
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><button type="button" id="toggle-review" title="审阅">${I.eye()} 审阅</button><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div></div>`;
   unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
   editor = new Editor({
@@ -2270,56 +2277,95 @@ function renderWrite() {
 }
 
 /**
- * 在正文右侧挂载锚点大纲：悬停展开、离开收起，可固定。
- * 挂在 .paper-stage 内绝对定位，随侧栏开合/拖宽自动贴齐正文右缘。
+ * 在左下角 meta 卡片上方挂载大纲：可收起为小卡片；打开后默认仅最高级。
  */
 function mountArticleOutline() {
-  const wrap = $(".paper-wrap");
-  const stage = $(".paper-stage") || wrap;
-  if (!wrap || !stage || !editor) return;
-  const prev = $("#article-outline");
-  prev?._teardown?.();
-  prev?.remove();
-  const nav = document.createElement("aside");
-  nav.id = "article-outline";
-  nav.className = "article-outline" + (outlinePinned ? " is-pinned" : "");
-  stage.appendChild(nav);
+  const stack = $(".paper-meta-stack");
+  if (!stack || !editor) return;
+  let nav = $("#article-outline");
+  if (!nav) {
+    nav = document.createElement("aside");
+    nav.id = "article-outline";
+    stack.prepend(nav);
+  }
+  nav._teardown?.();
 
-  /** 兼容旧调用；位置已由 CSS 相对 paper-stage 固定 */
-  const place = () => {};
-  nav._place = place;
+  /** 最小宽度与 byline 卡片对齐（收起/展开均生效） */
+  const syncChipWidth = () => {
+    const byline = stack.querySelector(".paper-meta.byline");
+    if (!byline) {
+      nav.style.minWidth = "";
+      nav.style.width = "";
+      return;
+    }
+    const w = Math.round(byline.getBoundingClientRect().width);
+    nav.style.minWidth = w + "px";
+    nav.style.width = outlineOpen ? "" : w + "px";
+  };
 
   /** 根据编辑器标题刷新锚点 */
   const refresh = () => {
     const root = $("#editor");
     if (!root) return;
-    const headings = [...root.querySelectorAll("h1, h2, h3")];
+    const headings = [...root.querySelectorAll("h1, h2, h3")].map((el) => ({
+      el,
+      level: el.tagName === "H1" ? 1 : el.tagName === "H2" ? 2 : 3,
+      text: el.textContent.trim() || "（空标题）",
+    }));
     if (!headings.length) {
       nav.hidden = true;
       nav.innerHTML = "";
+      nav.style.width = "";
+      nav.style.minWidth = "";
       return;
     }
+    const topLevel = Math.min(...headings.map((h) => h.level));
+    const hasDeeper = headings.some((h) => h.level > topLevel);
     nav.hidden = false;
-    nav.classList.toggle("is-pinned", outlinePinned);
-    nav.innerHTML = `<button type="button" class="outline-pin" title="${outlinePinned ? "取消固定" : "固定大纲"}" aria-label="${outlinePinned ? "取消固定" : "固定大纲"}">${outlinePinned ? I.pinOff({ size: 14 }) : I.pin({ size: 14 })}</button><div class="outline-track">${headings
-      .map((el, i) => {
-        const level = el.tagName === "H1" ? 1 : el.tagName === "H2" ? 2 : 3;
-        const text = el.textContent.trim() || "（空标题）";
-        return `<button type="button" class="outline-row level-${level}" data-heading="${i}" title="${esc(text)}"><span class="outline-bar" aria-hidden="true"></span><span class="outline-label">${esc(text)}</span></button>`;
-      })
-      .join("")}</div>`;
+    nav.className =
+      "article-outline" +
+      (outlineOpen ? "" : " is-collapsed") +
+      (outlineExpanded ? " is-expanded" : "");
 
-    nav.querySelector(".outline-pin").onclick = (e) => {
+    if (!outlineOpen) {
+      nav.innerHTML = `<button type="button" class="outline-chip" title="展开大纲" aria-label="展开大纲" aria-expanded="false">${I.outline({ size: 14 })} 大纲</button>`;
+      nav.querySelector(".outline-chip").onclick = (e) => {
+        e.stopPropagation();
+        outlineOpen = true;
+        refresh();
+      };
+      requestAnimationFrame(syncChipWidth);
+      return;
+    }
+
+    const rows = headings
+      .map((h, i) => {
+        const isTop = h.level === topLevel;
+        const hidden = !outlineExpanded && !isTop ? " hidden" : "";
+        return `<button type="button" class="outline-row level-${h.level}${isTop ? " is-top" : ""}"${hidden} data-heading="${i}" title="${esc(h.text)}"><span class="outline-label">${esc(h.text)}</span></button>`;
+      })
+      .join("");
+    const deeperToggle = hasDeeper
+      ? `<button type="button" class="outline-toggle" aria-expanded="${outlineExpanded ? "true" : "false"}" title="${outlineExpanded ? "收起下级标题" : "展开全部标题"}" aria-label="${outlineExpanded ? "收起下级标题" : "展开全部标题"}">${I.chevronDown({ size: 14 })}</button>`
+      : "";
+    nav.innerHTML = `<div class="outline-head"><span class="outline-title">大纲</span><button type="button" class="outline-collapse" title="收起大纲" aria-label="收起大纲">${I.chevronDown({ size: 14 })}</button></div><div class="outline-track">${rows}</div>${deeperToggle}`;
+    requestAnimationFrame(syncChipWidth);
+
+    nav.querySelector(".outline-collapse").onclick = (e) => {
       e.stopPropagation();
-      outlinePinned = !outlinePinned;
-      nav.classList.toggle("is-pinned", outlinePinned);
+      outlineOpen = false;
+      outlineExpanded = false;
       refresh();
     };
-
+    nav.querySelector(".outline-toggle")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      outlineExpanded = !outlineExpanded;
+      refresh();
+    });
     nav.querySelectorAll("[data-heading]").forEach((b) => {
       b.onclick = (e) => {
         e.stopPropagation();
-        headings[+b.dataset.heading]?.scrollIntoView({
+        headings[+b.dataset.heading]?.el?.scrollIntoView({
           behavior: "smooth",
           block: "start",
         });
@@ -2328,6 +2374,7 @@ function mountArticleOutline() {
   };
 
   nav._teardown = () => {};
+  nav._place = syncChipWidth;
 
   editor.on("update", refresh);
   refresh();
@@ -3309,7 +3356,7 @@ function renderTopics() {
     (d) => sameAccount(d.account, account) && d.topics?.length,
   );
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">选题和灵感</h1></div></header><section class="dashboard"><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc(d.title)}</h3><div>${esc(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">继续这篇文章 →</button></div>`).join("") || '<div class="empty-data">打开一篇文章，在「思路」面板生成或讨论选题。</div>'}</div></section>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">选题和灵感</h1></div></header><section class="dashboard"><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc(d.title)}</h3><div>${esc(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">继续这篇文章 →</button></div>`).join("") || '<div class="empty-state"><img src="assets/empty-topics.png" alt="" class="empty-state-img" /><p class="empty-state-text">空空如也</p></div>'}</div></section>`;
   $$("[data-open]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -4186,7 +4233,7 @@ async function renderMaterials() {
       rows
         .map((r) => materialPreviewCardHTML(r, { showRefCount: true }))
         .join("") ||
-      '<p class="empty-data">还没有素材。上传后可在多篇文章间共用。</p>';
+      '<div class="empty-state"><img src="assets/empty-materials.png" alt="" class="empty-state-img" /><p class="empty-state-text">空空如也</p></div>';
     $$("#project-files [data-ref-preview]").forEach(
       (b) =>
         (b.onclick = async () => {

@@ -1111,17 +1111,28 @@ header .byline {
   z-index: 40;
   pointer-events: none;
 }
-.paper-meta {
+.paper-meta-stack {
   position: absolute;
   left: 16px;
   top: calc(100vh - 85px - 16px);
   transform: translateY(-100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  max-width: calc(100% - 32px);
+  pointer-events: none;
+}
+.paper-meta-stack > * {
   pointer-events: auto;
+}
+.paper-meta {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   width: max-content;
-  max-width: calc(100% - 32px);
+  max-width: 100%;
   padding: 8px 12px;
   margin: 0;
   background: #ffffff;
@@ -1447,7 +1458,7 @@ header .byline {
   margin-bottom: 28px;
 }
 .dashboard {
-  padding: 38px 45px;
+  padding: 28px 45px 38px;
 }
 .page-title {
   margin-bottom: 35px;
@@ -1600,6 +1611,28 @@ td .delta.down {
 }
 .empty-data p {
   font-size: 12px;
+}
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px 64px;
+  text-align: center;
+  grid-column: 1 / -1;
+}
+.empty-state-img {
+  width: min(480px, 56vw);
+  height: auto;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+.empty-state-text {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: #999999;
+  letter-spacing: 0.08em;
 }
 table {
   width: 100%;
@@ -1939,174 +1972,189 @@ th {
   opacity: 1;
 }
 .article-outline {
-  position: absolute;
-  top: 50%;
-  right: 6px;
-  transform: translateY(-50%);
-  z-index: 20;
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  max-width: min(260px, 42vw);
-  max-height: calc(100% - 48px);
+  gap: 4px;
+  width: max-content;
+  min-width: 0;
+  max-width: min(280px, 100%);
+  max-height: min(360px, 45vh);
+  padding: 8px;
+  margin: 0;
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  opacity: 1;
   overflow: hidden;
-  padding: 18px 10px 18px 28px;
-  pointer-events: auto;
-  opacity: 0.4;
-  transition: opacity 0.15s;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
+  box-sizing: border-box;
 }
-.article-outline:hover,
-.article-outline.is-pinned {
-  opacity: 0.9;
+.article-outline.is-collapsed {
+  flex-direction: row;
+  align-items: center;
+  max-height: none;
+  padding: 8px 12px;
+  gap: 0;
 }
 .article-outline[hidden] {
   display: none !important;
 }
-.outline-pin {
-  pointer-events: auto;
-  align-self: flex-end;
-  display: none;
+.outline-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0 !important;
+  margin: 0 !important;
   border: 0 !important;
+  border-radius: 0 !important;
   background: transparent !important;
+  color: #888888;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  cursor: pointer;
   box-shadow: none !important;
-  padding: 2px !important;
-  margin: 0 0 8px !important;
-  color: #b8b8b8;
-  border-radius: 6px;
-  line-height: 0;
-  transition: color 0.15s;
 }
-.article-outline:hover .outline-pin,
-.article-outline.is-pinned .outline-pin {
-  display: block;
-}
-.outline-pin:hover {
-  color: #666 !important;
+.outline-chip:hover {
+  color: #555;
   background: transparent !important;
 }
-.article-outline.is-pinned .outline-pin {
-  color: #777;
+.outline-chip .lucide {
+  flex-shrink: 0;
+}
+.outline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 4px;
+}
+.outline-title {
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  color: #888;
+}
+.outline-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: #aaa;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.outline-collapse:hover {
+  background: #f5f5f5 !important;
+  color: #666;
+}
+.outline-collapse .lucide {
+  transform: rotate(180deg);
 }
 .outline-track {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-  flex: 1 1 auto;
+  gap: 2px;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: #cfcfcf transparent;
 }
 .outline-track::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
+  width: 2px;
+  height: 2px;
 }
-.article-outline:hover .outline-track,
-.article-outline.is-pinned .outline-track {
-  align-items: stretch;
-  gap: 12px;
+.outline-track::-webkit-scrollbar-thumb {
+  background: #cfcfcf;
+  border-radius: 99px;
+}
+.outline-track::-webkit-scrollbar-track {
+  background: transparent;
 }
 .outline-row {
   display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 10px;
+  align-items: center;
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
-  padding: 2px 0 !important;
+  padding: 5px 8px !important;
   margin: 0;
+  border-radius: 6px;
   text-align: left;
-  color: #7a7a7a;
+  color: #666;
   cursor: pointer;
-  max-width: none;
+  max-width: 100%;
 }
-.article-outline:hover .outline-row,
-.article-outline.is-pinned .outline-row {
-  justify-content: flex-start;
-  max-width: 220px;
-  padding: 0 !important;
+.outline-row[hidden] {
+  display: none !important;
 }
-.outline-bar {
-  flex-shrink: 0;
-  width: 3px;
-  height: 12px;
-  margin-top: 3px;
-  border-radius: 99px;
-  background: #c8c8c8;
-  transition:
-    background 0.15s,
-    height 0.15s;
-}
-.outline-row:hover .outline-bar,
-.outline-row:focus-visible .outline-bar {
-  background: #999;
+.outline-row:hover,
+.outline-row:focus-visible {
+  background: #f5f5f5 !important;
+  color: #222;
 }
 .outline-label {
-  display: none;
-  font-size: 13px;
-  line-height: 1.45;
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
   font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 200px;
-  transition: color 0.15s;
+  max-width: 240px;
 }
-.article-outline:hover .outline-label,
-.article-outline.is-pinned .outline-label {
-  display: block;
-}
-.outline-row:hover .outline-label {
-  color: #222;
-}
-.outline-row.level-1 .outline-bar {
-  height: 14px;
-  background: #bcbcbc;
-}
-.article-outline:hover .outline-row.level-1 .outline-bar,
-.article-outline.is-pinned .outline-row.level-1 .outline-bar {
-  height: 16px;
-}
-.outline-row.level-1 .outline-label {
+.outline-row.level-1 .outline-label,
+.outline-row.is-top .outline-label {
   font-weight: 500;
-  color: #555;
+  color: #444;
 }
-/* 二级/三级标题向内收进 */
 .outline-row.level-2 {
-  padding-right: 6px !important;
-}
-.article-outline:hover .outline-row.level-2,
-.article-outline.is-pinned .outline-row.level-2 {
-  padding-left: 14px !important;
-  padding-right: 0 !important;
-}
-.outline-row.level-2 .outline-bar {
-  height: 11px;
-}
-.outline-row.level-2 .outline-label {
-  color: #7a7a7a;
+  padding-left: 18px !important;
 }
 .outline-row.level-3 {
-  padding-right: 10px !important;
+  padding-left: 28px !important;
 }
-.article-outline:hover .outline-row.level-3,
-.article-outline.is-pinned .outline-row.level-3 {
-  padding-left: 26px !important;
-  padding-right: 0 !important;
-}
-.outline-row.level-3 .outline-bar {
-  height: 10px;
+.outline-row.level-2 .outline-label {
+  color: #777;
 }
 .outline-row.level-3 .outline-label {
-  font-size: 12px;
+  font-size: 11px;
   color: #999;
+}
+.outline-toggle {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 22px;
+  padding: 0 !important;
+  margin: 2px 0 0 !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: #aaa;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.outline-toggle:hover {
+  background: #f5f5f5 !important;
+  color: #666;
+}
+.outline-toggle .lucide {
+  transition: transform 0.15s ease;
+}
+.article-outline.is-expanded .outline-toggle .lucide {
+  transform: rotate(180deg);
 }
 .ProseMirror-selectednode {
   outline: 2px solid #666666;
@@ -2627,7 +2675,7 @@ pre {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px;
-  margin: 20px 0;
+  margin: 0 0 20px;
 }
 .material-card {
   display: flex;
