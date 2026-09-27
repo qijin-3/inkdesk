@@ -32828,7 +32828,7 @@ function renderDashboard() {
   )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>\u5DF2\u53D1\u5E03</h3><div id="published-bulk" class="published-bulk" ${selectedCount ? "" : "hidden"}><span class="published-bulk-count">\u5DF2\u9009 ${selectedCount}</span><button type="button" id="bulk-group">${I.tags()} \u8BBE\u7F6E\u5206\u7EC4</button><button type="button" id="bulk-backup">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" id="bulk-to-draft">\u79FB\u56DE\u8349\u7A3F</button><button type="button" class="ghost" id="bulk-clear">\u53D6\u6D88\u9009\u62E9</button></div><select id="metrics-sort" aria-label="\u6587\u7AE0\u6392\u5E8F\u65B9\u5F0F">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${rows.length ? `<table class="published-table"><thead><tr><th class="published-check"><input type="checkbox" id="published-select-all" aria-label="\u5168\u9009" ${allSelected ? "checked" : ""} ${selectedCount && !allSelected ? 'data-indeterminate="1"' : ""}></th><th>\u6587\u7AE0</th><th>\u5206\u7EC4</th><th>\u65E5\u671F</th><th>\u9605\u8BFB</th><th>\u70B9\u8D5E</th><th>\u6536\u85CF</th><th>\u6DA8\u7C89</th></tr></thead><tbody>${sorted.map((r) => {
     const on = publishedSelection.has(r.path);
     const g = typeof r["\u5206\u7EC4"] === "string" && r["\u5206\u7EC4"].trim() ? r["\u5206\u7EC4"].trim() : "";
-    return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc2(r.path)}" aria-label="\u9009\u62E9 ${esc2(r["\u6807\u9898"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc2(r.path)}">${esc2(r["\u6807\u9898"])}</button></td><td class="published-group">${g ? `<span class="group-chip">${esc2(g)}</span>` : "\u2014"}</td><td>${esc2(r["\u65E5\u671F"])}</td><td>${r["\u9605\u8BFB"] ?? "\u2014"}${cellDelta(r.path, "\u9605\u8BFB")}</td><td>${r["\u70B9\u8D5E"] ?? "\u2014"}${cellDelta(r.path, "\u70B9\u8D5E")}</td><td>${r["\u6536\u85CF"] ?? "\u2014"}${cellDelta(r.path, "\u6536\u85CF")}</td><td>${r["\u6DA8\u7C89"] ?? "\u2014"}${cellDelta(r.path, "\u6DA8\u7C89")}</td></tr>`;
+    return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc2(r.path)}" aria-label="\u9009\u62E9 ${esc2(r["\u6807\u9898"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc2(r.path)}">${esc2(r["\u6807\u9898"])}</button></td><td class="published-group">${g ? groupChipHtml(g) : "\u2014"}</td><td>${esc2(r["\u65E5\u671F"])}</td><td>${r["\u9605\u8BFB"] ?? "\u2014"}${cellDelta(r.path, "\u9605\u8BFB")}</td><td>${r["\u70B9\u8D5E"] ?? "\u2014"}${cellDelta(r.path, "\u70B9\u8D5E")}</td><td>${r["\u6536\u85CF"] ?? "\u2014"}${cellDelta(r.path, "\u6536\u85CF")}</td><td>${r["\u6DA8\u7C89"] ?? "\u2014"}${cellDelta(r.path, "\u6DA8\u7C89")}</td></tr>`;
   }).join("")}</tbody></table>` : '<div class="empty-data">\u8FD8\u6CA1\u6709\u6570\u636E\u3002<p>\u6587\u7AE0\u5F52\u6863\u540E\uFF0C\u5728 YAML \u4E2D\u586B\u5199\u5E73\u53F0\u6570\u636E\u5373\u53EF\u67E5\u770B\u3002</p></div>'}</div></section>`;
   renderCalendar(rows);
   $("#metrics-sort").onchange = (e) => {
@@ -33720,7 +33720,7 @@ function renderSettings() {
     control: `<div class="settings-panel-toolbar"><button type="button" class="primary" id="create-group">${I.plus()} \u65B0\u5EFA\u5206\u7EC4</button></div>` + (groups.length ? settingsPanel(
       `<table class="groups-table"><thead><tr><th>\u5206\u7EC4</th><th>\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84</th><th class="groups-actions-col">\u64CD\u4F5C</th></tr></thead><tbody>${groups.map((name) => {
         const backup = state.groups?.[name]?.backupPath || "";
-        return `<tr><td><span class="group-chip">${esc2(name)}</span></td><td><span class="settings-path-row groups-path-row"><input type="text" value="${esc2(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9\u5E76\u8BB0\u4F4F" readonly><button type="button" data-pick-group-backup="${esc2(name)}">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" data-clear-group-backup="${esc2(name)}">\u6E05\u9664</button>` : ""}</span></td><td class="groups-actions-col"><button type="button" class="ghost" data-rename-group="${esc2(name)}">\u91CD\u547D\u540D</button><button type="button" class="ghost" data-delete-group="${esc2(name)}">\u5220\u9664</button></td></tr>`;
+        return `<tr><td>${groupChipHtml(name)}</td><td><span class="settings-path-row groups-path-row"><input type="text" value="${esc2(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9\u5E76\u8BB0\u4F4F" readonly><button type="button" data-pick-group-backup="${esc2(name)}">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" data-clear-group-backup="${esc2(name)}">\u6E05\u9664</button>` : ""}</span></td><td class="groups-actions-col"><button type="button" class="ghost" data-rename-group="${esc2(name)}">\u91CD\u547D\u540D</button><button type="button" class="ghost" data-delete-group="${esc2(name)}">\u5220\u9664</button></td></tr>`;
       }).join("")}</tbody></table>`,
       "settings-panel-flush"
     ) : settingsPanel(
@@ -33892,6 +33892,14 @@ function groupNames() {
   return Object.keys(state.groups || {}).sort(
     (a, b) => a.localeCompare(b, "zh")
   );
+}
+function groupChipTone(name) {
+  let h2 = 0;
+  for (const c of String(name)) h2 = h2 * 31 + c.charCodeAt(0) >>> 0;
+  return h2 % 8;
+}
+function groupChipHtml(name) {
+  return `<span class="group-chip group-chip-${groupChipTone(name)}">${esc2(name)}</span>`;
 }
 function publishedGroup(rel) {
   const row = (state.metrics || []).find((r) => r.path === rel);

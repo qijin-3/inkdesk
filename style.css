@@ -310,13 +310,57 @@ p {
   background-size: 10px 7px;
 }
 .group-chip {
-  display: inline-block;
-  padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
   font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  border-radius: 4px;
+  border: 1px solid #c8c8c8;
+  background: #f5f5f5;
   color: #444;
-  background: #f0f0f0;
-  border-radius: 999px;
   white-space: nowrap;
+}
+.group-chip-0 {
+  background: #eef6f0;
+  color: #2d6a3e;
+  border-color: #a8cbb4;
+}
+.group-chip-1 {
+  background: #eef3f9;
+  color: #2c5282;
+  border-color: #a8c0db;
+}
+.group-chip-2 {
+  background: #faf0e8;
+  color: #8a4b1f;
+  border-color: #d9b896;
+}
+.group-chip-3 {
+  background: #f3eef8;
+  color: #5b3d7a;
+  border-color: #c4b0d9;
+}
+.group-chip-4 {
+  background: #eef8f7;
+  color: #1f6b66;
+  border-color: #a3cfc9;
+}
+.group-chip-5 {
+  background: #f9eef1;
+  color: #8a3050;
+  border-color: #d9a8b8;
+}
+.group-chip-6 {
+  background: #f7f4e8;
+  color: #6b5a1f;
+  border-color: #d1c48a;
+}
+.group-chip-7 {
+  background: #eef2f6;
+  color: #3d4f63;
+  border-color: #aebcce;
 }
 .published-table .published-group {
   white-space: nowrap;

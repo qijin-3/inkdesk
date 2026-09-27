@@ -3117,7 +3117,7 @@ function renderDashboard() {
                 typeof r["分组"] === "string" && r["分组"].trim()
                   ? r["分组"].trim()
                   : "";
-              return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc(r.path)}" aria-label="选择 ${esc(r["标题"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc(r.path)}">${esc(r["标题"])}</button></td><td class="published-group">${g ? `<span class="group-chip">${esc(g)}</span>` : "—"}</td><td>${esc(r["日期"])}</td><td>${r["阅读"] ?? "—"}${cellDelta(r.path, "阅读")}</td><td>${r["点赞"] ?? "—"}${cellDelta(r.path, "点赞")}</td><td>${r["收藏"] ?? "—"}${cellDelta(r.path, "收藏")}</td><td>${r["涨粉"] ?? "—"}${cellDelta(r.path, "涨粉")}</td></tr>`;
+              return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc(r.path)}" aria-label="选择 ${esc(r["标题"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc(r.path)}">${esc(r["标题"])}</button></td><td class="published-group">${g ? groupChipHtml(g) : "—"}</td><td>${esc(r["日期"])}</td><td>${r["阅读"] ?? "—"}${cellDelta(r.path, "阅读")}</td><td>${r["点赞"] ?? "—"}${cellDelta(r.path, "点赞")}</td><td>${r["收藏"] ?? "—"}${cellDelta(r.path, "收藏")}</td><td>${r["涨粉"] ?? "—"}${cellDelta(r.path, "涨粉")}</td></tr>`;
             })
             .join("")}</tbody></table>`
         : '<div class="empty-data">还没有数据。<p>文章归档后，在 YAML 中填写平台数据即可查看。</p></div>'
@@ -4211,7 +4211,7 @@ function renderSettings() {
             `<table class="groups-table"><thead><tr><th>分组</th><th>本地同步默认路径</th><th class="groups-actions-col">操作</th></tr></thead><tbody>${groups
               .map((name) => {
                 const backup = state.groups?.[name]?.backupPath || "";
-                return `<tr><td><span class="group-chip">${esc(name)}</span></td><td><span class="settings-path-row groups-path-row"><input type="text" value="${esc(backup)}" placeholder="未设置，同步时可选择并记住" readonly><button type="button" data-pick-group-backup="${esc(name)}">${I.folder()} 选择</button>${backup ? `<button type="button" class="ghost" data-clear-group-backup="${esc(name)}">清除</button>` : ""}</span></td><td class="groups-actions-col"><button type="button" class="ghost" data-rename-group="${esc(name)}">重命名</button><button type="button" class="ghost" data-delete-group="${esc(name)}">删除</button></td></tr>`;
+                return `<tr><td>${groupChipHtml(name)}</td><td><span class="settings-path-row groups-path-row"><input type="text" value="${esc(backup)}" placeholder="未设置，同步时可选择并记住" readonly><button type="button" data-pick-group-backup="${esc(name)}">${I.folder()} 选择</button>${backup ? `<button type="button" class="ghost" data-clear-group-backup="${esc(name)}">清除</button>` : ""}</span></td><td class="groups-actions-col"><button type="button" class="ghost" data-rename-group="${esc(name)}">重命名</button><button type="button" class="ghost" data-delete-group="${esc(name)}">删除</button></td></tr>`;
               })
               .join("")}</tbody></table>`,
             "settings-panel-flush",
@@ -4414,6 +4414,24 @@ function groupNames() {
   return Object.keys(state.groups || {}).sort((a, b) =>
     a.localeCompare(b, "zh"),
   );
+}
+
+/**
+ * 按分组名稳定映射到色板序号。
+ * @param {string} name
+ */
+function groupChipTone(name) {
+  let h = 0;
+  for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return h % 8;
+}
+
+/**
+ * 分组圆角标签 HTML。
+ * @param {string} name
+ */
+function groupChipHtml(name) {
+  return `<span class="group-chip group-chip-${groupChipTone(name)}">${esc(name)}</span>`;
 }
 
 /**
