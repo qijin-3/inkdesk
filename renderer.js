@@ -3188,7 +3188,7 @@ async function setPublishedGroups(paths) {
   const m = document.createElement("div");
   m.id = "group-set-modal";
   m.className = "modal";
-  m.innerHTML = `<div class="dialog"><h2>设置分组</h2><p>${list.length === 1 ? "为这篇文章指定分组标签。" : `为选中的 ${list.length} 篇文章指定分组。`}</p><p class="muted">分组决定本地同步的默认路径，可在设置 · 分组中配置。</p><label>分组<select id="group-set-select">${groupOptionsHtml(selected)}</select></label><label>或新建分组<input id="group-set-new" placeholder="输入新分组名称" autocomplete="off"></label><div class="row"><button type="button" id="group-set-cancel">取消</button><button type="button" class="primary" id="group-set-ok">保存</button></div></div>`;
+  m.innerHTML = `<div class="dialog"><h2>设置分组</h2><label>分组<select id="group-set-select">${groupOptionsHtml(selected)}</select></label><label>或新建分组<input id="group-set-new" placeholder="输入新分组名称" autocomplete="off"></label><div class="row"><button type="button" id="group-set-cancel">取消</button><button type="button" class="primary" id="group-set-ok">保存</button></div></div>`;
   document.body.append(m);
   $("#group-set-cancel").onclick = () => m.remove();
   $("#group-set-ok").onclick = async () => {

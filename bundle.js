@@ -32894,7 +32894,7 @@ async function setPublishedGroups(paths) {
   const m = document.createElement("div");
   m.id = "group-set-modal";
   m.className = "modal";
-  m.innerHTML = `<div class="dialog"><h2>\u8BBE\u7F6E\u5206\u7EC4</h2><p>${list2.length === 1 ? "\u4E3A\u8FD9\u7BC7\u6587\u7AE0\u6307\u5B9A\u5206\u7EC4\u6807\u7B7E\u3002" : `\u4E3A\u9009\u4E2D\u7684 ${list2.length} \u7BC7\u6587\u7AE0\u6307\u5B9A\u5206\u7EC4\u3002`}</p><p class="muted">\u5206\u7EC4\u51B3\u5B9A\u672C\u5730\u540C\u6B65\u7684\u9ED8\u8BA4\u8DEF\u5F84\uFF0C\u53EF\u5728\u8BBE\u7F6E \xB7 \u5206\u7EC4\u4E2D\u914D\u7F6E\u3002</p><label>\u5206\u7EC4<select id="group-set-select">${groupOptionsHtml(selected)}</select></label><label>\u6216\u65B0\u5EFA\u5206\u7EC4<input id="group-set-new" placeholder="\u8F93\u5165\u65B0\u5206\u7EC4\u540D\u79F0" autocomplete="off"></label><div class="row"><button type="button" id="group-set-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="group-set-ok">\u4FDD\u5B58</button></div></div>`;
+  m.innerHTML = `<div class="dialog"><h2>\u8BBE\u7F6E\u5206\u7EC4</h2><label>\u5206\u7EC4<select id="group-set-select">${groupOptionsHtml(selected)}</select></label><label>\u6216\u65B0\u5EFA\u5206\u7EC4<input id="group-set-new" placeholder="\u8F93\u5165\u65B0\u5206\u7EC4\u540D\u79F0" autocomplete="off"></label><div class="row"><button type="button" id="group-set-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="group-set-ok">\u4FDD\u5B58</button></div></div>`;
   document.body.append(m);
   $("#group-set-cancel").onclick = () => m.remove();
   $("#group-set-ok").onclick = async () => {

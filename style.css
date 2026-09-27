@@ -44,8 +44,19 @@ select {
   padding: 9px;
   outline: none;
 }
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 32px;
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23666666' d='M1.2 1.5 6 6.3l4.8-4.8 1.1 1.1L6 8.5.1 2.6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 10px 7px;
+}
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   border-color: #888888;
 }
 button.primary {
@@ -302,12 +313,6 @@ p {
   color: #555;
   border-radius: 6px;
   border: 1px solid #ddd;
-  background-color: #fff;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23666666' d='M1.2 1.5 6 6.3l4.8-4.8 1.1 1.1L6 8.5.1 2.6z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 10px 7px;
 }
 .group-chip {
   display: inline-flex;
@@ -1352,8 +1357,8 @@ header .byline {
 }
 .assistant-head select {
   font-size: 11px;
-  padding: 5px;
-  background: transparent;
+  padding: 5px 28px 5px 8px;
+  background-color: transparent;
 }
 .assistant-head #finalize {
   font-size: 12px;
@@ -1647,11 +1652,6 @@ header .byline {
 #metrics-sort {
   padding: 8px 32px 8px 12px;
   min-width: 96px;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23666666' d='M1.2 1.5 6 6.3l4.8-4.8 1.1 1.1L6 8.5.1 2.6z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  background-size: 12px 8px;
 }
 .performance-head {
   margin-bottom: 12px;
@@ -2295,11 +2295,14 @@ th {
   padding: 9px;
   border: 1px solid #e0e0e0;
   border-radius: 7px;
-  background: #fff;
+  background-color: #fff;
   color: #222;
   font: inherit;
   font-size: 13px;
   outline: none;
+}
+.agent-model-add select {
+  padding-right: 32px;
 }
 .agent-model-add select:focus,
 .agent-model-add input:focus {
@@ -2541,9 +2544,17 @@ th {
 .dialog h2 {
   font-size: 19px;
 }
-.dialog input {
+.dialog input,
+.dialog select {
   width: 100%;
-  margin: 10px 0;
+  margin: 10px 0 14px;
+  display: block;
+}
+.dialog label {
+  display: block;
+  margin: 12px 0 0;
+  color: #555555;
+  font-size: 13px;
 }
 .dialog p {
   font-size: 11px;
@@ -3084,7 +3095,8 @@ pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.dialog input {
+.dialog input,
+.dialog select {
   width: 100%;
   margin-bottom: 14px;
 }
@@ -4359,14 +4371,17 @@ button:disabled {
   padding: 0 10px;
   border: 0;
   border-radius: 999px;
-  background: #ececec;
+  background-color: #ececec;
   color: #111;
   cursor: pointer;
   flex-shrink: 0;
 }
+.agent-composer #agent-output {
+  padding-right: 28px;
+}
 .agent-composer #agent-output:hover,
 .agent-composer .agent-mode-trigger:hover {
-  background: #e2e2e2;
+  background-color: #e2e2e2;
   color: #000;
 }
 .agent-composer #agent-output .lucide,
@@ -4493,13 +4508,13 @@ button:disabled {
 }
 #rail .conversation-bar select {
   border: 0;
-  background: transparent;
+  background-color: transparent;
   flex: 1;
   min-width: 0;
   max-width: 100%;
   font-size: 12px;
   line-height: 1.4;
-  padding: 4px 4px 4px 0;
+  padding: 4px 28px 4px 0;
   color: #333;
   text-overflow: ellipsis;
   overflow: hidden;
