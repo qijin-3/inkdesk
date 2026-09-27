@@ -93,7 +93,9 @@ Content_OS 路径优先取自设置中用户选择的仓库（写入 `workspace.
 
 ## 开发与验证
 
-`npm run package:mac` 产出 `AsIde.app`、`AsIde-mac-arm64-v*.zip` 与 `AsIde-mac-arm64-v*.dmg`。生产包启动后会检测公开的 GitHub Release；设置页可手动检测、下载并替换安装。
+`npm run package:mac` 产出 `AsIde.app`、`AsIde-mac-arm64-v*.zip` 与 `AsIde-mac-arm64-v*.dmg`（含 ad-hoc 签名；DMG 内附「若提示已损坏请双击这里」一键解除隔离）。生产包启动后会检测公开的 GitHub Release；设置页可手动检测、下载并替换安装。
+
+从网上下载后若提示「已损坏」，请打开 DMG 双击该脚本，或到「系统设置 → 隐私与安全性」允许打开。彻底免提示需 Apple Developer 公证（Developer ID + notarize）。
 
 ```sh
 npm ci

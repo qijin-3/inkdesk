@@ -409,8 +409,11 @@ for i in $(seq 1 60); do
   sleep 0.5
 done
 xattr -dr com.apple.quarantine "$NEW" 2>/dev/null || true
+xattr -cr "$NEW" 2>/dev/null || true
+codesign --force --deep --sign - "$NEW" 2>/dev/null || true
 rm -rf "$OLD"
 ditto "$NEW" "$OLD"
+xattr -cr "$OLD" 2>/dev/null || true
 open "$OLD"
 rm -rf "$WORK"
 `,
