@@ -155,8 +155,8 @@ p {
   gap: 10px;
   background: #dedede;
   border-radius: 12px;
-  padding: 10px 12px 14px;
-  margin: 22px 0 20px;
+  padding: 10px 12px;
+  margin: 0 0 20px;
   max-height: none;
   overflow-x: auto;
   overflow-y: hidden;
@@ -188,12 +188,16 @@ p {
 .account-avatar-btn.active::after {
   content: "";
   position: absolute;
-  left: 6px;
-  right: 6px;
-  bottom: -7px;
-  height: 2px;
-  background: #1a1a1a;
-  border-radius: 1px;
+  top: -2px;
+  right: -2px;
+  left: auto;
+  bottom: auto;
+  width: 8px;
+  height: 8px;
+  background: #3b82f6;
+  border: 2px solid #dedede;
+  border-radius: 50%;
+  box-sizing: content-box;
 }
 .account-avatar-img {
   width: 100%;

@@ -24073,6 +24073,18 @@ var Library = [
   ["path", { d: "M4 4v16" }]
 ];
 
+// node_modules/lucide/dist/esm/icons/lightbulb.mjs
+var Lightbulb = [
+  [
+    "path",
+    {
+      d: "M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"
+    }
+  ],
+  ["path", { d: "M9 18h6" }],
+  ["path", { d: "M10 22h4" }]
+];
+
 // node_modules/lucide/dist/esm/icons/link-2.mjs
 var Link2 = [
   ["path", { d: "M9 17H7A5 5 0 0 1 7 7h2" }],
@@ -24282,6 +24294,7 @@ var I = {
   settings: (o) => icon(Settings, o),
   dashboard: (o) => icon(LayoutDashboard, o),
   sparkles: (o) => icon(Sparkles, o),
+  lightbulb: (o) => icon(Lightbulb, o),
   library: (o) => icon(Library, o),
   user: (o) => icon(CircleUser, o),
   plus: (o) => icon(Plus, o),
@@ -30906,9 +30919,9 @@ function render2() {
     previewDocId = null;
   }
   if (page !== "published-preview") publishedPreview = null;
-  $("#app").innerHTML = `<aside class="sidebar"><div class="brand-row"><div class="brand"><img class="brand-icon" src="assets/brand-icon.png" alt="" width="28" height="28" /> AsIde</div><button type="button" data-page="settings" class="ghost icon-btn brand-settings" title="\u8BBE\u7F6E" aria-label="\u8BBE\u7F6E">${I.settings({ size: 18 })}</button></div><div class="account">${accountList().map(
+  $("#app").innerHTML = `<aside class="sidebar"><div class="account">${accountList().map(
     (a) => `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc2(a.id)}" title="${esc2(a.label)}" aria-label="${esc2(a.label)}">${accountAvatarHtml(a)}</button>`
-  ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.sparkles()} <span>\u9009\u9898</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></div><div class="docs">${state.documents.filter(
+  ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>\u9009\u9898\u5E93</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>\u8BBE\u7F6E</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></div><div class="docs">${state.documents.filter(
     (d) => sameAccount(d.account, account) && d.status !== "final" && d.status !== "archive"
   ).map(
     (d) => `<button class="doc ${current?.id === d.id ? "selected" : ""}" data-id="${d.id}"><span>${esc2(d.title)}</span><small>${new Date(d.updated).toLocaleDateString("zh-CN")} \xB7 ${d.body.length} \u5B57</small></button>`
@@ -34439,6 +34452,7 @@ lucide/dist/esm/icons/image-plus.mjs:
 lucide/dist/esm/icons/italic.mjs:
 lucide/dist/esm/icons/layout-dashboard.mjs:
 lucide/dist/esm/icons/library.mjs:
+lucide/dist/esm/icons/lightbulb.mjs:
 lucide/dist/esm/icons/link-2.mjs:
 lucide/dist/esm/icons/list-tree.mjs:
 lucide/dist/esm/icons/list.mjs:
