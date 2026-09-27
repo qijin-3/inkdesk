@@ -4,6 +4,7 @@ data/
 development-vault.json
 vault.json
 *.zip
+*.dmg
 
 # Electron packaging / preview builds
 dist/

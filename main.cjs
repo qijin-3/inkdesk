@@ -116,6 +116,7 @@ ipcMain.handle("update-install", async (event) => {
   if (!info.assetUrl) throw Error("最新 Release 没有 macOS 安装包");
   return updater.downloadAndInstall({
     assetUrl: info.assetUrl,
+    assetName: info.assetName,
     onProgress: (text) => event.sender.send("update-progress", text),
   });
 });

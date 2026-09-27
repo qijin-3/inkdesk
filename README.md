@@ -93,7 +93,7 @@ Content_OS 路径优先取自设置中用户选择的仓库（写入 `workspace.
 
 ## 开发与验证
 
-`npm run package:mac` 产出 `dist-v4/AsIde-darwin-arm64/AsIde.app`。生产包启动后会检测公开的 GitHub Release；设置页可手动检测、下载并替换安装。
+`npm run package:mac` 产出 `AsIde.app`、`AsIde-mac-arm64-v*.zip` 与 `AsIde-mac-arm64-v*.dmg`。生产包启动后会检测公开的 GitHub Release；设置页可手动检测、下载并替换安装。
 
 ```sh
 npm ci
