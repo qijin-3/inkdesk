@@ -62,7 +62,7 @@ const ignore = [
   "/(smoke|review|social|workflow|packaged|real-vault|live-agent|package-mac|agents-ui|heatmap-ui|usage-ui)[^/]*\\.cjs$",
   "^/dist-",
   "/skills(?:\\.test|-ui-test)\\.cjs$",
-  "/agent-(?:models|usage|output)(?:\\.test)?\\.cjs$",
+  "/agent-(?:models|usage|output)\\.test\\.cjs$",
   "/AsIde-mac-arm64-v.*\\.(zip|dmg)$",
 ];
 
