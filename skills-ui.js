@@ -61,14 +61,40 @@ function skillAvailableFor(binding, account) {
 
 function bindingLabel(binding, accounts) {
   const b = normalizeBinding(binding);
-  if (b === "all") return "所有";
-  if (b === "none") return "不启用";
+  if (b === "all") return "全局";
+  if (b === "none") return "禁用";
   const labels = b.map(
     (id) => accounts.find((a) => a.id === id)?.label || id,
   );
-  if (!labels.length) return "不启用";
+  if (!labels.length) return "禁用";
   if (labels.length <= 2) return labels.join("、");
   return `${labels.slice(0, 2).join("、")} 等 ${labels.length} 个`;
+}
+
+/** 按名称稳定映射到色板序号（与分组 tag 一致）。 */
+function bindTagTone(name) {
+  let h = 0;
+  for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return h % 8;
+}
+
+/**
+ * 账号绑定摘要：以 tag 呈现。
+ * @param {string|string[]} binding
+ * @param {{ id: string, label: string }[]} accounts
+ */
+function bindingTagsHtml(binding, accounts) {
+  const b = normalizeBinding(binding);
+  if (b === "all")
+    return `<span class="group-chip skill-bind-tag skill-bind-tag-all">全局</span>`;
+  if (b === "none")
+    return `<span class="group-chip skill-bind-tag skill-bind-tag-none">禁用</span>`;
+  return b
+    .map((id) => {
+      const label = accounts.find((a) => a.id === id)?.label || id;
+      return `<span class="group-chip group-chip-${bindTagTone(label)} skill-bind-tag">${escape(label)}</span>`;
+    })
+    .join("");
 }
 
 function bindingMenuHtml(skillId, binding, accounts) {
@@ -82,7 +108,7 @@ function bindingMenuHtml(skillId, binding, accounts) {
         `<label class="skill-accounts-option"><input type="checkbox" data-skill-bind="${escape(skillId)}" data-bind-value="${escape(a.id)}" ${!allOn && !noneOn && selected.has(a.id) ? "checked" : ""}><span>${escape(a.label)}</span></label>`,
     )
     .join("");
-  return `<details class="skill-accounts" data-skill-accounts="${escape(skillId)}"><summary title="支持的账号">${escape(bindingLabel(b, accounts))}</summary><div class="skill-accounts-menu"><label class="skill-accounts-option"><input type="checkbox" data-skill-bind="${escape(skillId)}" data-bind-value="all" ${allOn ? "checked" : ""}><span>所有</span></label>${accountRows}<label class="skill-accounts-option"><input type="checkbox" data-skill-bind="${escape(skillId)}" data-bind-value="none" ${noneOn ? "checked" : ""}><span>不启用</span></label></div></details>`;
+  return `<details class="skill-accounts" data-skill-accounts="${escape(skillId)}"><summary title="支持的账号：${escape(bindingLabel(b, accounts))}">${bindingTagsHtml(b, accounts)}</summary><div class="skill-accounts-menu"><label class="skill-accounts-option"><input type="checkbox" data-skill-bind="${escape(skillId)}" data-bind-value="all" ${allOn ? "checked" : ""}><span>全局</span></label>${accountRows}<label class="skill-accounts-option"><input type="checkbox" data-skill-bind="${escape(skillId)}" data-bind-value="none" ${noneOn ? "checked" : ""}><span>禁用</span></label></div></details>`;
 }
 
 function readBindingFromMenu(menu) {

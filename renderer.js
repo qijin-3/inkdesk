@@ -2609,6 +2609,7 @@ function renderPanel() {
   let content = "";
   if (tab === "chat") {
     content =
+      `<div class="conversation-doc-chip" title="${esc(current?.id || "")}">当前文章：${esc(current?.title || "未命名文章")}</div>` +
       conversation()
         .messages.map(
           (m) =>
@@ -2789,6 +2790,7 @@ async function runTask(task) {
       account: doc.account,
       task,
       articleId: doc.id,
+      title: doc.title,
       conversationId: session.id,
       skillIds: session.skillIds,
       references: draft.references,
@@ -2825,6 +2827,8 @@ async function runTask(task) {
     busy = false;
     syncAsterFace();
     await persist();
+    // 防止切换文章后旧请求的回复渲染到新文章的侧栏
+    if (current?.id !== doc.id) return;
     if (page === "write") renderPanel();
   }
 }

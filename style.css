@@ -539,28 +539,51 @@ button.account-card-link:hover {
 }
 .skill-accounts {
   position: relative;
-  min-width: 112px;
+  min-width: 0;
 }
 .skill-accounts > summary {
   list-style: none;
   cursor: pointer;
-  padding: 6px 10px;
-  border: 1px solid #e5e5e5;
-  border-radius: 8px;
-  background: #fafafa;
-  font-size: 12px;
-  color: #333;
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: 220px;
+  padding: 2px;
+  margin: -2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
 }
 .skill-accounts > summary::-webkit-details-marker {
   display: none;
 }
+.skill-accounts > summary:hover .skill-bind-tag {
+  filter: brightness(0.97);
+}
 .skill-accounts[open] > summary {
-  border-color: #ccc;
-  background: #fff;
+  outline: 1px solid #d0d0d0;
+  outline-offset: 1px;
+  background: #fafafa;
+}
+.skill-bind-tag {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.skill-bind-tag-all {
+  background: #eef3f9;
+  color: #2c5282;
+  border-color: #a8c0db;
+}
+.skill-bind-tag-none {
+  background: #f3f3f3;
+  color: #777;
+  border-color: #cfcfcf;
 }
 .skill-accounts-menu {
   position: absolute;

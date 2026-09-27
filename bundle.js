@@ -198,14 +198,30 @@ function skillAvailableFor(binding, account2) {
 }
 function bindingLabel(binding, accounts) {
   const b = normalizeBinding(binding);
-  if (b === "all") return "\u6240\u6709";
-  if (b === "none") return "\u4E0D\u542F\u7528";
+  if (b === "all") return "\u5168\u5C40";
+  if (b === "none") return "\u7981\u7528";
   const labels = b.map(
     (id) => accounts.find((a) => a.id === id)?.label || id
   );
-  if (!labels.length) return "\u4E0D\u542F\u7528";
+  if (!labels.length) return "\u7981\u7528";
   if (labels.length <= 2) return labels.join("\u3001");
   return `${labels.slice(0, 2).join("\u3001")} \u7B49 ${labels.length} \u4E2A`;
+}
+function bindTagTone(name) {
+  let h2 = 0;
+  for (const c of String(name)) h2 = h2 * 31 + c.charCodeAt(0) >>> 0;
+  return h2 % 8;
+}
+function bindingTagsHtml(binding, accounts) {
+  const b = normalizeBinding(binding);
+  if (b === "all")
+    return `<span class="group-chip skill-bind-tag skill-bind-tag-all">\u5168\u5C40</span>`;
+  if (b === "none")
+    return `<span class="group-chip skill-bind-tag skill-bind-tag-none">\u7981\u7528</span>`;
+  return b.map((id) => {
+    const label = accounts.find((a) => a.id === id)?.label || id;
+    return `<span class="group-chip group-chip-${bindTagTone(label)} skill-bind-tag">${escape(label)}</span>`;
+  }).join("");
 }
 function bindingMenuHtml(skillId, binding, accounts) {
   const b = normalizeBinding(binding);
@@ -215,7 +231,7 @@ function bindingMenuHtml(skillId, binding, accounts) {
   const accountRows = accounts.map(
     (a) => `<label class="skill-accounts-option"><input type="checkbox" data-skill-bind="${escape(skillId)}" data-bind-value="${escape(a.id)}" ${!allOn && !noneOn && selected.has(a.id) ? "checked" : ""}><span>${escape(a.label)}</span></label>`
   ).join("");
-  return `<details class="skill-accounts" data-skill-accounts="${escape(skillId)}"><summary title="\u652F\u6301\u7684\u8D26\u53F7">${escape(bindingLabel(b, accounts))}</summary><div class="skill-accounts-menu"><label class="skill-accounts-option"><input type="checkbox" data-skill-bind="${escape(skillId)}" data-bind-value="all" ${allOn ? "checked" : ""}><span>\u6240\u6709</span></label>${accountRows}<label class="skill-accounts-option"><input type="checkbox" data-skill-bind="${escape(skillId)}" data-bind-value="none" ${noneOn ? "checked" : ""}><span>\u4E0D\u542F\u7528</span></label></div></details>`;
+  return `<details class="skill-accounts" data-skill-accounts="${escape(skillId)}"><summary title="\u652F\u6301\u7684\u8D26\u53F7\uFF1A${escape(bindingLabel(b, accounts))}">${bindingTagsHtml(b, accounts)}</summary><div class="skill-accounts-menu"><label class="skill-accounts-option"><input type="checkbox" data-skill-bind="${escape(skillId)}" data-bind-value="all" ${allOn ? "checked" : ""}><span>\u5168\u5C40</span></label>${accountRows}<label class="skill-accounts-option"><input type="checkbox" data-skill-bind="${escape(skillId)}" data-bind-value="none" ${noneOn ? "checked" : ""}><span>\u7981\u7528</span></label></div></details>`;
 }
 function readBindingFromMenu(menu) {
   const checked = [...menu.querySelectorAll("input[data-bind-value]:checked")];
@@ -32387,7 +32403,7 @@ function renderPanel() {
   const key = tab;
   let content = "";
   if (tab === "chat") {
-    content = conversation().messages.map(
+    content = `<div class="conversation-doc-chip" title="${esc2(current?.id || "")}">\u5F53\u524D\u6587\u7AE0\uFF1A${esc2(current?.title || "\u672A\u547D\u540D\u6587\u7AE0")}</div>` + conversation().messages.map(
       (m) => `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "\u4F60" : "aster"}</small><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? `<span class="inline-reference">${esc2(p.label)}</span>` : esc2(p.text)).join("") : esc2(m.text)}</div></div>`
     ).join("") || "";
   }
@@ -32552,6 +32568,7 @@ async function runTask(task) {
       account: doc3.account,
       task,
       articleId: doc3.id,
+      title: doc3.title,
       conversationId: session.id,
       skillIds: session.skillIds,
       references: draft.references,
@@ -32588,6 +32605,7 @@ async function runTask(task) {
     busy = false;
     syncAsterFace();
     await persist();
+    if (current?.id !== doc3.id) return;
     if (page === "write") renderPanel();
   }
 }
