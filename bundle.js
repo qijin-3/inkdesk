@@ -31896,13 +31896,14 @@ function renderAssistantRail() {
     return;
   }
   rail.dataset.railMode = "assistant";
-  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<div class="assistant-head-actions"><button type="button" id="close-assistant" class="ghost icon-btn" title="\u6536\u8D77" aria-label="\u6536\u8D77">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
+  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<select id="conversation" class="assistant-conversation" aria-label="\u5BF9\u8BDD">${conversationOptionsHTML()}</select><div class="assistant-head-actions"><button type="button" id="new-conversation" class="ghost icon-btn" title="\u4E3A\u672C\u7BC7\u521B\u5EFA\u65B0\u5BF9\u8BDD" aria-label="\u65B0\u5BF9\u8BDD">${I.plus({ size: 18 })}</button><button type="button" id="close-assistant" class="ghost icon-btn" title="\u6536\u8D77" aria-label="\u6536\u8D77">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
   unmountAsterRail = mountAster($("#aster-rail"));
   syncAsterFace();
   $("#close-assistant").onclick = () => {
     assistantOpen = false;
     syncRailVisibility();
   };
+  bindConversationHead();
   $$("#rail [data-tab]").forEach(
     (b) => b.onclick = () => {
       tab = b.dataset.tab;
@@ -31914,6 +31915,35 @@ function renderAssistantRail() {
   );
   renderPanel();
   syncRailVisibility();
+}
+function conversationOptionsHTML() {
+  if (!current?.conversations?.length) return "";
+  return current.conversations.map((c) => `<option value="${esc2(c.id)}">${esc2(c.title)}</option>`).join("");
+}
+function bindConversationHead() {
+  const sel = $("#conversation");
+  const neu = $("#new-conversation");
+  if (!current || !sel) return;
+  sel.innerHTML = conversationOptionsHTML();
+  sel.value = conversation().id;
+  sel.onchange = (e) => {
+    current.activeConversationId = e.target.value;
+    persist();
+    renderPanel();
+  };
+  if (neu)
+    neu.onclick = () => {
+      const c = {
+        id: crypto.randomUUID(),
+        title: "\u65B0\u5BF9\u8BDD " + (current.conversations.length + 1),
+        messages: []
+      };
+      current.conversations.push(c);
+      current.activeConversationId = c.id;
+      persist();
+      bindConversationHead();
+      renderPanel();
+    };
 }
 function bindArticleMaterialsPanel() {
   const listEl = $("#article-material-list");
@@ -32608,31 +32638,15 @@ function renderPanel() {
   tab = "chat";
   const key = tab;
   let content = "";
+  let docChip = "";
   if (tab === "chat") {
-    content = `<div class="conversation-doc-chip" title="${esc2(current?.id || "")}">\u5F53\u524D\u6587\u7AE0\uFF1A${esc2(current?.title || "\u672A\u547D\u540D\u6587\u7AE0")}</div>` + conversation().messages.map(
+    docChip = `<div class="conversation-doc-chip" title="${esc2(current?.id || "")}"><span class="conversation-doc-chip-icon">${I.file({ size: 14 })}</span><span class="conversation-doc-chip-text">${esc2(current?.title || "\u672A\u547D\u540D\u6587\u7AE0")}</span></div>`;
+    content = conversation().messages.map(
       (m) => `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "\u4F60" : "aster"}</small><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? referenceChipHTML(p.reference?.kind || "file", p.label) : esc2(p.text)).join("") : esc2(m.text)}</div></div>`
     ).join("") || "";
   }
-  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc2(c.id)}">${esc2(c.title)}</option>`).join("")}</select><button id="new-conversation" class="icon-btn" title="\u4E3A\u672C\u7BC7\u521B\u5EFA\u65B0\u5BF9\u8BDD" aria-label="\u65B0\u5BF9\u8BDD">${I.plus()}</button></div>` : ""}<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0" aria-label="\u6DFB\u52A0" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div>`;
-  if (tab === "chat") {
-    $("#conversation").value = conversation().id;
-    $("#conversation").onchange = (e) => {
-      current.activeConversationId = e.target.value;
-      persist();
-      renderPanel();
-    };
-    $("#new-conversation").onclick = () => {
-      const c = {
-        id: crypto.randomUUID(),
-        title: "\u65B0\u5BF9\u8BDD " + (current.conversations.length + 1),
-        messages: []
-      };
-      current.conversations.push(c);
-      current.activeConversationId = c.id;
-      persist();
-      renderPanel();
-    };
-  }
+  panel.innerHTML = `<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0" aria-label="\u6DFB\u52A0" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div></div>`;
+  bindConversationHead();
   $("#send").onclick = () => busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
   bindAgentModeMenu();
   bindModelPicker();

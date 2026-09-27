@@ -1906,7 +1906,7 @@ function renderAssistantRail() {
   }
 
   rail.dataset.railMode = "assistant";
-  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<div class="assistant-head-actions"><button type="button" id="close-assistant" class="ghost icon-btn" title="收起" aria-label="收起">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
+  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<select id="conversation" class="assistant-conversation" aria-label="对话">${conversationOptionsHTML()}</select><div class="assistant-head-actions"><button type="button" id="new-conversation" class="ghost icon-btn" title="为本篇创建新对话" aria-label="新对话">${I.plus({ size: 18 })}</button><button type="button" id="close-assistant" class="ghost icon-btn" title="收起" aria-label="收起">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
   unmountAsterRail = mountAster($("#aster-rail"));
   syncAsterFace();
 
@@ -1914,6 +1914,7 @@ function renderAssistantRail() {
     assistantOpen = false;
     syncRailVisibility();
   };
+  bindConversationHead();
   $$("#rail [data-tab]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -1926,6 +1927,41 @@ function renderAssistantRail() {
   );
   renderPanel();
   syncRailVisibility();
+}
+
+/** 对话下拉选项 HTML */
+function conversationOptionsHTML() {
+  if (!current?.conversations?.length) return "";
+  return current.conversations
+    .map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`)
+    .join("");
+}
+
+/** 绑定头栏对话切换 / 新建 */
+function bindConversationHead() {
+  const sel = $("#conversation");
+  const neu = $("#new-conversation");
+  if (!current || !sel) return;
+  sel.innerHTML = conversationOptionsHTML();
+  sel.value = conversation().id;
+  sel.onchange = (e) => {
+    current.activeConversationId = e.target.value;
+    persist();
+    renderPanel();
+  };
+  if (neu)
+    neu.onclick = () => {
+      const c = {
+        id: crypto.randomUUID(),
+        title: "新对话 " + (current.conversations.length + 1),
+        messages: [],
+      };
+      current.conversations.push(c);
+      current.activeConversationId = c.id;
+      persist();
+      bindConversationHead();
+      renderPanel();
+    };
 }
 
 /**
@@ -2757,9 +2793,10 @@ function renderPanel() {
   tab = "chat";
   const key = tab;
   let content = "";
+  let docChip = "";
   if (tab === "chat") {
+    docChip = `<div class="conversation-doc-chip" title="${esc(current?.id || "")}"><span class="conversation-doc-chip-icon">${I.file({ size: 14 })}</span><span class="conversation-doc-chip-text">${esc(current?.title || "未命名文章")}</span></div>`;
     content =
-      `<div class="conversation-doc-chip" title="${esc(current?.id || "")}">当前文章：${esc(current?.title || "未命名文章")}</div>` +
       conversation()
         .messages.map(
           (m) =>
@@ -2767,26 +2804,8 @@ function renderPanel() {
         )
         .join("") || "";
   }
-  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" class="icon-btn" title="为本篇创建新对话" aria-label="新对话">${I.plus()}</button></div>` : ""}<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="添加" aria-label="添加" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div>`;
-  if (tab === "chat") {
-    $("#conversation").value = conversation().id;
-    $("#conversation").onchange = (e) => {
-      current.activeConversationId = e.target.value;
-      persist();
-      renderPanel();
-    };
-    $("#new-conversation").onclick = () => {
-      const c = {
-        id: crypto.randomUUID(),
-        title: "新对话 " + (current.conversations.length + 1),
-        messages: [],
-      };
-      current.conversations.push(c);
-      current.activeConversationId = c.id;
-      persist();
-      renderPanel();
-    };
-  }
+  panel.innerHTML = `<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="添加" aria-label="添加" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div></div>`;
+  bindConversationHead();
   $("#send").onclick = () =>
     busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
   bindAgentModeMenu();
