@@ -1,3 +1,5 @@
+import { I } from "./icons.js";
+
 const escape = (s) =>
   String(s ?? "").replace(
     /[&<>"']/g,
@@ -120,7 +122,7 @@ function readBindingFromMenu(menu) {
 }
 
 /**
- * 设置页：树状分组平铺全部技能；账号详情可按当前账号过滤。
+ * 设置页：平铺技能卡片；账号详情可按当前账号过滤。
  * @param {HTMLElement} root
  * @param {(name: string, data?: object) => Promise<any>} api
  * @param {string} account 当前账号（账号详情过滤用）
@@ -137,6 +139,7 @@ export async function mountSkillsSettings(
   opts = {},
 ) {
   let state;
+  let skillQuery = "";
   const err = (msg) => {
     const el = root.querySelector("#skill-page-error");
     if (el) el.textContent = msg || "";
@@ -150,42 +153,69 @@ export async function mountSkillsSettings(
     state = await api("skills-list", { account: account || accounts[0].id });
     draw();
   };
-  const visibleTree = () => {
-    if (!opts.lockAccount) return state.tree;
-    return state.tree
-      .map((g) => ({
-        ...g,
-        skills: g.skills.filter((x) =>
-          skillAvailableFor(x.binding ?? state.bindings?.[x.id], state.account),
-        ),
-      }))
-      .filter((g) => g.skills.length);
+  /** @returns {any[]} */
+  const flatSkills = () => {
+    const fromItems = Array.isArray(state.items) ? state.items : null;
+    let list = fromItems
+      ? [...fromItems]
+      : (state.tree || []).flatMap((g) => g.skills || []);
+    if (opts.lockAccount) {
+      list = list.filter((x) =>
+        skillAvailableFor(x.binding ?? state.bindings?.[x.id], state.account),
+      );
+    }
+    return list.sort((a, b) =>
+      String(a.name || a.id).localeCompare(String(b.name || b.id), "zh"),
+    );
+  };
+  const filteredSkills = () => {
+    const q = skillQuery.trim().toLowerCase();
+    const list = flatSkills();
+    if (!q) return list;
+    return list.filter((x) => {
+      const hay = `${x.name || ""} ${x.description || ""} ${x.id || ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  };
+  const skillCardHtml = (x) => {
+    const binding = x.binding ?? state.bindings?.[x.id] ?? "none";
+    return `<article class="skill-card" data-skill-id="${escape(x.id)}"><div class="skill-card-body"><div class="skill-card-head"><strong class="skill-card-name">${escape(x.name)}</strong>${bindingMenuHtml(x.id, binding, accounts)}</div><p class="skill-card-desc muted">${escape(x.description || "")}</p>${x.missing ? '<p class="notice">目录异常</p>' : ""}</div><div class="skill-card-actions"><button type="button" class="ghost icon-btn" data-reveal="${escape(x.id)}" title="访达" aria-label="访达">${I.folder({ size: 15 })}</button><button type="button" class="ghost icon-btn danger" data-remove="${escape(x.id)}" title="删除" aria-label="删除">${I.trash({ size: 15 })}</button></div></article>`;
   };
   const draw = () => {
-    const tree = visibleTree();
-    const treeHtml = tree.length
-      ? tree
-          .map((g) => {
-            const rows = g.skills
-              .map((x) => {
-                const binding =
-                  x.binding ?? state.bindings?.[x.id] ?? "none";
-                return `<div class="skill-tree-row" data-skill-id="${escape(x.id)}"><div class="skill-tree-main"><strong>${escape(x.name)}</strong><span class="muted">${escape(x.description || "")}</span>${x.missing ? '<span class="notice">目录异常</span>' : ""}</div><div class="skill-tree-actions">${bindingMenuHtml(x.id, binding, accounts)}<button type="button" class="ghost" data-reveal="${escape(x.id)}">访达</button><button type="button" class="ghost danger" data-remove="${escape(x.id)}">删除</button></div></div>`;
-              })
-              .join("");
-            return `<details class="skill-tree-group" open><summary><span class="skill-tree-group-label">${escape(g.label)}</span><span class="muted">${g.skills.length}</span></summary><div class="skill-tree-list">${rows}</div></details>`;
-          })
-          .join("")
+    const skills = filteredSkills();
+    const total = flatSkills().length;
+    const listHtml = skills.length
+      ? `<div class="skill-card-list">${skills.map(skillCardHtml).join("")}</div>`
       : opts.lockAccount
-        ? '<p class="settings-empty">当前账号暂无可用技能。请到设置 → 技能库，将技能绑定到「所有」或本账号。</p>'
-        : '<p class="settings-empty">还没有技能。将含 SKILL.md 的文件夹放到仓库 <code>.agents/skills</code>，或使用导入 / 新建。</p>';
+        ? '<p class="settings-empty">当前账号暂无可用技能。请到设置 → 技能，将技能绑定到「全局」或本账号。</p>'
+        : total
+          ? '<p class="settings-empty">没有匹配的技能。</p>'
+          : '<p class="settings-empty">还没有技能。将含 SKILL.md 的文件夹放到仓库 <code>.agents/skills</code>，或使用导入技能。</p>';
+    const searchHtml = `<div class="skill-search-wrap">${I.search({ size: 15 })}<input type="search" id="skill-search" class="skill-search" placeholder="搜索技能名称或描述…" value="${escape(skillQuery)}" autocomplete="off"></div>`;
+    const toolbar = `<div class="settings-panel-toolbar skill-toolbar"><button type="button" id="skill-reveal-root">查看本地文件</button><button type="button" id="skill-import">导入技能</button>${searchHtml}</div>`;
     if (opts.layout === "sections") {
-      root.innerHTML = `<section class="settings-section"><div class="settings-section-control"><div class="settings-panel-toolbar"><button type="button" id="skill-reveal-root">访达</button><button type="button" id="skill-import">导入文件夹</button><button type="button" class="primary" id="skill-new">＋ 新建</button></div><div class="settings-panel settings-panel-flush"><div class="skill-tree">${treeHtml}</div></div><p id="skill-page-error" role="status"></p></div></section>`;
+      root.innerHTML = `<section class="settings-section"><div class="settings-section-control">${toolbar}<div class="skill-board">${listHtml}</div><p id="skill-page-error" role="status"></p></div></section>`;
     } else {
       const head = opts.compact
-        ? `<div class="settings-card-actions skill-compact-actions"><button type="button" id="skill-reveal-root">访达</button><button type="button" id="skill-import">导入文件夹</button><button type="button" class="primary" id="skill-new">＋ 新建</button></div><p class="muted">仓库 <code>${escape(state.root)}</code> · 为每个技能选择支持的账号。</p>`
-        : `<div class="settings-card-head accounts-toolbar"><h3>技能</h3><div class="settings-card-actions"><button type="button" id="skill-reveal-root">访达</button><button type="button" id="skill-import">导入文件夹</button><button type="button" class="primary" id="skill-new">＋ 新建</button></div></div><p class="muted">技能存放于仓库 <code>${escape(state.root)}</code>；运行时以软链接挂到 Agent 工作区同名路径。</p>`;
-      root.innerHTML = `${head}<div class="skill-tree">${treeHtml}</div><p id="skill-page-error" role="status"></p>`;
+        ? `<div class="settings-card-actions skill-compact-actions"><button type="button" id="skill-reveal-root">查看本地文件</button><button type="button" id="skill-import">导入技能</button>${searchHtml}</div><p class="muted">仓库 <code>${escape(state.root)}</code> · 为每个技能选择支持的账号。</p>`
+        : `<div class="settings-card-head accounts-toolbar"><h3>技能</h3><div class="settings-card-actions"><button type="button" id="skill-reveal-root">查看本地文件</button><button type="button" id="skill-import">导入技能</button>${searchHtml}</div></div><p class="muted">技能存放于仓库 <code>${escape(state.root)}</code>；运行时以软链接挂到 Agent 工作区同名路径。</p>`;
+      root.innerHTML = `${head}<div class="skill-board">${listHtml}</div><p id="skill-page-error" role="status"></p>`;
+    }
+    const search = root.querySelector("#skill-search");
+    if (search) {
+      search.oninput = () => {
+        skillQuery = search.value;
+        const active = document.activeElement === search;
+        const pos = search.selectionStart;
+        draw();
+        const next = root.querySelector("#skill-search");
+        if (active && next) {
+          next.focus();
+          try {
+            next.setSelectionRange(pos, pos);
+          } catch (_) {}
+        }
+      };
     }
     root.querySelector("#skill-reveal-root").onclick = async () => {
       try {
@@ -202,34 +232,6 @@ export async function mountSkillsSettings(
         });
         if (!next) return;
         state = next;
-        draw();
-      } catch (e) {
-        err(e.message);
-      }
-    };
-    root.querySelector("#skill-new").onclick = async () => {
-      const name = await askLine(
-        "技能名称",
-        "小写字母、数字、连字符，如 fact-check",
-      );
-      if (name == null) return;
-      const description = await askLine(
-        "技能描述",
-        "做什么、何时使用（1–1024 字）",
-      );
-      if (description == null) return;
-      const group = await askLine("分组路径（可留空）", "可选，如 writing；留空放在根目录", {
-        allowEmpty: true,
-      });
-      if (group == null) return;
-      try {
-        state = await api("skills-create", {
-          account: state.account,
-          revision: state.revision,
-          name,
-          description,
-          group,
-        });
         draw();
       } catch (e) {
         err(e.message);
@@ -270,11 +272,11 @@ export async function mountSkillsSettings(
         input.onchange = async () => {
           applyExclusive(input);
           const binding = readBindingFromMenu(menu);
-          const nextBinding = Array.isArray(binding) && binding.length === 0
-            ? "none"
-            : binding;
+          const nextBinding =
+            Array.isArray(binding) && binding.length === 0 ? "none" : binding;
           const summary = details.querySelector("summary");
-          if (summary) summary.textContent = bindingLabel(nextBinding, accounts);
+          if (summary)
+            summary.innerHTML = bindingTagsHtml(nextBinding, accounts);
           try {
             state = await api("skills-configure", {
               account: state.account,

@@ -42,6 +42,7 @@ import {
   MessageSquare,
   PenLine,
   Trash2,
+  Search,
 } from "lucide";
 
 /**
@@ -106,4 +107,5 @@ export const I = {
   chat: (o) => icon(MessageSquare, o),
   pen: (o) => icon(PenLine, o),
   trash: (o) => icon(Trash2, o),
+  search: (o) => icon(Search, o),
 };

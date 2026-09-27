@@ -142,44 +142,429 @@ function mountAgentUsage(root2, api2, providers, opts = {}) {
   load();
 }
 
+// node_modules/lucide/dist/esm/icons/at-sign.mjs
+var AtSign = [
+  ["circle", { cx: "12", cy: "12", r: "4" }],
+  ["path", { d: "M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" }]
+];
+
+// node_modules/lucide/dist/esm/icons/bold.mjs
+var Bold = [
+  ["path", { d: "M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8" }]
+];
+
+// node_modules/lucide/dist/esm/icons/chevron-down.mjs
+var ChevronDown = [["path", { d: "m6 9 6 6 6-6" }]];
+
+// node_modules/lucide/dist/esm/icons/chevron-left.mjs
+var ChevronLeft = [["path", { d: "m15 18-6-6 6-6" }]];
+
+// node_modules/lucide/dist/esm/icons/circle-user.mjs
+var CircleUser = [
+  ["circle", { cx: "12", cy: "12", r: "10" }],
+  ["circle", { cx: "12", cy: "10", r: "3" }],
+  ["path", { d: "M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662" }]
+];
+
+// node_modules/lucide/dist/esm/icons/copy.mjs
+var Copy = [
+  ["rect", { width: "14", height: "14", x: "8", y: "8", rx: "2", ry: "2" }],
+  ["path", { d: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" }]
+];
+
+// node_modules/lucide/dist/esm/icons/external-link.mjs
+var ExternalLink = [
+  ["path", { d: "M15 3h6v6" }],
+  ["path", { d: "M10 14 21 3" }],
+  ["path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }]
+];
+
+// node_modules/lucide/dist/esm/icons/eye.mjs
+var Eye = [
+  [
+    "path",
+    {
+      d: "M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+    }
+  ],
+  ["circle", { cx: "12", cy: "12", r: "3" }]
+];
+
+// node_modules/lucide/dist/esm/icons/file-text.mjs
+var FileText = [
+  [
+    "path",
+    {
+      d: "M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"
+    }
+  ],
+  ["path", { d: "M14 2v5a1 1 0 0 0 1 1h5" }],
+  ["path", { d: "M10 9H8" }],
+  ["path", { d: "M16 13H8" }],
+  ["path", { d: "M16 17H8" }]
+];
+
+// node_modules/lucide/dist/esm/icons/focus.mjs
+var Focus = [
+  ["circle", { cx: "12", cy: "12", r: "3" }],
+  ["path", { d: "M3 7V5a2 2 0 0 1 2-2h2" }],
+  ["path", { d: "M17 3h2a2 2 0 0 1 2 2v2" }],
+  ["path", { d: "M21 17v2a2 2 0 0 1-2 2h-2" }],
+  ["path", { d: "M7 21H5a2 2 0 0 1-2-2v-2" }]
+];
+
+// node_modules/lucide/dist/esm/icons/folder-open.mjs
+var FolderOpen = [
+  [
+    "path",
+    {
+      d: "m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"
+    }
+  ]
+];
+
+// node_modules/lucide/dist/esm/icons/heading-1.mjs
+var Heading1 = [
+  ["path", { d: "M4 12h8" }],
+  ["path", { d: "M4 18V6" }],
+  ["path", { d: "M12 18V6" }],
+  ["path", { d: "m17 12 3-2v8" }]
+];
+
+// node_modules/lucide/dist/esm/icons/heading-2.mjs
+var Heading2 = [
+  ["path", { d: "M4 12h8" }],
+  ["path", { d: "M4 18V6" }],
+  ["path", { d: "M12 18V6" }],
+  ["path", { d: "M21 18h-4c0-4 4-3 4-6 0-1.5-2-2.5-4-1" }]
+];
+
+// node_modules/lucide/dist/esm/icons/image-down.mjs
+var ImageDown = [
+  [
+    "path",
+    {
+      d: "M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1-3.1a2 2 0 0 0-2.814.014L6 21"
+    }
+  ],
+  ["path", { d: "m14 19 3 3v-5.5" }],
+  ["path", { d: "m17 22 3-3" }],
+  ["circle", { cx: "9", cy: "9", r: "2" }]
+];
+
+// node_modules/lucide/dist/esm/icons/image-plus.mjs
+var ImagePlus = [
+  ["path", { d: "M16 5h6" }],
+  ["path", { d: "M19 2v6" }],
+  ["path", { d: "M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5" }],
+  ["path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }],
+  ["circle", { cx: "9", cy: "9", r: "2" }]
+];
+
+// node_modules/lucide/dist/esm/icons/italic.mjs
+var Italic = [
+  ["line", { x1: "19", x2: "10", y1: "4", y2: "4" }],
+  ["line", { x1: "14", x2: "5", y1: "20", y2: "20" }],
+  ["line", { x1: "15", x2: "9", y1: "4", y2: "20" }]
+];
+
+// node_modules/lucide/dist/esm/icons/layout-dashboard.mjs
+var LayoutDashboard = [
+  ["rect", { width: "7", height: "9", x: "3", y: "3", rx: "1" }],
+  ["rect", { width: "7", height: "5", x: "14", y: "3", rx: "1" }],
+  ["rect", { width: "7", height: "9", x: "14", y: "12", rx: "1" }],
+  ["rect", { width: "7", height: "5", x: "3", y: "16", rx: "1" }]
+];
+
+// node_modules/lucide/dist/esm/icons/library.mjs
+var Library = [
+  ["path", { d: "m16 6 4 14" }],
+  ["path", { d: "M12 6v14" }],
+  ["path", { d: "M8 8v12" }],
+  ["path", { d: "M4 4v16" }]
+];
+
+// node_modules/lucide/dist/esm/icons/lightbulb.mjs
+var Lightbulb = [
+  [
+    "path",
+    {
+      d: "M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"
+    }
+  ],
+  ["path", { d: "M9 18h6" }],
+  ["path", { d: "M10 22h4" }]
+];
+
+// node_modules/lucide/dist/esm/icons/link-2.mjs
+var Link2 = [
+  ["path", { d: "M9 17H7A5 5 0 0 1 7 7h2" }],
+  ["path", { d: "M15 7h2a5 5 0 1 1 0 10h-2" }],
+  ["line", { x1: "8", x2: "16", y1: "12", y2: "12" }]
+];
+
+// node_modules/lucide/dist/esm/icons/list-tree.mjs
+var ListTree = [
+  ["path", { d: "M8 5h13" }],
+  ["path", { d: "M13 12h8" }],
+  ["path", { d: "M13 19h8" }],
+  ["path", { d: "M3 10a2 2 0 0 0 2 2h3" }],
+  ["path", { d: "M3 5v12a2 2 0 0 0 2 2h3" }]
+];
+
+// node_modules/lucide/dist/esm/icons/list.mjs
+var List = [
+  ["path", { d: "M3 5h.01" }],
+  ["path", { d: "M3 12h.01" }],
+  ["path", { d: "M3 19h.01" }],
+  ["path", { d: "M8 5h13" }],
+  ["path", { d: "M8 12h13" }],
+  ["path", { d: "M8 19h13" }]
+];
+
+// node_modules/lucide/dist/esm/icons/message-square.mjs
+var MessageSquare = [
+  [
+    "path",
+    {
+      d: "M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"
+    }
+  ]
+];
+
+// node_modules/lucide/dist/esm/icons/panel-right-close.mjs
+var PanelRightClose = [
+  ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }],
+  ["path", { d: "M15 3v18" }],
+  ["path", { d: "m8 9 3 3-3 3" }]
+];
+
+// node_modules/lucide/dist/esm/icons/panel-right-open.mjs
+var PanelRightOpen = [
+  ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }],
+  ["path", { d: "M15 3v18" }],
+  ["path", { d: "m10 15-3-3 3-3" }]
+];
+
+// node_modules/lucide/dist/esm/icons/pen-line.mjs
+var PenLine = [
+  ["path", { d: "M13 21h8" }],
+  [
+    "path",
+    {
+      d: "M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+    }
+  ]
+];
+
+// node_modules/lucide/dist/esm/icons/pin-off.mjs
+var PinOff = [
+  ["path", { d: "M12 17v5" }],
+  ["path", { d: "M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89" }],
+  ["path", { d: "m2 2 20 20" }],
+  ["path", { d: "M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11" }]
+];
+
+// node_modules/lucide/dist/esm/icons/pin.mjs
+var Pin = [
+  ["path", { d: "M12 17v5" }],
+  [
+    "path",
+    {
+      d: "M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"
+    }
+  ]
+];
+
+// node_modules/lucide/dist/esm/icons/plus.mjs
+var Plus = [
+  ["path", { d: "M5 12h14" }],
+  ["path", { d: "M12 5v14" }]
+];
+
+// node_modules/lucide/dist/esm/icons/quote.mjs
+var Quote = [
+  [
+    "path",
+    {
+      d: "M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"
+    }
+  ],
+  [
+    "path",
+    {
+      d: "M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"
+    }
+  ]
+];
+
+// node_modules/lucide/dist/esm/icons/refresh-cw.mjs
+var RefreshCw = [
+  ["path", { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" }],
+  ["path", { d: "M21 3v5h-5" }],
+  ["path", { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" }],
+  ["path", { d: "M8 16H3v5" }]
+];
+
+// node_modules/lucide/dist/esm/icons/search-check.mjs
+var SearchCheck = [
+  ["path", { d: "m8 11 2 2 4-4" }],
+  ["circle", { cx: "11", cy: "11", r: "8" }],
+  ["path", { d: "m21 21-4.3-4.3" }]
+];
+
+// node_modules/lucide/dist/esm/icons/search.mjs
+var Search = [
+  ["path", { d: "m21 21-4.34-4.34" }],
+  ["circle", { cx: "11", cy: "11", r: "8" }]
+];
+
+// node_modules/lucide/dist/esm/icons/send-horizontal.mjs
+var SendHorizontal = [
+  [
+    "path",
+    {
+      d: "M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z"
+    }
+  ],
+  ["path", { d: "M6 12h16" }]
+];
+
+// node_modules/lucide/dist/esm/icons/settings.mjs
+var Settings = [
+  [
+    "path",
+    {
+      d: "M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"
+    }
+  ],
+  ["circle", { cx: "12", cy: "12", r: "3" }]
+];
+
+// node_modules/lucide/dist/esm/icons/sparkles.mjs
+var Sparkles = [
+  [
+    "path",
+    {
+      d: "M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"
+    }
+  ],
+  ["path", { d: "M20 2v4" }],
+  ["path", { d: "M22 4h-4" }],
+  ["circle", { cx: "4", cy: "20", r: "2" }]
+];
+
+// node_modules/lucide/dist/esm/icons/tags.mjs
+var Tags = [
+  [
+    "path",
+    {
+      d: "M13.172 2a2 2 0 0 1 1.414.586l6.71 6.71a2.4 2.4 0 0 1 0 3.408l-4.592 4.592a2.4 2.4 0 0 1-3.408 0l-6.71-6.71A2 2 0 0 1 6 9.172V3a1 1 0 0 1 1-1z"
+    }
+  ],
+  ["path", { d: "M2 7v6.172a2 2 0 0 0 .586 1.414l6.71 6.71a2.4 2.4 0 0 0 3.191.193" }],
+  ["circle", { cx: "10.5", cy: "6.5", r: ".5", fill: "currentColor" }]
+];
+
+// node_modules/lucide/dist/esm/icons/trash.mjs
+var Trash = [
+  ["path", { d: "M10 11v6" }],
+  ["path", { d: "M14 11v6" }],
+  ["path", { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" }],
+  ["path", { d: "M3 6h18" }],
+  ["path", { d: "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" }]
+];
+
+// node_modules/lucide/dist/esm/icons/upload.mjs
+var Upload = [
+  ["path", { d: "M12 3v12" }],
+  ["path", { d: "m17 8-5-5-5 5" }],
+  ["path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }]
+];
+
+// node_modules/lucide/dist/esm/icons/wand-sparkles.mjs
+var WandSparkles = [
+  [
+    "path",
+    {
+      d: "m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"
+    }
+  ],
+  ["path", { d: "m14 7 3 3" }],
+  ["path", { d: "M5 6v4" }],
+  ["path", { d: "M19 14v4" }],
+  ["path", { d: "M10 2v2" }],
+  ["path", { d: "M7 8H3" }],
+  ["path", { d: "M21 16h-4" }],
+  ["path", { d: "M11 3H9" }]
+];
+
+// node_modules/lucide/dist/esm/icons/x.mjs
+var X = [
+  ["path", { d: "M18 6 6 18" }],
+  ["path", { d: "m6 6 12 12" }]
+];
+
+// icons.js
+function icon(node, opts = {}) {
+  const size = opts.size ?? 16;
+  const stroke = opts.stroke ?? 1.75;
+  const cls = opts.className ? ` ${opts.className}` : "";
+  const body = node.map(([tag2, attrs]) => {
+    const a = Object.entries(attrs || {}).map(([k, v]) => `${k}="${String(v).replace(/"/g, "&quot;")}"`).join(" ");
+    return `<${tag2} ${a}/>`;
+  }).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round" class="lucide${cls}" aria-hidden="true">${body}</svg>`;
+}
+var I = {
+  settings: (o) => icon(Settings, o),
+  dashboard: (o) => icon(LayoutDashboard, o),
+  sparkles: (o) => icon(Sparkles, o),
+  lightbulb: (o) => icon(Lightbulb, o),
+  library: (o) => icon(Library, o),
+  user: (o) => icon(CircleUser, o),
+  plus: (o) => icon(Plus, o),
+  image: (o) => icon(ImagePlus, o),
+  bold: (o) => icon(Bold, o),
+  italic: (o) => icon(Italic, o),
+  h1: (o) => icon(Heading1, o),
+  h2: (o) => icon(Heading2, o),
+  list: (o) => icon(List, o),
+  quote: (o) => icon(Quote, o),
+  outline: (o) => icon(ListTree, o),
+  pin: (o) => icon(Pin, o),
+  pinOff: (o) => icon(PinOff, o),
+  focus: (o) => icon(Focus, o),
+  refresh: (o) => icon(RefreshCw, o),
+  folder: (o) => icon(FolderOpen, o),
+  external: (o) => icon(ExternalLink, o),
+  close: (o) => icon(X, o),
+  panelOpen: (o) => icon(PanelRightOpen, o),
+  panelClose: (o) => icon(PanelRightClose, o),
+  send: (o) => icon(SendHorizontal, o),
+  upload: (o) => icon(Upload, o),
+  at: (o) => icon(AtSign, o),
+  tags: (o) => icon(Tags, o),
+  eye: (o) => icon(Eye, o),
+  wand: (o) => icon(WandSparkles, o),
+  check: (o) => icon(SearchCheck, o),
+  file: (o) => icon(FileText, o),
+  link: (o) => icon(Link2, o),
+  copy: (o) => icon(Copy, o),
+  imageDown: (o) => icon(ImageDown, o),
+  chevronDown: (o) => icon(ChevronDown, o),
+  chevronLeft: (o) => icon(ChevronLeft, o),
+  chat: (o) => icon(MessageSquare, o),
+  pen: (o) => icon(PenLine, o),
+  trash: (o) => icon(Trash, o),
+  search: (o) => icon(Search, o)
+};
+
 // skills-ui.js
 var escape = (s) => String(s ?? "").replace(
   /[&<>"']/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
 );
-function askLine(title, placeholder = "", { allowEmpty = false } = {}) {
-  return new Promise((resolve) => {
-    const d = document.createElement("dialog");
-    d.className = "skill-ask-dialog";
-    d.innerHTML = `<div class="skill-ask-body"><h2>${escape(title)}</h2><input id="skill-prompt-input" type="text" placeholder="${escape(placeholder)}" autocomplete="off"><div class="row"><button type="button" id="skill-prompt-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="skill-prompt-ok">\u786E\u5B9A</button></div></div>`;
-    document.body.append(d);
-    const input = d.querySelector("#skill-prompt-input");
-    const done = (v) => {
-      d.close();
-      d.remove();
-      resolve(v);
-    };
-    d.querySelector("#skill-prompt-cancel").onclick = () => done(null);
-    d.addEventListener("cancel", (e) => {
-      e.preventDefault();
-      done(null);
-    });
-    const submit = () => {
-      const v = input.value.trim();
-      if (!v && !allowEmpty) return;
-      done(v);
-    };
-    d.querySelector("#skill-prompt-ok").onclick = submit;
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        submit();
-      }
-    });
-    d.showModal();
-    input.focus();
-  });
-}
 function normalizeBinding(raw) {
   if (raw === "all" || raw === "none") return raw;
   if (Array.isArray(raw)) {
@@ -243,6 +628,7 @@ function readBindingFromMenu(menu) {
 async function mountSkillsSettings(root2, api2, account2, accounts, onRefresh = () => {
 }, opts = {}) {
   let state2;
+  let skillQuery = "";
   const err = (msg) => {
     const el = root2.querySelector("#skill-page-error");
     if (el) el.textContent = msg || "";
@@ -255,29 +641,59 @@ async function mountSkillsSettings(root2, api2, account2, accounts, onRefresh = 
     state2 = await api2("skills-list", { account: account2 || accounts[0].id });
     draw();
   };
-  const visibleTree = () => {
-    if (!opts.lockAccount) return state2.tree;
-    return state2.tree.map((g) => ({
-      ...g,
-      skills: g.skills.filter(
+  const flatSkills = () => {
+    const fromItems = Array.isArray(state2.items) ? state2.items : null;
+    let list2 = fromItems ? [...fromItems] : (state2.tree || []).flatMap((g) => g.skills || []);
+    if (opts.lockAccount) {
+      list2 = list2.filter(
         (x) => skillAvailableFor(x.binding ?? state2.bindings?.[x.id], state2.account)
-      )
-    })).filter((g) => g.skills.length);
+      );
+    }
+    return list2.sort(
+      (a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id), "zh")
+    );
+  };
+  const filteredSkills = () => {
+    const q = skillQuery.trim().toLowerCase();
+    const list2 = flatSkills();
+    if (!q) return list2;
+    return list2.filter((x) => {
+      const hay = `${x.name || ""} ${x.description || ""} ${x.id || ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  };
+  const skillCardHtml = (x) => {
+    const binding = x.binding ?? state2.bindings?.[x.id] ?? "none";
+    return `<article class="skill-card" data-skill-id="${escape(x.id)}"><div class="skill-card-body"><div class="skill-card-head"><strong class="skill-card-name">${escape(x.name)}</strong>${bindingMenuHtml(x.id, binding, accounts)}</div><p class="skill-card-desc muted">${escape(x.description || "")}</p>${x.missing ? '<p class="notice">\u76EE\u5F55\u5F02\u5E38</p>' : ""}</div><div class="skill-card-actions"><button type="button" class="ghost icon-btn" data-reveal="${escape(x.id)}" title="\u8BBF\u8FBE" aria-label="\u8BBF\u8FBE">${I.folder({ size: 15 })}</button><button type="button" class="ghost icon-btn danger" data-remove="${escape(x.id)}" title="\u5220\u9664" aria-label="\u5220\u9664">${I.trash({ size: 15 })}</button></div></article>`;
   };
   const draw = () => {
-    const tree = visibleTree();
-    const treeHtml = tree.length ? tree.map((g) => {
-      const rows = g.skills.map((x) => {
-        const binding = x.binding ?? state2.bindings?.[x.id] ?? "none";
-        return `<div class="skill-tree-row" data-skill-id="${escape(x.id)}"><div class="skill-tree-main"><strong>${escape(x.name)}</strong><span class="muted">${escape(x.description || "")}</span>${x.missing ? '<span class="notice">\u76EE\u5F55\u5F02\u5E38</span>' : ""}</div><div class="skill-tree-actions">${bindingMenuHtml(x.id, binding, accounts)}<button type="button" class="ghost" data-reveal="${escape(x.id)}">\u8BBF\u8FBE</button><button type="button" class="ghost danger" data-remove="${escape(x.id)}">\u5220\u9664</button></div></div>`;
-      }).join("");
-      return `<details class="skill-tree-group" open><summary><span class="skill-tree-group-label">${escape(g.label)}</span><span class="muted">${g.skills.length}</span></summary><div class="skill-tree-list">${rows}</div></details>`;
-    }).join("") : opts.lockAccount ? '<p class="settings-empty">\u5F53\u524D\u8D26\u53F7\u6682\u65E0\u53EF\u7528\u6280\u80FD\u3002\u8BF7\u5230\u8BBE\u7F6E \u2192 \u6280\u80FD\u5E93\uFF0C\u5C06\u6280\u80FD\u7ED1\u5B9A\u5230\u300C\u6240\u6709\u300D\u6216\u672C\u8D26\u53F7\u3002</p>' : '<p class="settings-empty">\u8FD8\u6CA1\u6709\u6280\u80FD\u3002\u5C06\u542B SKILL.md \u7684\u6587\u4EF6\u5939\u653E\u5230\u4ED3\u5E93 <code>.agents/skills</code>\uFF0C\u6216\u4F7F\u7528\u5BFC\u5165 / \u65B0\u5EFA\u3002</p>';
+    const skills = filteredSkills();
+    const total = flatSkills().length;
+    const listHtml = skills.length ? `<div class="skill-card-list">${skills.map(skillCardHtml).join("")}</div>` : opts.lockAccount ? '<p class="settings-empty">\u5F53\u524D\u8D26\u53F7\u6682\u65E0\u53EF\u7528\u6280\u80FD\u3002\u8BF7\u5230\u8BBE\u7F6E \u2192 \u6280\u80FD\uFF0C\u5C06\u6280\u80FD\u7ED1\u5B9A\u5230\u300C\u5168\u5C40\u300D\u6216\u672C\u8D26\u53F7\u3002</p>' : total ? '<p class="settings-empty">\u6CA1\u6709\u5339\u914D\u7684\u6280\u80FD\u3002</p>' : '<p class="settings-empty">\u8FD8\u6CA1\u6709\u6280\u80FD\u3002\u5C06\u542B SKILL.md \u7684\u6587\u4EF6\u5939\u653E\u5230\u4ED3\u5E93 <code>.agents/skills</code>\uFF0C\u6216\u4F7F\u7528\u5BFC\u5165\u6280\u80FD\u3002</p>';
+    const searchHtml = `<div class="skill-search-wrap">${I.search({ size: 15 })}<input type="search" id="skill-search" class="skill-search" placeholder="\u641C\u7D22\u6280\u80FD\u540D\u79F0\u6216\u63CF\u8FF0\u2026" value="${escape(skillQuery)}" autocomplete="off"></div>`;
+    const toolbar = `<div class="settings-panel-toolbar skill-toolbar"><button type="button" id="skill-reveal-root">\u67E5\u770B\u672C\u5730\u6587\u4EF6</button><button type="button" id="skill-import">\u5BFC\u5165\u6280\u80FD</button>${searchHtml}</div>`;
     if (opts.layout === "sections") {
-      root2.innerHTML = `<section class="settings-section"><div class="settings-section-control"><div class="settings-panel-toolbar"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div><div class="settings-panel settings-panel-flush"><div class="skill-tree">${treeHtml}</div></div><p id="skill-page-error" role="status"></p></div></section>`;
+      root2.innerHTML = `<section class="settings-section"><div class="settings-section-control">${toolbar}<div class="skill-board">${listHtml}</div><p id="skill-page-error" role="status"></p></div></section>`;
     } else {
-      const head = opts.compact ? `<div class="settings-card-actions skill-compact-actions"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div><p class="muted">\u4ED3\u5E93 <code>${escape(state2.root)}</code> \xB7 \u4E3A\u6BCF\u4E2A\u6280\u80FD\u9009\u62E9\u652F\u6301\u7684\u8D26\u53F7\u3002</p>` : `<div class="settings-card-head accounts-toolbar"><h3>\u6280\u80FD</h3><div class="settings-card-actions"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div></div><p class="muted">\u6280\u80FD\u5B58\u653E\u4E8E\u4ED3\u5E93 <code>${escape(state2.root)}</code>\uFF1B\u8FD0\u884C\u65F6\u4EE5\u8F6F\u94FE\u63A5\u6302\u5230 Agent \u5DE5\u4F5C\u533A\u540C\u540D\u8DEF\u5F84\u3002</p>`;
-      root2.innerHTML = `${head}<div class="skill-tree">${treeHtml}</div><p id="skill-page-error" role="status"></p>`;
+      const head = opts.compact ? `<div class="settings-card-actions skill-compact-actions"><button type="button" id="skill-reveal-root">\u67E5\u770B\u672C\u5730\u6587\u4EF6</button><button type="button" id="skill-import">\u5BFC\u5165\u6280\u80FD</button>${searchHtml}</div><p class="muted">\u4ED3\u5E93 <code>${escape(state2.root)}</code> \xB7 \u4E3A\u6BCF\u4E2A\u6280\u80FD\u9009\u62E9\u652F\u6301\u7684\u8D26\u53F7\u3002</p>` : `<div class="settings-card-head accounts-toolbar"><h3>\u6280\u80FD</h3><div class="settings-card-actions"><button type="button" id="skill-reveal-root">\u67E5\u770B\u672C\u5730\u6587\u4EF6</button><button type="button" id="skill-import">\u5BFC\u5165\u6280\u80FD</button>${searchHtml}</div></div><p class="muted">\u6280\u80FD\u5B58\u653E\u4E8E\u4ED3\u5E93 <code>${escape(state2.root)}</code>\uFF1B\u8FD0\u884C\u65F6\u4EE5\u8F6F\u94FE\u63A5\u6302\u5230 Agent \u5DE5\u4F5C\u533A\u540C\u540D\u8DEF\u5F84\u3002</p>`;
+      root2.innerHTML = `${head}<div class="skill-board">${listHtml}</div><p id="skill-page-error" role="status"></p>`;
+    }
+    const search = root2.querySelector("#skill-search");
+    if (search) {
+      search.oninput = () => {
+        skillQuery = search.value;
+        const active = document.activeElement === search;
+        const pos = search.selectionStart;
+        draw();
+        const next2 = root2.querySelector("#skill-search");
+        if (active && next2) {
+          next2.focus();
+          try {
+            next2.setSelectionRange(pos, pos);
+          } catch (_) {
+          }
+        }
+      };
     }
     root2.querySelector("#skill-reveal-root").onclick = async () => {
       try {
@@ -294,34 +710,6 @@ async function mountSkillsSettings(root2, api2, account2, accounts, onRefresh = 
         });
         if (!next2) return;
         state2 = next2;
-        draw();
-      } catch (e) {
-        err(e.message);
-      }
-    };
-    root2.querySelector("#skill-new").onclick = async () => {
-      const name = await askLine(
-        "\u6280\u80FD\u540D\u79F0",
-        "\u5C0F\u5199\u5B57\u6BCD\u3001\u6570\u5B57\u3001\u8FDE\u5B57\u7B26\uFF0C\u5982 fact-check"
-      );
-      if (name == null) return;
-      const description = await askLine(
-        "\u6280\u80FD\u63CF\u8FF0",
-        "\u505A\u4EC0\u4E48\u3001\u4F55\u65F6\u4F7F\u7528\uFF081\u20131024 \u5B57\uFF09"
-      );
-      if (description == null) return;
-      const group = await askLine("\u5206\u7EC4\u8DEF\u5F84\uFF08\u53EF\u7559\u7A7A\uFF09", "\u53EF\u9009\uFF0C\u5982 writing\uFF1B\u7559\u7A7A\u653E\u5728\u6839\u76EE\u5F55", {
-        allowEmpty: true
-      });
-      if (group == null) return;
-      try {
-        state2 = await api2("skills-create", {
-          account: state2.account,
-          revision: state2.revision,
-          name,
-          description,
-          group
-        });
         draw();
       } catch (e) {
         err(e.message);
@@ -362,7 +750,8 @@ async function mountSkillsSettings(root2, api2, account2, accounts, onRefresh = 
           const binding = readBindingFromMenu(menu);
           const nextBinding = Array.isArray(binding) && binding.length === 0 ? "none" : binding;
           const summary = details.querySelector("summary");
-          if (summary) summary.textContent = bindingLabel(nextBinding, accounts);
+          if (summary)
+            summary.innerHTML = bindingTagsHtml(nextBinding, accounts);
           try {
             state2 = await api2("skills-configure", {
               account: state2.account,
@@ -18694,7 +19083,7 @@ var starInputRegex = /(?:^|\s)(\*\*(?!\s+\*\*)((?:[^*]+))\*\*(?!\s+\*\*))$/;
 var starPasteRegex = /(?:^|\s)(\*\*(?!\s+\*\*)((?:[^*]+))\*\*(?!\s+\*\*))/g;
 var underscoreInputRegex = /(?:^|\s)(__(?!\s+__)((?:[^_]+))__(?!\s+__))$/;
 var underscorePasteRegex = /(?:^|\s)(__(?!\s+__)((?:[^_]+))__(?!\s+__))/g;
-var Bold = Mark2.create({
+var Bold2 = Mark2.create({
   name: "bold",
   addOptions() {
     return { HTMLAttributes: {} };
@@ -19296,7 +19685,7 @@ var starInputRegex2 = /(?:^|\s)(\*(?!\s+\*)((?:[^*]+))\*(?!\s+\*))$/;
 var starPasteRegex2 = /(?:^|\s)(\*(?!\s+\*)((?:[^*]+))\*(?!\s+\*))/g;
 var underscoreInputRegex2 = /(?:^|\s)(_(?!\s+_)((?:[^_]+))_(?!\s+_))$/;
 var underscorePasteRegex2 = /(?:^|\s)(_(?!\s+_)((?:[^_]+))_(?!\s+_))/g;
-var Italic = Mark2.create({
+var Italic2 = Mark2.create({
   name: "italic",
   addOptions() {
     return { HTMLAttributes: {} };
@@ -23346,7 +23735,7 @@ var Dropcursor = Extension.create({
     return [dropCursor(this.options)];
   }
 });
-var Focus = Extension.create({
+var Focus2 = Extension.create({
   name: "focus",
   addOptions() {
     return {
@@ -23786,7 +24175,7 @@ var StarterKit = Extension.create({
   name: "starterKit",
   addExtensions() {
     const extensions = [];
-    if (this.options.bold !== false) extensions.push(Bold.configure(this.options.bold));
+    if (this.options.bold !== false) extensions.push(Bold2.configure(this.options.bold));
     if (this.options.blockquote !== false) extensions.push(Blockquote.configure(this.options.blockquote));
     if (this.options.bulletList !== false) extensions.push(BulletList.configure(this.options.bulletList));
     if (this.options.code !== false) extensions.push(Code.configure(this.options.code));
@@ -23798,7 +24187,7 @@ var StarterKit = Extension.create({
     if (this.options.heading !== false) extensions.push(Heading.configure(this.options.heading));
     if (this.options.undoRedo !== false) extensions.push(UndoRedo.configure(this.options.undoRedo));
     if (this.options.horizontalRule !== false) extensions.push(HorizontalRule.configure(this.options.horizontalRule));
-    if (this.options.italic !== false) extensions.push(Italic.configure(this.options.italic));
+    if (this.options.italic !== false) extensions.push(Italic2.configure(this.options.italic));
     if (this.options.listItem !== false) extensions.push(ListItem.configure(this.options.listItem));
     if (this.options.listKeymap !== false) {
       var _this$options;
@@ -23945,417 +24334,6 @@ var Composer = class {
   destroy() {
     this.editor.destroy();
   }
-};
-
-// node_modules/lucide/dist/esm/icons/at-sign.mjs
-var AtSign = [
-  ["circle", { cx: "12", cy: "12", r: "4" }],
-  ["path", { d: "M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" }]
-];
-
-// node_modules/lucide/dist/esm/icons/bold.mjs
-var Bold2 = [
-  ["path", { d: "M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8" }]
-];
-
-// node_modules/lucide/dist/esm/icons/chevron-down.mjs
-var ChevronDown = [["path", { d: "m6 9 6 6 6-6" }]];
-
-// node_modules/lucide/dist/esm/icons/chevron-left.mjs
-var ChevronLeft = [["path", { d: "m15 18-6-6 6-6" }]];
-
-// node_modules/lucide/dist/esm/icons/circle-user.mjs
-var CircleUser = [
-  ["circle", { cx: "12", cy: "12", r: "10" }],
-  ["circle", { cx: "12", cy: "10", r: "3" }],
-  ["path", { d: "M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662" }]
-];
-
-// node_modules/lucide/dist/esm/icons/copy.mjs
-var Copy = [
-  ["rect", { width: "14", height: "14", x: "8", y: "8", rx: "2", ry: "2" }],
-  ["path", { d: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" }]
-];
-
-// node_modules/lucide/dist/esm/icons/external-link.mjs
-var ExternalLink = [
-  ["path", { d: "M15 3h6v6" }],
-  ["path", { d: "M10 14 21 3" }],
-  ["path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }]
-];
-
-// node_modules/lucide/dist/esm/icons/eye.mjs
-var Eye = [
-  [
-    "path",
-    {
-      d: "M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
-    }
-  ],
-  ["circle", { cx: "12", cy: "12", r: "3" }]
-];
-
-// node_modules/lucide/dist/esm/icons/file-text.mjs
-var FileText = [
-  [
-    "path",
-    {
-      d: "M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"
-    }
-  ],
-  ["path", { d: "M14 2v5a1 1 0 0 0 1 1h5" }],
-  ["path", { d: "M10 9H8" }],
-  ["path", { d: "M16 13H8" }],
-  ["path", { d: "M16 17H8" }]
-];
-
-// node_modules/lucide/dist/esm/icons/focus.mjs
-var Focus2 = [
-  ["circle", { cx: "12", cy: "12", r: "3" }],
-  ["path", { d: "M3 7V5a2 2 0 0 1 2-2h2" }],
-  ["path", { d: "M17 3h2a2 2 0 0 1 2 2v2" }],
-  ["path", { d: "M21 17v2a2 2 0 0 1-2 2h-2" }],
-  ["path", { d: "M7 21H5a2 2 0 0 1-2-2v-2" }]
-];
-
-// node_modules/lucide/dist/esm/icons/folder-open.mjs
-var FolderOpen = [
-  [
-    "path",
-    {
-      d: "m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"
-    }
-  ]
-];
-
-// node_modules/lucide/dist/esm/icons/heading-1.mjs
-var Heading1 = [
-  ["path", { d: "M4 12h8" }],
-  ["path", { d: "M4 18V6" }],
-  ["path", { d: "M12 18V6" }],
-  ["path", { d: "m17 12 3-2v8" }]
-];
-
-// node_modules/lucide/dist/esm/icons/heading-2.mjs
-var Heading2 = [
-  ["path", { d: "M4 12h8" }],
-  ["path", { d: "M4 18V6" }],
-  ["path", { d: "M12 18V6" }],
-  ["path", { d: "M21 18h-4c0-4 4-3 4-6 0-1.5-2-2.5-4-1" }]
-];
-
-// node_modules/lucide/dist/esm/icons/image-down.mjs
-var ImageDown = [
-  [
-    "path",
-    {
-      d: "M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1-3.1a2 2 0 0 0-2.814.014L6 21"
-    }
-  ],
-  ["path", { d: "m14 19 3 3v-5.5" }],
-  ["path", { d: "m17 22 3-3" }],
-  ["circle", { cx: "9", cy: "9", r: "2" }]
-];
-
-// node_modules/lucide/dist/esm/icons/image-plus.mjs
-var ImagePlus = [
-  ["path", { d: "M16 5h6" }],
-  ["path", { d: "M19 2v6" }],
-  ["path", { d: "M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5" }],
-  ["path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }],
-  ["circle", { cx: "9", cy: "9", r: "2" }]
-];
-
-// node_modules/lucide/dist/esm/icons/italic.mjs
-var Italic2 = [
-  ["line", { x1: "19", x2: "10", y1: "4", y2: "4" }],
-  ["line", { x1: "14", x2: "5", y1: "20", y2: "20" }],
-  ["line", { x1: "15", x2: "9", y1: "4", y2: "20" }]
-];
-
-// node_modules/lucide/dist/esm/icons/layout-dashboard.mjs
-var LayoutDashboard = [
-  ["rect", { width: "7", height: "9", x: "3", y: "3", rx: "1" }],
-  ["rect", { width: "7", height: "5", x: "14", y: "3", rx: "1" }],
-  ["rect", { width: "7", height: "9", x: "14", y: "12", rx: "1" }],
-  ["rect", { width: "7", height: "5", x: "3", y: "16", rx: "1" }]
-];
-
-// node_modules/lucide/dist/esm/icons/library.mjs
-var Library = [
-  ["path", { d: "m16 6 4 14" }],
-  ["path", { d: "M12 6v14" }],
-  ["path", { d: "M8 8v12" }],
-  ["path", { d: "M4 4v16" }]
-];
-
-// node_modules/lucide/dist/esm/icons/lightbulb.mjs
-var Lightbulb = [
-  [
-    "path",
-    {
-      d: "M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"
-    }
-  ],
-  ["path", { d: "M9 18h6" }],
-  ["path", { d: "M10 22h4" }]
-];
-
-// node_modules/lucide/dist/esm/icons/link-2.mjs
-var Link2 = [
-  ["path", { d: "M9 17H7A5 5 0 0 1 7 7h2" }],
-  ["path", { d: "M15 7h2a5 5 0 1 1 0 10h-2" }],
-  ["line", { x1: "8", x2: "16", y1: "12", y2: "12" }]
-];
-
-// node_modules/lucide/dist/esm/icons/list-tree.mjs
-var ListTree = [
-  ["path", { d: "M8 5h13" }],
-  ["path", { d: "M13 12h8" }],
-  ["path", { d: "M13 19h8" }],
-  ["path", { d: "M3 10a2 2 0 0 0 2 2h3" }],
-  ["path", { d: "M3 5v12a2 2 0 0 0 2 2h3" }]
-];
-
-// node_modules/lucide/dist/esm/icons/list.mjs
-var List = [
-  ["path", { d: "M3 5h.01" }],
-  ["path", { d: "M3 12h.01" }],
-  ["path", { d: "M3 19h.01" }],
-  ["path", { d: "M8 5h13" }],
-  ["path", { d: "M8 12h13" }],
-  ["path", { d: "M8 19h13" }]
-];
-
-// node_modules/lucide/dist/esm/icons/message-square.mjs
-var MessageSquare = [
-  [
-    "path",
-    {
-      d: "M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"
-    }
-  ]
-];
-
-// node_modules/lucide/dist/esm/icons/panel-right-close.mjs
-var PanelRightClose = [
-  ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }],
-  ["path", { d: "M15 3v18" }],
-  ["path", { d: "m8 9 3 3-3 3" }]
-];
-
-// node_modules/lucide/dist/esm/icons/panel-right-open.mjs
-var PanelRightOpen = [
-  ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }],
-  ["path", { d: "M15 3v18" }],
-  ["path", { d: "m10 15-3-3 3-3" }]
-];
-
-// node_modules/lucide/dist/esm/icons/pen-line.mjs
-var PenLine = [
-  ["path", { d: "M13 21h8" }],
-  [
-    "path",
-    {
-      d: "M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
-    }
-  ]
-];
-
-// node_modules/lucide/dist/esm/icons/pin-off.mjs
-var PinOff = [
-  ["path", { d: "M12 17v5" }],
-  ["path", { d: "M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89" }],
-  ["path", { d: "m2 2 20 20" }],
-  ["path", { d: "M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11" }]
-];
-
-// node_modules/lucide/dist/esm/icons/pin.mjs
-var Pin = [
-  ["path", { d: "M12 17v5" }],
-  [
-    "path",
-    {
-      d: "M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"
-    }
-  ]
-];
-
-// node_modules/lucide/dist/esm/icons/plus.mjs
-var Plus = [
-  ["path", { d: "M5 12h14" }],
-  ["path", { d: "M12 5v14" }]
-];
-
-// node_modules/lucide/dist/esm/icons/quote.mjs
-var Quote = [
-  [
-    "path",
-    {
-      d: "M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"
-    }
-  ],
-  [
-    "path",
-    {
-      d: "M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"
-    }
-  ]
-];
-
-// node_modules/lucide/dist/esm/icons/refresh-cw.mjs
-var RefreshCw = [
-  ["path", { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" }],
-  ["path", { d: "M21 3v5h-5" }],
-  ["path", { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" }],
-  ["path", { d: "M8 16H3v5" }]
-];
-
-// node_modules/lucide/dist/esm/icons/search-check.mjs
-var SearchCheck = [
-  ["path", { d: "m8 11 2 2 4-4" }],
-  ["circle", { cx: "11", cy: "11", r: "8" }],
-  ["path", { d: "m21 21-4.3-4.3" }]
-];
-
-// node_modules/lucide/dist/esm/icons/send-horizontal.mjs
-var SendHorizontal = [
-  [
-    "path",
-    {
-      d: "M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z"
-    }
-  ],
-  ["path", { d: "M6 12h16" }]
-];
-
-// node_modules/lucide/dist/esm/icons/settings.mjs
-var Settings = [
-  [
-    "path",
-    {
-      d: "M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"
-    }
-  ],
-  ["circle", { cx: "12", cy: "12", r: "3" }]
-];
-
-// node_modules/lucide/dist/esm/icons/sparkles.mjs
-var Sparkles = [
-  [
-    "path",
-    {
-      d: "M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"
-    }
-  ],
-  ["path", { d: "M20 2v4" }],
-  ["path", { d: "M22 4h-4" }],
-  ["circle", { cx: "4", cy: "20", r: "2" }]
-];
-
-// node_modules/lucide/dist/esm/icons/tags.mjs
-var Tags = [
-  [
-    "path",
-    {
-      d: "M13.172 2a2 2 0 0 1 1.414.586l6.71 6.71a2.4 2.4 0 0 1 0 3.408l-4.592 4.592a2.4 2.4 0 0 1-3.408 0l-6.71-6.71A2 2 0 0 1 6 9.172V3a1 1 0 0 1 1-1z"
-    }
-  ],
-  ["path", { d: "M2 7v6.172a2 2 0 0 0 .586 1.414l6.71 6.71a2.4 2.4 0 0 0 3.191.193" }],
-  ["circle", { cx: "10.5", cy: "6.5", r: ".5", fill: "currentColor" }]
-];
-
-// node_modules/lucide/dist/esm/icons/trash.mjs
-var Trash = [
-  ["path", { d: "M10 11v6" }],
-  ["path", { d: "M14 11v6" }],
-  ["path", { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" }],
-  ["path", { d: "M3 6h18" }],
-  ["path", { d: "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" }]
-];
-
-// node_modules/lucide/dist/esm/icons/upload.mjs
-var Upload = [
-  ["path", { d: "M12 3v12" }],
-  ["path", { d: "m17 8-5-5-5 5" }],
-  ["path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }]
-];
-
-// node_modules/lucide/dist/esm/icons/wand-sparkles.mjs
-var WandSparkles = [
-  [
-    "path",
-    {
-      d: "m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"
-    }
-  ],
-  ["path", { d: "m14 7 3 3" }],
-  ["path", { d: "M5 6v4" }],
-  ["path", { d: "M19 14v4" }],
-  ["path", { d: "M10 2v2" }],
-  ["path", { d: "M7 8H3" }],
-  ["path", { d: "M21 16h-4" }],
-  ["path", { d: "M11 3H9" }]
-];
-
-// node_modules/lucide/dist/esm/icons/x.mjs
-var X = [
-  ["path", { d: "M18 6 6 18" }],
-  ["path", { d: "m6 6 12 12" }]
-];
-
-// icons.js
-function icon(node, opts = {}) {
-  const size = opts.size ?? 16;
-  const stroke = opts.stroke ?? 1.75;
-  const cls = opts.className ? ` ${opts.className}` : "";
-  const body = node.map(([tag2, attrs]) => {
-    const a = Object.entries(attrs || {}).map(([k, v]) => `${k}="${String(v).replace(/"/g, "&quot;")}"`).join(" ");
-    return `<${tag2} ${a}/>`;
-  }).join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round" class="lucide${cls}" aria-hidden="true">${body}</svg>`;
-}
-var I = {
-  settings: (o) => icon(Settings, o),
-  dashboard: (o) => icon(LayoutDashboard, o),
-  sparkles: (o) => icon(Sparkles, o),
-  lightbulb: (o) => icon(Lightbulb, o),
-  library: (o) => icon(Library, o),
-  user: (o) => icon(CircleUser, o),
-  plus: (o) => icon(Plus, o),
-  image: (o) => icon(ImagePlus, o),
-  bold: (o) => icon(Bold2, o),
-  italic: (o) => icon(Italic2, o),
-  h1: (o) => icon(Heading1, o),
-  h2: (o) => icon(Heading2, o),
-  list: (o) => icon(List, o),
-  quote: (o) => icon(Quote, o),
-  outline: (o) => icon(ListTree, o),
-  pin: (o) => icon(Pin, o),
-  pinOff: (o) => icon(PinOff, o),
-  focus: (o) => icon(Focus2, o),
-  refresh: (o) => icon(RefreshCw, o),
-  folder: (o) => icon(FolderOpen, o),
-  external: (o) => icon(ExternalLink, o),
-  close: (o) => icon(X, o),
-  panelOpen: (o) => icon(PanelRightOpen, o),
-  panelClose: (o) => icon(PanelRightClose, o),
-  send: (o) => icon(SendHorizontal, o),
-  upload: (o) => icon(Upload, o),
-  at: (o) => icon(AtSign, o),
-  tags: (o) => icon(Tags, o),
-  eye: (o) => icon(Eye, o),
-  wand: (o) => icon(WandSparkles, o),
-  check: (o) => icon(SearchCheck, o),
-  file: (o) => icon(FileText, o),
-  link: (o) => icon(Link2, o),
-  copy: (o) => icon(Copy, o),
-  imageDown: (o) => icon(ImageDown, o),
-  chevronDown: (o) => icon(ChevronDown, o),
-  chevronLeft: (o) => icon(ChevronLeft, o),
-  chat: (o) => icon(MessageSquare, o),
-  pen: (o) => icon(PenLine, o),
-  trash: (o) => icon(Trash, o)
 };
 
 // aster.js
@@ -34725,6 +34703,7 @@ lucide/dist/esm/icons/plus.mjs:
 lucide/dist/esm/icons/quote.mjs:
 lucide/dist/esm/icons/refresh-cw.mjs:
 lucide/dist/esm/icons/search-check.mjs:
+lucide/dist/esm/icons/search.mjs:
 lucide/dist/esm/icons/send-horizontal.mjs:
 lucide/dist/esm/icons/settings.mjs:
 lucide/dist/esm/icons/sparkles.mjs:
