@@ -1527,6 +1527,154 @@ header .byline {
   padding: 5px 28px 5px 8px;
   background-color: transparent;
 }
+.model-picker {
+  position: relative;
+  flex-shrink: 1;
+  min-width: 0;
+}
+.model-picker-trigger {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(200px, 42vw);
+  height: 28px;
+  padding: 0 8px 0 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #111;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.model-picker-trigger:hover {
+  background: #ececec;
+}
+.model-picker-logo {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+}
+.model-picker-logo img {
+  display: block;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+.model-picker-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.model-picker-trigger .lucide {
+  flex-shrink: 0;
+  color: #888;
+}
+.model-picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 168px;
+  padding: 4px;
+  background: #f7f7f7;
+  border: 1px solid #e6e6e6;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px #00000014;
+}
+.model-picker-empty {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #888;
+}
+.model-picker-agent {
+  position: relative;
+}
+.model-picker-agent-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 7px 8px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: #111;
+  text-align: left;
+  cursor: pointer;
+}
+.model-picker-agent-btn:hover,
+.model-picker-agent-btn[aria-expanded="true"] {
+  background: #ececec;
+}
+.model-picker-agent-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.model-picker-current {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+}
+.model-picker-agent-btn .lucide {
+  flex-shrink: 0;
+  color: #888;
+}
+.model-picker-submenu {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 4px);
+  z-index: 51;
+  min-width: 160px;
+  max-width: 240px;
+  max-height: min(320px, 60vh);
+  overflow: auto;
+  padding: 4px;
+  background: #f7f7f7;
+  border: 1px solid #e6e6e6;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px #00000014;
+}
+.model-picker-option {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: #111;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.model-picker-option:hover {
+  background: #ececec;
+}
+.model-picker-option[aria-checked="true"] {
+  background: #e8e8e8;
+}
 .assistant-head #finalize {
   font-size: 12px;
   padding: 6px 12px;
@@ -3453,9 +3601,11 @@ pre {
   font-size: 10px;
 }
 .composer-tools #send {
-  margin-left: auto;
   padding: 6px 12px;
   font-size: 11px;
+}
+.composer-tools #chat-upload {
+  margin-left: auto;
 }
 .material-cards {
   display: grid;
@@ -4566,7 +4716,7 @@ button:disabled {
   background: transparent;
   padding: 7px 8px;
   border-radius: 7px;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.2;
   font-weight: 500;
   color: #000000;
@@ -4579,7 +4729,7 @@ button:disabled {
 }
 .agent-composer .agent-mode-menu button span {
   flex: 1;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   color: #000000;
 }
@@ -4592,17 +4742,59 @@ button:disabled {
   color: #000000;
 }
 .agent-composer #send {
-  margin-left: auto;
+  margin-left: 0;
   width: 30px;
   height: 30px;
   min-width: 30px;
   padding: 6px;
-  border-radius: 9px;
+  border-radius: 999px;
   flex-shrink: 0;
   color: #fff;
 }
 .agent-composer #send:hover {
   background: #000;
+}
+.agent-composer #chat-upload {
+  margin-left: auto;
+}
+.agent-composer .model-picker {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 140px;
+}
+.agent-composer .model-picker-trigger {
+  height: 28px;
+  max-width: 140px;
+  padding: 0 8px 0 6px;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 12px;
+}
+.agent-composer .model-picker-trigger:hover {
+  background: #f0f0f0;
+  color: #000;
+}
+.agent-composer .model-picker-menu {
+  top: auto;
+  bottom: calc(100% + 8px);
+  right: auto;
+  left: 0;
+}
+.agent-composer .model-picker-submenu {
+  top: auto;
+  bottom: 0;
+}
+.agent-composer .model-picker-agent-btn,
+.agent-composer .model-picker-option {
+  font-size: 12px;
+  line-height: 1.2;
+  padding: 7px 10px;
+}
+.agent-composer .model-picker-agent-btn {
+  padding: 7px 8px;
+}
+.agent-composer .model-picker-current {
+  font-size: 11px;
 }
 .agent-composer #skill-picker {
   display: block;

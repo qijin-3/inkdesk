@@ -209,6 +209,10 @@ for (const name of passthrough) {
 }
 
 ipcMain.handle("skills-import", async (_, data = {}) => {
+  // 网页端已选好文件夹文件；桌面端再弹原生目录选择
+  if (data?.files?.length || data?.sourcePath) {
+    return desk.invoke("skills-import", data);
+  }
   const result = await dialog.showOpenDialog({
     title: "选择技能文件夹（含 SKILL.md）",
     properties: ["openDirectory"],

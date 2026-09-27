@@ -9,6 +9,50 @@ const escape = (s) =>
       ],
   );
 
+/** 网页端选择技能文件夹（含 SKILL.md），返回可上传的相对路径文件列表 */
+function pickSkillFolderFiles() {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.webkitdirectory = true;
+    input.directory = true;
+    input.multiple = true;
+    input.style.cssText =
+      "position:fixed;left:-100px;top:0;width:1px;height:1px;opacity:0;";
+    document.body.append(input);
+    let settled = false;
+    /** @param {File[]} files */
+    const done = (files) => {
+      if (settled) return;
+      settled = true;
+      input.remove();
+      resolve(files);
+    };
+    input.addEventListener("change", () =>
+      done(input.files ? [...input.files] : []),
+    );
+    input.addEventListener("cancel", () => done([]));
+    input.click();
+  });
+}
+
+/**
+ * @param {File[]} files
+ * @returns {Promise<{ path: string, bytes: number[] }[]>}
+ */
+async function skillFilesPayload(files) {
+  const out = [];
+  for (const f of files) {
+    const rel = String(f.webkitRelativePath || f.name || "").replace(/\\/g, "/");
+    if (!rel || rel.split("/").some((p) => p.startsWith("."))) continue;
+    out.push({
+      path: rel,
+      bytes: Array.from(new Uint8Array(await f.arrayBuffer())),
+    });
+  }
+  return out;
+}
+
 function askLine(title, placeholder = "", { allowEmpty = false } = {}) {
   return new Promise((resolve) => {
     const d = document.createElement("dialog");
@@ -226,10 +270,19 @@ export async function mountSkillsSettings(
     };
     root.querySelector("#skill-import").onclick = async () => {
       try {
-        const next = await api("skills-import", {
+        /** @type {*} */
+        let payload = {
           account: state.account,
           revision: state.revision,
-        });
+        };
+        if (window.desk?.web) {
+          const picked = await pickSkillFolderFiles();
+          if (!picked.length) return;
+          const files = await skillFilesPayload(picked);
+          if (!files.length) throw Error("请选择有效的技能文件夹");
+          payload = { ...payload, files };
+        }
+        const next = await api("skills-import", payload);
         if (!next) return;
         state = next;
         draw();

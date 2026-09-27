@@ -74,6 +74,32 @@ test("vault .agents/skills scan, symlink mount, bindings", () => {
     assert.equal(s.tree.length, 2);
     assert.ok(s.tree.some((g) => g.group === "writing"));
 
+    const webSrcName = "web-import";
+    const webSkillMd = `---\nname: ${webSrcName}\ndescription: 网页导入\n---\n\n# ${webSrcName}\n`;
+    s = k.import({
+      account: "A",
+      revision: s.revision,
+      files: [
+        {
+          path: `${webSrcName}/SKILL.md`,
+          bytes: [...Buffer.from(webSkillMd)],
+        },
+        {
+          path: `${webSrcName}/references/note.md`,
+          bytes: [...Buffer.from("# note\n")],
+        },
+      ],
+    });
+    assert.ok(
+      fs.existsSync(path.join(root, ".agents/skills/web-import/SKILL.md")),
+    );
+    assert.ok(
+      fs.existsSync(
+        path.join(root, ".agents/skills/web-import/references/note.md"),
+      ),
+    );
+    assert.equal(s.bindings["web-import"], "all");
+
     s = k.configure({
       account: "A",
       revision: s.revision,

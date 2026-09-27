@@ -1804,19 +1804,10 @@ function renderAssistantRail() {
   }
 
   rail.dataset.railMode = "assistant";
-  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<div class="assistant-head-actions"><select id="provider">${AGENT_PROVIDERS.map((p) => `<option value="${p.id}">${esc(p.label)}</option>`).join("")}</select><button type="button" id="close-assistant" class="ghost icon-btn" title="收起" aria-label="收起">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
+  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<div class="assistant-head-actions"><button type="button" id="close-assistant" class="ghost icon-btn" title="收起" aria-label="收起">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
   unmountAsterRail = mountAster($("#aster-rail"));
   syncAsterFace();
 
-  const provider = $("#provider");
-  if (provider) {
-    provider.value = state.provider;
-    provider.onchange = (e) => {
-      state.provider = e.target.value;
-      state.model = "";
-      persist();
-    };
-  }
   $("#close-assistant").onclick = () => {
     assistantOpen = false;
     syncRailVisibility();
@@ -2617,7 +2608,7 @@ function renderPanel() {
         )
         .join("") || "";
   }
-  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" class="icon-btn" title="为本篇创建新对话" aria-label="新对话">${I.plus()}</button></div>` : ""}<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools">${agentModeHTML()}<button id="chat-upload" class="icon-btn" title="添加文件" aria-label="添加文件" aria-haspopup="menu">${I.plus()}</button><div id="skill-picker"></div><button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div>`;
+  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" class="icon-btn" title="为本篇创建新对话" aria-label="新对话">${I.plus()}</button></div>` : ""}<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools">${agentModeHTML()}${modelPickerHTML()}<button id="chat-upload" class="icon-btn" title="添加文件" aria-label="添加文件" aria-haspopup="menu">${I.plus()}</button><div id="skill-picker"></div><button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div>`;
   if (tab === "chat") {
     $("#conversation").value = conversation().id;
     $("#conversation").onchange = (e) => {
@@ -2658,6 +2649,7 @@ function renderPanel() {
       };
     });
   }
+  bindModelPicker();
   composer = new Composer($("#composer-input"), conversation(), {
     changed: () => {
       dirty = true;
@@ -3768,13 +3760,204 @@ const AGENT_PROVIDERS = [
   { id: "antigravity", label: "Antigravity", blurb: "Google Antigravity（agy）" },
 ];
 
-function agentLogoSvg(id) {
-  const extensions = {cursor:"png",codex:"png",claude:"ico",zcode:"png",opencode:"svg",antigravity:"ico"};
-  return extensions[id] ? `<img src="assets/agents/${id}.${extensions[id]}" width="28" height="28" style="object-fit:contain" alt="">` : "";
+function agentLogoSvg(id, size = 28) {
+  const extensions = {
+    cursor: "png",
+    codex: "png",
+    claude: "ico",
+    zcode: "png",
+    opencode: "svg",
+    antigravity: "ico",
+  };
+  return extensions[id]
+    ? `<img src="assets/agents/${id}.${extensions[id]}" width="${size}" height="${size}" style="object-fit:contain" alt="">`
+    : "";
 }
 
 function agentInstalled(id) {
   return !!state.agents?.[id];
+}
+
+/** 已安装的 Agent 列表 */
+function installedAgentProviders() {
+  return AGENT_PROVIDERS.filter((p) => agentInstalled(p.id));
+}
+
+/** 当前侧栏展示用的 provider（优先已安装） */
+function railProviderId() {
+  const installed = installedAgentProviders();
+  if (installed.some((p) => p.id === state.provider)) return state.provider;
+  return installed[0]?.id || state.provider;
+}
+
+/** 触发器文案：模型名，未指定时为「默认」 */
+function railModelLabel(provider = railProviderId()) {
+  if (provider === state.provider && state.model) return state.model;
+  if (provider === state.provider) return "默认";
+  const p = AGENT_PROVIDERS.find((x) => x.id === provider);
+  return p?.label || "选择模型";
+}
+
+/**
+ * 侧栏 Agent / 模型联级选择器 HTML。
+ */
+function modelPickerHTML() {
+  const provider = railProviderId();
+  const p = AGENT_PROVIDERS.find((x) => x.id === provider);
+  const label = railModelLabel(provider);
+  const agents = installedAgentProviders();
+  const agentRows = agents.length
+    ? agents
+        .map((agent) => {
+          const models =
+            agent.id === "zcode" ? [] : getAgentModelList(agent.id);
+          const usingAgent = state.provider === agent.id;
+          const modelBtns = [
+            `<button type="button" role="menuitemradio" class="model-picker-option" data-provider="${agent.id}" data-model="" aria-checked="${usingAgent && !state.model}">${usingAgent && !state.model ? "✓ " : ""}默认</button>`,
+            ...models.map(
+              (m) =>
+                `<button type="button" role="menuitemradio" class="model-picker-option" data-provider="${agent.id}" data-model="${esc(m)}" aria-checked="${usingAgent && state.model === m}">${usingAgent && state.model === m ? "✓ " : ""}${esc(m)}</button>`,
+            ),
+          ].join("");
+          return `<div class="model-picker-agent" data-agent="${agent.id}">
+            <button type="button" class="model-picker-agent-btn" role="menuitem" aria-haspopup="menu" aria-expanded="false">
+              <span class="model-picker-logo">${agentLogoSvg(agent.id, 16)}</span>
+              <span class="model-picker-agent-name">${esc(agent.label)}</span>
+              ${usingAgent ? `<span class="model-picker-current">使用中</span>` : ""}
+              ${I.chevronRight({ size: 12 })}
+            </button>
+            <div class="model-picker-submenu" hidden role="menu">${modelBtns}</div>
+          </div>`;
+        })
+        .join("")
+    : `<p class="model-picker-empty">暂无已安装的 Agent</p>`;
+  return `<div class="model-picker" id="model-picker">
+    <button type="button" id="model-picker-trigger" class="model-picker-trigger" title="${esc(p?.label || "")} · ${esc(label)}" aria-label="选择模型：${esc(label)}" aria-haspopup="menu" aria-expanded="false">
+      <span class="model-picker-logo">${agentLogoSvg(provider, 16)}</span>
+      <span class="model-picker-label">${esc(label)}</span>
+      ${I.chevronDown({ size: 12 })}
+    </button>
+    <div id="model-picker-menu" class="model-picker-menu" hidden role="menu">${agentRows}</div>
+  </div>`;
+}
+
+/**
+ * 绑定侧栏模型联级菜单：一级 Agent，二级已添加模型（含默认）。
+ */
+function bindModelPicker() {
+  const root = $("#model-picker");
+  const trigger = $("#model-picker-trigger");
+  const menu = $("#model-picker-menu");
+  if (!root || !trigger || !menu) return;
+
+  /** @type {((e: Event) => void) | null} */
+  let onDocPointer = null;
+
+  const closeAll = () => {
+    menu.setAttribute("hidden", "");
+    trigger.setAttribute("aria-expanded", "false");
+    root.querySelectorAll(".model-picker-submenu").forEach((el) => {
+      el.setAttribute("hidden", "");
+    });
+    root.querySelectorAll(".model-picker-agent-btn").forEach((btn) => {
+      btn.setAttribute("aria-expanded", "false");
+    });
+    if (onDocPointer) {
+      document.removeEventListener("pointerdown", onDocPointer, true);
+      onDocPointer = null;
+    }
+  };
+
+  const openSubmenu = (agentEl) => {
+    root.querySelectorAll(".model-picker-agent").forEach((el) => {
+      const sub = el.querySelector(".model-picker-submenu");
+      const btn = el.querySelector(".model-picker-agent-btn");
+      const open = !!agentEl && el === agentEl;
+      if (sub) {
+        if (open) sub.removeAttribute("hidden");
+        else sub.setAttribute("hidden", "");
+      }
+      if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  };
+
+  trigger.onclick = (e) => {
+    e.stopPropagation();
+    const willOpen = menu.hasAttribute("hidden");
+    if (!willOpen) {
+      closeAll();
+      return;
+    }
+    menu.removeAttribute("hidden");
+    trigger.setAttribute("aria-expanded", "true");
+    const active = root.querySelector(
+      `.model-picker-agent[data-agent="${CSS.escape(railProviderId())}"]`,
+    );
+    if (active) openSubmenu(active);
+    onDocPointer = (ev) => {
+      if (root.contains(/** @type {Node} */ (ev.target))) return;
+      closeAll();
+    };
+    document.addEventListener("pointerdown", onDocPointer, true);
+  };
+
+  root.querySelectorAll(".model-picker-agent").forEach((agentEl) => {
+    const btn = agentEl.querySelector(".model-picker-agent-btn");
+    if (!btn) return;
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const sub = agentEl.querySelector(".model-picker-submenu");
+      const opening = sub?.hasAttribute("hidden");
+      openSubmenu(opening ? agentEl : null);
+    };
+    agentEl.onmouseenter = () => openSubmenu(agentEl);
+  });
+
+  root.querySelectorAll(".model-picker-option").forEach((opt) => {
+    opt.onclick = async (e) => {
+      e.stopPropagation();
+      const provider = opt.getAttribute("data-provider") || "";
+      const model = opt.getAttribute("data-model") || "";
+      if (!provider || !agentInstalled(provider)) {
+        toast("未找到该 CLI");
+        return;
+      }
+      state.provider = provider;
+      state.model = model;
+      closeAll();
+      await persistAgentModels();
+      const label = railModelLabel(provider);
+      const logo = trigger.querySelector(".model-picker-logo");
+      const text = trigger.querySelector(".model-picker-label");
+      if (logo) logo.innerHTML = agentLogoSvg(provider, 16);
+      if (text) text.textContent = label;
+      const agentLabel =
+        AGENT_PROVIDERS.find((x) => x.id === provider)?.label || "";
+      trigger.title = `${agentLabel} · ${label}`;
+      trigger.setAttribute("aria-label", `选择模型：${label}`);
+      // 刷新勾选状态
+      root.querySelectorAll(".model-picker-option").forEach((btn) => {
+        const on =
+          btn.getAttribute("data-provider") === provider &&
+          (btn.getAttribute("data-model") || "") === model;
+        btn.setAttribute("aria-checked", on ? "true" : "false");
+        const raw = (btn.getAttribute("data-model") || "") || "默认";
+        const name = btn.getAttribute("data-model") ? raw : "默认";
+        btn.textContent = on ? `✓ ${name}` : name;
+      });
+      root.querySelectorAll(".model-picker-agent").forEach((el) => {
+        const mark = el.querySelector(".model-picker-current");
+        const isOn = el.getAttribute("data-agent") === provider;
+        if (isOn && !mark) {
+          const name = el.querySelector(".model-picker-agent-name");
+          name?.insertAdjacentHTML(
+            "afterend",
+            `<span class="model-picker-current">使用中</span>`,
+          );
+        } else if (!isOn && mark) mark.remove();
+      });
+    };
+  });
 }
 
 function ensureAgentModelsStore() {

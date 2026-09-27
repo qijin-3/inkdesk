@@ -159,6 +159,9 @@ var ChevronDown = [["path", { d: "m6 9 6 6 6-6" }]];
 // node_modules/lucide/dist/esm/icons/chevron-left.mjs
 var ChevronLeft = [["path", { d: "m15 18-6-6 6-6" }]];
 
+// node_modules/lucide/dist/esm/icons/chevron-right.mjs
+var ChevronRight = [["path", { d: "m9 18 6-6-6-6" }]];
+
 // node_modules/lucide/dist/esm/icons/circle-user.mjs
 var CircleUser = [
   ["circle", { cx: "12", cy: "12", r: "10" }],
@@ -554,6 +557,7 @@ var I = {
   imageDown: (o) => icon(ImageDown, o),
   chevronDown: (o) => icon(ChevronDown, o),
   chevronLeft: (o) => icon(ChevronLeft, o),
+  chevronRight: (o) => icon(ChevronRight, o),
   chat: (o) => icon(MessageSquare, o),
   pen: (o) => icon(PenLine, o),
   trash: (o) => icon(Trash, o),
@@ -565,6 +569,42 @@ var escape = (s) => String(s ?? "").replace(
   /[&<>"']/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
 );
+function pickSkillFolderFiles() {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.webkitdirectory = true;
+    input.directory = true;
+    input.multiple = true;
+    input.style.cssText = "position:fixed;left:-100px;top:0;width:1px;height:1px;opacity:0;";
+    document.body.append(input);
+    let settled = false;
+    const done = (files) => {
+      if (settled) return;
+      settled = true;
+      input.remove();
+      resolve(files);
+    };
+    input.addEventListener(
+      "change",
+      () => done(input.files ? [...input.files] : [])
+    );
+    input.addEventListener("cancel", () => done([]));
+    input.click();
+  });
+}
+async function skillFilesPayload(files) {
+  const out = [];
+  for (const f of files) {
+    const rel = String(f.webkitRelativePath || f.name || "").replace(/\\/g, "/");
+    if (!rel || rel.split("/").some((p) => p.startsWith("."))) continue;
+    out.push({
+      path: rel,
+      bytes: Array.from(new Uint8Array(await f.arrayBuffer()))
+    });
+  }
+  return out;
+}
 function normalizeBinding(raw) {
   if (raw === "all" || raw === "none") return raw;
   if (Array.isArray(raw)) {
@@ -704,10 +744,18 @@ async function mountSkillsSettings(root2, api2, account2, accounts, onRefresh = 
     };
     root2.querySelector("#skill-import").onclick = async () => {
       try {
-        const next2 = await api2("skills-import", {
+        let payload = {
           account: state2.account,
           revision: state2.revision
-        });
+        };
+        if (window.desk?.web) {
+          const picked = await pickSkillFolderFiles();
+          if (!picked.length) return;
+          const files = await skillFilesPayload(picked);
+          if (!files.length) throw Error("\u8BF7\u9009\u62E9\u6709\u6548\u7684\u6280\u80FD\u6587\u4EF6\u5939");
+          payload = { ...payload, files };
+        }
+        const next2 = await api2("skills-import", payload);
         if (!next2) return;
         state2 = next2;
         draw();
@@ -31706,18 +31754,9 @@ function renderAssistantRail() {
     return;
   }
   rail.dataset.railMode = "assistant";
-  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<div class="assistant-head-actions"><select id="provider">${AGENT_PROVIDERS.map((p) => `<option value="${p.id}">${esc2(p.label)}</option>`).join("")}</select><button type="button" id="close-assistant" class="ghost icon-btn" title="\u6536\u8D77" aria-label="\u6536\u8D77">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
+  rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<div class="assistant-head-actions"><button type="button" id="close-assistant" class="ghost icon-btn" title="\u6536\u8D77" aria-label="\u6536\u8D77">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
   unmountAsterRail = mountAster($("#aster-rail"));
   syncAsterFace();
-  const provider = $("#provider");
-  if (provider) {
-    provider.value = state.provider;
-    provider.onchange = (e) => {
-      state.provider = e.target.value;
-      state.model = "";
-      persist();
-    };
-  }
   $("#close-assistant").onclick = () => {
     assistantOpen = false;
     syncRailVisibility();
@@ -32385,7 +32424,7 @@ function renderPanel() {
       (m) => `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "\u4F60" : "aster"}</small><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? `<span class="inline-reference">${esc2(p.label)}</span>` : esc2(p.text)).join("") : esc2(m.text)}</div></div>`
     ).join("") || "";
   }
-  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc2(c.id)}">${esc2(c.title)}</option>`).join("")}</select><button id="new-conversation" class="icon-btn" title="\u4E3A\u672C\u7BC7\u521B\u5EFA\u65B0\u5BF9\u8BDD" aria-label="\u65B0\u5BF9\u8BDD">${I.plus()}</button></div>` : ""}<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools">${agentModeHTML()}<button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0\u6587\u4EF6" aria-label="\u6DFB\u52A0\u6587\u4EF6" aria-haspopup="menu">${I.plus()}</button><div id="skill-picker"></div><button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div>`;
+  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc2(c.id)}">${esc2(c.title)}</option>`).join("")}</select><button id="new-conversation" class="icon-btn" title="\u4E3A\u672C\u7BC7\u521B\u5EFA\u65B0\u5BF9\u8BDD" aria-label="\u65B0\u5BF9\u8BDD">${I.plus()}</button></div>` : ""}<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools">${agentModeHTML()}${modelPickerHTML()}<button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0\u6587\u4EF6" aria-label="\u6DFB\u52A0\u6587\u4EF6" aria-haspopup="menu">${I.plus()}</button><div id="skill-picker"></div><button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div>`;
   if (tab === "chat") {
     $("#conversation").value = conversation().id;
     $("#conversation").onchange = (e) => {
@@ -32425,6 +32464,7 @@ function renderPanel() {
       };
     });
   }
+  bindModelPicker();
   composer = new Composer($("#composer-input"), conversation(), {
     changed: () => {
       dirty = true;
@@ -33333,12 +33373,173 @@ var AGENT_PROVIDERS = [
   { id: "opencode", label: "OpenCode", blurb: "OpenCode CLI" },
   { id: "antigravity", label: "Antigravity", blurb: "Google Antigravity\uFF08agy\uFF09" }
 ];
-function agentLogoSvg(id) {
-  const extensions = { cursor: "png", codex: "png", claude: "ico", zcode: "png", opencode: "svg", antigravity: "ico" };
-  return extensions[id] ? `<img src="assets/agents/${id}.${extensions[id]}" width="28" height="28" style="object-fit:contain" alt="">` : "";
+function agentLogoSvg(id, size = 28) {
+  const extensions = {
+    cursor: "png",
+    codex: "png",
+    claude: "ico",
+    zcode: "png",
+    opencode: "svg",
+    antigravity: "ico"
+  };
+  return extensions[id] ? `<img src="assets/agents/${id}.${extensions[id]}" width="${size}" height="${size}" style="object-fit:contain" alt="">` : "";
 }
 function agentInstalled(id) {
   return !!state.agents?.[id];
+}
+function installedAgentProviders() {
+  return AGENT_PROVIDERS.filter((p) => agentInstalled(p.id));
+}
+function railProviderId() {
+  const installed = installedAgentProviders();
+  if (installed.some((p) => p.id === state.provider)) return state.provider;
+  return installed[0]?.id || state.provider;
+}
+function railModelLabel(provider = railProviderId()) {
+  if (provider === state.provider && state.model) return state.model;
+  if (provider === state.provider) return "\u9ED8\u8BA4";
+  const p = AGENT_PROVIDERS.find((x) => x.id === provider);
+  return p?.label || "\u9009\u62E9\u6A21\u578B";
+}
+function modelPickerHTML() {
+  const provider = railProviderId();
+  const p = AGENT_PROVIDERS.find((x) => x.id === provider);
+  const label = railModelLabel(provider);
+  const agents = installedAgentProviders();
+  const agentRows = agents.length ? agents.map((agent2) => {
+    const models = agent2.id === "zcode" ? [] : getAgentModelList(agent2.id);
+    const usingAgent = state.provider === agent2.id;
+    const modelBtns = [
+      `<button type="button" role="menuitemradio" class="model-picker-option" data-provider="${agent2.id}" data-model="" aria-checked="${usingAgent && !state.model}">${usingAgent && !state.model ? "\u2713 " : ""}\u9ED8\u8BA4</button>`,
+      ...models.map(
+        (m) => `<button type="button" role="menuitemradio" class="model-picker-option" data-provider="${agent2.id}" data-model="${esc2(m)}" aria-checked="${usingAgent && state.model === m}">${usingAgent && state.model === m ? "\u2713 " : ""}${esc2(m)}</button>`
+      )
+    ].join("");
+    return `<div class="model-picker-agent" data-agent="${agent2.id}">
+            <button type="button" class="model-picker-agent-btn" role="menuitem" aria-haspopup="menu" aria-expanded="false">
+              <span class="model-picker-logo">${agentLogoSvg(agent2.id, 16)}</span>
+              <span class="model-picker-agent-name">${esc2(agent2.label)}</span>
+              ${usingAgent ? `<span class="model-picker-current">\u4F7F\u7528\u4E2D</span>` : ""}
+              ${I.chevronRight({ size: 12 })}
+            </button>
+            <div class="model-picker-submenu" hidden role="menu">${modelBtns}</div>
+          </div>`;
+  }).join("") : `<p class="model-picker-empty">\u6682\u65E0\u5DF2\u5B89\u88C5\u7684 Agent</p>`;
+  return `<div class="model-picker" id="model-picker">
+    <button type="button" id="model-picker-trigger" class="model-picker-trigger" title="${esc2(p?.label || "")} \xB7 ${esc2(label)}" aria-label="\u9009\u62E9\u6A21\u578B\uFF1A${esc2(label)}" aria-haspopup="menu" aria-expanded="false">
+      <span class="model-picker-logo">${agentLogoSvg(provider, 16)}</span>
+      <span class="model-picker-label">${esc2(label)}</span>
+      ${I.chevronDown({ size: 12 })}
+    </button>
+    <div id="model-picker-menu" class="model-picker-menu" hidden role="menu">${agentRows}</div>
+  </div>`;
+}
+function bindModelPicker() {
+  const root2 = $("#model-picker");
+  const trigger = $("#model-picker-trigger");
+  const menu = $("#model-picker-menu");
+  if (!root2 || !trigger || !menu) return;
+  let onDocPointer = null;
+  const closeAll = () => {
+    menu.setAttribute("hidden", "");
+    trigger.setAttribute("aria-expanded", "false");
+    root2.querySelectorAll(".model-picker-submenu").forEach((el) => {
+      el.setAttribute("hidden", "");
+    });
+    root2.querySelectorAll(".model-picker-agent-btn").forEach((btn) => {
+      btn.setAttribute("aria-expanded", "false");
+    });
+    if (onDocPointer) {
+      document.removeEventListener("pointerdown", onDocPointer, true);
+      onDocPointer = null;
+    }
+  };
+  const openSubmenu = (agentEl) => {
+    root2.querySelectorAll(".model-picker-agent").forEach((el) => {
+      const sub = el.querySelector(".model-picker-submenu");
+      const btn = el.querySelector(".model-picker-agent-btn");
+      const open = !!agentEl && el === agentEl;
+      if (sub) {
+        if (open) sub.removeAttribute("hidden");
+        else sub.setAttribute("hidden", "");
+      }
+      if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  };
+  trigger.onclick = (e) => {
+    e.stopPropagation();
+    const willOpen = menu.hasAttribute("hidden");
+    if (!willOpen) {
+      closeAll();
+      return;
+    }
+    menu.removeAttribute("hidden");
+    trigger.setAttribute("aria-expanded", "true");
+    const active = root2.querySelector(
+      `.model-picker-agent[data-agent="${CSS.escape(railProviderId())}"]`
+    );
+    if (active) openSubmenu(active);
+    onDocPointer = (ev) => {
+      if (root2.contains(
+        /** @type {Node} */
+        ev.target
+      )) return;
+      closeAll();
+    };
+    document.addEventListener("pointerdown", onDocPointer, true);
+  };
+  root2.querySelectorAll(".model-picker-agent").forEach((agentEl) => {
+    const btn = agentEl.querySelector(".model-picker-agent-btn");
+    if (!btn) return;
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const sub = agentEl.querySelector(".model-picker-submenu");
+      const opening = sub?.hasAttribute("hidden");
+      openSubmenu(opening ? agentEl : null);
+    };
+    agentEl.onmouseenter = () => openSubmenu(agentEl);
+  });
+  root2.querySelectorAll(".model-picker-option").forEach((opt) => {
+    opt.onclick = async (e) => {
+      e.stopPropagation();
+      const provider = opt.getAttribute("data-provider") || "";
+      const model = opt.getAttribute("data-model") || "";
+      if (!provider || !agentInstalled(provider)) {
+        toast("\u672A\u627E\u5230\u8BE5 CLI");
+        return;
+      }
+      state.provider = provider;
+      state.model = model;
+      closeAll();
+      await persistAgentModels();
+      const label = railModelLabel(provider);
+      const logo = trigger.querySelector(".model-picker-logo");
+      const text = trigger.querySelector(".model-picker-label");
+      if (logo) logo.innerHTML = agentLogoSvg(provider, 16);
+      if (text) text.textContent = label;
+      const agentLabel = AGENT_PROVIDERS.find((x) => x.id === provider)?.label || "";
+      trigger.title = `${agentLabel} \xB7 ${label}`;
+      trigger.setAttribute("aria-label", `\u9009\u62E9\u6A21\u578B\uFF1A${label}`);
+      root2.querySelectorAll(".model-picker-option").forEach((btn) => {
+        const on = btn.getAttribute("data-provider") === provider && (btn.getAttribute("data-model") || "") === model;
+        btn.setAttribute("aria-checked", on ? "true" : "false");
+        const raw = btn.getAttribute("data-model") || "" || "\u9ED8\u8BA4";
+        const name = btn.getAttribute("data-model") ? raw : "\u9ED8\u8BA4";
+        btn.textContent = on ? `\u2713 ${name}` : name;
+      });
+      root2.querySelectorAll(".model-picker-agent").forEach((el) => {
+        const mark = el.querySelector(".model-picker-current");
+        const isOn = el.getAttribute("data-agent") === provider;
+        if (isOn && !mark) {
+          const name = el.querySelector(".model-picker-agent-name");
+          name?.insertAdjacentHTML(
+            "afterend",
+            `<span class="model-picker-current">\u4F7F\u7528\u4E2D</span>`
+          );
+        } else if (!isOn && mark) mark.remove();
+      });
+    };
+  });
 }
 function ensureAgentModelsStore() {
   if (!state.agentModels || typeof state.agentModels !== "object")
@@ -34675,6 +34876,7 @@ lucide/dist/esm/icons/at-sign.mjs:
 lucide/dist/esm/icons/bold.mjs:
 lucide/dist/esm/icons/chevron-down.mjs:
 lucide/dist/esm/icons/chevron-left.mjs:
+lucide/dist/esm/icons/chevron-right.mjs:
 lucide/dist/esm/icons/circle-user.mjs:
 lucide/dist/esm/icons/copy.mjs:
 lucide/dist/esm/icons/external-link.mjs:

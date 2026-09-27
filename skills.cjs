@@ -1,5 +1,6 @@
 const fs = require("node:fs"),
   path = require("node:path"),
+  os = require("node:os"),
   crypto = require("node:crypto"),
   { execFileSync } = require("node:child_process");
 
@@ -310,19 +311,63 @@ class Skills {
     return group ? `${group}/${name}` : name;
   }
 
+  /**
+   * 将网页端上传的相对路径文件写入临时目录，返回技能根目录绝对路径。
+   * @param {{ path?: string, name?: string, bytes?: number[], bytesBase64?: string }[]} files
+   */
+  materializeUpload(files) {
+    const list = Array.isArray(files) ? files : [];
+    if (!list.length) throw Error("请选择有效的技能文件夹");
+    const tmp = path.join(
+      os.tmpdir(),
+      "inkdesk-skill-" + crypto.randomUUID(),
+    );
+    const roots = new Set();
+    for (const f of list) {
+      const rel = String(f.path || f.name || "")
+        .replace(/\\/g, "/")
+        .replace(/^\/+/, "");
+      if (!rel || rel.includes("..")) throw Error("无效的文件路径");
+      const parts = rel.split("/").filter(Boolean);
+      if (!parts.length || parts.some((part) => part.startsWith("."))) continue;
+      roots.add(parts[0]);
+      const dest = path.join(tmp, ...parts);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      const buf = f.bytesBase64
+        ? Buffer.from(String(f.bytesBase64), "base64")
+        : Buffer.from(f.bytes || []);
+      fs.writeFileSync(dest, buf);
+    }
+    if (roots.size !== 1) {
+      rmrf(tmp);
+      throw Error("请选择单个技能文件夹（含 SKILL.md）");
+    }
+    return { tmp, src: path.join(tmp, [...roots][0]) };
+  }
+
   import(p) {
     return this.change(p.account, p.revision, (reg) => {
-      const src = path.resolve(String(p.sourcePath || ""));
-      if (!src || !fs.existsSync(src) || !fs.statSync(src).isDirectory())
-        throw Error("请选择有效的技能文件夹");
-      const meta = this.readSkillDir(src);
-      this.assertName(meta.name);
-      const id = this.resolveTargetId(p, meta.name);
-      const dest = this.packAbs(id);
-      if (fs.existsSync(dest)) throw Error("技能目录已存在：" + id);
-      fs.mkdirSync(path.dirname(dest), { recursive: true });
-      copyDir(src, dest);
-      reg.bindings[id] = "all";
+      let tmp = null;
+      let src = "";
+      try {
+        if (p.files?.length) {
+          ({ tmp, src } = this.materializeUpload(p.files));
+        } else {
+          src = path.resolve(String(p.sourcePath || ""));
+        }
+        if (!src || !fs.existsSync(src) || !fs.statSync(src).isDirectory())
+          throw Error("请选择有效的技能文件夹");
+        const meta = this.readSkillDir(src);
+        this.assertName(meta.name);
+        const id = this.resolveTargetId(p, meta.name);
+        const dest = this.packAbs(id);
+        if (fs.existsSync(dest)) throw Error("技能目录已存在：" + id);
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        copyDir(src, dest);
+        reg.bindings[id] = "all";
+      } finally {
+        if (tmp) rmrf(tmp);
+      }
     });
   }
 
