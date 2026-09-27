@@ -1,7 +1,7 @@
 import { mountAgentUsage } from "./agent-usage-ui.js";
-import { mountSkillPicker, mountSkillsSettings } from "./skills-ui.js";
+import { mountSkillsSettings, skillAvailableFor } from "./skills-ui.js";
 import { bindSocialPreview } from "./social-layout.js";
-import { Composer } from "./composer.js";
+import { Composer, referenceChipHTML } from "./composer.js";
 import { I } from "./icons.js";
 import { asterHtml, mountAster, setAsterState } from "./aster.js";
 import { Editor } from "@tiptap/core";
@@ -963,6 +963,108 @@ function showContextMenu(x, y, items) {
     window.addEventListener("contextmenu", close);
     window.addEventListener("scroll", close, true);
   }, 0);
+}
+
+/**
+ * Composer「+」菜单：添加文件 / 素材，以及本次技能开关（GPT 风格分区）。
+ * @param {HTMLElement} anchor
+ */
+async function openComposerAddMenu(anchor) {
+  if ($("#composer-add-menu")) {
+    dismissActiveComposerMenu();
+    $("#composer-add-menu")?.remove();
+    return;
+  }
+  dismissActiveComposerMenu();
+
+  const doc = current;
+  const acc = doc?.account || account;
+  /** @type {{ id: string, name: string, description?: string }[]} */
+  let skills = [];
+  try {
+    const data = await api("skills-list", { account: acc });
+    skills = (data.items || [])
+      .filter((x) =>
+        skillAvailableFor(x.binding ?? data.bindings?.[x.id], data.account),
+      )
+      .sort((a, b) =>
+        String(a.name || a.id).localeCompare(String(b.name || b.id), "zh"),
+      );
+  } catch (e) {
+    /* 技能加载失败时仍可添加文件 */
+  }
+
+  const skillRows = skills.length
+    ? skills
+        .map(
+          (x) =>
+            `<button type="button" class="composer-add-item" data-skill-id="${esc(x.id)}" data-skill-name="${esc(x.name)}" title="${esc(x.description || x.name)}">${I.sparkles({ size: 16 })}<span class="composer-add-item-text"><span class="composer-add-item-title">${esc(x.name)}</span>${x.description ? `<span class="composer-add-item-hint">${esc(x.description)}</span>` : ""}</span></button>`,
+        )
+        .join("")
+    : `<p class="composer-add-empty">暂无可用技能</p>`;
+
+  const menu = document.createElement("div");
+  menu.id = "composer-add-menu";
+  menu.className = "composer-add-menu";
+  menu.innerHTML = `
+    <div class="composer-add-section-label">添加</div>
+    <button type="button" class="composer-add-item" data-add="local">${I.paperclip({ size: 16 })}<span class="composer-add-item-text"><span class="composer-add-item-title">本地文件</span><span class="composer-add-item-hint">从电脑选择文件</span></span></button>
+    <button type="button" class="composer-add-item" data-add="library">${I.library({ size: 16 })}<span class="composer-add-item-text"><span class="composer-add-item-title">素材库</span><span class="composer-add-item-hint">引用已有素材</span></span></button>
+    <div class="composer-add-section-label">技能</div>
+    <div class="composer-add-skills">${skillRows}</div>`;
+  document.body.append(menu);
+
+  const place = () => {
+    const rect = anchor.getBoundingClientRect();
+    const mw = menu.offsetWidth;
+    const mh = menu.offsetHeight;
+    let left = Math.min(rect.left, window.innerWidth - mw - 8);
+    left = Math.max(8, left);
+    let top = rect.top - mh - 8;
+    if (top < 8) top = Math.min(rect.bottom + 8, window.innerHeight - mh - 8);
+    menu.style.left = left + "px";
+    menu.style.top = Math.max(8, top) + "px";
+  };
+  place();
+
+  /** @type {((e: Event) => void) | null} */
+  let onDocPointer = null;
+  const close = () => {
+    menu.remove();
+    if (onDocPointer) {
+      document.removeEventListener("pointerdown", onDocPointer, true);
+      onDocPointer = null;
+    }
+    if (activeComposerMenuDismiss === close) activeComposerMenuDismiss = null;
+  };
+  activeComposerMenuDismiss = close;
+  onDocPointer = (ev) => {
+    if (menu.contains(/** @type {Node} */ (ev.target))) return;
+    if (anchor.contains(/** @type {Node} */ (ev.target))) return;
+    close();
+  };
+  document.addEventListener("pointerdown", onDocPointer, true);
+
+  menu.querySelector('[data-add="local"]').onclick = (e) => {
+    e.stopPropagation();
+    close();
+    uploadChatFiles();
+  };
+  menu.querySelector('[data-add="library"]').onclick = (e) => {
+    e.stopPropagation();
+    close();
+    chooseChatFile();
+  };
+  menu.querySelectorAll("[data-skill-id]").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const skillId = btn.getAttribute("data-skill-id") || "";
+      const name = btn.getAttribute("data-skill-name") || skillId;
+      if (!skillId) return;
+      close();
+      putTag({ kind: "skill", skillId, label: name });
+    };
+  });
 }
 
 /**
@@ -2661,11 +2763,11 @@ function renderPanel() {
       conversation()
         .messages.map(
           (m) =>
-            `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "你" : "aster"}</small><div>${m.parts ? m.parts.map((p) => (p.kind === "tag" ? `<span class="inline-reference">${esc(p.label)}</span>` : esc(p.text))).join("") : esc(m.text)}</div></div>`,
+            `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "你" : "aster"}</small><div>${m.parts ? m.parts.map((p) => (p.kind === "tag" ? referenceChipHTML(p.reference?.kind || "file", p.label) : esc(p.text))).join("") : esc(m.text)}</div></div>`,
         )
         .join("") || "";
   }
-  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" class="icon-btn" title="为本篇创建新对话" aria-label="新对话">${I.plus()}</button></div>` : ""}<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools">${agentModeHTML()}${modelPickerHTML()}<button id="chat-upload" class="icon-btn" title="添加文件" aria-label="添加文件" aria-haspopup="menu">${I.plus()}</button><div id="skill-picker"></div><button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div>`;
+  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select><button id="new-conversation" class="icon-btn" title="为本篇创建新对话" aria-label="新对话">${I.plus()}</button></div>` : ""}<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="添加" aria-label="添加" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div>`;
   if (tab === "chat") {
     $("#conversation").value = conversation().id;
     $("#conversation").onchange = (e) => {
@@ -2700,16 +2802,9 @@ function renderPanel() {
   });
   $("#chat-upload").onclick = (e) => {
     e.stopPropagation();
-    dismissActiveComposerMenu();
-    const rect = e.currentTarget.getBoundingClientRect();
-    showContextMenu(rect.left, Math.max(8, rect.top - 88), [
-      { label: "本地选择", run: () => uploadChatFiles() },
-      { label: "素材库", run: () => chooseChatFile() },
-    ]);
+    openComposerAddMenu(e.currentTarget);
   };
   $("#chat-upload").onmousedown = (e) => e.preventDefault();
-  $("#skill-picker").addEventListener("skills-change",()=>{ dirty=true; persist(); });
-  mountSkillPicker($("#skill-picker"), api, account, conversation());
   if ($("#generate")) $("#generate").onclick = () => runTask(tab);
   $$("[data-copy]").forEach(
     (b) =>
@@ -2782,11 +2877,18 @@ async function runTask(task) {
   }
   const instruction = draft.instruction;
   const anchors = draft.references.filter((r) => r.kind === "selection");
+  const skillIds = [
+    ...new Set(
+      draft.references
+        .filter((r) => r.kind === "skill" && r.skillId)
+        .map((r) => r.skillId),
+    ),
+  ];
   if (anchors.some((r) => r.articleId !== doc.id || r.base !== body))
     return toast("引用选段已过期，请删除标签并重新选中添加");
-  if (task === "chat" && !instruction && !conversation(doc).skillIds?.length)
+  if (task === "chat" && !instruction && !skillIds.length)
     return toast("先写一句想讨论的内容");
-  if (task === "rewrite" && !instruction && !conversation(doc).skillIds?.length)
+  if (task === "rewrite" && !instruction && !skillIds.length)
     return toast("先写一句修改要求，或选用技能");
   const prompts = {
     rewrite: "按所选技能和用户要求修改全文，只输出修改后的完整正文。",
@@ -2798,7 +2900,7 @@ async function runTask(task) {
   session.messages.push({
     role: "user",
     text: draft.display || "运行所选技能",
-    skillIds: session.skillIds,
+    skillIds,
     parts: draft.parts.length ? draft.parts : undefined,
   });
   const submittedDraft = session.composerDraft;
@@ -2824,7 +2926,7 @@ async function runTask(task) {
       articleId: doc.id,
       title: doc.title,
       conversationId: session.id,
-      skillIds: session.skillIds,
+      skillIds,
       references: draft.references,
       instruction: (prompts[task] || "") + "\n" + instruction,
       body,
@@ -3883,6 +3985,7 @@ function modelPickerHTML() {
 
 /**
  * 绑定侧栏模型联级菜单：一级 Agent，二级已添加模型（含默认）。
+ * 菜单使用 fixed 定位，避免被 composer / rail 裁切。
  */
 function bindModelPicker() {
   const root = $("#model-picker");
@@ -3893,11 +3996,23 @@ function bindModelPicker() {
   /** @type {((e: Event) => void) | null} */
   let onDocPointer = null;
 
+  const clearFixed = (el) => {
+    el.style.position = "";
+    el.style.left = "";
+    el.style.right = "";
+    el.style.top = "";
+    el.style.bottom = "";
+    el.style.zIndex = "";
+    el.classList.remove("is-fixed");
+  };
+
   const closeAll = () => {
     menu.setAttribute("hidden", "");
     trigger.setAttribute("aria-expanded", "false");
+    clearFixed(menu);
     root.querySelectorAll(".model-picker-submenu").forEach((el) => {
       el.setAttribute("hidden", "");
+      clearFixed(el);
     });
     root.querySelectorAll(".model-picker-agent-btn").forEach((btn) => {
       btn.setAttribute("aria-expanded", "false");
@@ -3909,14 +4024,52 @@ function bindModelPicker() {
     if (activeComposerMenuDismiss === closeAll) activeComposerMenuDismiss = null;
   };
 
+  const placeMenu = () => {
+    const rect = trigger.getBoundingClientRect();
+    menu.classList.add("is-fixed");
+    menu.style.position = "fixed";
+    menu.style.zIndex = "200";
+    menu.style.left = "auto";
+    menu.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+    menu.style.top = "auto";
+    menu.style.bottom = `${Math.max(8, window.innerHeight - rect.top + 8)}px`;
+  };
+
+  const placeSubmenu = (agentEl) => {
+    const sub = agentEl.querySelector(".model-picker-submenu");
+    const btn = agentEl.querySelector(".model-picker-agent-btn");
+    if (!sub || !btn) return;
+    sub.classList.add("is-fixed");
+    sub.style.position = "fixed";
+    sub.style.zIndex = "201";
+    const btnRect = btn.getBoundingClientRect();
+    const subW = sub.offsetWidth || 160;
+    const subH = sub.offsetHeight || 40;
+    let left = btnRect.left - subW - 4;
+    if (left < 8) left = Math.min(btnRect.right + 4, window.innerWidth - subW - 8);
+    let top = btnRect.bottom - subH;
+    if (top < 8) top = 8;
+    if (top + subH > window.innerHeight - 8)
+      top = Math.max(8, window.innerHeight - subH - 8);
+    sub.style.left = `${left}px`;
+    sub.style.top = `${top}px`;
+    sub.style.right = "auto";
+    sub.style.bottom = "auto";
+  };
+
   const openSubmenu = (agentEl) => {
     root.querySelectorAll(".model-picker-agent").forEach((el) => {
       const sub = el.querySelector(".model-picker-submenu");
       const btn = el.querySelector(".model-picker-agent-btn");
       const open = !!agentEl && el === agentEl;
       if (sub) {
-        if (open) sub.removeAttribute("hidden");
-        else sub.setAttribute("hidden", "");
+        if (open) {
+          sub.removeAttribute("hidden");
+          placeSubmenu(el);
+        } else {
+          sub.setAttribute("hidden", "");
+          clearFixed(sub);
+        }
       }
       if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
     });
@@ -3930,12 +4083,20 @@ function bindModelPicker() {
     menu.removeAttribute("hidden");
     trigger.setAttribute("aria-expanded", "true");
     activeComposerMenuDismiss = closeAll;
+    placeMenu();
     const active = root.querySelector(
       `.model-picker-agent[data-agent="${CSS.escape(railProviderId())}"]`,
     );
     if (active) openSubmenu(active);
     onDocPointer = (ev) => {
-      if (root.contains(/** @type {Node} */ (ev.target))) return;
+      const t = /** @type {Node} */ (ev.target);
+      if (root.contains(t) || menu.contains(t)) return;
+      if (
+        [...root.querySelectorAll(".model-picker-submenu")].some((s) =>
+          s.contains(t),
+        )
+      )
+        return;
       closeAll();
     };
     document.addEventListener("pointerdown", onDocPointer, true);
@@ -3975,7 +4136,6 @@ function bindModelPicker() {
         AGENT_PROVIDERS.find((x) => x.id === provider)?.label || "";
       trigger.title = `${agentLabel} · ${label}`;
       trigger.setAttribute("aria-label", `选择模型：${label}`);
-      // 刷新勾选状态
       root.querySelectorAll(".model-picker-option").forEach((btn) => {
         const on =
           btn.getAttribute("data-provider") === provider &&
@@ -4997,7 +5157,14 @@ function putTag(reference, doc = current, session = conversation(doc)) {
     const content = session.composerDraft.content;
     content[content.length - 1].content ||= [];
     content[content.length - 1].content.push(
-      { type: "referenceTag", attrs: { refId, label: reference.label } },
+      {
+        type: "referenceTag",
+        attrs: {
+          refId,
+          label: reference.label,
+          kind: reference.kind || "file",
+        },
+      },
       { type: "text", text: " " },
     );
     dirty = true;

@@ -349,6 +349,16 @@ var PanelRightOpen = [
   ["path", { d: "m10 15-3-3 3-3" }]
 ];
 
+// node_modules/lucide/dist/esm/icons/paperclip.mjs
+var Paperclip = [
+  [
+    "path",
+    {
+      d: "m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"
+    }
+  ]
+];
+
 // node_modules/lucide/dist/esm/icons/pen-line.mjs
 var PenLine = [
   ["path", { d: "M13 21h8" }],
@@ -561,7 +571,8 @@ var I = {
   chat: (o) => icon(MessageSquare, o),
   pen: (o) => icon(PenLine, o),
   trash: (o) => icon(Trash, o),
-  search: (o) => icon(Search, o)
+  search: (o) => icon(Search, o),
+  paperclip: (o) => icon(Paperclip, o)
 };
 
 // skills-ui.js
@@ -857,55 +868,6 @@ async function mountSkillsSettings(root2, api2, account2, accounts, onRefresh = 
     await load();
   } catch (e) {
     root2.innerHTML = `<p class="notice">${escape(e.message)}</p>`;
-  }
-}
-async function mountSkillPicker(root2, api2, account2, session) {
-  let data;
-  try {
-    data = await api2("skills-list", { account: account2 });
-    if (!root2.isConnected) return;
-    const available = (data.items || []).filter(
-      (x) => skillAvailableFor(x.binding ?? data.bindings?.[x.id], data.account)
-    );
-    const availableIds = new Set(available.map((x) => x.id));
-    const defaults2 = data.accounts[data.account] || available.map((x) => x.id);
-    const ids = (session.skillIds ?? defaults2).filter(
-      (id) => availableIds.has(id)
-    );
-    session.skillIds = [...ids];
-    const draw = () => {
-      const selected = session.skillIds || [];
-      const byGroup = (data.tree || []).map((g) => ({
-        ...g,
-        skills: g.skills.filter((x) => availableIds.has(x.id))
-      })).filter((g) => g.skills.length);
-      root2.innerHTML = `<details class="chat-skill-menu"><summary title="\u9009\u62E9\u672C\u6B21\u6280\u80FD">\u6280\u80FD${selected.length ? ` \xB7 ${selected.length}` : ""}</summary><div class="chat-skill-options"><strong>\u672C\u6B21\u4F7F\u7528</strong>${byGroup.map((g) => {
-        const rows = g.skills.map(
-          (x) => `<label class="skill-check"><input type="checkbox" value="${escape(x.id)}" ${selected.includes(x.id) ? "checked" : ""}>${escape(x.name)}${g.group ? `<small>${escape(g.group)}</small>` : ""}</label>`
-        ).join("");
-        return g.group ? `<div class="chat-skill-group"><span>${escape(g.label)}</span>${rows}</div>` : rows;
-      }).join("") || "<p>\u8FD8\u6CA1\u6709\u53EF\u7528\u6280\u80FD\uFF0C\u8BF7\u5728\u8BBE\u7F6E \u2192 \u6280\u80FD\u4E2D\u7ED1\u5B9A\u8D26\u53F7\u3002</p>"}</div></details>`;
-      root2.querySelectorAll("input").forEach(
-        (x) => x.onchange = () => {
-          session.skillIds = [...root2.querySelectorAll("input:checked")].map(
-            (el) => el.value
-          );
-          root2.querySelector("summary").textContent = `\u6280\u80FD${session.skillIds.length ? " \xB7 " + session.skillIds.length : ""}`;
-          root2.dispatchEvent(
-            new CustomEvent("skills-change", { bubbles: true })
-          );
-        }
-      );
-      root2.querySelector("details").addEventListener("keydown", (e) => {
-        if (e.key === "Escape") {
-          e.currentTarget.open = false;
-          root2.querySelector("summary").focus();
-        }
-      });
-    };
-    draw();
-  } catch (e) {
-    if (root2.isConnected) root2.textContent = e.message;
   }
 }
 
@@ -24263,6 +24225,37 @@ var StarterKit = Extension.create({
 var src_default = StarterKit;
 
 // composer.js
+var REF_KINDS = /* @__PURE__ */ new Set(["file", "selection", "skill"]);
+function normalizeRefKind(kind) {
+  return REF_KINDS.has(kind) ? kind : "file";
+}
+function refKindIcon(kind) {
+  const k = normalizeRefKind(kind);
+  if (k === "skill") return I.sparkles({ size: 12 });
+  if (k === "selection") return I.quote({ size: 12 });
+  return I.paperclip({ size: 12 });
+}
+function referenceChipHTML(kind, label) {
+  const k = normalizeRefKind(kind);
+  const text = String(label ?? "");
+  const esc3 = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return `<span class="inline-reference inline-reference-${k}" title="${esc3}"><span class="inline-reference-icon" aria-hidden="true">${refKindIcon(k)}</span><span class="inline-reference-label">${esc3}</span></span>`;
+}
+function withRefKinds(draft, refs) {
+  if (!draft || typeof draft !== "object") return draft;
+  const clone = structuredClone(draft);
+  const walk = (nodes) => {
+    for (const n of nodes || []) {
+      if (n?.type === "referenceTag" && n.attrs) {
+        const ref = refs?.[n.attrs.refId];
+        n.attrs.kind = normalizeRefKind(ref?.kind || n.attrs.kind || "file");
+      }
+      if (n?.content) walk(n.content);
+    }
+  };
+  walk(clone.content);
+  return clone;
+}
 var Tag = Node2.create({
   name: "referenceTag",
   group: "inline",
@@ -24270,22 +24263,74 @@ var Tag = Node2.create({
   atom: true,
   selectable: true,
   addAttributes() {
-    return { refId: { default: "" }, label: { default: "" } };
+    return {
+      refId: { default: "" },
+      label: { default: "" },
+      kind: { default: "file" }
+    };
   },
   parseHTML() {
-    return [{ tag: "span[data-reference]" }];
+    return [
+      {
+        tag: "span[data-reference]",
+        getAttrs: (el) => {
+          if (!(el instanceof HTMLElement)) return false;
+          return {
+            refId: el.getAttribute("data-reference") || "",
+            label: el.getAttribute("title") || el.textContent || "",
+            kind: normalizeRefKind(el.getAttribute("data-kind") || "file")
+          };
+        }
+      }
+    ];
   },
   renderHTML({ node }) {
+    const kind = normalizeRefKind(node.attrs.kind);
     return [
       "span",
       {
         "data-reference": node.attrs.refId,
-        class: "inline-reference",
+        "data-kind": kind,
+        class: `inline-reference inline-reference-${kind}`,
         contenteditable: "false",
         title: node.attrs.label
       },
-      node.attrs.label
+      ["span", { class: "inline-reference-icon", "aria-hidden": "true" }],
+      ["span", { class: "inline-reference-label" }, node.attrs.label]
     ];
+  },
+  addNodeView() {
+    return ({ node }) => {
+      const kind = normalizeRefKind(node.attrs.kind);
+      const dom = document.createElement("span");
+      dom.className = `inline-reference inline-reference-${kind}`;
+      dom.contentEditable = "false";
+      dom.dataset.reference = node.attrs.refId || "";
+      dom.dataset.kind = kind;
+      dom.title = node.attrs.label || "";
+      const icon2 = document.createElement("span");
+      icon2.className = "inline-reference-icon";
+      icon2.setAttribute("aria-hidden", "true");
+      icon2.innerHTML = refKindIcon(kind);
+      const label = document.createElement("span");
+      label.className = "inline-reference-label";
+      label.textContent = node.attrs.label || "";
+      dom.append(icon2, label);
+      return {
+        dom,
+        update: (updated) => {
+          if (updated.type.name !== "referenceTag") return false;
+          const nextKind = normalizeRefKind(updated.attrs.kind);
+          dom.className = `inline-reference inline-reference-${nextKind}`;
+          dom.dataset.reference = updated.attrs.refId || "";
+          dom.dataset.kind = nextKind;
+          dom.title = updated.attrs.label || "";
+          icon2.innerHTML = refKindIcon(nextKind);
+          label.textContent = updated.attrs.label || "";
+          return true;
+        }
+      };
+    };
   }
 });
 var Composer = class {
@@ -24295,16 +24340,19 @@ var Composer = class {
     this.editor = new Editor({
       element,
       extensions: [src_default, Tag],
-      content: session.composerDraft || {
-        type: "doc",
-        content: [{ type: "paragraph" }]
-      },
+      content: withRefKinds(
+        session.composerDraft || {
+          type: "doc",
+          content: [{ type: "paragraph" }]
+        },
+        session.composerRefs
+      ),
       editorProps: {
         attributes: {
           id: "instruction",
           role: "textbox",
           "aria-label": "\u5199\u4F5C\u6307\u4EE4",
-          "data-placeholder": "\u8F93\u5165\u8981\u6C42\uFF0C\u5728\u5149\u6807\u5904\u63D2\u5165\u6587\u4EF6\u6216\u9009\u6BB5\u6807\u7B7E\u2026"
+          "data-placeholder": "\u8F93\u5165\u8981\u6C42\uFF0C\u7528 + \u63D2\u5165\u6587\u4EF6\u6216\u6280\u80FD\u6807\u7B7E\u2026"
         },
         handleKeyDown: (_, e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -24344,7 +24392,14 @@ var Composer = class {
       this.editor.state.doc.content.size
     );
     this.editor.chain().focus().insertContentAt(pos, [
-      { type: "referenceTag", attrs: { refId, label: reference.label } },
+      {
+        type: "referenceTag",
+        attrs: {
+          refId,
+          label: reference.label,
+          kind: normalizeRefKind(reference.kind)
+        }
+      },
       { type: "text", text: " " }
     ]).run();
   }
@@ -31090,6 +31145,93 @@ function showContextMenu(x, y, items) {
     window.addEventListener("scroll", close2, true);
   }, 0);
 }
+async function openComposerAddMenu(anchor) {
+  if ($("#composer-add-menu")) {
+    dismissActiveComposerMenu();
+    $("#composer-add-menu")?.remove();
+    return;
+  }
+  dismissActiveComposerMenu();
+  const doc3 = current;
+  const acc = doc3?.account || account;
+  let skills = [];
+  try {
+    const data = await api("skills-list", { account: acc });
+    skills = (data.items || []).filter(
+      (x) => skillAvailableFor(x.binding ?? data.bindings?.[x.id], data.account)
+    ).sort(
+      (a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id), "zh")
+    );
+  } catch (e) {
+  }
+  const skillRows = skills.length ? skills.map(
+    (x) => `<button type="button" class="composer-add-item" data-skill-id="${esc2(x.id)}" data-skill-name="${esc2(x.name)}" title="${esc2(x.description || x.name)}">${I.sparkles({ size: 16 })}<span class="composer-add-item-text"><span class="composer-add-item-title">${esc2(x.name)}</span>${x.description ? `<span class="composer-add-item-hint">${esc2(x.description)}</span>` : ""}</span></button>`
+  ).join("") : `<p class="composer-add-empty">\u6682\u65E0\u53EF\u7528\u6280\u80FD</p>`;
+  const menu = document.createElement("div");
+  menu.id = "composer-add-menu";
+  menu.className = "composer-add-menu";
+  menu.innerHTML = `
+    <div class="composer-add-section-label">\u6DFB\u52A0</div>
+    <button type="button" class="composer-add-item" data-add="local">${I.paperclip({ size: 16 })}<span class="composer-add-item-text"><span class="composer-add-item-title">\u672C\u5730\u6587\u4EF6</span><span class="composer-add-item-hint">\u4ECE\u7535\u8111\u9009\u62E9\u6587\u4EF6</span></span></button>
+    <button type="button" class="composer-add-item" data-add="library">${I.library({ size: 16 })}<span class="composer-add-item-text"><span class="composer-add-item-title">\u7D20\u6750\u5E93</span><span class="composer-add-item-hint">\u5F15\u7528\u5DF2\u6709\u7D20\u6750</span></span></button>
+    <div class="composer-add-section-label">\u6280\u80FD</div>
+    <div class="composer-add-skills">${skillRows}</div>`;
+  document.body.append(menu);
+  const place = () => {
+    const rect = anchor.getBoundingClientRect();
+    const mw = menu.offsetWidth;
+    const mh = menu.offsetHeight;
+    let left = Math.min(rect.left, window.innerWidth - mw - 8);
+    left = Math.max(8, left);
+    let top = rect.top - mh - 8;
+    if (top < 8) top = Math.min(rect.bottom + 8, window.innerHeight - mh - 8);
+    menu.style.left = left + "px";
+    menu.style.top = Math.max(8, top) + "px";
+  };
+  place();
+  let onDocPointer = null;
+  const close2 = () => {
+    menu.remove();
+    if (onDocPointer) {
+      document.removeEventListener("pointerdown", onDocPointer, true);
+      onDocPointer = null;
+    }
+    if (activeComposerMenuDismiss === close2) activeComposerMenuDismiss = null;
+  };
+  activeComposerMenuDismiss = close2;
+  onDocPointer = (ev) => {
+    if (menu.contains(
+      /** @type {Node} */
+      ev.target
+    )) return;
+    if (anchor.contains(
+      /** @type {Node} */
+      ev.target
+    )) return;
+    close2();
+  };
+  document.addEventListener("pointerdown", onDocPointer, true);
+  menu.querySelector('[data-add="local"]').onclick = (e) => {
+    e.stopPropagation();
+    close2();
+    uploadChatFiles();
+  };
+  menu.querySelector('[data-add="library"]').onclick = (e) => {
+    e.stopPropagation();
+    close2();
+    chooseChatFile();
+  };
+  menu.querySelectorAll("[data-skill-id]").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const skillId = btn.getAttribute("data-skill-id") || "";
+      const name = btn.getAttribute("data-skill-name") || skillId;
+      if (!skillId) return;
+      close2();
+      putTag({ kind: "skill", skillId, label: name });
+    };
+  });
+}
 async function deleteDraft(id) {
   if (busy) return toast("\u8BF7\u7B49\u5F85 AI \u5B8C\u6210\u540E\u518D\u5220\u9664");
   const doc3 = state.documents.find((d) => d.id === id);
@@ -32468,10 +32610,10 @@ function renderPanel() {
   let content = "";
   if (tab === "chat") {
     content = `<div class="conversation-doc-chip" title="${esc2(current?.id || "")}">\u5F53\u524D\u6587\u7AE0\uFF1A${esc2(current?.title || "\u672A\u547D\u540D\u6587\u7AE0")}</div>` + conversation().messages.map(
-      (m) => `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "\u4F60" : "aster"}</small><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? `<span class="inline-reference">${esc2(p.label)}</span>` : esc2(p.text)).join("") : esc2(m.text)}</div></div>`
+      (m) => `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "\u4F60" : "aster"}</small><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? referenceChipHTML(p.reference?.kind || "file", p.label) : esc2(p.text)).join("") : esc2(m.text)}</div></div>`
     ).join("") || "";
   }
-  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc2(c.id)}">${esc2(c.title)}</option>`).join("")}</select><button id="new-conversation" class="icon-btn" title="\u4E3A\u672C\u7BC7\u521B\u5EFA\u65B0\u5BF9\u8BDD" aria-label="\u65B0\u5BF9\u8BDD">${I.plus()}</button></div>` : ""}<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools">${agentModeHTML()}${modelPickerHTML()}<button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0\u6587\u4EF6" aria-label="\u6DFB\u52A0\u6587\u4EF6" aria-haspopup="menu">${I.plus()}</button><div id="skill-picker"></div><button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div>`;
+  panel.innerHTML = `${tab === "chat" ? `<div class="conversation-bar"><select id="conversation">${current.conversations.map((c) => `<option value="${esc2(c.id)}">${esc2(c.title)}</option>`).join("")}</select><button id="new-conversation" class="icon-btn" title="\u4E3A\u672C\u7BC7\u521B\u5EFA\u65B0\u5BF9\u8BDD" aria-label="\u65B0\u5BF9\u8BDD">${I.plus()}</button></div>` : ""}<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0" aria-label="\u6DFB\u52A0" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div>`;
   if (tab === "chat") {
     $("#conversation").value = conversation().id;
     $("#conversation").onchange = (e) => {
@@ -32505,19 +32647,9 @@ function renderPanel() {
   });
   $("#chat-upload").onclick = (e) => {
     e.stopPropagation();
-    dismissActiveComposerMenu();
-    const rect = e.currentTarget.getBoundingClientRect();
-    showContextMenu(rect.left, Math.max(8, rect.top - 88), [
-      { label: "\u672C\u5730\u9009\u62E9", run: () => uploadChatFiles() },
-      { label: "\u7D20\u6750\u5E93", run: () => chooseChatFile() }
-    ]);
+    openComposerAddMenu(e.currentTarget);
   };
   $("#chat-upload").onmousedown = (e) => e.preventDefault();
-  $("#skill-picker").addEventListener("skills-change", () => {
-    dirty = true;
-    persist();
-  });
-  mountSkillPicker($("#skill-picker"), api, account, conversation());
   if ($("#generate")) $("#generate").onclick = () => runTask(tab);
   $$("[data-copy]").forEach(
     (b) => b.onclick = () => api("copy", { text: current[key][+b.dataset.copy].text }).then(
@@ -32579,11 +32711,16 @@ async function runTask(task) {
   }
   const instruction = draft.instruction;
   const anchors = draft.references.filter((r) => r.kind === "selection");
+  const skillIds = [
+    ...new Set(
+      draft.references.filter((r) => r.kind === "skill" && r.skillId).map((r) => r.skillId)
+    )
+  ];
   if (anchors.some((r) => r.articleId !== doc3.id || r.base !== body))
     return toast("\u5F15\u7528\u9009\u6BB5\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u5220\u9664\u6807\u7B7E\u5E76\u91CD\u65B0\u9009\u4E2D\u6DFB\u52A0");
-  if (task === "chat" && !instruction && !conversation(doc3).skillIds?.length)
+  if (task === "chat" && !instruction && !skillIds.length)
     return toast("\u5148\u5199\u4E00\u53E5\u60F3\u8BA8\u8BBA\u7684\u5185\u5BB9");
-  if (task === "rewrite" && !instruction && !conversation(doc3).skillIds?.length)
+  if (task === "rewrite" && !instruction && !skillIds.length)
     return toast("\u5148\u5199\u4E00\u53E5\u4FEE\u6539\u8981\u6C42\uFF0C\u6216\u9009\u7528\u6280\u80FD");
   const prompts = {
     rewrite: "\u6309\u6240\u9009\u6280\u80FD\u548C\u7528\u6237\u8981\u6C42\u4FEE\u6539\u5168\u6587\uFF0C\u53EA\u8F93\u51FA\u4FEE\u6539\u540E\u7684\u5B8C\u6574\u6B63\u6587\u3002",
@@ -32595,7 +32732,7 @@ async function runTask(task) {
   session.messages.push({
     role: "user",
     text: draft.display || "\u8FD0\u884C\u6240\u9009\u6280\u80FD",
-    skillIds: session.skillIds,
+    skillIds,
     parts: draft.parts.length ? draft.parts : void 0
   });
   const submittedDraft = session.composerDraft;
@@ -32618,7 +32755,7 @@ async function runTask(task) {
       articleId: doc3.id,
       title: doc3.title,
       conversationId: session.id,
-      skillIds: session.skillIds,
+      skillIds,
       references: draft.references,
       instruction: (prompts[task] || "") + "\n" + instruction,
       body,
@@ -33470,11 +33607,22 @@ function bindModelPicker() {
   const menu = $("#model-picker-menu");
   if (!root2 || !trigger || !menu) return;
   let onDocPointer = null;
+  const clearFixed = (el) => {
+    el.style.position = "";
+    el.style.left = "";
+    el.style.right = "";
+    el.style.top = "";
+    el.style.bottom = "";
+    el.style.zIndex = "";
+    el.classList.remove("is-fixed");
+  };
   const closeAll = () => {
     menu.setAttribute("hidden", "");
     trigger.setAttribute("aria-expanded", "false");
+    clearFixed(menu);
     root2.querySelectorAll(".model-picker-submenu").forEach((el) => {
       el.setAttribute("hidden", "");
+      clearFixed(el);
     });
     root2.querySelectorAll(".model-picker-agent-btn").forEach((btn) => {
       btn.setAttribute("aria-expanded", "false");
@@ -33485,14 +33633,50 @@ function bindModelPicker() {
     }
     if (activeComposerMenuDismiss === closeAll) activeComposerMenuDismiss = null;
   };
+  const placeMenu = () => {
+    const rect = trigger.getBoundingClientRect();
+    menu.classList.add("is-fixed");
+    menu.style.position = "fixed";
+    menu.style.zIndex = "200";
+    menu.style.left = "auto";
+    menu.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+    menu.style.top = "auto";
+    menu.style.bottom = `${Math.max(8, window.innerHeight - rect.top + 8)}px`;
+  };
+  const placeSubmenu = (agentEl) => {
+    const sub = agentEl.querySelector(".model-picker-submenu");
+    const btn = agentEl.querySelector(".model-picker-agent-btn");
+    if (!sub || !btn) return;
+    sub.classList.add("is-fixed");
+    sub.style.position = "fixed";
+    sub.style.zIndex = "201";
+    const btnRect = btn.getBoundingClientRect();
+    const subW = sub.offsetWidth || 160;
+    const subH = sub.offsetHeight || 40;
+    let left = btnRect.left - subW - 4;
+    if (left < 8) left = Math.min(btnRect.right + 4, window.innerWidth - subW - 8);
+    let top = btnRect.bottom - subH;
+    if (top < 8) top = 8;
+    if (top + subH > window.innerHeight - 8)
+      top = Math.max(8, window.innerHeight - subH - 8);
+    sub.style.left = `${left}px`;
+    sub.style.top = `${top}px`;
+    sub.style.right = "auto";
+    sub.style.bottom = "auto";
+  };
   const openSubmenu = (agentEl) => {
     root2.querySelectorAll(".model-picker-agent").forEach((el) => {
       const sub = el.querySelector(".model-picker-submenu");
       const btn = el.querySelector(".model-picker-agent-btn");
       const open = !!agentEl && el === agentEl;
       if (sub) {
-        if (open) sub.removeAttribute("hidden");
-        else sub.setAttribute("hidden", "");
+        if (open) {
+          sub.removeAttribute("hidden");
+          placeSubmenu(el);
+        } else {
+          sub.setAttribute("hidden", "");
+          clearFixed(sub);
+        }
       }
       if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
     });
@@ -33505,15 +33689,21 @@ function bindModelPicker() {
     menu.removeAttribute("hidden");
     trigger.setAttribute("aria-expanded", "true");
     activeComposerMenuDismiss = closeAll;
+    placeMenu();
     const active = root2.querySelector(
       `.model-picker-agent[data-agent="${CSS.escape(railProviderId())}"]`
     );
     if (active) openSubmenu(active);
     onDocPointer = (ev) => {
-      if (root2.contains(
+      const t = (
         /** @type {Node} */
         ev.target
-      )) return;
+      );
+      if (root2.contains(t) || menu.contains(t)) return;
+      if ([...root2.querySelectorAll(".model-picker-submenu")].some(
+        (s) => s.contains(t)
+      ))
+        return;
       closeAll();
     };
     document.addEventListener("pointerdown", onDocPointer, true);
@@ -34350,7 +34540,14 @@ function putTag(reference, doc3 = current, session = conversation(doc3)) {
     const content = session.composerDraft.content;
     content[content.length - 1].content ||= [];
     content[content.length - 1].content.push(
-      { type: "referenceTag", attrs: { refId, label: reference.label } },
+      {
+        type: "referenceTag",
+        attrs: {
+          refId,
+          label: reference.label,
+          kind: reference.kind || "file"
+        }
+      },
       { type: "text", text: " " }
     );
     dirty = true;
@@ -34928,6 +35125,7 @@ lucide/dist/esm/icons/list.mjs:
 lucide/dist/esm/icons/message-square.mjs:
 lucide/dist/esm/icons/panel-right-close.mjs:
 lucide/dist/esm/icons/panel-right-open.mjs:
+lucide/dist/esm/icons/paperclip.mjs:
 lucide/dist/esm/icons/pen-line.mjs:
 lucide/dist/esm/icons/pin-off.mjs:
 lucide/dist/esm/icons/pin.mjs:

@@ -293,6 +293,16 @@ function resolveRefs(k, doc, refs, body) {
           r.text
         );
       }
+      if (r.kind === "skill") {
+        const name = String(r.label || r.skillId || "").trim() || "技能";
+        return (
+          "\n[引用 " +
+          r.refId +
+          "：技能 " +
+          name +
+          "]\n该技能已挂载到工作区 .agents/skills，请阅读并遵循其 SKILL.md。\n"
+        );
+      }
       throw Error("未知引用类型");
     })
     .join("\n");

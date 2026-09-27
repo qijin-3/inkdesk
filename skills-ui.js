@@ -98,7 +98,7 @@ function normalizeBinding(raw) {
   return "none";
 }
 
-function skillAvailableFor(binding, account) {
+export function skillAvailableFor(binding, account) {
   const b = normalizeBinding(binding);
   if (b === "all") return true;
   if (b === "none") return false;

@@ -53,14 +53,23 @@ const { _electron: electron } = require("@playwright/test"),
     );
     await w.locator("#new").click();
     await w.locator("#toggle-assistant").click();
+    await w.locator("#chat-upload").click();
     await w
-      .locator("#skill-picker input:checked")
+      .locator('#composer-add-menu [data-skill-id="fact-check"]')
       .waitFor({ state: "attached" });
+    await w.locator('#composer-add-menu [data-skill-id="fact-check"]').click();
+    await w.locator("#instruction .inline-reference").waitFor();
+    assert.ok(
+      (await w.locator("#instruction .inline-reference").innerText()).includes(
+        "fact-check",
+      ),
+    );
     await app.evaluate(({ ipcMain }) => {
       ipcMain.removeHandler("agent");
       ipcMain.handle("agent", (_, req) => "收到技能 " + req.skillIds?.length);
     });
-    await w.locator("#instruction").fill("检查这一段");
+    await w.locator("#composer-input").click();
+    await w.keyboard.type("检查这一段");
     await w.locator("#send").click();
     await w.waitForFunction(() =>
       document.body.innerText.includes("收到技能"),

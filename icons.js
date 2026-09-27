@@ -44,6 +44,7 @@ import {
   PenLine,
   Trash2,
   Search,
+  Paperclip,
 } from "lucide";
 
 /**
@@ -110,4 +111,5 @@ export const I = {
   pen: (o) => icon(PenLine, o),
   trash: (o) => icon(Trash2, o),
   search: (o) => icon(Search, o),
+  paperclip: (o) => icon(Paperclip, o),
 };
