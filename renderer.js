@@ -2531,6 +2531,63 @@ function agentModeHTML() {
   return `<div class="agent-mode"><button type="button" id="agent-output" class="agent-mode-trigger" title="${label}" aria-label="输出模式：${label}" aria-haspopup="listbox" aria-expanded="false" data-mode="${agentMode}">${modeIcon}${I.chevronDown({ size: 12 })}</button><div id="agent-mode-menu" class="agent-mode-menu" hidden role="listbox"><button type="button" role="option" data-value="chat" aria-selected="${!edit}">${I.chat({ size: 14 })}<span>对话</span></button><button type="button" role="option" data-value="edit" aria-selected="${edit}">${I.pen({ size: 14 })}<span>编辑</span></button></div></div>`;
 }
 
+/** @type {null | (() => void)} */
+let activeComposerMenuDismiss = null;
+
+/** 关闭当前打开的 composer 下拉（模式 / 模型） */
+function dismissActiveComposerMenu() {
+  const fn = activeComposerMenuDismiss;
+  activeComposerMenuDismiss = null;
+  fn?.();
+}
+
+/**
+ * 绑定模式菜单：点击外部或其他下拉时关闭。
+ */
+function bindAgentModeMenu() {
+  const root = $(".agent-mode");
+  const modeBtn = $("#agent-output");
+  const modeMenu = $("#agent-mode-menu");
+  if (!root || !modeBtn || !modeMenu) return;
+
+  /** @type {((e: Event) => void) | null} */
+  let onDocPointer = null;
+
+  const closeMode = () => {
+    modeMenu.setAttribute("hidden", "");
+    modeBtn.setAttribute("aria-expanded", "false");
+    if (onDocPointer) {
+      document.removeEventListener("pointerdown", onDocPointer, true);
+      onDocPointer = null;
+    }
+    if (activeComposerMenuDismiss === closeMode) activeComposerMenuDismiss = null;
+  };
+
+  modeBtn.onclick = (e) => {
+    e.stopPropagation();
+    const willOpen = modeMenu.hasAttribute("hidden");
+    dismissActiveComposerMenu();
+    if (!willOpen) return;
+    modeMenu.removeAttribute("hidden");
+    modeBtn.setAttribute("aria-expanded", "true");
+    activeComposerMenuDismiss = closeMode;
+    onDocPointer = (ev) => {
+      if (root.contains(/** @type {Node} */ (ev.target))) return;
+      closeMode();
+    };
+    document.addEventListener("pointerdown", onDocPointer, true);
+  };
+
+  modeMenu.querySelectorAll("[data-value]").forEach((opt) => {
+    opt.onclick = (e) => {
+      e.stopPropagation();
+      agentMode = opt.dataset.value === "edit" ? "edit" : "chat";
+      closeMode();
+      renderPanel();
+    };
+  });
+}
+
 /** 将 pending 合成结果写入编辑器 */
 function applyPendingResult(nextText, action) {
   sync();
@@ -2630,25 +2687,7 @@ function renderPanel() {
   }
   $("#send").onclick = () =>
     busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
-  const modeBtn = $("#agent-output");
-  const modeMenu = $("#agent-mode-menu");
-  if (modeBtn && modeMenu) {
-    modeBtn.onclick = (e) => {
-      e.stopPropagation();
-      const open = modeMenu.hasAttribute("hidden");
-      if (open) modeMenu.removeAttribute("hidden");
-      else modeMenu.setAttribute("hidden", "");
-      modeBtn.setAttribute("aria-expanded", open ? "true" : "false");
-    };
-    modeMenu.querySelectorAll("[data-value]").forEach((opt) => {
-      opt.onclick = (e) => {
-        e.stopPropagation();
-        agentMode = opt.dataset.value === "edit" ? "edit" : "chat";
-        modeMenu.setAttribute("hidden", "");
-        renderPanel();
-      };
-    });
-  }
+  bindAgentModeMenu();
   bindModelPicker();
   composer = new Composer($("#composer-input"), conversation(), {
     changed: () => {
@@ -2661,6 +2700,7 @@ function renderPanel() {
   });
   $("#chat-upload").onclick = (e) => {
     e.stopPropagation();
+    dismissActiveComposerMenu();
     const rect = e.currentTarget.getBoundingClientRect();
     showContextMenu(rect.left, Math.max(8, rect.top - 88), [
       { label: "本地选择", run: () => uploadChatFiles() },
@@ -3866,6 +3906,7 @@ function bindModelPicker() {
       document.removeEventListener("pointerdown", onDocPointer, true);
       onDocPointer = null;
     }
+    if (activeComposerMenuDismiss === closeAll) activeComposerMenuDismiss = null;
   };
 
   const openSubmenu = (agentEl) => {
@@ -3884,12 +3925,11 @@ function bindModelPicker() {
   trigger.onclick = (e) => {
     e.stopPropagation();
     const willOpen = menu.hasAttribute("hidden");
-    if (!willOpen) {
-      closeAll();
-      return;
-    }
+    dismissActiveComposerMenu();
+    if (!willOpen) return;
     menu.removeAttribute("hidden");
     trigger.setAttribute("aria-expanded", "true");
+    activeComposerMenuDismiss = closeAll;
     const active = root.querySelector(
       `.model-picker-agent[data-agent="${CSS.escape(railProviderId())}"]`,
     );

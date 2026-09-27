@@ -32356,6 +32356,53 @@ function agentModeHTML() {
   const modeIcon = edit2 ? I.pen({ size: 14 }) : I.chat({ size: 14 });
   return `<div class="agent-mode"><button type="button" id="agent-output" class="agent-mode-trigger" title="${label}" aria-label="\u8F93\u51FA\u6A21\u5F0F\uFF1A${label}" aria-haspopup="listbox" aria-expanded="false" data-mode="${agentMode}">${modeIcon}${I.chevronDown({ size: 12 })}</button><div id="agent-mode-menu" class="agent-mode-menu" hidden role="listbox"><button type="button" role="option" data-value="chat" aria-selected="${!edit2}">${I.chat({ size: 14 })}<span>\u5BF9\u8BDD</span></button><button type="button" role="option" data-value="edit" aria-selected="${edit2}">${I.pen({ size: 14 })}<span>\u7F16\u8F91</span></button></div></div>`;
 }
+var activeComposerMenuDismiss = null;
+function dismissActiveComposerMenu() {
+  const fn = activeComposerMenuDismiss;
+  activeComposerMenuDismiss = null;
+  fn?.();
+}
+function bindAgentModeMenu() {
+  const root2 = $(".agent-mode");
+  const modeBtn = $("#agent-output");
+  const modeMenu = $("#agent-mode-menu");
+  if (!root2 || !modeBtn || !modeMenu) return;
+  let onDocPointer = null;
+  const closeMode = () => {
+    modeMenu.setAttribute("hidden", "");
+    modeBtn.setAttribute("aria-expanded", "false");
+    if (onDocPointer) {
+      document.removeEventListener("pointerdown", onDocPointer, true);
+      onDocPointer = null;
+    }
+    if (activeComposerMenuDismiss === closeMode) activeComposerMenuDismiss = null;
+  };
+  modeBtn.onclick = (e) => {
+    e.stopPropagation();
+    const willOpen = modeMenu.hasAttribute("hidden");
+    dismissActiveComposerMenu();
+    if (!willOpen) return;
+    modeMenu.removeAttribute("hidden");
+    modeBtn.setAttribute("aria-expanded", "true");
+    activeComposerMenuDismiss = closeMode;
+    onDocPointer = (ev) => {
+      if (root2.contains(
+        /** @type {Node} */
+        ev.target
+      )) return;
+      closeMode();
+    };
+    document.addEventListener("pointerdown", onDocPointer, true);
+  };
+  modeMenu.querySelectorAll("[data-value]").forEach((opt) => {
+    opt.onclick = (e) => {
+      e.stopPropagation();
+      agentMode = opt.dataset.value === "edit" ? "edit" : "chat";
+      closeMode();
+      renderPanel();
+    };
+  });
+}
 function applyPendingResult(nextText, action) {
   sync();
   if (current.body !== pending.base) {
@@ -32445,25 +32492,7 @@ function renderPanel() {
     };
   }
   $("#send").onclick = () => busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
-  const modeBtn = $("#agent-output");
-  const modeMenu = $("#agent-mode-menu");
-  if (modeBtn && modeMenu) {
-    modeBtn.onclick = (e) => {
-      e.stopPropagation();
-      const open = modeMenu.hasAttribute("hidden");
-      if (open) modeMenu.removeAttribute("hidden");
-      else modeMenu.setAttribute("hidden", "");
-      modeBtn.setAttribute("aria-expanded", open ? "true" : "false");
-    };
-    modeMenu.querySelectorAll("[data-value]").forEach((opt) => {
-      opt.onclick = (e) => {
-        e.stopPropagation();
-        agentMode = opt.dataset.value === "edit" ? "edit" : "chat";
-        modeMenu.setAttribute("hidden", "");
-        renderPanel();
-      };
-    });
-  }
+  bindAgentModeMenu();
   bindModelPicker();
   composer = new Composer($("#composer-input"), conversation(), {
     changed: () => {
@@ -32476,6 +32505,7 @@ function renderPanel() {
   });
   $("#chat-upload").onclick = (e) => {
     e.stopPropagation();
+    dismissActiveComposerMenu();
     const rect = e.currentTarget.getBoundingClientRect();
     showContextMenu(rect.left, Math.max(8, rect.top - 88), [
       { label: "\u672C\u5730\u9009\u62E9", run: () => uploadChatFiles() },
@@ -33453,6 +33483,7 @@ function bindModelPicker() {
       document.removeEventListener("pointerdown", onDocPointer, true);
       onDocPointer = null;
     }
+    if (activeComposerMenuDismiss === closeAll) activeComposerMenuDismiss = null;
   };
   const openSubmenu = (agentEl) => {
     root2.querySelectorAll(".model-picker-agent").forEach((el) => {
@@ -33469,12 +33500,11 @@ function bindModelPicker() {
   trigger.onclick = (e) => {
     e.stopPropagation();
     const willOpen = menu.hasAttribute("hidden");
-    if (!willOpen) {
-      closeAll();
-      return;
-    }
+    dismissActiveComposerMenu();
+    if (!willOpen) return;
     menu.removeAttribute("hidden");
     trigger.setAttribute("aria-expanded", "true");
+    activeComposerMenuDismiss = closeAll;
     const active = root2.querySelector(
       `.model-picker-agent[data-agent="${CSS.escape(railProviderId())}"]`
     );
