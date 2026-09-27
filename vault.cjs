@@ -993,7 +993,32 @@ class Vault {
       path: normalized,
       title: path.basename(normalized, ".md"),
       body: String(body || ""),
+      updated: fs.statSync(this.p(normalized)).mtime.toISOString(),
     };
+  }
+  /**
+   * 更新灵感正文，保留 frontmatter。
+   * @param {string} rel
+   * @param {{ body: string }} data
+   */
+  updateTopic(rel, data) {
+    const normalized = this.assertTopicPath(rel);
+    const abs = this.p(normalized);
+    let doc;
+    try {
+      doc = split(fs.readFileSync(abs, "utf8")).yaml;
+    } catch {
+      doc = YAML.parseDocument("{}");
+    }
+    if (!doc.get("创建时间")) doc.set("创建时间", now());
+    if (!doc.get("类型")) doc.set("类型", "灵感");
+    doc.set("更新时间", now());
+    atomic(
+      abs,
+      "---\n" + doc.toString() + "---\n" + String(data?.body ?? ""),
+    );
+    const account = normalized.split("/")[0];
+    return this.topics(account);
   }
   /**
    * @param {string} rel

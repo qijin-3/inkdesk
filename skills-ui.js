@@ -154,7 +154,7 @@ export async function mountSkillsSettings(
         ? '<p class="settings-empty">当前账号暂无可用技能。请到设置 → 技能库，将技能绑定到「所有」或本账号。</p>'
         : '<p class="settings-empty">还没有技能。将含 SKILL.md 的文件夹放到仓库 <code>.agents/skills</code>，或使用导入 / 新建。</p>';
     if (opts.layout === "sections") {
-      root.innerHTML = `<section class="settings-section"><h3 class="settings-section-title">技能库</h3><div class="settings-section-control"><div class="settings-panel-toolbar"><button type="button" id="skill-reveal-root">访达</button><button type="button" id="skill-import">导入文件夹</button><button type="button" class="primary" id="skill-new">＋ 新建</button></div><div class="settings-panel settings-panel-flush"><div class="skill-tree">${treeHtml}</div></div><p id="skill-page-error" role="status"></p></div></section>`;
+      root.innerHTML = `<section class="settings-section"><div class="settings-section-control"><div class="settings-panel-toolbar"><button type="button" id="skill-reveal-root">访达</button><button type="button" id="skill-import">导入文件夹</button><button type="button" class="primary" id="skill-new">＋ 新建</button></div><div class="settings-panel settings-panel-flush"><div class="skill-tree">${treeHtml}</div></div><p id="skill-page-error" role="status"></p></div></section>`;
     } else {
       const head = opts.compact
         ? `<div class="settings-card-actions skill-compact-actions"><button type="button" id="skill-reveal-root">访达</button><button type="button" id="skill-import">导入文件夹</button><button type="button" class="primary" id="skill-new">＋ 新建</button></div><p class="muted">仓库 <code>${escape(state.root)}</code> · 为每个技能选择支持的账号。</p>`

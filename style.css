@@ -1542,6 +1542,9 @@ header .byline {
 }
 .dashboard {
   padding: 28px 45px 38px;
+  max-width: 1080px;
+  box-sizing: border-box;
+  margin-inline: auto;
 }
 .page-title {
   margin-bottom: 35px;
@@ -1735,13 +1738,14 @@ th {
 }
 .topic-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
 }
 .topic-dashboard {
   display: flex;
   flex-direction: column;
   gap: 22px;
+  width: 100%;
 }
 .topic-composer {
   background: #ffffff;
@@ -1775,50 +1779,160 @@ th {
 }
 .topic-card {
   margin: 0;
+  max-width: 320px;
+  padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
+}
+.topic-card > div {
+  margin-top: 0;
+}
+.topic-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  min-height: 24px;
 }
 .topic-card time {
   font-size: 12px;
+  line-height: 24px;
   color: #888;
   font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topic-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+  height: 24px;
+}
+.topic-card-actions .icon-btn,
+.topic-card-actions button.icon-btn,
+.topic-card button.icon-btn {
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-color: transparent;
+  background: transparent;
+  color: #888;
+  border-radius: 6px;
+  box-shadow: none;
+}
+.topic-card-actions .icon-btn:hover,
+.topic-card-actions button.icon-btn:hover {
+  color: #222;
+  background: #f0f0f0;
+  border: 0;
+}
+.topic-card-actions .icon-btn.danger:hover,
+.topic-card-actions button.icon-btn.danger:hover {
+  color: #b42318;
+  background: #fef3f2;
+  border: 0;
 }
 .topic-card-body {
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 14px;
+  font-weight: 400;
+  font-family:
+    "PingFang SC", "Hiragino Sans GB", "Heiti SC", "Microsoft YaHei",
+    sans-serif;
+  line-height: 1.45;
   color: #333;
+  height: 180px;
   max-height: 180px;
-  overflow: auto;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: pointer;
+  border-radius: 6px;
 }
-.topic-card-body.is-md > :first-child {
-  margin-top: 0;
-}
-.topic-card-body.is-md > :last-child {
-  margin-bottom: 0;
-}
-.topic-card-body.is-md p,
-.topic-card-body.is-md ul,
-.topic-card-body.is-md ol {
-  margin: 0.45em 0;
-}
-.topic-card-body.is-md pre,
-.topic-card-body.is-md code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-}
-.topic-card-body.is-md pre {
-  background: #f3f3f3;
-  padding: 8px 10px;
-  border-radius: 8px;
-  overflow: auto;
-}
-.topic-card > .primary {
-  align-self: flex-start;
-  margin: 4px 0 0;
+.topic-card-body .muted {
+  font-weight: 400;
+  color: #999;
 }
 .topic-empty {
   grid-column: 1 / -1;
+}
+.topic-drawer {
+  width: min(480px, 52vw);
+}
+.topic-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+}
+.topic-drawer-preview {
+  font-size: 14px;
+  font-weight: 600;
+  font-family:
+    "PingFang SC", "Hiragino Sans GB", "Heiti SC", "Microsoft YaHei",
+    sans-serif;
+  line-height: 1.4;
+  color: #222;
+  overflow: auto;
+  padding-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.topic-drawer-preview.is-md > * {
+  margin: 0 !important;
+  color: #222 !important;
+  line-height: 1.4 !important;
+}
+.topic-drawer-preview.is-md h1 {
+  font-size: 20px;
+  font-weight: 700;
+}
+.topic-drawer-preview.is-md h2 {
+  font-size: 17px;
+  font-weight: 700;
+}
+.topic-drawer-preview.is-md h3 {
+  font-size: 15px;
+  font-weight: 700;
+}
+.topic-drawer-preview.is-md p {
+  font-size: 14px;
+  font-weight: 600;
+}
+.topic-drawer-preview.is-md ul,
+.topic-drawer-preview.is-md ol {
+  padding-left: 1.2em !important;
+}
+.topic-drawer-editor {
+  flex: 1;
+  min-height: 280px;
+  width: 100%;
+  resize: none;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  background: #fafafa;
+}
+.topic-drawer-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 0 18px;
+  flex-shrink: 0;
+  border-top: 1px solid #eee;
+  margin-top: 8px;
 }
 .settings {
   max-width: 1080px;
@@ -1839,13 +1953,16 @@ th {
   gap: 10px;
   padding: 0;
   border-bottom: 0;
-  max-width: 760px;
+  width: 100%;
 }
 .settings-section-title {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
   color: #111;
+}
+.settings-panel > .settings-section-title {
+  margin-bottom: 14px;
 }
 .settings-section-control {
   min-width: 0;
@@ -2209,6 +2326,36 @@ th {
   padding: 8px 4px;
   font-size: 13px;
   color: #888;
+}
+.settings-app-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+.settings-app-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.settings-app-meta {
+  min-width: 0;
+}
+.settings-app-name {
+  display: block;
+  margin: 0 0 2px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111;
+}
+.settings-app-identity .settings-status-row {
+  margin-bottom: 0;
+}
+.settings-app-identity .settings-version {
+  font-size: 14px;
+  margin-top: 2px;
 }
 .settings-status-row {
   display: flex;

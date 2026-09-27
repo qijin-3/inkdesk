@@ -786,6 +786,7 @@ function render() {
   saveProfileEditor = null;
   $("#reference-drawer")?.remove();
   $("#published-drawer")?.remove();
+  $("#topic-drawer")?.remove();
   $("#outline-popover")?.remove();
   removeArticleOutline();
   if (composer) {
@@ -2852,6 +2853,7 @@ async function pushWechatDraft(doc) {
   try {
     toast("正在生成标题图并推送…");
     const result = await api("wechat-draft-push", {
+      account: doc.account,
       title: doc.title || "未命名文章",
       html: await publishHTML(doc.body, {
         keepImages: true,
@@ -3452,6 +3454,41 @@ async function renderTopics() {
   $("#main").innerHTML =
     `<header><div class="header-lead"><h1 class="dashboard-tagline">灵感库</h1></div></header><section class="dashboard topic-dashboard"><div class="topic-composer"><textarea id="topic-input" rows="5" placeholder="记下灵感… 支持 Markdown"></textarea><div class="topic-composer-bar"><span class="muted">Markdown · ⌘/Ctrl + Enter 保存</span><button type="button" id="topic-save" class="primary">记下</button></div></div><div class="topic-grid" id="topic-grid"><p class="muted">加载中…</p></div></section>`;
 
+  /** 从灵感写成草稿并进入写作页 */
+  const writeFromTopic = async (rel) => {
+    const topic = await api("topics-read", { path: rel });
+    const firstLine =
+      String(topic.body || "")
+        .split(/\r?\n/)
+        .map((l) => l.replace(/^#+\s*/, "").trim())
+        .find(Boolean) || "未命名文章";
+    const d = {
+      id: crypto.randomUUID(),
+      title: firstLine.slice(0, 80),
+      body: topic.body || "",
+      account,
+      updated: new Date().toISOString(),
+      chat: [],
+      titles: [],
+      prompts: [],
+      topics: [
+        {
+          text: firstLine.slice(0, 80),
+          at: new Date().toISOString(),
+        },
+      ],
+      checks: [],
+      snapshots: [],
+    };
+    state.documents.unshift(d);
+    current = d;
+    page = "write";
+    tab = "topics";
+    pending = null;
+    persist();
+    render();
+  };
+
   /** @param {{ path: string, title?: string, body?: string, preview?: string, updated?: string }[]} list */
   const draw = (list) => {
     if (page !== "topics") return;
@@ -3463,49 +3500,60 @@ async function renderTopics() {
           const when = t.updated
             ? new Date(t.updated).toLocaleString("zh-CN")
             : "";
-          const md = t.body || t.preview || "";
-          return `<div class="result-card topic-card" data-topic="${esc(t.path)}"><time datetime="${esc(t.updated || "")}">${esc(when)}</time><div class="topic-card-body is-md">${md.trim() ? safeHTML(md) : '<p class="muted">（空）</p>'}</div><button type="button" class="primary" data-write-topic="${esc(t.path)}">写成文章 →</button></div>`;
+          const md = typeof t.body === "string" ? t.body : "";
+          const plain = md
+            .replace(/\r\n/g, "\n")
+            .replace(/^#{1,6}\s+/gm, "")
+            .replace(/\*\*([^*]+)\*\*/g, "$1")
+            .replace(/\*([^*]+)\*/g, "$1")
+            .replace(/`([^`]+)`/g, "$1")
+            .replace(/^>\s?/gm, "")
+            .replace(/^[-*+]\s+/gm, "• ")
+            .trim();
+          return `<div class="result-card topic-card" data-topic="${esc(t.path)}"><div class="topic-card-head"><time datetime="${esc(t.updated || "")}">${esc(when)}</time><div class="topic-card-actions"><button type="button" class="ghost icon-btn" data-write-topic="${esc(t.path)}" title="写成文章" aria-label="写成文章">${I.pen({ size: 15 })}</button><button type="button" class="ghost icon-btn danger" data-delete-topic="${esc(t.path)}" title="删除灵感" aria-label="删除灵感">${I.trash({ size: 15 })}</button></div></div><div class="topic-card-body" data-open-topic="${esc(t.path)}" role="button" tabindex="0">${plain ? esc(plain) : '<span class="muted">（空）</span>'}</div></div>`;
         })
         .join("") ||
       '<div class="empty-state topic-empty"><img src="assets/empty-topics.png" alt="" class="empty-state-img" /><p class="empty-state-text">还没有灵感，在上方写一条吧</p></div>';
+
+    const deleteTopic = async (rel) => {
+      if (!(await askConfirm("删除灵感", "确定删除这条灵感？"))) return;
+      try {
+        draw(await api("topics-delete", { path: rel }));
+        $("#topic-drawer")?.remove();
+        toast("已删除");
+      } catch (err) {
+        toast(err.message);
+      }
+    };
 
     $$("[data-write-topic]").forEach((b) => {
       b.onclick = async (e) => {
         e.stopPropagation();
         try {
-          const topic = await api("topics-read", { path: b.dataset.writeTopic });
-          const firstLine =
-            String(topic.body || "")
-              .split(/\r?\n/)
-              .map((l) => l.replace(/^#+\s*/, "").trim())
-              .find(Boolean) || "未命名文章";
-          const d = {
-            id: crypto.randomUUID(),
-            title: firstLine.slice(0, 80),
-            body: topic.body || "",
-            account,
-            updated: new Date().toISOString(),
-            chat: [],
-            titles: [],
-            prompts: [],
-            topics: [
-              {
-                text: firstLine.slice(0, 80),
-                at: new Date().toISOString(),
-              },
-            ],
-            checks: [],
-            snapshots: [],
-          };
-          state.documents.unshift(d);
-          current = d;
-          page = "write";
-          tab = "topics";
-          pending = null;
-          persist();
-          render();
+          await writeFromTopic(b.dataset.writeTopic);
         } catch (err) {
           toast(err.message);
+        }
+      };
+    });
+
+    $$("[data-delete-topic]").forEach((b) => {
+      b.onclick = (e) => {
+        e.stopPropagation();
+        deleteTopic(b.dataset.deleteTopic);
+      };
+    });
+
+    $$("[data-open-topic]").forEach((el) => {
+      const open = () => openTopicDrawer(el.dataset.openTopic, { onSaved: draw });
+      el.onclick = (e) => {
+        e.stopPropagation();
+        open();
+      };
+      el.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          open();
         }
       };
     });
@@ -3518,15 +3566,7 @@ async function renderTopics() {
           {
             label: "删除灵感",
             danger: true,
-            run: async () => {
-              if (!(await askConfirm("删除灵感", "确定删除这条灵感？"))) return;
-              try {
-                draw(await api("topics-delete", { path: rel }));
-                toast("已删除");
-              } catch (err) {
-                toast(err.message);
-              }
-            },
+            run: () => deleteTopic(rel),
           },
         ]);
       };
@@ -3560,7 +3600,19 @@ async function renderTopics() {
   requestAnimationFrame(() => $("#topic-input")?.focus());
 
   try {
-    draw(await api("topics-list", { account }));
+    const list = await api("topics-list", { account });
+    const hydrated = await Promise.all(
+      (list || []).map(async (t) => {
+        if (typeof t.body === "string") return t;
+        try {
+          const full = await api("topics-read", { path: t.path });
+          return { ...t, body: full.body || "" };
+        } catch {
+          return { ...t, body: "" };
+        }
+      }),
+    );
+    draw(hydrated);
   } catch (err) {
     const grid = $("#topic-grid");
     if (grid)
@@ -3570,11 +3622,127 @@ async function renderTopics() {
 }
 
 /**
- * 设置页分区：标题在卡片上方，下方为控件。
- * @param {{ title: string, control: string, className?: string }} opts
+ * 右侧抽屉查看 / 编辑灵感全文。
+ * @param {string} rel
+ * @param {{ onSaved?: (list: any[]) => void }} [opts]
+ */
+async function openTopicDrawer(rel, opts = {}) {
+  let topic;
+  try {
+    topic = await api("topics-read", { path: rel });
+  } catch (err) {
+    toast(err.message);
+    return;
+  }
+  $("#topic-drawer")?.remove();
+  $("#reference-drawer")?.remove();
+  $("#published-drawer")?.remove();
+  const when = topic.updated
+    ? new Date(topic.updated).toLocaleString("zh-CN")
+    : topic.title || "灵感";
+  const n = document.createElement("aside");
+  n.id = "topic-drawer";
+  n.className = "reference-drawer topic-drawer";
+  n.innerHTML = `<div class="row reference-drawer-head"><h3>${esc(when)}</h3><div class="reference-drawer-toolbar"><button type="button" class="ghost" id="topic-drawer-mode">编辑</button><button type="button" class="ghost icon-btn" id="topic-drawer-write" title="写成文章" aria-label="写成文章">${I.pen({ size: 16 })}</button><button type="button" class="ghost icon-btn" id="close-topic-drawer" title="关闭" aria-label="关闭">${I.close({ size: 18 })}</button></div></div><div class="reference-drawer-body topic-drawer-body"><div id="topic-drawer-preview" class="topic-drawer-preview is-md">${topic.body?.trim() ? safeHTML(topic.body) : '<p class="muted">（空）</p>'}</div><textarea id="topic-drawer-editor" class="topic-drawer-editor hidden" spellcheck="false">${esc(topic.body || "")}</textarea></div><div class="topic-drawer-foot hidden" id="topic-drawer-foot"><button type="button" class="ghost" id="topic-drawer-cancel">取消</button><button type="button" class="primary" id="topic-drawer-save">保存</button></div>`;
+  document.body.append(n);
+
+  let editing = false;
+  const preview = $("#topic-drawer-preview");
+  const editor = $("#topic-drawer-editor");
+  const foot = $("#topic-drawer-foot");
+  const modeBtn = $("#topic-drawer-mode");
+
+  const setMode = (edit) => {
+    editing = edit;
+    preview.classList.toggle("hidden", edit);
+    editor.classList.toggle("hidden", !edit);
+    foot.classList.toggle("hidden", !edit);
+    modeBtn.textContent = edit ? "预览" : "编辑";
+    if (edit) {
+      requestAnimationFrame(() => {
+        editor.focus();
+        editor.setSelectionRange(editor.value.length, editor.value.length);
+      });
+    } else {
+      const md = editor.value;
+      preview.innerHTML = md.trim()
+        ? safeHTML(md)
+        : '<p class="muted">（空）</p>';
+    }
+  };
+
+  $("#close-topic-drawer").onclick = () => n.remove();
+  modeBtn.onclick = () => setMode(!editing);
+  $("#topic-drawer-cancel").onclick = () => {
+    editor.value = topic.body || "";
+    setMode(false);
+  };
+  $("#topic-drawer-save").onclick = async () => {
+    try {
+      const list = await api("topics-save", {
+        path: topic.path,
+        body: editor.value,
+      });
+      topic = { ...topic, body: editor.value };
+      setMode(false);
+      opts.onSaved?.(list);
+      toast("已保存");
+    } catch (err) {
+      toast(err.message);
+    }
+  };
+  $("#topic-drawer-write").onclick = async () => {
+    try {
+      if (editing && editor.value !== (topic.body || "")) {
+        await api("topics-save", { path: topic.path, body: editor.value });
+        topic.body = editor.value;
+      }
+      n.remove();
+      const firstLine =
+        String(topic.body || "")
+          .split(/\r?\n/)
+          .map((l) => l.replace(/^#+\s*/, "").trim())
+          .find(Boolean) || "未命名文章";
+      const d = {
+        id: crypto.randomUUID(),
+        title: firstLine.slice(0, 80),
+        body: topic.body || "",
+        account,
+        updated: new Date().toISOString(),
+        chat: [],
+        titles: [],
+        prompts: [],
+        topics: [
+          {
+            text: firstLine.slice(0, 80),
+            at: new Date().toISOString(),
+          },
+        ],
+        checks: [],
+        snapshots: [],
+      };
+      state.documents.unshift(d);
+      current = d;
+      page = "write";
+      tab = "topics";
+      pending = null;
+      persist();
+      render();
+    } catch (err) {
+      toast(err.message);
+    }
+  };
+}
+
+/**
+ * 设置页分区；title 可选，省略则不渲染分区标题。
+ * @param {{ title?: string, control: string, className?: string }} opts
  */
 function settingsSection({ title, control, className = "" }) {
-  return `<section class="settings-section ${className}"><h3 class="settings-section-title">${esc(title)}</h3><div class="settings-section-control">${control}</div></section>`;
+  const titleHtml = title
+    ? `<h3 class="settings-section-title">${esc(title)}</h3>`
+    : "";
+  return `<section class="settings-section ${className}">${titleHtml}<div class="settings-section-control">${control}</div></section>`;
 }
 
 /** 右侧白底面板 */
@@ -3970,7 +4138,6 @@ async function renderAgentDetail() {
 }
 
 function renderSettings() {
-  const wx = state.wechat || {};
   if (
     settingsTab !== "config" &&
     settingsTab !== "agents" &&
@@ -3989,48 +4156,26 @@ function renderSettings() {
 
   const configBody = [
     settingsSection({
-      title: "内容仓库",
       control: settingsPanel(
-        `${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}` +
-          settingsField(
-            "仓库路径",
-            `<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="选择 Content_OS 目录" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} 选择</button><button type="button" class="ghost" id="refresh-vault">${I.refresh()} 刷新</button></span>`,
-          ) +
+        `<h3 class="settings-section-title">关于</h3>` +
+          `<div class="settings-app-identity"><img src="assets/logo.png" alt="" class="settings-app-logo" width="48" height="48"><div class="settings-app-meta"><strong class="settings-app-name">Aster*</strong><div class="settings-status-row"><div><span class="settings-field-label">当前版本</span><strong class="settings-version">${esc(state._appVersion || "…")}</strong></div></div></div></div>` +
+          `<div class="settings-panel-footer"><button type="button" id="open-releases">${I.external()} 发布页</button><button type="button" id="check-update">${I.refresh()} 检测更新</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">下载并安装</button>` : ""}</div>`,
+      ),
+    }),
+    settingsSection({
+      control: settingsPanel(
+        `<h3 class="settings-section-title">仓库路径</h3>` +
+          `${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc).join("<br>")}</p>` : ""}` +
+          `<span class="settings-path-row"><input id="vault-path" value="${esc(state.vaultPath || state.source || "")}" placeholder="选择 Content_OS 目录" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} 选择</button><button type="button" class="ghost" id="refresh-vault">${I.refresh()} 刷新</button></span>` +
           (state.vaultLocked
             ? `<p class="settings-hint">当前仓库由环境变量指定，无法在界面中更改。</p>`
             : ""),
-      ),
-    }),
-    settingsSection({
-      title: "微信公众号",
-      control: settingsPanel(
-        settingsField(
-          "AppID",
-          `<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx…" autocomplete="off">`,
-        ) +
-          settingsField(
-            "AppSecret",
-            `<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="密钥" autocomplete="off">`,
-          ) +
-          settingsField(
-            "默认作者",
-            `<input id="wechat-author" value="${esc(wx.author || "")}" placeholder="可选" autocomplete="off">`,
-          ) +
-          `<div class="settings-panel-footer"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存</button></div>`,
-      ),
-    }),
-    settingsSection({
-      title: "应用更新",
-      control: settingsPanel(
-        `<div class="settings-status-row"><div><span class="settings-field-label">当前版本</span><strong class="settings-version">${esc(state._appVersion || "…")}</strong></div></div>` +
-          `<div class="settings-panel-footer"><button type="button" id="open-releases">${I.external()} 发布页</button><button type="button" id="check-update">${I.refresh()} 检测更新</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">下载并安装</button>` : ""}</div>`,
       ),
     }),
   ].join("");
 
   const agentsBody = [
     settingsSection({
-      title: "使用统计",
       className: "settings-section-agents",
       control: `<section id="agent-usage" class="agent-usage"></section>`,
     }),
@@ -4043,7 +4188,6 @@ function renderSettings() {
 
   const accounts = accountList();
   const accountsBody = settingsSection({
-    title: "写作账号",
     control:
       `<div class="settings-panel-toolbar"><button type="button" id="register-account">${I.folder()} 选择文件夹</button><button type="button" class="primary" id="create-account">${I.plus()} 新建账号</button></div>` +
       (accounts.length
@@ -4060,7 +4204,6 @@ function renderSettings() {
 
   const groups = groupNames();
   const groupsBody = settingsSection({
-    title: "文章分组",
     control:
       `<div class="settings-panel-toolbar"><button type="button" class="primary" id="create-group">${I.plus()} 新建分组</button></div>` +
       (groups.length
@@ -4132,29 +4275,6 @@ function renderSettings() {
     $("#check-update").onclick = () => checkForAppUpdate({ manual: true });
     const installBtn = $("#install-update");
     if (installBtn) installBtn.onclick = () => installAppUpdate();
-    const readWechatForm = () => {
-      state.wechat = {
-        appId: $("#wechat-appid").value.trim(),
-        appSecret: $("#wechat-secret").value.trim(),
-        author: $("#wechat-author").value.trim(),
-        coverPath: state.wechat?.coverPath || "",
-      };
-    };
-    $("#wechat-test").onclick = async () => {
-      readWechatForm();
-      await persist();
-      try {
-        await api("wechat-test-token");
-        toast("公众号凭证有效");
-      } catch (e) {
-        toast(e.message || "连接失败");
-      }
-    };
-    $("#save-wechat").onclick = () => {
-      readWechatForm();
-      persist();
-      toast("公众号设置已保存");
-    };
     $("#pick-vault").onclick = async () => {
       if (isWeb()) return toast("选择仓库仅支持桌面端");
       if (state.vaultLocked) return toast("当前仓库由环境变量指定，无法更改");
@@ -4772,6 +4892,7 @@ function openPreview({
 }) {
   $("#reference-drawer")?.remove();
   $("#published-drawer")?.remove();
+  $("#topic-drawer")?.remove();
   const r = material ||
     reference || {
       name: title,
@@ -4982,7 +5103,11 @@ async function renderAccountDetail() {
     });
   };
   if (accountDetailTab === "detail") {
-    const backup = state.backupPaths?.[a.id] || "";
+    const backup = state.backupPaths?.[a] || "";
+    const wx =
+      state.wechatAccounts?.[a] ||
+      (state.wechat?.appId || state.wechat?.appSecret ? state.wechat : {}) ||
+      {};
     shell(
       [
         settingsSection({
@@ -5000,6 +5125,25 @@ async function renderAccountDetail() {
             ),
           ),
         }),
+        settingsSection({
+          title: "微信公众号",
+          control: settingsPanel(
+            settingsField(
+              "AppID",
+              `<input id="wechat-appid" value="${esc(wx.appId || "")}" placeholder="wx…" autocomplete="off">`,
+            ) +
+              settingsField(
+                "AppSecret",
+                `<input id="wechat-secret" type="password" value="${esc(wx.appSecret || "")}" placeholder="密钥" autocomplete="off">`,
+              ) +
+              settingsField(
+                "默认作者",
+                `<input id="wechat-author" value="${esc(wx.author || "")}" placeholder="可选" autocomplete="off">`,
+              ) +
+              `<p class="settings-hint">每个账号独立配置，推送草稿时使用当前文章所属账号的凭证。</p>` +
+              `<div class="settings-panel-footer"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存</button></div>`,
+          ),
+        }),
       ].join(""),
     );
     $("#account-set-avatar").onclick = () => pickAndSetAccountAvatar(a);
@@ -5015,6 +5159,34 @@ async function renderAccountDetail() {
           toast(e.message || "清除失败");
         }
       };
+    const readWechatForm = () => {
+      const next = {
+        appId: $("#wechat-appid").value.trim(),
+        appSecret: $("#wechat-secret").value.trim(),
+        author: $("#wechat-author").value.trim(),
+        coverPath:
+          state.wechatAccounts?.[a]?.coverPath ||
+          state.wechat?.coverPath ||
+          "",
+      };
+      state.wechatAccounts = { ...(state.wechatAccounts || {}), [a]: next };
+      return next;
+    };
+    $("#wechat-test").onclick = async () => {
+      readWechatForm();
+      await persist();
+      try {
+        await api("wechat-test-token", { account: a });
+        toast("公众号凭证有效");
+      } catch (e) {
+        toast(e.message || "连接失败");
+      }
+    };
+    $("#save-wechat").onclick = () => {
+      readWechatForm();
+      persist();
+      toast("公众号设置已保存");
+    };
     return;
   }
   if (accountDetailTab === "skills") {

@@ -41,6 +41,7 @@ import {
   ChevronLeft,
   MessageSquare,
   PenLine,
+  Trash2,
 } from "lucide";
 
 /**
@@ -104,4 +105,5 @@ export const I = {
   chevronLeft: (o) => icon(ChevronLeft, o),
   chat: (o) => icon(MessageSquare, o),
   pen: (o) => icon(PenLine, o),
+  trash: (o) => icon(Trash2, o),
 };

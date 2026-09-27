@@ -57,6 +57,7 @@ const channels = [
   "topics-list",
   "topics-create",
   "topics-read",
+  "topics-save",
   "topics-delete",
   "wechat-draft-push",
   "wechat-test-token",

@@ -258,7 +258,7 @@ async function mountSkillsSettings(root2, api2, account2, accounts, onRefresh = 
       return `<details class="skill-tree-group" open><summary><span class="skill-tree-group-label">${escape(g.label)}</span><span class="muted">${g.skills.length}</span></summary><div class="skill-tree-list">${rows}</div></details>`;
     }).join("") : opts.lockAccount ? '<p class="settings-empty">\u5F53\u524D\u8D26\u53F7\u6682\u65E0\u53EF\u7528\u6280\u80FD\u3002\u8BF7\u5230\u8BBE\u7F6E \u2192 \u6280\u80FD\u5E93\uFF0C\u5C06\u6280\u80FD\u7ED1\u5B9A\u5230\u300C\u6240\u6709\u300D\u6216\u672C\u8D26\u53F7\u3002</p>' : '<p class="settings-empty">\u8FD8\u6CA1\u6709\u6280\u80FD\u3002\u5C06\u542B SKILL.md \u7684\u6587\u4EF6\u5939\u653E\u5230\u4ED3\u5E93 <code>.agents/skills</code>\uFF0C\u6216\u4F7F\u7528\u5BFC\u5165 / \u65B0\u5EFA\u3002</p>';
     if (opts.layout === "sections") {
-      root2.innerHTML = `<section class="settings-section"><h3 class="settings-section-title">\u6280\u80FD\u5E93</h3><div class="settings-section-control"><div class="settings-panel-toolbar"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div><div class="settings-panel settings-panel-flush"><div class="skill-tree">${treeHtml}</div></div><p id="skill-page-error" role="status"></p></div></section>`;
+      root2.innerHTML = `<section class="settings-section"><div class="settings-section-control"><div class="settings-panel-toolbar"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div><div class="settings-panel settings-panel-flush"><div class="skill-tree">${treeHtml}</div></div><p id="skill-page-error" role="status"></p></div></section>`;
     } else {
       const head = opts.compact ? `<div class="settings-card-actions skill-compact-actions"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div><p class="muted">\u4ED3\u5E93 <code>${escape(state2.root)}</code> \xB7 \u4E3A\u6BCF\u4E2A\u6280\u80FD\u9009\u62E9\u652F\u6301\u7684\u8D26\u53F7\u3002</p>` : `<div class="settings-card-head accounts-toolbar"><h3>\u6280\u80FD</h3><div class="settings-card-actions"><button type="button" id="skill-reveal-root">\u8BBF\u8FBE</button><button type="button" id="skill-import">\u5BFC\u5165\u6587\u4EF6\u5939</button><button type="button" class="primary" id="skill-new">\uFF0B \u65B0\u5EFA</button></div></div><p class="muted">\u6280\u80FD\u5B58\u653E\u4E8E\u4ED3\u5E93 <code>${escape(state2.root)}</code>\uFF1B\u8FD0\u884C\u65F6\u4EE5\u8F6F\u94FE\u63A5\u6302\u5230 Agent \u5DE5\u4F5C\u533A\u540C\u540D\u8DEF\u5F84\u3002</p>`;
       root2.innerHTML = `${head}<div class="skill-tree">${treeHtml}</div><p id="skill-page-error" role="status"></p>`;
@@ -24249,6 +24249,15 @@ var Tags = [
   ["circle", { cx: "10.5", cy: "6.5", r: ".5", fill: "currentColor" }]
 ];
 
+// node_modules/lucide/dist/esm/icons/trash.mjs
+var Trash = [
+  ["path", { d: "M10 11v6" }],
+  ["path", { d: "M14 11v6" }],
+  ["path", { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" }],
+  ["path", { d: "M3 6h18" }],
+  ["path", { d: "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" }]
+];
+
 // node_modules/lucide/dist/esm/icons/upload.mjs
 var Upload = [
   ["path", { d: "M12 3v12" }],
@@ -24329,7 +24338,8 @@ var I = {
   chevronDown: (o) => icon(ChevronDown, o),
   chevronLeft: (o) => icon(ChevronLeft, o),
   chat: (o) => icon(MessageSquare, o),
-  pen: (o) => icon(PenLine, o)
+  pen: (o) => icon(PenLine, o),
+  trash: (o) => icon(Trash, o)
 };
 
 // aster.js
@@ -30900,6 +30910,7 @@ function render2() {
   saveProfileEditor = null;
   $("#reference-drawer")?.remove();
   $("#published-drawer")?.remove();
+  $("#topic-drawer")?.remove();
   $("#outline-popover")?.remove();
   removeArticleOutline();
   if (composer) {
@@ -32599,6 +32610,7 @@ async function pushWechatDraft(doc3) {
   try {
     toast("\u6B63\u5728\u751F\u6210\u6807\u9898\u56FE\u5E76\u63A8\u9001\u2026");
     const result = await api("wechat-draft-push", {
+      account: doc3.account,
       title: doc3.title || "\u672A\u547D\u540D\u6587\u7AE0",
       html: await publishHTML(doc3.body, {
         keepImages: true,
@@ -33074,48 +33086,81 @@ async function renderTopics() {
     return;
   }
   $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7075\u611F\u5E93</h1></div></header><section class="dashboard topic-dashboard"><div class="topic-composer"><textarea id="topic-input" rows="5" placeholder="\u8BB0\u4E0B\u7075\u611F\u2026 \u652F\u6301 Markdown"></textarea><div class="topic-composer-bar"><span class="muted">Markdown \xB7 \u2318/Ctrl + Enter \u4FDD\u5B58</span><button type="button" id="topic-save" class="primary">\u8BB0\u4E0B</button></div></div><div class="topic-grid" id="topic-grid"><p class="muted">\u52A0\u8F7D\u4E2D\u2026</p></div></section>`;
+  const writeFromTopic = async (rel) => {
+    const topic = await api("topics-read", { path: rel });
+    const firstLine = String(topic.body || "").split(/\r?\n/).map((l) => l.replace(/^#+\s*/, "").trim()).find(Boolean) || "\u672A\u547D\u540D\u6587\u7AE0";
+    const d = {
+      id: crypto.randomUUID(),
+      title: firstLine.slice(0, 80),
+      body: topic.body || "",
+      account,
+      updated: (/* @__PURE__ */ new Date()).toISOString(),
+      chat: [],
+      titles: [],
+      prompts: [],
+      topics: [
+        {
+          text: firstLine.slice(0, 80),
+          at: (/* @__PURE__ */ new Date()).toISOString()
+        }
+      ],
+      checks: [],
+      snapshots: []
+    };
+    state.documents.unshift(d);
+    current = d;
+    page = "write";
+    tab = "topics";
+    pending = null;
+    persist();
+    render2();
+  };
   const draw = (list2) => {
     if (page !== "topics") return;
     const grid = $("#topic-grid");
     if (!grid) return;
     grid.innerHTML = list2.map((t) => {
       const when = t.updated ? new Date(t.updated).toLocaleString("zh-CN") : "";
-      const md = t.body || t.preview || "";
-      return `<div class="result-card topic-card" data-topic="${esc2(t.path)}"><time datetime="${esc2(t.updated || "")}">${esc2(when)}</time><div class="topic-card-body is-md">${md.trim() ? safeHTML(md) : '<p class="muted">\uFF08\u7A7A\uFF09</p>'}</div><button type="button" class="primary" data-write-topic="${esc2(t.path)}">\u5199\u6210\u6587\u7AE0 \u2192</button></div>`;
+      const md = typeof t.body === "string" ? t.body : "";
+      const plain = md.replace(/\r\n/g, "\n").replace(/^#{1,6}\s+/gm, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1").replace(/`([^`]+)`/g, "$1").replace(/^>\s?/gm, "").replace(/^[-*+]\s+/gm, "\u2022 ").trim();
+      return `<div class="result-card topic-card" data-topic="${esc2(t.path)}"><div class="topic-card-head"><time datetime="${esc2(t.updated || "")}">${esc2(when)}</time><div class="topic-card-actions"><button type="button" class="ghost icon-btn" data-write-topic="${esc2(t.path)}" title="\u5199\u6210\u6587\u7AE0" aria-label="\u5199\u6210\u6587\u7AE0">${I.pen({ size: 15 })}</button><button type="button" class="ghost icon-btn danger" data-delete-topic="${esc2(t.path)}" title="\u5220\u9664\u7075\u611F" aria-label="\u5220\u9664\u7075\u611F">${I.trash({ size: 15 })}</button></div></div><div class="topic-card-body" data-open-topic="${esc2(t.path)}" role="button" tabindex="0">${plain ? esc2(plain) : '<span class="muted">\uFF08\u7A7A\uFF09</span>'}</div></div>`;
     }).join("") || '<div class="empty-state topic-empty"><img src="assets/empty-topics.png" alt="" class="empty-state-img" /><p class="empty-state-text">\u8FD8\u6CA1\u6709\u7075\u611F\uFF0C\u5728\u4E0A\u65B9\u5199\u4E00\u6761\u5427</p></div>';
+    const deleteTopic = async (rel) => {
+      if (!await askConfirm("\u5220\u9664\u7075\u611F", "\u786E\u5B9A\u5220\u9664\u8FD9\u6761\u7075\u611F\uFF1F")) return;
+      try {
+        draw(await api("topics-delete", { path: rel }));
+        $("#topic-drawer")?.remove();
+        toast("\u5DF2\u5220\u9664");
+      } catch (err) {
+        toast(err.message);
+      }
+    };
     $$("[data-write-topic]").forEach((b) => {
       b.onclick = async (e) => {
         e.stopPropagation();
         try {
-          const topic = await api("topics-read", { path: b.dataset.writeTopic });
-          const firstLine = String(topic.body || "").split(/\r?\n/).map((l) => l.replace(/^#+\s*/, "").trim()).find(Boolean) || "\u672A\u547D\u540D\u6587\u7AE0";
-          const d = {
-            id: crypto.randomUUID(),
-            title: firstLine.slice(0, 80),
-            body: topic.body || "",
-            account,
-            updated: (/* @__PURE__ */ new Date()).toISOString(),
-            chat: [],
-            titles: [],
-            prompts: [],
-            topics: [
-              {
-                text: firstLine.slice(0, 80),
-                at: (/* @__PURE__ */ new Date()).toISOString()
-              }
-            ],
-            checks: [],
-            snapshots: []
-          };
-          state.documents.unshift(d);
-          current = d;
-          page = "write";
-          tab = "topics";
-          pending = null;
-          persist();
-          render2();
+          await writeFromTopic(b.dataset.writeTopic);
         } catch (err) {
           toast(err.message);
+        }
+      };
+    });
+    $$("[data-delete-topic]").forEach((b) => {
+      b.onclick = (e) => {
+        e.stopPropagation();
+        deleteTopic(b.dataset.deleteTopic);
+      };
+    });
+    $$("[data-open-topic]").forEach((el) => {
+      const open = () => openTopicDrawer(el.dataset.openTopic, { onSaved: draw });
+      el.onclick = (e) => {
+        e.stopPropagation();
+        open();
+      };
+      el.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          open();
         }
       };
     });
@@ -33127,15 +33172,7 @@ async function renderTopics() {
           {
             label: "\u5220\u9664\u7075\u611F",
             danger: true,
-            run: async () => {
-              if (!await askConfirm("\u5220\u9664\u7075\u611F", "\u786E\u5B9A\u5220\u9664\u8FD9\u6761\u7075\u611F\uFF1F")) return;
-              try {
-                draw(await api("topics-delete", { path: rel }));
-                toast("\u5DF2\u5220\u9664");
-              } catch (err) {
-                toast(err.message);
-              }
-            }
+            run: () => deleteTopic(rel)
           }
         ]);
       };
@@ -33166,7 +33203,19 @@ async function renderTopics() {
   });
   requestAnimationFrame(() => $("#topic-input")?.focus());
   try {
-    draw(await api("topics-list", { account }));
+    const list2 = await api("topics-list", { account });
+    const hydrated = await Promise.all(
+      (list2 || []).map(async (t) => {
+        if (typeof t.body === "string") return t;
+        try {
+          const full = await api("topics-read", { path: t.path });
+          return { ...t, body: full.body || "" };
+        } catch {
+          return { ...t, body: "" };
+        }
+      })
+    );
+    draw(hydrated);
   } catch (err) {
     const grid = $("#topic-grid");
     if (grid)
@@ -33174,8 +33223,105 @@ async function renderTopics() {
     toast(err.message);
   }
 }
+async function openTopicDrawer(rel, opts = {}) {
+  let topic;
+  try {
+    topic = await api("topics-read", { path: rel });
+  } catch (err) {
+    toast(err.message);
+    return;
+  }
+  $("#topic-drawer")?.remove();
+  $("#reference-drawer")?.remove();
+  $("#published-drawer")?.remove();
+  const when = topic.updated ? new Date(topic.updated).toLocaleString("zh-CN") : topic.title || "\u7075\u611F";
+  const n = document.createElement("aside");
+  n.id = "topic-drawer";
+  n.className = "reference-drawer topic-drawer";
+  n.innerHTML = `<div class="row reference-drawer-head"><h3>${esc2(when)}</h3><div class="reference-drawer-toolbar"><button type="button" class="ghost" id="topic-drawer-mode">\u7F16\u8F91</button><button type="button" class="ghost icon-btn" id="topic-drawer-write" title="\u5199\u6210\u6587\u7AE0" aria-label="\u5199\u6210\u6587\u7AE0">${I.pen({ size: 16 })}</button><button type="button" class="ghost icon-btn" id="close-topic-drawer" title="\u5173\u95ED" aria-label="\u5173\u95ED">${I.close({ size: 18 })}</button></div></div><div class="reference-drawer-body topic-drawer-body"><div id="topic-drawer-preview" class="topic-drawer-preview is-md">${topic.body?.trim() ? safeHTML(topic.body) : '<p class="muted">\uFF08\u7A7A\uFF09</p>'}</div><textarea id="topic-drawer-editor" class="topic-drawer-editor hidden" spellcheck="false">${esc2(topic.body || "")}</textarea></div><div class="topic-drawer-foot hidden" id="topic-drawer-foot"><button type="button" class="ghost" id="topic-drawer-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="topic-drawer-save">\u4FDD\u5B58</button></div>`;
+  document.body.append(n);
+  let editing = false;
+  const preview = $("#topic-drawer-preview");
+  const editor2 = $("#topic-drawer-editor");
+  const foot = $("#topic-drawer-foot");
+  const modeBtn = $("#topic-drawer-mode");
+  const setMode = (edit2) => {
+    editing = edit2;
+    preview.classList.toggle("hidden", edit2);
+    editor2.classList.toggle("hidden", !edit2);
+    foot.classList.toggle("hidden", !edit2);
+    modeBtn.textContent = edit2 ? "\u9884\u89C8" : "\u7F16\u8F91";
+    if (edit2) {
+      requestAnimationFrame(() => {
+        editor2.focus();
+        editor2.setSelectionRange(editor2.value.length, editor2.value.length);
+      });
+    } else {
+      const md = editor2.value;
+      preview.innerHTML = md.trim() ? safeHTML(md) : '<p class="muted">\uFF08\u7A7A\uFF09</p>';
+    }
+  };
+  $("#close-topic-drawer").onclick = () => n.remove();
+  modeBtn.onclick = () => setMode(!editing);
+  $("#topic-drawer-cancel").onclick = () => {
+    editor2.value = topic.body || "";
+    setMode(false);
+  };
+  $("#topic-drawer-save").onclick = async () => {
+    try {
+      const list2 = await api("topics-save", {
+        path: topic.path,
+        body: editor2.value
+      });
+      topic = { ...topic, body: editor2.value };
+      setMode(false);
+      opts.onSaved?.(list2);
+      toast("\u5DF2\u4FDD\u5B58");
+    } catch (err) {
+      toast(err.message);
+    }
+  };
+  $("#topic-drawer-write").onclick = async () => {
+    try {
+      if (editing && editor2.value !== (topic.body || "")) {
+        await api("topics-save", { path: topic.path, body: editor2.value });
+        topic.body = editor2.value;
+      }
+      n.remove();
+      const firstLine = String(topic.body || "").split(/\r?\n/).map((l) => l.replace(/^#+\s*/, "").trim()).find(Boolean) || "\u672A\u547D\u540D\u6587\u7AE0";
+      const d = {
+        id: crypto.randomUUID(),
+        title: firstLine.slice(0, 80),
+        body: topic.body || "",
+        account,
+        updated: (/* @__PURE__ */ new Date()).toISOString(),
+        chat: [],
+        titles: [],
+        prompts: [],
+        topics: [
+          {
+            text: firstLine.slice(0, 80),
+            at: (/* @__PURE__ */ new Date()).toISOString()
+          }
+        ],
+        checks: [],
+        snapshots: []
+      };
+      state.documents.unshift(d);
+      current = d;
+      page = "write";
+      tab = "topics";
+      pending = null;
+      persist();
+      render2();
+    } catch (err) {
+      toast(err.message);
+    }
+  };
+}
 function settingsSection({ title, control, className = "" }) {
-  return `<section class="settings-section ${className}"><h3 class="settings-section-title">${esc2(title)}</h3><div class="settings-section-control">${control}</div></section>`;
+  const titleHtml = title ? `<h3 class="settings-section-title">${esc2(title)}</h3>` : "";
+  return `<section class="settings-section ${className}">${titleHtml}<div class="settings-section-control">${control}</div></section>`;
 }
 function settingsPanel(inner, className = "") {
   return `<div class="settings-panel ${className}">${inner}</div>`;
@@ -33529,7 +33675,6 @@ async function renderAgentDetail() {
   await fillAgentCard(p);
 }
 function renderSettings() {
-  const wx = state.wechat || {};
   if (settingsTab !== "config" && settingsTab !== "agents" && settingsTab !== "accounts" && settingsTab !== "groups" && settingsTab !== "skills")
     settingsTab = "config";
   const tabs = [
@@ -33541,39 +33686,18 @@ function renderSettings() {
   ];
   const configBody = [
     settingsSection({
-      title: "\u5185\u5BB9\u4ED3\u5E93",
       control: settingsPanel(
-        `${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc2).join("<br>")}</p>` : ""}` + settingsField(
-          "\u4ED3\u5E93\u8DEF\u5F84",
-          `<span class="settings-path-row"><input id="vault-path" value="${esc2(state.vaultPath || state.source || "")}" placeholder="\u9009\u62E9 Content_OS \u76EE\u5F55" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} \u9009\u62E9</button><button type="button" class="ghost" id="refresh-vault">${I.refresh()} \u5237\u65B0</button></span>`
-        ) + (state.vaultLocked ? `<p class="settings-hint">\u5F53\u524D\u4ED3\u5E93\u7531\u73AF\u5883\u53D8\u91CF\u6307\u5B9A\uFF0C\u65E0\u6CD5\u5728\u754C\u9762\u4E2D\u66F4\u6539\u3002</p>` : "")
+        `<h3 class="settings-section-title">\u5173\u4E8E</h3><div class="settings-app-identity"><img src="assets/logo.png" alt="" class="settings-app-logo" width="48" height="48"><div class="settings-app-meta"><strong class="settings-app-name">Aster*</strong><div class="settings-status-row"><div><span class="settings-field-label">\u5F53\u524D\u7248\u672C</span><strong class="settings-version">${esc2(state._appVersion || "\u2026")}</strong></div></div></div></div><div class="settings-panel-footer"><button type="button" id="open-releases">${I.external()} \u53D1\u5E03\u9875</button><button type="button" id="check-update">${I.refresh()} \u68C0\u6D4B\u66F4\u65B0</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">\u4E0B\u8F7D\u5E76\u5B89\u88C5</button>` : ""}</div>`
       )
     }),
     settingsSection({
-      title: "\u5FAE\u4FE1\u516C\u4F17\u53F7",
       control: settingsPanel(
-        settingsField(
-          "AppID",
-          `<input id="wechat-appid" value="${esc2(wx.appId || "")}" placeholder="wx\u2026" autocomplete="off">`
-        ) + settingsField(
-          "AppSecret",
-          `<input id="wechat-secret" type="password" value="${esc2(wx.appSecret || "")}" placeholder="\u5BC6\u94A5" autocomplete="off">`
-        ) + settingsField(
-          "\u9ED8\u8BA4\u4F5C\u8005",
-          `<input id="wechat-author" value="${esc2(wx.author || "")}" placeholder="\u53EF\u9009" autocomplete="off">`
-        ) + `<div class="settings-panel-footer"><button type="button" id="wechat-test">\u6D4B\u8BD5\u8FDE\u63A5</button><button type="button" class="primary" id="save-wechat">\u4FDD\u5B58</button></div>`
-      )
-    }),
-    settingsSection({
-      title: "\u5E94\u7528\u66F4\u65B0",
-      control: settingsPanel(
-        `<div class="settings-status-row"><div><span class="settings-field-label">\u5F53\u524D\u7248\u672C</span><strong class="settings-version">${esc2(state._appVersion || "\u2026")}</strong></div></div><div class="settings-panel-footer"><button type="button" id="open-releases">${I.external()} \u53D1\u5E03\u9875</button><button type="button" id="check-update">${I.refresh()} \u68C0\u6D4B\u66F4\u65B0</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">\u4E0B\u8F7D\u5E76\u5B89\u88C5</button>` : ""}</div>`
+        `<h3 class="settings-section-title">\u4ED3\u5E93\u8DEF\u5F84</h3>${state.warnings?.length ? `<p class="notice">${state.warnings.map(esc2).join("<br>")}</p>` : ""}<span class="settings-path-row"><input id="vault-path" value="${esc2(state.vaultPath || state.source || "")}" placeholder="\u9009\u62E9 Content_OS \u76EE\u5F55" readonly><button type="button" id="pick-vault" ${state.vaultLocked ? "disabled" : ""}>${I.folder()} \u9009\u62E9</button><button type="button" class="ghost" id="refresh-vault">${I.refresh()} \u5237\u65B0</button></span>` + (state.vaultLocked ? `<p class="settings-hint">\u5F53\u524D\u4ED3\u5E93\u7531\u73AF\u5883\u53D8\u91CF\u6307\u5B9A\uFF0C\u65E0\u6CD5\u5728\u754C\u9762\u4E2D\u66F4\u6539\u3002</p>` : "")
       )
     })
   ].join("");
   const agentsBody = [
     settingsSection({
-      title: "\u4F7F\u7528\u7EDF\u8BA1",
       className: "settings-section-agents",
       control: `<section id="agent-usage" class="agent-usage"></section>`
     }),
@@ -33585,7 +33709,6 @@ function renderSettings() {
   ].join("");
   const accounts = accountList();
   const accountsBody = settingsSection({
-    title: "\u5199\u4F5C\u8D26\u53F7",
     control: `<div class="settings-panel-toolbar"><button type="button" id="register-account">${I.folder()} \u9009\u62E9\u6587\u4EF6\u5939</button><button type="button" class="primary" id="create-account">${I.plus()} \u65B0\u5EFA\u8D26\u53F7</button></div>` + (accounts.length ? `<div class="account-list">${accounts.map(
       (a) => `<button type="button" class="account-list-item" data-open-account="${esc2(a.id)}"><span class="account-avatar-btn account-avatar-md" aria-hidden="true">${accountAvatarHtml(a)}</span><span class="account-list-main"><strong>${esc2(a.label)}</strong><span class="muted">${a.drafts ?? 0} \u8349\u7A3F \xB7 ${a.archives ?? 0} \u5F52\u6863 \xB7 ${formatBytes(a.bytes)}</span></span><span class="account-list-chevron" aria-hidden="true">\u203A</span></button>`
     ).join("")}</div>` : settingsPanel(
@@ -33594,7 +33717,6 @@ function renderSettings() {
   });
   const groups = groupNames();
   const groupsBody = settingsSection({
-    title: "\u6587\u7AE0\u5206\u7EC4",
     control: `<div class="settings-panel-toolbar"><button type="button" class="primary" id="create-group">${I.plus()} \u65B0\u5EFA\u5206\u7EC4</button></div>` + (groups.length ? settingsPanel(
       `<table class="groups-table"><thead><tr><th>\u5206\u7EC4</th><th>\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84</th><th class="groups-actions-col">\u64CD\u4F5C</th></tr></thead><tbody>${groups.map((name) => {
         const backup = state.groups?.[name]?.backupPath || "";
@@ -33643,29 +33765,6 @@ function renderSettings() {
     $("#check-update").onclick = () => checkForAppUpdate({ manual: true });
     const installBtn = $("#install-update");
     if (installBtn) installBtn.onclick = () => installAppUpdate();
-    const readWechatForm = () => {
-      state.wechat = {
-        appId: $("#wechat-appid").value.trim(),
-        appSecret: $("#wechat-secret").value.trim(),
-        author: $("#wechat-author").value.trim(),
-        coverPath: state.wechat?.coverPath || ""
-      };
-    };
-    $("#wechat-test").onclick = async () => {
-      readWechatForm();
-      await persist();
-      try {
-        await api("wechat-test-token");
-        toast("\u516C\u4F17\u53F7\u51ED\u8BC1\u6709\u6548");
-      } catch (e) {
-        toast(e.message || "\u8FDE\u63A5\u5931\u8D25");
-      }
-    };
-    $("#save-wechat").onclick = () => {
-      readWechatForm();
-      persist();
-      toast("\u516C\u4F17\u53F7\u8BBE\u7F6E\u5DF2\u4FDD\u5B58");
-    };
     $("#pick-vault").onclick = async () => {
       if (isWeb()) return toast("\u9009\u62E9\u4ED3\u5E93\u4EC5\u652F\u6301\u684C\u9762\u7AEF");
       if (state.vaultLocked) return toast("\u5F53\u524D\u4ED3\u5E93\u7531\u73AF\u5883\u53D8\u91CF\u6307\u5B9A\uFF0C\u65E0\u6CD5\u66F4\u6539");
@@ -34144,6 +34243,7 @@ function openPreview({
 }) {
   $("#reference-drawer")?.remove();
   $("#published-drawer")?.remove();
+  $("#topic-drawer")?.remove();
   const r = material || reference || {
     name: title,
     text,
@@ -34322,7 +34422,8 @@ async function renderAccountDetail() {
     });
   };
   if (accountDetailTab === "detail") {
-    const backup = state.backupPaths?.[a.id] || "";
+    const backup = state.backupPaths?.[a] || "";
+    const wx = state.wechatAccounts?.[a] || (state.wechat?.appId || state.wechat?.appSecret ? state.wechat : {}) || {};
     shell(
       [
         settingsSection({
@@ -34338,6 +34439,21 @@ async function renderAccountDetail() {
               "\u5907\u4EFD\u8DEF\u5F84",
               `<span class="settings-path-row"><input type="text" value="${esc2(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9" readonly><button type="button" id="account-pick-backup">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" id="account-clear-backup">\u6E05\u9664</button>` : ""}</span>`
             )
+          )
+        }),
+        settingsSection({
+          title: "\u5FAE\u4FE1\u516C\u4F17\u53F7",
+          control: settingsPanel(
+            settingsField(
+              "AppID",
+              `<input id="wechat-appid" value="${esc2(wx.appId || "")}" placeholder="wx\u2026" autocomplete="off">`
+            ) + settingsField(
+              "AppSecret",
+              `<input id="wechat-secret" type="password" value="${esc2(wx.appSecret || "")}" placeholder="\u5BC6\u94A5" autocomplete="off">`
+            ) + settingsField(
+              "\u9ED8\u8BA4\u4F5C\u8005",
+              `<input id="wechat-author" value="${esc2(wx.author || "")}" placeholder="\u53EF\u9009" autocomplete="off">`
+            ) + `<p class="settings-hint">\u6BCF\u4E2A\u8D26\u53F7\u72EC\u7ACB\u914D\u7F6E\uFF0C\u63A8\u9001\u8349\u7A3F\u65F6\u4F7F\u7528\u5F53\u524D\u6587\u7AE0\u6240\u5C5E\u8D26\u53F7\u7684\u51ED\u8BC1\u3002</p><div class="settings-panel-footer"><button type="button" id="wechat-test">\u6D4B\u8BD5\u8FDE\u63A5</button><button type="button" class="primary" id="save-wechat">\u4FDD\u5B58</button></div>`
           )
         })
       ].join("")
@@ -34355,6 +34471,31 @@ async function renderAccountDetail() {
           toast(e.message || "\u6E05\u9664\u5931\u8D25");
         }
       };
+    const readWechatForm = () => {
+      const next2 = {
+        appId: $("#wechat-appid").value.trim(),
+        appSecret: $("#wechat-secret").value.trim(),
+        author: $("#wechat-author").value.trim(),
+        coverPath: state.wechatAccounts?.[a]?.coverPath || state.wechat?.coverPath || ""
+      };
+      state.wechatAccounts = { ...state.wechatAccounts || {}, [a]: next2 };
+      return next2;
+    };
+    $("#wechat-test").onclick = async () => {
+      readWechatForm();
+      await persist();
+      try {
+        await api("wechat-test-token", { account: a });
+        toast("\u516C\u4F17\u53F7\u51ED\u8BC1\u6709\u6548");
+      } catch (e) {
+        toast(e.message || "\u8FDE\u63A5\u5931\u8D25");
+      }
+    };
+    $("#save-wechat").onclick = () => {
+      readWechatForm();
+      persist();
+      toast("\u516C\u4F17\u53F7\u8BBE\u7F6E\u5DF2\u4FDD\u5B58");
+    };
     return;
   }
   if (accountDetailTab === "skills") {
@@ -34562,6 +34703,7 @@ lucide/dist/esm/icons/send-horizontal.mjs:
 lucide/dist/esm/icons/settings.mjs:
 lucide/dist/esm/icons/sparkles.mjs:
 lucide/dist/esm/icons/tags.mjs:
+lucide/dist/esm/icons/trash.mjs:
 lucide/dist/esm/icons/upload.mjs:
 lucide/dist/esm/icons/wand-sparkles.mjs:
 lucide/dist/esm/icons/x.mjs:

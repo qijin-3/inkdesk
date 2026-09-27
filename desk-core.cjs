@@ -34,6 +34,11 @@ const defaults = {
    * 本地同步默认路径优先按文章「分组」字段解析。
    */
   groups: {},
+  /**
+   * 各账号的公众号同步凭证：accountId → { appId, appSecret, author, coverPath }
+   * 旧版全局 wechat 仅作迁移回退，新写入一律进 wechatAccounts。
+   */
+  wechatAccounts: {},
   wechat: {
     appId: "",
     appSecret: "",
@@ -102,6 +107,7 @@ const API_CHANNELS = [
   "topics-list",
   "topics-create",
   "topics-read",
+  "topics-save",
   "topics-delete",
   "wechat-draft-push",
   "wechat-test-token",
@@ -133,7 +139,7 @@ class DeskCore {
     this.knowledge = null;
     this.accountModel = null;
     this.onAgentProgress = null;
-    /** @type {{ token?: string, expiresAt?: number }} */
+    /** @type {Record<string, { token?: string, expiresAt?: number }>} appId → token cache */
     this.wechatTokenCache = {};
   }
 
@@ -175,6 +181,10 @@ class DeskCore {
         agentModels: {
           ...defaults.agentModels,
           ...(loaded.agentModels || {}),
+        },
+        wechatAccounts: {
+          ...defaults.wechatAccounts,
+          ...(loaded.wechatAccounts || {}),
         },
         wechat: {
           ...defaults.wechat,
@@ -281,6 +291,7 @@ class DeskCore {
       metricDeltas: this.store.metricDeltas || {},
       backupPaths: this.store.backupPaths || {},
       groups: this.store.groups || {},
+      wechatAccounts: this.publicWechatAccounts(),
       wechat: {
         appId: this.store.wechat?.appId || "",
         appSecret: this.store.wechat?.appSecret || "",
@@ -316,6 +327,7 @@ class DeskCore {
       metricDeltas: this.store.metricDeltas || {},
       backupPaths: this.store.backupPaths || {},
       groups: this.store.groups || {},
+      wechatAccounts: this.publicWechatAccounts(),
       wechat: {
         appId: this.store.wechat?.appId || "",
         appSecret: this.store.wechat?.appSecret || "",
@@ -868,7 +880,18 @@ class DeskCore {
         return this.publicState();
       }
       case "account-unregister": {
-        this.vault.unregisterAccount(data?.id || data);
+        const removed = String(data?.id || data || "").trim();
+        let accountKey = removed;
+        try {
+          accountKey = this.vault.resolveAccountId(removed);
+        } catch {
+          /* 用原始 id 清理附属配置 */
+        }
+        this.vault.unregisterAccount(removed);
+        if (this.store.wechatAccounts?.[accountKey]) {
+          delete this.store.wechatAccounts[accountKey];
+          this.save();
+        }
         this.reload();
         return this.publicState();
       }
@@ -1012,6 +1035,8 @@ class DeskCore {
         return this.vault.createTopic(data.account, data);
       case "topics-read":
         return this.vault.readTopic(data?.path ?? data);
+      case "topics-save":
+        return this.vault.updateTopic(data.path, data);
       case "topics-delete":
         return this.vault.deleteTopic(data?.path ?? data);
       case "finalize":
@@ -1052,7 +1077,7 @@ class DeskCore {
       case "wechat-draft-push":
         return this.pushWechatDraft(data);
       case "wechat-test-token":
-        return this.testWechatToken();
+        return this.testWechatToken(data);
       default:
         throw Error("Unknown channel: " + name);
     }
@@ -1613,28 +1638,47 @@ class DeskCore {
     });
   }
 
+  /**
+   * 对外暴露的各账号公众号配置快照。
+   * @returns {Record<string, { appId: string, appSecret: string, author: string, coverPath: string }>}
+   */
+  publicWechatAccounts() {
+    const out = {};
+    const map = this.store.wechatAccounts || {};
+    for (const [id, w] of Object.entries(map)) {
+      if (!w || typeof w !== "object") continue;
+      out[id] = {
+        appId: w.appId || "",
+        appSecret: w.appSecret || "",
+        author: w.author || "",
+        coverPath: w.coverPath || "",
+      };
+    }
+    return out;
+  }
+
   /** 校验公众号凭证能否换取 access_token */
-  async testWechatToken() {
-    const cfg = this.wechatConfig();
-    this.wechatTokenCache = {};
+  async testWechatToken(payload = {}) {
+    const cfg = this.wechatConfig(payload?.account);
+    delete this.wechatTokenCache[cfg.appId];
     const token = await wechatMp.getAccessToken(
       cfg.appId,
       cfg.appSecret,
-      this.wechatTokenCache,
+      this.wechatTokenBucket(cfg.appId),
     );
     return { ok: true, preview: token.slice(0, 8) + "…" };
   }
 
   /**
    * 将排版 HTML 推送到公众号草稿箱：上传正文图与封面，再 draft/add。
-   * @param {{ title: string, author?: string, digest?: string, html: string, coverPath?: string }} payload
+   * @param {{ account?: string, title: string, author?: string, digest?: string, html: string, coverPath?: string }} payload
    */
   async pushWechatDraft(payload) {
-    const cfg = this.wechatConfig();
+    const cfg = this.wechatConfig(payload?.account);
     const token = await wechatMp.getAccessToken(
       cfg.appId,
       cfg.appSecret,
-      this.wechatTokenCache,
+      this.wechatTokenBucket(cfg.appId),
     );
     let html = String(payload.html || "");
     if (!html.trim()) throw Error("正文为空");
@@ -1673,7 +1717,7 @@ class DeskCore {
       payload.coverPath || cfg.coverPath || uploadedFiles[0] || "";
     if (!coverPath || !fs.existsSync(coverPath))
       throw Error(
-        "缺少封面图：请在设置中指定默认封面，或在正文加入至少一张本地图片",
+        "缺少封面图：请在账号设置中指定默认封面，或在正文加入至少一张本地图片",
       );
     const thumb = await wechatMp.uploadPermanentImage(
       token,
@@ -1734,14 +1778,35 @@ class DeskCore {
   }
 
   /**
-   * 读取并校验公众号配置。
+   * 按 appId 取 token 缓存桶。
+   * @param {string} appId
    */
-  wechatConfig() {
-    const w = this.store.wechat || {};
+  wechatTokenBucket(appId) {
+    const key = String(appId || "");
+    if (!this.wechatTokenCache[key]) this.wechatTokenCache[key] = {};
+    return this.wechatTokenCache[key];
+  }
+
+  /**
+   * 读取并校验指定账号的公众号配置；账号未单独保存过时回退旧版全局 wechat。
+   * @param {string} [accountId]
+   */
+  wechatConfig(accountId) {
+    let id = String(accountId || "").trim();
+    if (id && this.vault) {
+      try {
+        id = this.vault.resolveAccountId(id);
+      } catch {
+        /* 保留原 id，便于未绑定 vault 时的测试 */
+      }
+    }
+    const map = this.store.wechatAccounts || {};
+    const hasEntry = id && Object.prototype.hasOwnProperty.call(map, id);
+    const w = hasEntry ? map[id] || {} : this.store.wechat || {};
     const appId = String(w.appId || "").trim();
     const appSecret = String(w.appSecret || "").trim();
     if (!appId || !appSecret)
-      throw Error("请先在设置中填写公众号 AppID 与 AppSecret");
+      throw Error("请先在该账号设置中填写公众号 AppID 与 AppSecret");
     return {
       appId,
       appSecret,
