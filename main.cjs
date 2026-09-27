@@ -16,7 +16,23 @@ const { DeskCore } = require("./desk-core.cjs");
 const updater = require("./update.cjs");
 
 if (process.platform === "darwin") {
-  app.setName("AsIde");
+  app.setName("Aster*");
+}
+
+// 显示名含 *，userData 用安全目录名；兼容从 AsIde / inkdesk 迁移
+{
+  const appData = app.getPath("appData");
+  const userData = path.join(appData, "Aster");
+  if (!fs.existsSync(userData)) {
+    for (const legacy of ["AsIde", "inkdesk"]) {
+      const src = path.join(appData, legacy);
+      if (fs.existsSync(src)) {
+        fs.cpSync(src, userData, { recursive: true });
+        break;
+      }
+    }
+  }
+  app.setPath("userData", userData);
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -37,7 +53,7 @@ function createWindow() {
     height: 940,
     minWidth: 1050,
     minHeight: 700,
-    title: "AsIde",
+    title: "Aster*",
     icon: path.join(__dirname, "assets", "logo.png"),
     backgroundColor: "#f7f6f2",
     titleBarStyle: "hiddenInset",
@@ -167,6 +183,10 @@ const passthrough = new Set([
   "materials-read",
   "materials-delete",
   "materials-link",
+  "topics-list",
+  "topics-create",
+  "topics-read",
+  "topics-delete",
   "wechat-draft-push",
   "wechat-test-token",
   "set-vault",

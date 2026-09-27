@@ -71,7 +71,7 @@ function run(cmd, args, opts = {}) {
 function fetchBuffer(url, opts = {}) {
   return new Promise((resolve, reject) => {
     const headers = {
-      "User-Agent": "AsIde-Updater",
+      "User-Agent": "Aster-Updater",
       Accept: opts.accept || "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
     };
@@ -114,7 +114,7 @@ async function downloadFile(url, opts = {}) {
   let current = url;
   for (let hop = 0; hop < 8; hop++) {
     const res = await new Promise((resolve, reject) => {
-      const headers = { "User-Agent": "AsIde-Updater" };
+      const headers = { "User-Agent": "Aster-Updater" };
       // API asset URL 必须带 octet-stream，否则会返回 JSON 元数据而非文件
       if (/api\.github\.com\/.+\/releases\/assets\//i.test(current)) {
         headers.Accept = "application/octet-stream";
@@ -211,7 +211,7 @@ function pickMacAsset(release) {
       else return { asset: a, score: 0, name };
       if (/mac|darwin|osx/i.test(name)) score += 5;
       if (/arm64|aarch64|apple.?silicon/i.test(name)) score += 3;
-      if (/AsIde|Inkdesk/i.test(name)) score += 2;
+      if (/Aster|AsIde|Inkdesk/i.test(name)) score += 2;
       return { asset: a, score, name };
     })
     .filter((x) => x.score >= 15)
@@ -279,7 +279,9 @@ function findApp(dir) {
     const p = path.join(dir, e.name);
     if (
       e.isDirectory() &&
-      (e.name === "AsIde.app" || e.name === "Inkdesk.app")
+      (e.name === "Aster.app" ||
+        e.name === "AsIde.app" ||
+        e.name === "Inkdesk.app")
     )
       return p;
   }
@@ -329,7 +331,7 @@ async function extractDmg(dmgPath, extractDir) {
   }
   try {
     const appPath = findApp(mountPoint);
-    if (!appPath) throw Error("DMG 中未找到 AsIde.app");
+    if (!appPath) throw Error("DMG 中未找到 Aster.app");
     const dest = path.join(extractDir, path.basename(appPath));
     const copy = await run("ditto", [appPath, dest]);
     if (copy.code !== 0) throw Error(`从 DMG 复制应用失败（${copy.code}）`);
@@ -385,7 +387,7 @@ async function downloadAndInstall(opts) {
   }
 
   const newApp = findApp(extractDir);
-  if (!newApp) throw Error("安装包中未找到 AsIde.app");
+  if (!newApp) throw Error("安装包中未找到 Aster.app");
 
   const currentApp = path.resolve(process.execPath, "../../..");
   if (!currentApp.endsWith(".app")) {
@@ -402,7 +404,8 @@ NEW="$2"
 WORK="$3"
 sleep 1
 for i in $(seq 1 60); do
-  if ! pgrep -f "AsIde.app/Contents/MacOS/AsIde" >/dev/null 2>&1 && \\
+  if ! pgrep -f "Aster.app/Contents/MacOS/Aster" >/dev/null 2>&1 && \\
+     ! pgrep -f "AsIde.app/Contents/MacOS/AsIde" >/dev/null 2>&1 && \\
      ! pgrep -f "Inkdesk.app/Contents/MacOS/Inkdesk" >/dev/null 2>&1; then
     break
   fi

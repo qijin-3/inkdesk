@@ -94,7 +94,7 @@ function mountAgentUsage(root2, api2, providers, opts = {}) {
   const lockedProvider = mode === "detail" && providers.some((p) => p.id === opts.provider) ? opts.provider : "all";
   let days = 30, provider = lockedProvider, metric = "calls", request = 0;
   const title = mode === "detail" ? `${esc(providers.find((p) => p.id === provider)?.label || provider)} \u8C03\u7528\u660E\u7EC6` : "\u603B\u89C8";
-  const hint = mode === "detail" ? "\u4EC5\u7EDF\u8BA1\u901A\u8FC7 AsIde \u53D1\u8D77\u7684\u8C03\u7528\uFF0C\u4ECE\u542F\u7528\u6B64\u7248\u672C\u540E\u5F00\u59CB\u8BB0\u5F55\u3002" : "\u4EC5\u7EDF\u8BA1\u901A\u8FC7 AsIde \u53D1\u8D77\u7684\u8C03\u7528\uFF0C\u4ECE\u542F\u7528\u6B64\u7248\u672C\u540E\u5F00\u59CB\u8BB0\u5F55\u3002\u8FDB\u5165\u4E0B\u65B9\u6A21\u578B\u5361\u7247\u53EF\u67E5\u770B\u5404 Agent \u660E\u7EC6\u4E0E\u8FDE\u63A5\u914D\u7F6E\u3002";
+  const hint = mode === "detail" ? "\u4EC5\u7EDF\u8BA1\u901A\u8FC7 Aster* \u53D1\u8D77\u7684\u8C03\u7528\uFF0C\u4ECE\u542F\u7528\u6B64\u7248\u672C\u540E\u5F00\u59CB\u8BB0\u5F55\u3002" : "\u4EC5\u7EDF\u8BA1\u901A\u8FC7 Aster* \u53D1\u8D77\u7684\u8C03\u7528\uFF0C\u4ECE\u542F\u7528\u6B64\u7248\u672C\u540E\u5F00\u59CB\u8BB0\u5F55\u3002\u8FDB\u5165\u4E0B\u65B9\u6A21\u578B\u5361\u7247\u53EF\u67E5\u770B\u5404 Agent \u660E\u7EC6\u4E0E\u8FDE\u63A5\u914D\u7F6E\u3002";
   root2.innerHTML = `<div class="usage-head"><div><h3>${title}</h3><p class="settings-hint">${hint}</p></div><div class="usage-filters"><select aria-label="\u7EDF\u8BA1\u5468\u671F" id="usage-days"><option value="7">\u8FD1 7 \u5929</option><option value="30" selected>\u8FD1 30 \u5929</option><option value="90">\u8FD1 90 \u5929</option></select><button type="button" class="ghost" id="usage-refresh">\u5237\u65B0</button></div></div><div id="usage-content" aria-live="polite">\u8BFB\u53D6\u7EDF\u8BA1\u2026</div>`;
   const content = root2.querySelector("#usage-content");
   async function load() {
@@ -30834,7 +30834,7 @@ function showSaveConflictDialog(msg) {
   const m = document.createElement("div");
   m.id = "save-conflict-modal";
   m.className = "modal";
-  m.innerHTML = '<div class="dialog"><h2>\u6587\u7AE0\u5DF2\u5728\u5916\u90E8\u4FEE\u6539</h2><p>\u78C1\u76D8\u4E0A\u7684\u8349\u7A3F\u4E0E\u5F53\u524D\u7F16\u8F91\u5668\u4E0D\u4E00\u81F4\u3002\u7EE7\u7EED\u81EA\u52A8\u4FDD\u5B58\u4F1A\u8986\u76D6\u5916\u90E8\u6539\u52A8\uFF0C\u56E0\u6B64\u5DF2\u6682\u505C\u4FDD\u5B58\u3002</p><p class="muted">\u5E38\u89C1\u539F\u56E0\uFF1A\u5728 Obsidian / \u5176\u4ED6\u7F16\u8F91\u5668\u4E2D\u6539\u8FC7\u540C\u4E00\u7BC7\uFF0C\u6216\u53E6\u4E00\u7A97\u53E3\u4E5F\u6253\u5F00\u4E86 AsIde\u3002</p><div class="row"><button type="button" id="conflict-keep">\u5148\u7559\u5728\u7F16\u8F91\u5668</button><button type="button" id="conflict-reload" class="primary">\u5907\u4EFD\u672A\u4FDD\u5B58\u5185\u5BB9\u5E76\u5237\u65B0</button></div></div>';
+  m.innerHTML = '<div class="dialog"><h2>\u6587\u7AE0\u5DF2\u5728\u5916\u90E8\u4FEE\u6539</h2><p>\u78C1\u76D8\u4E0A\u7684\u8349\u7A3F\u4E0E\u5F53\u524D\u7F16\u8F91\u5668\u4E0D\u4E00\u81F4\u3002\u7EE7\u7EED\u81EA\u52A8\u4FDD\u5B58\u4F1A\u8986\u76D6\u5916\u90E8\u6539\u52A8\uFF0C\u56E0\u6B64\u5DF2\u6682\u505C\u4FDD\u5B58\u3002</p><p class="muted">\u5E38\u89C1\u539F\u56E0\uFF1A\u5728 Obsidian / \u5176\u4ED6\u7F16\u8F91\u5668\u4E2D\u6539\u8FC7\u540C\u4E00\u7BC7\uFF0C\u6216\u53E6\u4E00\u7A97\u53E3\u4E5F\u6253\u5F00\u4E86 Aster*\u3002</p><div class="row"><button type="button" id="conflict-keep">\u5148\u7559\u5728\u7F16\u8F91\u5668</button><button type="button" id="conflict-reload" class="primary">\u5907\u4EFD\u672A\u4FDD\u5B58\u5185\u5BB9\u5E76\u5237\u65B0</button></div></div>';
   document.body.append(m);
   $("#conflict-keep").onclick = () => m.remove();
   $("#conflict-reload").onclick = async () => {
@@ -30921,7 +30921,7 @@ function render2() {
   if (page !== "published-preview") publishedPreview = null;
   $("#app").innerHTML = `<aside class="sidebar"><div class="account">${accountList().map(
     (a) => `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc2(a.id)}" title="${esc2(a.label)}" aria-label="${esc2(a.label)}">${accountAvatarHtml(a)}</button>`
-  ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>\u9009\u9898\u5E93</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>\u8BBE\u7F6E</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></div><div class="docs">${state.documents.filter(
+  ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>\u7075\u611F\u5E93</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>\u8BBE\u7F6E</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></div><div class="docs">${state.documents.filter(
     (d) => sameAccount(d.account, account) && d.status !== "final" && d.status !== "archive"
   ).map(
     (d) => `<button class="doc ${current?.id === d.id ? "selected" : ""}" data-id="${d.id}"><span>${esc2(d.title)}</span><small>${new Date(d.updated).toLocaleDateString("zh-CN")} \xB7 ${d.body.length} \u5B57</small></button>`
@@ -33068,19 +33068,111 @@ async function refreshDashboardData() {
     toast(e.message);
   }
 }
-function renderTopics() {
-  const docs = state.documents.filter(
-    (d) => sameAccount(d.account, account) && d.topics?.length
-  );
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u9009\u9898\u548C\u7075\u611F</h1></div></header><section class="dashboard"><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc2(d.title)}</h3><div>${esc2(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">\u7EE7\u7EED\u8FD9\u7BC7\u6587\u7AE0 \u2192</button></div>`).join("") || '<div class="empty-state"><img src="assets/empty-topics.png" alt="" class="empty-state-img" /><p class="empty-state-text">\u7A7A\u7A7A\u5982\u4E5F</p></div>'}</div></section>`;
-  $$("[data-open]").forEach(
-    (b) => b.onclick = () => {
-      current = state.documents.find((d) => d.id === b.dataset.open);
-      page = "write";
-      tab = "topics";
-      render2();
+async function renderTopics() {
+  if (!account) {
+    $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7075\u611F\u5E93</h1></div></header><section class="dashboard"><div class="empty-state"><img src="assets/empty-topics.png" alt="" class="empty-state-img" /><p class="empty-state-text">\u8BF7\u5148\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p></div></section>`;
+    return;
+  }
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7075\u611F\u5E93</h1></div></header><section class="dashboard topic-dashboard"><div class="topic-composer"><textarea id="topic-input" rows="5" placeholder="\u8BB0\u4E0B\u7075\u611F\u2026 \u652F\u6301 Markdown"></textarea><div class="topic-composer-bar"><span class="muted">Markdown \xB7 \u2318/Ctrl + Enter \u4FDD\u5B58</span><button type="button" id="topic-save" class="primary">\u8BB0\u4E0B</button></div></div><div class="topic-grid" id="topic-grid"><p class="muted">\u52A0\u8F7D\u4E2D\u2026</p></div></section>`;
+  const draw = (list2) => {
+    if (page !== "topics") return;
+    const grid = $("#topic-grid");
+    if (!grid) return;
+    grid.innerHTML = list2.map((t) => {
+      const when = t.updated ? new Date(t.updated).toLocaleString("zh-CN") : "";
+      const md = t.body || t.preview || "";
+      return `<div class="result-card topic-card" data-topic="${esc2(t.path)}"><time datetime="${esc2(t.updated || "")}">${esc2(when)}</time><div class="topic-card-body is-md">${md.trim() ? safeHTML(md) : '<p class="muted">\uFF08\u7A7A\uFF09</p>'}</div><button type="button" class="primary" data-write-topic="${esc2(t.path)}">\u5199\u6210\u6587\u7AE0 \u2192</button></div>`;
+    }).join("") || '<div class="empty-state topic-empty"><img src="assets/empty-topics.png" alt="" class="empty-state-img" /><p class="empty-state-text">\u8FD8\u6CA1\u6709\u7075\u611F\uFF0C\u5728\u4E0A\u65B9\u5199\u4E00\u6761\u5427</p></div>';
+    $$("[data-write-topic]").forEach((b) => {
+      b.onclick = async (e) => {
+        e.stopPropagation();
+        try {
+          const topic = await api("topics-read", { path: b.dataset.writeTopic });
+          const firstLine = String(topic.body || "").split(/\r?\n/).map((l) => l.replace(/^#+\s*/, "").trim()).find(Boolean) || "\u672A\u547D\u540D\u6587\u7AE0";
+          const d = {
+            id: crypto.randomUUID(),
+            title: firstLine.slice(0, 80),
+            body: topic.body || "",
+            account,
+            updated: (/* @__PURE__ */ new Date()).toISOString(),
+            chat: [],
+            titles: [],
+            prompts: [],
+            topics: [
+              {
+                text: firstLine.slice(0, 80),
+                at: (/* @__PURE__ */ new Date()).toISOString()
+              }
+            ],
+            checks: [],
+            snapshots: []
+          };
+          state.documents.unshift(d);
+          current = d;
+          page = "write";
+          tab = "topics";
+          pending = null;
+          persist();
+          render2();
+        } catch (err) {
+          toast(err.message);
+        }
+      };
+    });
+    $$("[data-topic]").forEach((card) => {
+      card.oncontextmenu = (e) => {
+        e.preventDefault();
+        const rel = card.dataset.topic;
+        showContextMenu(e.clientX, e.clientY, [
+          {
+            label: "\u5220\u9664\u7075\u611F",
+            danger: true,
+            run: async () => {
+              if (!await askConfirm("\u5220\u9664\u7075\u611F", "\u786E\u5B9A\u5220\u9664\u8FD9\u6761\u7075\u611F\uFF1F")) return;
+              try {
+                draw(await api("topics-delete", { path: rel }));
+                toast("\u5DF2\u5220\u9664");
+              } catch (err) {
+                toast(err.message);
+              }
+            }
+          }
+        ]);
+      };
+    });
+  };
+  const saveTopic = async () => {
+    const input = $("#topic-input");
+    const body = input?.value.trim() || "";
+    if (!body) {
+      input?.focus();
+      return;
     }
-  );
+    try {
+      draw(await api("topics-create", { account, body }));
+      if (input) input.value = "";
+      toast("\u5DF2\u8BB0\u4E0B");
+      input?.focus();
+    } catch (err) {
+      toast(err.message);
+    }
+  };
+  $("#topic-save").onclick = () => saveTopic();
+  $("#topic-input").addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      saveTopic();
+    }
+  });
+  requestAnimationFrame(() => $("#topic-input")?.focus());
+  try {
+    draw(await api("topics-list", { account }));
+  } catch (err) {
+    const grid = $("#topic-grid");
+    if (grid)
+      grid.innerHTML = `<p class="muted">${esc2(err.message || "\u52A0\u8F7D\u5931\u8D25")}</p>`;
+    toast(err.message);
+  }
 }
 function settingsSection({ title, control, className = "" }) {
   return `<section class="settings-section ${className}"><h3 class="settings-section-title">${esc2(title)}</h3><div class="settings-section-control">${control}</div></section>`;

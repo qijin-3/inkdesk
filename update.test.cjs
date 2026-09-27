@@ -11,30 +11,30 @@ test("pickMacAsset prefers zip over dmg", () => {
   const asset = pickMacAsset({
     assets: [
       {
-        name: "AsIde-mac-arm64-v1.dmg",
+        name: "Aster-mac-arm64-v1.dmg",
         url: "api-dmg",
         browser_download_url: "https://example/a.dmg",
       },
       {
-        name: "AsIde-mac-arm64-v1.zip",
+        name: "Aster-mac-arm64-v1.zip",
         url: "api-zip",
         browser_download_url: "https://example/a.zip",
       },
     ],
   });
-  assert.equal(asset.name, "AsIde-mac-arm64-v1.zip");
+  assert.equal(asset.name, "Aster-mac-arm64-v1.zip");
 });
 
 test("pickMacAsset accepts dmg when no zip", () => {
   const asset = pickMacAsset({
     assets: [
       {
-        name: "AsIde-mac-arm64-v1.dmg",
+        name: "Aster-mac-arm64-v1.dmg",
         browser_download_url: "https://example/a.dmg",
       },
     ],
   });
-  assert.equal(asset.name, "AsIde-mac-arm64-v1.dmg");
+  assert.equal(asset.name, "Aster-mac-arm64-v1.dmg");
 });
 
 test("assetDownloadUrl prefers browser_download_url", () => {

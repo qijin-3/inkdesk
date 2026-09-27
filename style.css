@@ -1738,6 +1738,88 @@ th {
   grid-template-columns: repeat(2, 1fr);
   gap: 20px;
 }
+.topic-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.topic-composer {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 14px 16px 12px;
+}
+.topic-composer textarea {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #222;
+}
+.topic-composer textarea:focus {
+  outline: none;
+}
+.topic-composer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+}
+.topic-card {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.topic-card time {
+  font-size: 12px;
+  color: #888;
+  font-variant-numeric: tabular-nums;
+}
+.topic-card-body {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #333;
+  max-height: 180px;
+  overflow: auto;
+}
+.topic-card-body.is-md > :first-child {
+  margin-top: 0;
+}
+.topic-card-body.is-md > :last-child {
+  margin-bottom: 0;
+}
+.topic-card-body.is-md p,
+.topic-card-body.is-md ul,
+.topic-card-body.is-md ol {
+  margin: 0.45em 0;
+}
+.topic-card-body.is-md pre,
+.topic-card-body.is-md code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.topic-card-body.is-md pre {
+  background: #f3f3f3;
+  padding: 8px 10px;
+  border-radius: 8px;
+  overflow: auto;
+}
+.topic-card > .primary {
+  align-self: flex-start;
+  margin: 4px 0 0;
+}
+.topic-empty {
+  grid-column: 1 / -1;
+}
 .settings {
   max-width: 1080px;
   padding-top: 8px;

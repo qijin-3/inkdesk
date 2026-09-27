@@ -173,3 +173,17 @@ test("finalizing a legacy multi-version article does not leave a new rogue draft
     "旧 AI 正文",
   );
 });
+
+test("topics list/create/read/delete stay under account 01_Topics", (t) => {
+  const v = fixture(t);
+  let list = v.createTopic("AI", { body: "一个**想法**" });
+  assert.equal(list.length, 1);
+  assert.match(list[0].path, /^Demo_AI\/01_Topics\/\d{4}-\d{2}-\d{2}-\d{6}\.md$/);
+  assert.match(list[0].body, /一个\*\*想法\*\*/);
+  assert(fs.existsSync(v.p(list[0].path)));
+  const read = v.readTopic(list[0].path);
+  assert.match(read.body, /一个\*\*想法\*\*/);
+  list = v.deleteTopic(list[0].path);
+  assert.equal(list.length, 0);
+  assert.equal(v.topics("AI").length, 0);
+});

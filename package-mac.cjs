@@ -5,6 +5,8 @@
  *
  * 会做 ad-hoc 深度签名并清除隔离属性，避免「已损坏」误报。
  * DMG 内附带一键修复脚本，供首次从网上下载后双击使用。
+ *
+ * 显示名为 Aster*；.app / 安装包文件名用 Aster（避免 * 干扰路径与脚本）。
  */
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
@@ -16,13 +18,17 @@ const pkg = JSON.parse(
   fs.readFileSync(path.join(root, "package.json"), "utf8"),
 );
 const ver = pkg.version;
+/** 用户可见产品名 */
+const displayName = pkg.productName || "Aster*";
+/** 文件系统安全的应用名（.app / zip / dmg） */
+const appName = "Aster";
 const outDir = path.join(root, `dist-${ver}`);
-const appPath = path.join(outDir, "AsIde-darwin-arm64", "AsIde.app");
-const zipName = `AsIde-mac-arm64-v${ver}.zip`;
-const dmgName = `AsIde-mac-arm64-v${ver}.dmg`;
+const appPath = path.join(outDir, `${appName}-darwin-arm64`, `${appName}.app`);
+const zipName = `${appName}-mac-arm64-v${ver}.zip`;
+const dmgName = `${appName}-mac-arm64-v${ver}.dmg`;
 const zipOut = path.join(root, zipName);
 const dmgOut = path.join(root, dmgName);
-const bundleId = "com.qijin.aside";
+const bundleId = "com.qijin.aster";
 
 function run(cmd, args, opts = {}) {
   console.log(`→ ${cmd} ${args.join(" ")}`);
@@ -49,7 +55,7 @@ function prepareApp(app) {
   }
 }
 
-console.log(`Packaging AsIde v${ver}…`);
+console.log(`Packaging ${displayName} v${ver}…`);
 run("npm", ["run", "build"]);
 
 const ignore = [
@@ -63,21 +69,23 @@ const ignore = [
   "^/dist-",
   "/skills(?:\\.test|-ui-test)\\.cjs$",
   "/agent-(?:models|usage|output)\\.test\\.cjs$",
+  `/${appName}-mac-arm64-v.*\\.(zip|dmg)$`,
   "/AsIde-mac-arm64-v.*\\.(zip|dmg)$",
 ];
 
 const packagerArgs = [
   ".",
-  "AsIde",
+  appName,
   "--platform=darwin",
   "--arch=arm64",
   `--out=${outDir}`,
   "--overwrite",
-  "--icon=assets/AsIde.icns",
+  "--icon=assets/Aster.icns",
   `--app-bundle-id=${bundleId}`,
   `--app-version=${ver}`,
   `--build-version=${ver}`,
   "--extra-resource=assets/reference-reader",
+  `--extend-info=${path.join(root, "assets", "aster-info.plist")}`,
 ];
 for (const p of ignore) packagerArgs.push(`--ignore=${p}`);
 
@@ -96,9 +104,9 @@ prepareApp(appPath);
 if (fs.existsSync(zipOut)) fs.unlinkSync(zipOut);
 run("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", appPath, zipOut]);
 
-const stage = fs.mkdtempSync(path.join(os.tmpdir(), "aside-dmg-"));
+const stage = fs.mkdtempSync(path.join(os.tmpdir(), "aster-dmg-"));
 try {
-  const stagedApp = path.join(stage, "AsIde.app");
+  const stagedApp = path.join(stage, `${appName}.app`);
   run("ditto", [appPath, stagedApp]);
   prepareApp(stagedApp);
   fs.symlinkSync("/Applications", path.join(stage, "Applications"));
@@ -110,14 +118,14 @@ try {
     helperPath,
     `#!/bin/bash
 osascript <<'APPLESCRIPT' 2>/dev/null || true
-display notification "正在解除隔离并打开 AsIde…" with title "AsIde"
+display notification "正在解除隔离并打开 ${displayName}…" with title "${displayName}"
 APPLESCRIPT
-APP="/Applications/AsIde.app"
+APP="/Applications/${appName}.app"
 if [ ! -d "$APP" ]; then
-  APP="$(cd "$(dirname "$0")" && pwd)/AsIde.app"
+  APP="$(cd "$(dirname "$0")" && pwd)/${appName}.app"
 fi
 if [ ! -d "$APP" ]; then
-  osascript -e 'display alert "未找到 AsIde.app" message "请先把 AsIde 拖到「应用程序」文件夹，再双击本脚本。" as critical'
+  osascript -e 'display alert "未找到 ${appName}.app" message "请先把 ${displayName} 拖到「应用程序」文件夹，再双击本脚本。" as critical'
   exit 1
 fi
 xattr -cr "$APP" 2>/dev/null || true
@@ -133,7 +141,7 @@ open "$APP"
   run("hdiutil", [
     "create",
     "-volname",
-    `AsIde ${ver}`,
+    `${displayName} ${ver}`,
     "-srcfolder",
     stage,
     "-ov",

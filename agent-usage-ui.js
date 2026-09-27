@@ -16,8 +16,8 @@ export function mountAgentUsage(root, api, providers, opts = {}) {
   ? `${esc(providers.find(p=>p.id===provider)?.label || provider)} 调用明细`
   : '总览';
  const hint = mode === 'detail'
-  ? '仅统计通过 AsIde 发起的调用，从启用此版本后开始记录。'
-  : '仅统计通过 AsIde 发起的调用，从启用此版本后开始记录。进入下方模型卡片可查看各 Agent 明细与连接配置。';
+  ? '仅统计通过 Aster* 发起的调用，从启用此版本后开始记录。'
+  : '仅统计通过 Aster* 发起的调用，从启用此版本后开始记录。进入下方模型卡片可查看各 Agent 明细与连接配置。';
  root.innerHTML=`<div class="usage-head"><div><h3>${title}</h3><p class="settings-hint">${hint}</p></div><div class="usage-filters"><select aria-label="统计周期" id="usage-days"><option value="7">近 7 天</option><option value="30" selected>近 30 天</option><option value="90">近 90 天</option></select><button type="button" class="ghost" id="usage-refresh">刷新</button></div></div><div id="usage-content" aria-live="polite">读取统计…</div>`;
  const content=root.querySelector('#usage-content');
  async function load(){

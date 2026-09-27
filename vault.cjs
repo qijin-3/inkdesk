@@ -898,6 +898,111 @@ class Vault {
         title: path.basename(p, ".md"),
       }));
   }
+  /**
+   * 校验路径属于某账号的 01_Topics/*.md。
+   * @param {string} rel
+   */
+  assertTopicPath(rel) {
+    const r = String(rel || "")
+      .replace(/\\/g, "/")
+      .replace(/^\/+/, "");
+    if (
+      !r.includes("/01_Topics/") ||
+      r.includes("..") ||
+      !r.endsWith(".md") ||
+      r.split("/").length < 3
+    )
+      throw Error("不是灵感文档");
+    if (!fs.existsSync(this.p(r))) throw Error("灵感不存在");
+    return r;
+  }
+  /**
+   * 列出账号 01_Topics 下的 Markdown 灵感。
+   * @param {string} account
+   */
+  topics(account) {
+    const id = this.resolveAccountId(account);
+    const base = `${id}/01_Topics`;
+    fs.mkdirSync(this.p(base), { recursive: true });
+    return files(this.p(base))
+      .filter((p) => p.endsWith(".md"))
+      .map((p) => {
+        const rel = path.relative(this.root, p).split(path.sep).join("/");
+        let body = "";
+        try {
+          const raw = fs.readFileSync(p, "utf8");
+          try {
+            body = split(raw).body;
+          } catch {
+            body = raw;
+          }
+          body = String(body || "");
+        } catch {
+          body = "";
+        }
+        return {
+          path: rel,
+          title: path.basename(p, ".md"),
+          body,
+          preview: body.replace(/\s+/g, " ").trim().slice(0, 140),
+          updated: fs.statSync(p).mtime.toISOString(),
+        };
+      })
+      .sort((a, b) => b.updated.localeCompare(a.updated));
+  }
+  /**
+   * 在账号 01_Topics 下新建灵感 Markdown。
+   * 默认以日期时间命名；也可传入 title。
+   * @param {string} account
+   * @param {{ title?: string, body?: string }} data
+   */
+  createTopic(account, data) {
+    const id = this.resolveAccountId(account);
+    const base = `${id}/01_Topics`;
+    fs.mkdirSync(this.p(base), { recursive: true });
+    const d = new Date();
+    const p2 = (n) => String(n).padStart(2, "0");
+    const stamp = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+    const name = data?.title?.trim() ? clean(data.title) : stamp;
+    let rel = `${base}/${name}.md`;
+    let i = 2;
+    while (fs.existsSync(this.p(rel))) {
+      rel = `${base}/${name}-${i++}.md`;
+    }
+    const text =
+      "---\n" +
+      YAML.stringify({ 创建时间: now(), 类型: "灵感" }) +
+      "---\n" +
+      String(data?.body || "");
+    atomic(this.p(rel), text);
+    return this.topics(id);
+  }
+  /**
+   * @param {string} rel
+   */
+  readTopic(rel) {
+    const normalized = this.assertTopicPath(rel);
+    const raw = fs.readFileSync(this.p(normalized), "utf8");
+    let body = raw;
+    try {
+      body = split(raw).body;
+    } catch {
+      /* keep raw */
+    }
+    return {
+      path: normalized,
+      title: path.basename(normalized, ".md"),
+      body: String(body || ""),
+    };
+  }
+  /**
+   * @param {string} rel
+   */
+  deleteTopic(rel) {
+    const normalized = this.assertTopicPath(rel);
+    fs.unlinkSync(this.p(normalized));
+    return this.topics(normalized.split("/")[0]);
+  }
   readMaterial(rel) {
     if (!rel.startsWith("00_wiki/") || !rel.endsWith(".md"))
       throw Error("不是素材文档");

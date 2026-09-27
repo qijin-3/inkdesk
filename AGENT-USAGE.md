@@ -2,7 +2,7 @@
 
 Settings → 模型 → Agent 使用统计. Filter by Agent and last 7/30/90 local calendar days; switch the daily chart between calls, unique conversations and reported tokens. The per-Agent table covers the selected date window.
 
-- A call begins when AsIde attempts to spawn a writing CLI. Preflight validation and model discovery do not count.
+- A call begins when Aster* attempts to spawn a writing CLI. Preflight validation and model discovery do not count.
 - Success, failure, cancellation, timeout and interruption remain recorded. Test connections are counted separately and excluded from writing totals/tokens.
 - Conversations deduplicate `(account, articleId, conversationId)`. The same conversation across two Agents counts once overall and once for each participating Agent. Daily unique counts need not sum to period unique counts.
 - Records start with this version. No estimated backfill or external CLI usage is included.

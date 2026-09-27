@@ -99,6 +99,10 @@ const API_CHANNELS = [
   "materials-read",
   "materials-delete",
   "materials-link",
+  "topics-list",
+  "topics-create",
+  "topics-read",
+  "topics-delete",
   "wechat-draft-push",
   "wechat-test-token",
   "set-vault",
@@ -116,7 +120,7 @@ const API_CHANNELS = [
 ];
 
 /**
- * AsIde 共享业务层：Vault、人设、Agent 等与 UI 无关的逻辑。
+ * Aster* 共享业务层：Vault、人设、Agent 等与 UI 无关的逻辑。
  */
 class DeskCore {
   constructor() {
@@ -1002,6 +1006,14 @@ class DeskCore {
         return this.knowledge.deleteMaterial(data);
       case "materials-link":
         return this.knowledge.linkMaterial(data.articleId, data.id);
+      case "topics-list":
+        return this.vault.topics(data?.account ?? data);
+      case "topics-create":
+        return this.vault.createTopic(data.account, data);
+      case "topics-read":
+        return this.vault.readTopic(data?.path ?? data);
+      case "topics-delete":
+        return this.vault.deleteTopic(data?.path ?? data);
       case "finalize":
         return this.finalize(data);
       case "to-draft":

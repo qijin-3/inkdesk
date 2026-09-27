@@ -714,7 +714,7 @@ function showSaveConflictDialog(msg) {
   m.id = "save-conflict-modal";
   m.className = "modal";
   m.innerHTML =
-    '<div class="dialog"><h2>文章已在外部修改</h2><p>磁盘上的草稿与当前编辑器不一致。继续自动保存会覆盖外部改动，因此已暂停保存。</p><p class="muted">常见原因：在 Obsidian / 其他编辑器中改过同一篇，或另一窗口也打开了 AsIde。</p><div class="row"><button type="button" id="conflict-keep">先留在编辑器</button><button type="button" id="conflict-reload" class="primary">备份未保存内容并刷新</button></div></div>';
+    '<div class="dialog"><h2>文章已在外部修改</h2><p>磁盘上的草稿与当前编辑器不一致。继续自动保存会覆盖外部改动，因此已暂停保存。</p><p class="muted">常见原因：在 Obsidian / 其他编辑器中改过同一篇，或另一窗口也打开了 Aster*。</p><div class="row"><button type="button" id="conflict-keep">先留在编辑器</button><button type="button" id="conflict-reload" class="primary">备份未保存内容并刷新</button></div></div>';
   document.body.append(m);
   $("#conflict-keep").onclick = () => m.remove();
   $("#conflict-reload").onclick = async () => {
@@ -813,7 +813,7 @@ function render() {
             `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc(a.id)}" title="${esc(a.label)}" aria-label="${esc(a.label)}">${accountAvatarHtml(a)}</button>`,
         )
         .join("") || `<p class="account-empty">请在设置中添加账号</p>`
-    }</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>选题库</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>设置</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></div><div class="docs">${
+    }</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>灵感库</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>设置</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></div><div class="docs">${
       state.documents
         .filter(
           (d) =>
@@ -3443,22 +3443,132 @@ async function refreshDashboardData() {
   }
 }
 
-function renderTopics() {
-  const docs = state.documents.filter(
-    (d) => sameAccount(d.account, account) && d.topics?.length,
-  );
+async function renderTopics() {
+  if (!account) {
+    $("#main").innerHTML =
+      `<header><div class="header-lead"><h1 class="dashboard-tagline">灵感库</h1></div></header><section class="dashboard"><div class="empty-state"><img src="assets/empty-topics.png" alt="" class="empty-state-img" /><p class="empty-state-text">请先在设置中添加账号</p></div></section>`;
+    return;
+  }
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">选题和灵感</h1></div></header><section class="dashboard"><div class="topic-grid">${docs.map((d) => `<div class="result-card"><h3>${esc(d.title)}</h3><div>${esc(d.topics[0].text)}</div><button class="primary" data-open="${d.id}">继续这篇文章 →</button></div>`).join("") || '<div class="empty-state"><img src="assets/empty-topics.png" alt="" class="empty-state-img" /><p class="empty-state-text">空空如也</p></div>'}</div></section>`;
-  $$("[data-open]").forEach(
-    (b) =>
-      (b.onclick = () => {
-        current = state.documents.find((d) => d.id === b.dataset.open);
-        page = "write";
-        tab = "topics";
-        render();
-      }),
-  );
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">灵感库</h1></div></header><section class="dashboard topic-dashboard"><div class="topic-composer"><textarea id="topic-input" rows="5" placeholder="记下灵感… 支持 Markdown"></textarea><div class="topic-composer-bar"><span class="muted">Markdown · ⌘/Ctrl + Enter 保存</span><button type="button" id="topic-save" class="primary">记下</button></div></div><div class="topic-grid" id="topic-grid"><p class="muted">加载中…</p></div></section>`;
+
+  /** @param {{ path: string, title?: string, body?: string, preview?: string, updated?: string }[]} list */
+  const draw = (list) => {
+    if (page !== "topics") return;
+    const grid = $("#topic-grid");
+    if (!grid) return;
+    grid.innerHTML =
+      list
+        .map((t) => {
+          const when = t.updated
+            ? new Date(t.updated).toLocaleString("zh-CN")
+            : "";
+          const md = t.body || t.preview || "";
+          return `<div class="result-card topic-card" data-topic="${esc(t.path)}"><time datetime="${esc(t.updated || "")}">${esc(when)}</time><div class="topic-card-body is-md">${md.trim() ? safeHTML(md) : '<p class="muted">（空）</p>'}</div><button type="button" class="primary" data-write-topic="${esc(t.path)}">写成文章 →</button></div>`;
+        })
+        .join("") ||
+      '<div class="empty-state topic-empty"><img src="assets/empty-topics.png" alt="" class="empty-state-img" /><p class="empty-state-text">还没有灵感，在上方写一条吧</p></div>';
+
+    $$("[data-write-topic]").forEach((b) => {
+      b.onclick = async (e) => {
+        e.stopPropagation();
+        try {
+          const topic = await api("topics-read", { path: b.dataset.writeTopic });
+          const firstLine =
+            String(topic.body || "")
+              .split(/\r?\n/)
+              .map((l) => l.replace(/^#+\s*/, "").trim())
+              .find(Boolean) || "未命名文章";
+          const d = {
+            id: crypto.randomUUID(),
+            title: firstLine.slice(0, 80),
+            body: topic.body || "",
+            account,
+            updated: new Date().toISOString(),
+            chat: [],
+            titles: [],
+            prompts: [],
+            topics: [
+              {
+                text: firstLine.slice(0, 80),
+                at: new Date().toISOString(),
+              },
+            ],
+            checks: [],
+            snapshots: [],
+          };
+          state.documents.unshift(d);
+          current = d;
+          page = "write";
+          tab = "topics";
+          pending = null;
+          persist();
+          render();
+        } catch (err) {
+          toast(err.message);
+        }
+      };
+    });
+
+    $$("[data-topic]").forEach((card) => {
+      card.oncontextmenu = (e) => {
+        e.preventDefault();
+        const rel = card.dataset.topic;
+        showContextMenu(e.clientX, e.clientY, [
+          {
+            label: "删除灵感",
+            danger: true,
+            run: async () => {
+              if (!(await askConfirm("删除灵感", "确定删除这条灵感？"))) return;
+              try {
+                draw(await api("topics-delete", { path: rel }));
+                toast("已删除");
+              } catch (err) {
+                toast(err.message);
+              }
+            },
+          },
+        ]);
+      };
+    });
+  };
+
+  const saveTopic = async () => {
+    const input = $("#topic-input");
+    const body = input?.value.trim() || "";
+    if (!body) {
+      input?.focus();
+      return;
+    }
+    try {
+      draw(await api("topics-create", { account, body }));
+      if (input) input.value = "";
+      toast("已记下");
+      input?.focus();
+    } catch (err) {
+      toast(err.message);
+    }
+  };
+
+  $("#topic-save").onclick = () => saveTopic();
+  $("#topic-input").addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      saveTopic();
+    }
+  });
+  requestAnimationFrame(() => $("#topic-input")?.focus());
+
+  try {
+    draw(await api("topics-list", { account }));
+  } catch (err) {
+    const grid = $("#topic-grid");
+    if (grid)
+      grid.innerHTML = `<p class="muted">${esc(err.message || "加载失败")}</p>`;
+    toast(err.message);
+  }
 }
+
 /**
  * 设置页分区：标题在卡片上方，下方为控件。
  * @param {{ title: string, control: string, className?: string }} opts

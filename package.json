@@ -1,8 +1,8 @@
 {
   "name": "inkdesk",
-  "productName": "AsIde",
+  "productName": "Aster*",
   "version": "0.2.7",
-  "description": "AsIde — local writing desk for Content OS",
+  "description": "Aster* — local writing desk for Content OS",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
