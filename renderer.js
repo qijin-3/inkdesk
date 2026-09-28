@@ -2239,7 +2239,7 @@ function renderWrite() {
   unmountAster?.();
   unmountAster = null;
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button></div><span></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="审阅" aria-haspopup="true" aria-expanded="false">${I.eye()} 审阅</button><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></div><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">AI审阅中</span><button type="button" data-inline="accept-all">全部接受</button><button type="button" data-inline="reject-all">全部拒绝</button><button type="button" data-inline="finish" class="primary">完成</button></div></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>添加到 AI 对话</span></button></div></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="审阅" aria-haspopup="true" aria-expanded="false">${I.eye()} 审阅</button><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></div><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">审阅中</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">全部接受</button><button type="button" data-inline="reject-all">全部拒绝</button><button type="button" data-inline="finish" class="primary">完成</button></div></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>添加到 AI 对话</span></button></div></div>`;
   unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
   const onSelectionScroll = () => {
@@ -2722,6 +2722,23 @@ function buildEditHunks(oldText, nextText) {
       status: "pending",
     });
   }
+  // hunk 级结构保护：改后若删掉配图 / 标题行，强制保留原文该行，只审阅其余文字
+  const IMG = /!\[[^\]]*\]\([^)]+\)/g;
+  for (const h of hunks) {
+    if (h.kind !== "change") continue;
+    const oldImgs = [...String(h.old || "").matchAll(IMG)].map((m) => m[0]);
+    const missing = [...new Set(oldImgs)].filter((s) => !String(h.next || "").includes(s));
+    if (missing.length) h.next = String(h.next || "") + (String(h.next || "").endsWith("\n") ? "" : "\n") + missing.join("\n") + "\n";
+    const oldHeads = String(h.old || "").split("\n").filter((l) => /^#{1,6}\s/.test(l.trim()));
+    const missH = [...new Set(oldHeads.map((l) => l.trim()))].filter((s) => !String(h.next || "").includes(s));
+    if (missH.length) h.next = missH.join("\n") + "\n" + String(h.next || "");
+    if (String(h.old || "").trim() === String(h.next || "").trim()) {
+      h.kind = "equal";
+      h.value = h.old;
+      delete h.id;
+      delete h.status;
+    }
+  }
   return hunks;
 }
 
@@ -2735,7 +2752,7 @@ function composeHunks(hunks) {
     .join("");
 }
 
-/** 修改建议侧栏卡片：只放总结，不放全文 diff（diff 已直接落在正文） */
+/** 修改建议小卡片：紧跟在总结气泡下方，只放进度与操作，不放全文 diff */
 function reviewCardHTML() {
   if (
     !pending ||
@@ -2743,8 +2760,9 @@ function reviewCardHTML() {
     pending.conversationId !== conversation().id
   )
     return "";
-  const n = (pending.hunks || []).filter((h) => h.kind === "change").length;
-  return `<div class="review-card review-card-summary"><div class="review-card-head"><h3>修改建议 · ${n} 处正在审阅</h3><div class="row"><button type="button" id="accept" class="primary">全部接受</button><button type="button" id="reject">全部拒绝</button></div></div><p class="muted">已进入正文审阅模式：逐条对比、接受 / 拒绝，正文与改后卡片均可直接手动改。</p></div>`;
+  const list = (pending.hunks || []).filter((h) => h.kind === "change");
+  const done = list.filter((h) => h.status !== "pending").length;
+  return `<div class="review-card review-card-summary review-card-inline"><div class="review-card-head"><h3>修改建议 · ${done}/${list.length} 已决定</h3><div class="row"><button type="button" id="accept" class="primary">全部接受</button><button type="button" id="reject">全部拒绝</button></div></div><p class="muted">正文保持原文，可逐条对比接受 / 拒绝，改后卡片可直接手动改。</p></div>`;
 }
 
 /** 审阅中的改动列表（仅 change） */
@@ -2771,9 +2789,11 @@ function reviewPlainHTML(text, empty = "（空段落）") {
   return esc(t).replace(/\n/g, "<br>");
 }
 
-/** 改后行：默认纯文本 */
+/** 改后行：默认可编辑纯文本 */
 function reviewNewHTML(h) {
-  return reviewPlainHTML(h.next, "（已删除）");
+  const t = String(h.next ?? "").trim();
+  if (!t) return "";
+  return esc(t).replace(/\n/g, "<br>");
 }
 
 /** 原文行：hover 时展示的词级 diff 细节 */
@@ -2807,7 +2827,7 @@ function reviewPageHTML() {
         const empty = h.status === "accepted" ? "（已删除）" : "（空段落）";
         return `<section class="review-block is-decided is-${h.status}" data-review-hunk="${esc(h.id)}"><div class="review-resolved-wrap"><p class="review-para review-resolved">${reviewPlainHTML(finalText, empty)}</p><div class="review-float" role="group" aria-label="撤销本处决定"><button type="button" class="review-undo" data-review-undo="${esc(h.id)}" title="撤销${h.status === "accepted" ? "接受" : "拒绝"}">↩</button></div></div></section>`;
       }
-      return `<section class="review-block" data-review-hunk="${esc(h.id)}"><div class="review-new" data-review-tune-open="${esc(h.id)}" title="双击可微调本处改后"><div class="review-new-body">${reviewNewHTML(h)}</div><div class="review-float" role="group" aria-label="第 ${i + 1} 处修改操作"><button type="button" class="review-ok" data-review-accept="${esc(h.id)}" title="接受本处（A）">✓</button><button type="button" class="review-no" data-review-reject="${esc(h.id)}" title="拒绝本处（X）">×</button></div></div><div class="review-old"><span class="review-old-plain">${reviewPlainHTML(h.old)}</span><span class="review-old-diff">${reviewOldDiffHTML(h)}</span></div><div class="review-tunebox" hidden><textarea rows="4" data-review-edit="${esc(h.id)}">${esc(h.next)}</textarea><div class="row"><button type="button" data-review-tune-save="${esc(h.id)}" class="primary">保存微调</button><button type="button" data-review-tune-cancel="${esc(h.id)}">取消</button></div></div></section>`;
+      return `<section class="review-block" data-review-hunk="${esc(h.id)}"><div class="review-new"><div class="review-new-body" contenteditable="true" role="textbox" aria-label="改后正文，可直接编辑" data-placeholder="（已删除）" data-review-edit="${esc(h.id)}" title="点击直接编辑">${reviewNewHTML(h)}</div><div class="review-float" role="group" aria-label="第 ${i + 1} 处修改操作"><button type="button" class="review-ok" data-review-accept="${esc(h.id)}" title="接受本处（A）">✓</button><button type="button" class="review-no" data-review-reject="${esc(h.id)}" title="拒绝本处（X）">×</button></div></div><div class="review-old"><span class="review-old-plain">${reviewPlainHTML(h.old)}</span><span class="review-old-diff">${reviewOldDiffHTML(h)}</span></div></section>`;
     })
     .join("");
   void n;
@@ -2841,7 +2861,7 @@ function exitReviewMode() {
 }
 
 /**
- * 审阅时：隐藏编辑工具（含分组/审阅/专注/素材），改为「AI审阅中」+ 全部接受/拒绝/完成。
+ * 审阅时：隐藏编辑工具，左侧「审阅中 x/n」，右侧全部接受/拒绝/完成。
  * @param {boolean} on
  */
 function syncFormatbarReviewMode(on) {
@@ -2852,6 +2872,8 @@ function syncFormatbarReviewMode(on) {
   bar.querySelectorAll(".formatbar-edit-tools").forEach((el) => {
     el.hidden = !!on;
   });
+  const spacer = bar.querySelector(".formatbar-spacer");
+  if (spacer) spacer.hidden = !!on;
   const reviewTools = bar.querySelector(".formatbar-review-tools");
   if (reviewTools) {
     reviewTools.hidden = !on;
@@ -2859,21 +2881,9 @@ function syncFormatbarReviewMode(on) {
     if (tag) {
       const { total } = reviewProgress();
       const cur = Math.min(reviewIndex, Math.max(total - 1, 0));
-      tag.textContent =
-        total > 0 ? `AI审阅中 · ${cur + 1}/${total}` : "AI审阅中";
+      tag.textContent = total > 0 ? `审阅中 ${cur + 1}/${total}` : "审阅中";
     }
-    let demo = reviewTools.querySelector(".review-demo-badge");
-    if (reviewDemoActive) {
-      if (!demo) {
-        demo = document.createElement("span");
-        demo.className = "review-demo-badge";
-        demo.title = "开发审阅范例，操作不会写入仓库";
-        demo.textContent = "UI 演示";
-        reviewTools.prepend(demo);
-      }
-    } else {
-      demo?.remove();
-    }
+    reviewTools.querySelector(".review-demo-badge")?.remove();
   }
 }
 
@@ -2972,54 +2982,44 @@ function bindInlineReviewBar() {
       renderPanel();
     }),
   );
-  paper.querySelectorAll("[data-review-edit]").forEach((ta) => {
-    ta.addEventListener("click", (e) => e.stopPropagation());
-    ta.addEventListener("keydown", (e) => e.stopPropagation());
-  });
-  paper.querySelectorAll("[data-review-hunk]").forEach((card) => {
-    card.addEventListener("click", () => {
-      const i = reviewChanges().findIndex((x) => x.id === card.getAttribute("data-review-hunk"));
-      if (i >= 0) {
-        reviewIndex = i;
-        refreshReviewUI();
-        scrollReviewToCurrent();
-      }
-    });
-  });
-  // 双击改后行展开微调
-  paper.querySelectorAll("[data-review-tune-open]").forEach((el) => {
-    el.addEventListener("dblclick", () => {
-      const id = el.getAttribute("data-review-tune-open");
-      const box = el.closest("[data-review-hunk]")?.querySelector(".review-tunebox");
-      if (!box) return;
-      box.hidden = false;
-      box.querySelector("textarea")?.focus();
-      void id;
-    });
-  });
-  paper.querySelectorAll("[data-review-tune-save]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const id = b.getAttribute("data-review-tune-save");
+  paper.querySelectorAll("[data-review-edit]").forEach((el) => {
+    const readNext = () =>
+      (el.innerText || "").replace(/\u00a0/g, " ").replace(/\n+$/, "");
+    const applyLocal = () => {
+      const id = el.getAttribute("data-review-edit");
       const h = pending?.hunks.find((x) => x.id === id);
-      const ta = paper.querySelector(`textarea[data-review-edit="${CSS.escape(id)}"]`);
-      if (!h || !ta) return;
-      h.next = ta.value;
+      if (!h) return null;
+      h.next = readNext();
+      const diff = el
+        .closest("[data-review-hunk]")
+        ?.querySelector(".review-old-diff");
+      if (diff) diff.innerHTML = reviewOldDiffHTML(h);
+      return h;
+    };
+    const commitEditor = () => {
+      if (!applyLocal()) return;
       if (editor && current) {
         editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
         sync();
         changed();
       }
-      refreshReviewUI();
-      renderPanel();
-    }),
-  );
-  paper.querySelectorAll("[data-review-tune-cancel]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const id = b.getAttribute("data-review-tune-cancel");
-      const box = paper.querySelector(`[data-review-hunk="${CSS.escape(id)}"] .review-tunebox`);
-      if (box) box.hidden = true;
-    }),
-  );
+    };
+    el.addEventListener("click", (e) => e.stopPropagation());
+    el.addEventListener("keydown", (e) => e.stopPropagation());
+    el.addEventListener("input", () => applyLocal());
+    el.addEventListener("blur", commitEditor);
+  });
+  paper.querySelectorAll("[data-review-hunk]").forEach((card) => {
+    card.addEventListener("click", (e) => {
+      if (e.target.closest("[contenteditable], button, .review-float")) return;
+      const i = reviewChanges().findIndex(
+        (x) => x.id === card.getAttribute("data-review-hunk"),
+      );
+      if (i < 0) return;
+      reviewIndex = i;
+      syncFormatbarReviewMode(true);
+    });
+  });
   paper.querySelectorAll("[data-dot]").forEach((d) =>
     d.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -3052,13 +3052,11 @@ function bindInlineReviewBar() {
         decideHunk(cur.id, false);
       } else if (k === "e") {
         e.preventDefault();
-        const box = document.querySelector(
-          `#inline-review-list [data-review-hunk="${CSS.escape(cur.id)}"] .review-tunebox`,
-        );
-        if (box) {
-          box.hidden = false;
-          box.querySelector("textarea")?.focus();
-        }
+        document
+          .querySelector(
+            `#inline-review-list [data-review-hunk="${CSS.escape(cur.id)}"] [data-review-edit]`,
+          )
+          ?.focus();
       }
     };
     window.addEventListener("keydown", bindInlineReviewBar._key);
@@ -3092,13 +3090,52 @@ function mountInlineReviewBar() {
   bindInlineReviewBar();
 }
 
+/** 结构保护：改后稿若丢了原文的图片 / 标题 / 代码围栏，自动补回，避免破坏性改写 */
+function protectStructure(oldText, nextText) {
+  let next = String(nextText || "");
+  const dropped = [];
+  const imgs = [...String(oldText || "").matchAll(/!\[[^\]]*\]\([^)]+\)/g)].map((m) => m[0]);
+  const missingImgs = [...new Set(imgs)].filter((s) => !next.includes(s));
+  if (missingImgs.length) {
+    next += (next.endsWith("\n") ? "" : "\n") + "\n" + missingImgs.join("\n") + "\n";
+    dropped.push(`已保护配图 ${missingImgs.length} 张（改后稿误删，已自动保留在原文位置附近）`);
+  }
+  const heads = String(oldText || "").split("\n").filter((l) => /^#{1,6}\s/.test(l.trim()));
+  const missingHeads = [...new Set(heads)].filter((s) => !next.includes(s.trim()));
+  if (missingHeads.length) {
+    dropped.push(`标题结构 ${missingHeads.length} 处在改后稿中缺失，已保留原文标题`);
+    missingHeads.forEach((h) => {
+      if (!next.includes(h.trim())) next = h + "\n" + next;
+    });
+  }
+  const fences = (String(oldText || "").match(/```/g) || []).length;
+  const nextFences = (next.match(/```/g) || []).length;
+  if (fences % 2 === 0 && fences > 0 && nextFences !== fences) {
+    dropped.push("检测到代码块可能被破坏，已尽量保留原文代码围栏");
+  }
+  return { next, notes: dropped };
+}
+
 /** 用一句话总结本次改写，供侧栏展示（不重复全文） */
 function summarizeRewrite(oldText, nextText) {
   const hunks = (pending?.hunks || []).filter((h) => h.kind === "change");
   const n = hunks.length;
+  let add = 0, del = 0, polish = 0, punct = 0;
+  hunks.forEach((h) => {
+    add += String(h.next || "").length;
+    del += String(h.old || "").length;
+    const o = String(h.old || "").trim(), t = String(h.next || "").trim();
+    if (o.replace(/[，。！？、；：“”‘’（）《》\s]/g, "") !== t.replace(/[，。！？、；：“”‘’（）《》\s]/g, "")) polish += 1;
+    else punct += 1;
+  });
+  const reasons = [];
+  if (polish) reasons.push(`${polish} 处文字润色（措辞更顺、去掉赘字）`);
+  if (punct) reasons.push(`${punct} 处标点 / 断句微调`);
+  if (pending?.protectNotes?.length) reasons.push(...pending.protectNotes);
+  else reasons.push("原文 Markdown、标题层级与配图均已保留，未动大结构");
   const first = hunks[0]?.next?.trim().split("\n").find(Boolean) || "";
-  const excerpt = first.length > 60 ? first.slice(0, 60) + "…" : first;
-  return `已进入审阅模式：改后稿已直接落在正文，共 ${n} 条${excerpt ? `，如：“${excerpt}”` : ""}。逐条对比接受 / 拒绝，正文与改后卡片都可直接手动改，完成后点审阅条的「完成」。`;
+  const excerpt = first.length > 48 ? first.slice(0, 48) + "…" : first;
+  return `审阅总结：共 ${n} 处修改（新增约 ${add} 字 / 原文约 ${del} 字）。${reasons.join("；")}。${excerpt ? `例如：“${excerpt}”。` : ""}原文未被覆盖，可逐条接受 / 拒绝，完成后点审阅条「完成」。`;
 }
 
 /** Agent 模式切换控件（pill） */
@@ -3268,8 +3305,9 @@ function renderPanel() {
         )
         .join("") || "";
     if (busy) content += streamBubbleHTML();
+    if (reviewCardHTML()) content += reviewCardHTML();
   }
-  panel.innerHTML = `<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="添加" aria-label="添加" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div></div>`;
+  panel.innerHTML = `<div class="panel-scroll">${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="添加" aria-label="添加" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div></div>`;
   bindConversationHead();
   $("#send").onclick = () =>
     busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
@@ -3469,23 +3507,24 @@ async function runTask(task) {
     });
     if (!result) throw Error("Agent 未返回正文");
     if (task === "rewrite" && doc.id === current?.id) {
+      const guarded = protectStructure(body, result);
       pending = {
         doc: doc.id,
         conversationId: session.id,
         base: body,
         old: body,
-        next: result,
-        hunks: buildEditHunks(body, result),
+        next: guarded.next,
+        hunks: buildEditHunks(body, guarded.next),
+        protectNotes: guarded.notes,
       };
-      // 改后稿直接落在正文，并进入审阅模式逐条对比；侧栏只留总结，不重复全文
-      session.messages.push({ role: "assistant", text: summarizeRewrite(body, result) });
+      // 非破坏式审阅：正文保持原文（pending 未决定时合成结果即原文），改后只在审阅页对比；侧栏只留总结小卡片
+      session.messages.push({ role: "assistant", text: summarizeRewrite(body, guarded.next) });
       current.snapshots.push({ at: new Date().toISOString(), body });
       if (editor) {
-        editor.commands.setContent(safeHTML(result));
+        editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
         sync();
-        changed();
       } else {
-        current.body = result;
+        current.body = composeHunks(pending.hunks);
         changed();
       }
       enterReviewMode();

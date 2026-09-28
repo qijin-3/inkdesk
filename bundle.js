@@ -32181,7 +32181,7 @@ function renderWrite() {
   }
   unmountAster?.();
   unmountAster = null;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button></div><span></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="\u5BA1\u9605" aria-haspopup="true" aria-expanded="false">${I.eye()} \u5BA1\u9605</button><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></div><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">AI\u5BA1\u9605\u4E2D</span><button type="button" data-inline="accept-all">\u5168\u90E8\u63A5\u53D7</button><button type="button" data-inline="reject-all">\u5168\u90E8\u62D2\u7EDD</button><button type="button" data-inline="finish" class="primary">\u5B8C\u6210</button></div></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc2(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD</span></button></div></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="\u5BA1\u9605" aria-haspopup="true" aria-expanded="false">${I.eye()} \u5BA1\u9605</button><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></div><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">\u5BA1\u9605\u4E2D</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">\u5168\u90E8\u63A5\u53D7</button><button type="button" data-inline="reject-all">\u5168\u90E8\u62D2\u7EDD</button><button type="button" data-inline="finish" class="primary">\u5B8C\u6210</button></div></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc2(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD</span></button></div></div>`;
   unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
   const onSelectionScroll = () => {
@@ -32599,6 +32599,22 @@ function buildEditHunks(oldText, nextText) {
       status: "pending"
     });
   }
+  const IMG = /!\[[^\]]*\]\([^)]+\)/g;
+  for (const h2 of hunks) {
+    if (h2.kind !== "change") continue;
+    const oldImgs = [...String(h2.old || "").matchAll(IMG)].map((m) => m[0]);
+    const missing = [...new Set(oldImgs)].filter((s) => !String(h2.next || "").includes(s));
+    if (missing.length) h2.next = String(h2.next || "") + (String(h2.next || "").endsWith("\n") ? "" : "\n") + missing.join("\n") + "\n";
+    const oldHeads = String(h2.old || "").split("\n").filter((l) => /^#{1,6}\s/.test(l.trim()));
+    const missH = [...new Set(oldHeads.map((l) => l.trim()))].filter((s) => !String(h2.next || "").includes(s));
+    if (missH.length) h2.next = missH.join("\n") + "\n" + String(h2.next || "");
+    if (String(h2.old || "").trim() === String(h2.next || "").trim()) {
+      h2.kind = "equal";
+      h2.value = h2.old;
+      delete h2.id;
+      delete h2.status;
+    }
+  }
   return hunks;
 }
 function composeHunks(hunks) {
@@ -32610,8 +32626,9 @@ function composeHunks(hunks) {
 function reviewCardHTML() {
   if (!pending || pending.doc !== current?.id || pending.conversationId !== conversation().id)
     return "";
-  const n = (pending.hunks || []).filter((h2) => h2.kind === "change").length;
-  return `<div class="review-card review-card-summary"><div class="review-card-head"><h3>\u4FEE\u6539\u5EFA\u8BAE \xB7 ${n} \u5904\u6B63\u5728\u5BA1\u9605</h3><div class="row"><button type="button" id="accept" class="primary">\u5168\u90E8\u63A5\u53D7</button><button type="button" id="reject">\u5168\u90E8\u62D2\u7EDD</button></div></div><p class="muted">\u5DF2\u8FDB\u5165\u6B63\u6587\u5BA1\u9605\u6A21\u5F0F\uFF1A\u9010\u6761\u5BF9\u6BD4\u3001\u63A5\u53D7 / \u62D2\u7EDD\uFF0C\u6B63\u6587\u4E0E\u6539\u540E\u5361\u7247\u5747\u53EF\u76F4\u63A5\u624B\u52A8\u6539\u3002</p></div>`;
+  const list2 = (pending.hunks || []).filter((h2) => h2.kind === "change");
+  const done = list2.filter((h2) => h2.status !== "pending").length;
+  return `<div class="review-card review-card-summary review-card-inline"><div class="review-card-head"><h3>\u4FEE\u6539\u5EFA\u8BAE \xB7 ${done}/${list2.length} \u5DF2\u51B3\u5B9A</h3><div class="row"><button type="button" id="accept" class="primary">\u5168\u90E8\u63A5\u53D7</button><button type="button" id="reject">\u5168\u90E8\u62D2\u7EDD</button></div></div><p class="muted">\u6B63\u6587\u4FDD\u6301\u539F\u6587\uFF0C\u53EF\u9010\u6761\u5BF9\u6BD4\u63A5\u53D7 / \u62D2\u7EDD\uFF0C\u6539\u540E\u5361\u7247\u53EF\u76F4\u63A5\u624B\u52A8\u6539\u3002</p></div>`;
 }
 function reviewChanges() {
   return (pending?.hunks || []).filter((h2) => h2.kind === "change");
@@ -32627,7 +32644,9 @@ function reviewPlainHTML(text, empty2 = "\uFF08\u7A7A\u6BB5\u843D\uFF09") {
   return esc2(t).replace(/\n/g, "<br>");
 }
 function reviewNewHTML(h2) {
-  return reviewPlainHTML(h2.next, "\uFF08\u5DF2\u5220\u9664\uFF09");
+  const t = String(h2.next ?? "").trim();
+  if (!t) return "";
+  return esc2(t).replace(/\n/g, "<br>");
 }
 function reviewOldDiffHTML(h2) {
   return diffHTML(h2.old, h2.next) || reviewPlainHTML(h2.old);
@@ -32649,7 +32668,7 @@ function reviewPageHTML() {
       const empty2 = h2.status === "accepted" ? "\uFF08\u5DF2\u5220\u9664\uFF09" : "\uFF08\u7A7A\u6BB5\u843D\uFF09";
       return `<section class="review-block is-decided is-${h2.status}" data-review-hunk="${esc2(h2.id)}"><div class="review-resolved-wrap"><p class="review-para review-resolved">${reviewPlainHTML(finalText, empty2)}</p><div class="review-float" role="group" aria-label="\u64A4\u9500\u672C\u5904\u51B3\u5B9A"><button type="button" class="review-undo" data-review-undo="${esc2(h2.id)}" title="\u64A4\u9500${h2.status === "accepted" ? "\u63A5\u53D7" : "\u62D2\u7EDD"}">\u21A9</button></div></div></section>`;
     }
-    return `<section class="review-block" data-review-hunk="${esc2(h2.id)}"><div class="review-new" data-review-tune-open="${esc2(h2.id)}" title="\u53CC\u51FB\u53EF\u5FAE\u8C03\u672C\u5904\u6539\u540E"><div class="review-new-body">${reviewNewHTML(h2)}</div><div class="review-float" role="group" aria-label="\u7B2C ${i + 1} \u5904\u4FEE\u6539\u64CD\u4F5C"><button type="button" class="review-ok" data-review-accept="${esc2(h2.id)}" title="\u63A5\u53D7\u672C\u5904\uFF08A\uFF09">\u2713</button><button type="button" class="review-no" data-review-reject="${esc2(h2.id)}" title="\u62D2\u7EDD\u672C\u5904\uFF08X\uFF09">\xD7</button></div></div><div class="review-old"><span class="review-old-plain">${reviewPlainHTML(h2.old)}</span><span class="review-old-diff">${reviewOldDiffHTML(h2)}</span></div><div class="review-tunebox" hidden><textarea rows="4" data-review-edit="${esc2(h2.id)}">${esc2(h2.next)}</textarea><div class="row"><button type="button" data-review-tune-save="${esc2(h2.id)}" class="primary">\u4FDD\u5B58\u5FAE\u8C03</button><button type="button" data-review-tune-cancel="${esc2(h2.id)}">\u53D6\u6D88</button></div></div></section>`;
+    return `<section class="review-block" data-review-hunk="${esc2(h2.id)}"><div class="review-new"><div class="review-new-body" contenteditable="true" role="textbox" aria-label="\u6539\u540E\u6B63\u6587\uFF0C\u53EF\u76F4\u63A5\u7F16\u8F91" data-placeholder="\uFF08\u5DF2\u5220\u9664\uFF09" data-review-edit="${esc2(h2.id)}" title="\u70B9\u51FB\u76F4\u63A5\u7F16\u8F91">${reviewNewHTML(h2)}</div><div class="review-float" role="group" aria-label="\u7B2C ${i + 1} \u5904\u4FEE\u6539\u64CD\u4F5C"><button type="button" class="review-ok" data-review-accept="${esc2(h2.id)}" title="\u63A5\u53D7\u672C\u5904\uFF08A\uFF09">\u2713</button><button type="button" class="review-no" data-review-reject="${esc2(h2.id)}" title="\u62D2\u7EDD\u672C\u5904\uFF08X\uFF09">\xD7</button></div></div><div class="review-old"><span class="review-old-plain">${reviewPlainHTML(h2.old)}</span><span class="review-old-diff">${reviewOldDiffHTML(h2)}</span></div></section>`;
   }).join("");
   void n;
   return `<div id="inline-review-list" class="review-page"><h1 class="review-title">${esc2(current?.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="review-article">${body}</div></div>`;
@@ -32684,6 +32703,8 @@ function syncFormatbarReviewMode(on) {
   bar.querySelectorAll(".formatbar-edit-tools").forEach((el) => {
     el.hidden = !!on;
   });
+  const spacer = bar.querySelector(".formatbar-spacer");
+  if (spacer) spacer.hidden = !!on;
   const reviewTools = bar.querySelector(".formatbar-review-tools");
   if (reviewTools) {
     reviewTools.hidden = !on;
@@ -32691,20 +32712,9 @@ function syncFormatbarReviewMode(on) {
     if (tag2) {
       const { total } = reviewProgress();
       const cur = Math.min(reviewIndex, Math.max(total - 1, 0));
-      tag2.textContent = total > 0 ? `AI\u5BA1\u9605\u4E2D \xB7 ${cur + 1}/${total}` : "AI\u5BA1\u9605\u4E2D";
+      tag2.textContent = total > 0 ? `\u5BA1\u9605\u4E2D ${cur + 1}/${total}` : "\u5BA1\u9605\u4E2D";
     }
-    let demo = reviewTools.querySelector(".review-demo-badge");
-    if (reviewDemoActive) {
-      if (!demo) {
-        demo = document.createElement("span");
-        demo.className = "review-demo-badge";
-        demo.title = "\u5F00\u53D1\u5BA1\u9605\u8303\u4F8B\uFF0C\u64CD\u4F5C\u4E0D\u4F1A\u5199\u5165\u4ED3\u5E93";
-        demo.textContent = "UI \u6F14\u793A";
-        reviewTools.prepend(demo);
-      }
-    } else {
-      demo?.remove();
-    }
+    reviewTools.querySelector(".review-demo-badge")?.remove();
   }
 }
 function scrollReviewToCurrent(smooth = true) {
@@ -32795,53 +32805,41 @@ function bindInlineReviewBar() {
       renderPanel();
     })
   );
-  paper.querySelectorAll("[data-review-edit]").forEach((ta2) => {
-    ta2.addEventListener("click", (e) => e.stopPropagation());
-    ta2.addEventListener("keydown", (e) => e.stopPropagation());
-  });
-  paper.querySelectorAll("[data-review-hunk]").forEach((card) => {
-    card.addEventListener("click", () => {
-      const i = reviewChanges().findIndex((x) => x.id === card.getAttribute("data-review-hunk"));
-      if (i >= 0) {
-        reviewIndex = i;
-        refreshReviewUI();
-        scrollReviewToCurrent();
-      }
-    });
-  });
-  paper.querySelectorAll("[data-review-tune-open]").forEach((el) => {
-    el.addEventListener("dblclick", () => {
-      const id = el.getAttribute("data-review-tune-open");
-      const box = el.closest("[data-review-hunk]")?.querySelector(".review-tunebox");
-      if (!box) return;
-      box.hidden = false;
-      box.querySelector("textarea")?.focus();
-      void id;
-    });
-  });
-  paper.querySelectorAll("[data-review-tune-save]").forEach(
-    (b) => b.addEventListener("click", () => {
-      const id = b.getAttribute("data-review-tune-save");
+  paper.querySelectorAll("[data-review-edit]").forEach((el) => {
+    const readNext = () => (el.innerText || "").replace(/\u00a0/g, " ").replace(/\n+$/, "");
+    const applyLocal = () => {
+      const id = el.getAttribute("data-review-edit");
       const h2 = pending?.hunks.find((x) => x.id === id);
-      const ta2 = paper.querySelector(`textarea[data-review-edit="${CSS.escape(id)}"]`);
-      if (!h2 || !ta2) return;
-      h2.next = ta2.value;
+      if (!h2) return null;
+      h2.next = readNext();
+      const diff = el.closest("[data-review-hunk]")?.querySelector(".review-old-diff");
+      if (diff) diff.innerHTML = reviewOldDiffHTML(h2);
+      return h2;
+    };
+    const commitEditor = () => {
+      if (!applyLocal()) return;
       if (editor && current) {
         editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
         sync();
         changed();
       }
-      refreshReviewUI();
-      renderPanel();
-    })
-  );
-  paper.querySelectorAll("[data-review-tune-cancel]").forEach(
-    (b) => b.addEventListener("click", () => {
-      const id = b.getAttribute("data-review-tune-cancel");
-      const box = paper.querySelector(`[data-review-hunk="${CSS.escape(id)}"] .review-tunebox`);
-      if (box) box.hidden = true;
-    })
-  );
+    };
+    el.addEventListener("click", (e) => e.stopPropagation());
+    el.addEventListener("keydown", (e) => e.stopPropagation());
+    el.addEventListener("input", () => applyLocal());
+    el.addEventListener("blur", commitEditor);
+  });
+  paper.querySelectorAll("[data-review-hunk]").forEach((card) => {
+    card.addEventListener("click", (e) => {
+      if (e.target.closest("[contenteditable], button, .review-float")) return;
+      const i = reviewChanges().findIndex(
+        (x) => x.id === card.getAttribute("data-review-hunk")
+      );
+      if (i < 0) return;
+      reviewIndex = i;
+      syncFormatbarReviewMode(true);
+    });
+  });
   paper.querySelectorAll("[data-dot]").forEach(
     (d) => d.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -32874,13 +32872,9 @@ function bindInlineReviewBar() {
         decideHunk(cur.id, false);
       } else if (k === "e") {
         e.preventDefault();
-        const box = document.querySelector(
-          `#inline-review-list [data-review-hunk="${CSS.escape(cur.id)}"] .review-tunebox`
-        );
-        if (box) {
-          box.hidden = false;
-          box.querySelector("textarea")?.focus();
-        }
+        document.querySelector(
+          `#inline-review-list [data-review-hunk="${CSS.escape(cur.id)}"] [data-review-edit]`
+        )?.focus();
       }
     };
     window.addEventListener("keydown", bindInlineReviewBar._key);
@@ -32910,12 +32904,49 @@ function mountInlineReviewBar() {
   paper.insertAdjacentHTML("afterbegin", reviewPageHTML());
   bindInlineReviewBar();
 }
+function protectStructure(oldText, nextText) {
+  let next2 = String(nextText || "");
+  const dropped = [];
+  const imgs = [...String(oldText || "").matchAll(/!\[[^\]]*\]\([^)]+\)/g)].map((m) => m[0]);
+  const missingImgs = [...new Set(imgs)].filter((s) => !next2.includes(s));
+  if (missingImgs.length) {
+    next2 += (next2.endsWith("\n") ? "" : "\n") + "\n" + missingImgs.join("\n") + "\n";
+    dropped.push(`\u5DF2\u4FDD\u62A4\u914D\u56FE ${missingImgs.length} \u5F20\uFF08\u6539\u540E\u7A3F\u8BEF\u5220\uFF0C\u5DF2\u81EA\u52A8\u4FDD\u7559\u5728\u539F\u6587\u4F4D\u7F6E\u9644\u8FD1\uFF09`);
+  }
+  const heads = String(oldText || "").split("\n").filter((l) => /^#{1,6}\s/.test(l.trim()));
+  const missingHeads = [...new Set(heads)].filter((s) => !next2.includes(s.trim()));
+  if (missingHeads.length) {
+    dropped.push(`\u6807\u9898\u7ED3\u6784 ${missingHeads.length} \u5904\u5728\u6539\u540E\u7A3F\u4E2D\u7F3A\u5931\uFF0C\u5DF2\u4FDD\u7559\u539F\u6587\u6807\u9898`);
+    missingHeads.forEach((h2) => {
+      if (!next2.includes(h2.trim())) next2 = h2 + "\n" + next2;
+    });
+  }
+  const fences2 = (String(oldText || "").match(/```/g) || []).length;
+  const nextFences = (next2.match(/```/g) || []).length;
+  if (fences2 % 2 === 0 && fences2 > 0 && nextFences !== fences2) {
+    dropped.push("\u68C0\u6D4B\u5230\u4EE3\u7801\u5757\u53EF\u80FD\u88AB\u7834\u574F\uFF0C\u5DF2\u5C3D\u91CF\u4FDD\u7559\u539F\u6587\u4EE3\u7801\u56F4\u680F");
+  }
+  return { next: next2, notes: dropped };
+}
 function summarizeRewrite(oldText, nextText) {
   const hunks = (pending?.hunks || []).filter((h2) => h2.kind === "change");
   const n = hunks.length;
+  let add = 0, del2 = 0, polish = 0, punct = 0;
+  hunks.forEach((h2) => {
+    add += String(h2.next || "").length;
+    del2 += String(h2.old || "").length;
+    const o = String(h2.old || "").trim(), t = String(h2.next || "").trim();
+    if (o.replace(/[，。！？、；：“”‘’（）《》\s]/g, "") !== t.replace(/[，。！？、；：“”‘’（）《》\s]/g, "")) polish += 1;
+    else punct += 1;
+  });
+  const reasons = [];
+  if (polish) reasons.push(`${polish} \u5904\u6587\u5B57\u6DA6\u8272\uFF08\u63AA\u8F9E\u66F4\u987A\u3001\u53BB\u6389\u8D58\u5B57\uFF09`);
+  if (punct) reasons.push(`${punct} \u5904\u6807\u70B9 / \u65AD\u53E5\u5FAE\u8C03`);
+  if (pending?.protectNotes?.length) reasons.push(...pending.protectNotes);
+  else reasons.push("\u539F\u6587 Markdown\u3001\u6807\u9898\u5C42\u7EA7\u4E0E\u914D\u56FE\u5747\u5DF2\u4FDD\u7559\uFF0C\u672A\u52A8\u5927\u7ED3\u6784");
   const first2 = hunks[0]?.next?.trim().split("\n").find(Boolean) || "";
-  const excerpt = first2.length > 60 ? first2.slice(0, 60) + "\u2026" : first2;
-  return `\u5DF2\u8FDB\u5165\u5BA1\u9605\u6A21\u5F0F\uFF1A\u6539\u540E\u7A3F\u5DF2\u76F4\u63A5\u843D\u5728\u6B63\u6587\uFF0C\u5171 ${n} \u6761${excerpt ? `\uFF0C\u5982\uFF1A\u201C${excerpt}\u201D` : ""}\u3002\u9010\u6761\u5BF9\u6BD4\u63A5\u53D7 / \u62D2\u7EDD\uFF0C\u6B63\u6587\u4E0E\u6539\u540E\u5361\u7247\u90FD\u53EF\u76F4\u63A5\u624B\u52A8\u6539\uFF0C\u5B8C\u6210\u540E\u70B9\u5BA1\u9605\u6761\u7684\u300C\u5B8C\u6210\u300D\u3002`;
+  const excerpt = first2.length > 48 ? first2.slice(0, 48) + "\u2026" : first2;
+  return `\u5BA1\u9605\u603B\u7ED3\uFF1A\u5171 ${n} \u5904\u4FEE\u6539\uFF08\u65B0\u589E\u7EA6 ${add} \u5B57 / \u539F\u6587\u7EA6 ${del2} \u5B57\uFF09\u3002${reasons.join("\uFF1B")}\u3002${excerpt ? `\u4F8B\u5982\uFF1A\u201C${excerpt}\u201D\u3002` : ""}\u539F\u6587\u672A\u88AB\u8986\u76D6\uFF0C\u53EF\u9010\u6761\u63A5\u53D7 / \u62D2\u7EDD\uFF0C\u5B8C\u6210\u540E\u70B9\u5BA1\u9605\u6761\u300C\u5B8C\u6210\u300D\u3002`;
 }
 function agentModeHTML() {
   const edit2 = agentMode === "edit";
@@ -33062,8 +33093,9 @@ function renderPanel() {
       (m) => `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "\u4F60" : "aster"}</small><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? referenceChipHTML(p.reference?.kind || "file", p.label) : esc2(p.text)).join("") : esc2(m.text)}</div></div>`
     ).join("") || "";
     if (busy) content += streamBubbleHTML();
+    if (reviewCardHTML()) content += reviewCardHTML();
   }
-  panel.innerHTML = `<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0" aria-label="\u6DFB\u52A0" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div></div>`;
+  panel.innerHTML = `<div class="panel-scroll">${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0" aria-label="\u6DFB\u52A0" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div></div>`;
   bindConversationHead();
   $("#send").onclick = () => busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
   bindAgentModeMenu();
@@ -33238,22 +33270,23 @@ async function runTask(task) {
     });
     if (!result) throw Error("Agent \u672A\u8FD4\u56DE\u6B63\u6587");
     if (task === "rewrite" && doc3.id === current?.id) {
+      const guarded = protectStructure(body, result);
       pending = {
         doc: doc3.id,
         conversationId: session.id,
         base: body,
         old: body,
-        next: result,
-        hunks: buildEditHunks(body, result)
+        next: guarded.next,
+        hunks: buildEditHunks(body, guarded.next),
+        protectNotes: guarded.notes
       };
-      session.messages.push({ role: "assistant", text: summarizeRewrite(body, result) });
+      session.messages.push({ role: "assistant", text: summarizeRewrite(body, guarded.next) });
       current.snapshots.push({ at: (/* @__PURE__ */ new Date()).toISOString(), body });
       if (editor) {
-        editor.commands.setContent(safeHTML(result));
+        editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
         sync();
-        changed();
       } else {
-        current.body = result;
+        current.body = composeHunks(pending.hunks);
         changed();
       }
       enterReviewMode();

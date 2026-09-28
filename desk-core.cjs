@@ -1654,7 +1654,7 @@ class DeskCore {
     prompt += "文章正文：\n" + req.body + "\n";
     if (req.selection) prompt += "当前选区：\n" + req.selection + "\n";
     if (req.task === "rewrite")
-      prompt += "只输出修改后的全文，不要解释、代码围栏或前言。";
+      prompt += "只输出修改后的全文，不要解释、代码围栏或前言。只做最小必要润色：严禁删除或改动 Markdown 格式（标题层级、列表、引用、加粗、代码块）、段落顺序与大结构，图片语法 ![...](...) 必须原样保留、不得删除移动；无必要不改。";
     if (Buffer.byteLength(prompt, "utf8") > 200000)
       throw Error("本次上下文超过 200KB，请减少本次启用的资料或缩短正文");
 
