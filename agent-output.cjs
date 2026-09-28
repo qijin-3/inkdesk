@@ -1,5 +1,19 @@
 const {normalizeUsage}=require('./agent-usage.cjs');
 // Parse only known CLI envelopes. Raw JSON, tool results and reasoning never become article text.
+function parseEnvelope(raw){
+  const text=String(raw||'').trim();
+  if(!text)return null;
+  try{return{ok:true,value:JSON.parse(text)};}catch{}
+  const start=text.indexOf('{'),end=text.lastIndexOf('}');
+  if(start>=0&&end>start){
+    try{return{ok:true,value:JSON.parse(text.slice(start,end+1))};}catch{}
+  }
+  for(const line of text.split('\n').reverse()){
+    const t=line.trim();if(!t)continue;
+    try{return{ok:true,value:JSON.parse(t)};}catch{}
+  }
+  return{ok:false};
+}
 class AgentOutput {
  constructor(provider,onText){this.provider=provider;this.onText=onText;this.buffer='';this.text='';this.finalText=null;this.usage=null;this.error='';this.seen=new Set();}
  emit(text){if(typeof text!=='string')return;this.text+=text;this.onText?.(text);}
@@ -24,7 +38,11 @@ class AgentOutput {
  push(chunk){this.buffer+=chunk;let i;while((i=this.buffer.indexOf('\n'))>=0){const line=this.buffer.slice(0,i);this.buffer=this.buffer.slice(i+1);try{this.event(JSON.parse(line));}catch{}}}
  finish(raw){
   if(['claude','antigravity','zcode'].includes(this.provider)){
-   let e;try{e=JSON.parse(raw);}catch{this.error='无法解析 Agent 返回结果，请检查 CLI 版本';return this;}
+   // Empty stdout: leave error unset so spawnAgent can surface stderr (e.g. missing provider config).
+   if(!String(raw||'').trim())return this;
+   const parsed=parseEnvelope(raw);
+   if(!parsed||!parsed.ok){this.error='无法解析 Agent 返回结果，请检查 CLI 版本';return this;}
+   const e=parsed.value;
    if(e === null || (typeof e !== 'object' && typeof e !== 'string')){this.error='无法解析 Agent 返回结果，请检查 CLI 版本';return this;}
    this.finalText=typeof e === "string" ? e : e.result??e.response??e.text??e.message;
    if(typeof this.finalText!=='string')this.finalText='';

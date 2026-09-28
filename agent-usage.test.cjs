@@ -31,6 +31,19 @@ test('structured output never leaks tool data and does not double count cumulati
  const cursor=new AgentOutput('cursor');cursor.push(JSON.stringify({type:'assistant',message:{content:[{type:'text',text:'结果'}]}})+'\n');cursor.push(JSON.stringify({type:'result',result:'结果'})+'\n');cursor.finish('');assert.equal(cursor.result(),'结果');assert.equal(cursor.usage,null);
  const opencode=new AgentOutput('opencode');const event={type:'step_finish',part:{id:'p',tokens:{input:5,output:4,reasoning:1,cache:{read:2,write:3}}}};opencode.event(event);opencode.event(event);assert.equal(opencode.usage.total,15);
  assert(new AgentOutput('claude').finish('{"is_error":true,"result":"error"}').error);
+ const zcode=new AgentOutput('zcode').finish(JSON.stringify({response:'你好',usage:{inputTokens:3,outputTokens:2,totalTokens:5}}));
+ assert.equal(zcode.result(),'你好');assert.equal(zcode.usage.total,5);assert.equal(zcode.error,'');
+ assert.equal(new AgentOutput('zcode').finish('').error,'');
+ assert.equal(new AgentOutput('zcode').finish('noise\n{"response":"正文"}\n').result(),'正文');
+});
+test('zcode app launch injects builtin provider config',()=>{
+ const core=new DeskCore();
+ const exe='/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs';
+ if(!fs.existsSync(exe)) return;
+ const launch=core.zcodeLaunch(exe);
+ assert.equal(launch.env.ELECTRON_RUN_AS_NODE,'1');
+ assert.match(launch.env.ZCODE_BUILTIN_PROVIDER_CONFIG_FILE||'',/zcode-builtin\.json$/);
+ assert(fs.existsSync(launch.env.ZCODE_BUILTIN_PROVIDER_CONFIG_FILE));
 });
 test('spawn records real process success, zero-exit CLI failure and cancellation',async t=>{
  const {dir,usage}=setup(t);const core=new DeskCore();core.agentUsage=usage;

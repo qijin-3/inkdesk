@@ -13,6 +13,7 @@ import { marked } from "marked";
 import TurndownService from "turndown";
 import { diffWords, diffLines } from "diff";
 import { calendar, validDate, publishSummary } from "./calendar.cjs";
+import reviewDemoFixture from "./fixtures/review-demo.json";
 let saveProfileEditor = null;
 let composer = null,
   profileTab = "identity",
@@ -124,9 +125,20 @@ let state,
   sourceFiles = [],
   selectedText = "",
   selectionContext = null,
+  selectionDragging = false,
   dirty = false,
   /** Agent 输出模式：对话 | 编辑全文 */
   agentMode = "chat";
+/** 流式输出：当前累积文本与订阅卸载函数 */
+let streamText = "",
+  /** 流式消息是否处于思考等待期（未收到首个文本块） */
+  streamThinking = false,
+  unsubProgress = null,
+  /** 审阅模式：改后稿落正文后，逐条对比审阅 */
+  reviewMode = false,
+  reviewIndex = 0;
+/** 开发环境审阅 UI 演示：用固定范例进入审阅，不写回仓库 */
+let reviewDemoActive = false;
 let editorHTML = "";
 let previewMode = false;
 let previewDocId = null;
@@ -671,6 +683,11 @@ function promptText(title, opts = {}) {
 
 async function persist() {
   clearTimeout(saveTimer);
+  if (reviewDemoActive) {
+    setSavedStatus("演示中 · 不保存");
+    dirty = false;
+    return true;
+  }
   if (saveConflict) return false;
   try {
     const before = JSON.stringify(state);
@@ -784,6 +801,10 @@ function sync() {
 }
 function render() {
   saveProfileEditor = null;
+  if (!pending || pending.doc !== current?.id) {
+    reviewMode = false;
+    reviewIndex = 0;
+  }
   $("#reference-drawer")?.remove();
   $("#published-drawer")?.remove();
   $("#topic-drawer")?.remove();
@@ -2218,9 +2239,12 @@ function renderWrite() {
   unmountAster?.();
   unmountAster = null;
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button><span></span><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="审阅" aria-haspopup="true" aria-expanded="false">${I.eye()} 审阅</button><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></div><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button></div><span></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="审阅" aria-haspopup="true" aria-expanded="false">${I.eye()} 审阅</button><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></div><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">AI审阅中</span><button type="button" data-inline="accept-all">全部接受</button><button type="button" data-inline="reject-all">全部拒绝</button><button type="button" data-inline="finish" class="primary">完成</button></div></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>添加到 AI 对话</span></button></div></div>`;
   unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
+  const onSelectionScroll = () => {
+    if (editor && !selectionDragging) placeSelectionFloat(editor);
+  };
   editor = new Editor({
     element: $("#editor"),
     extensions: [StarterKit, Image, TableKit],
@@ -2232,9 +2256,14 @@ function renderWrite() {
       $("#wordcount").textContent = current.body.length + " 字";
       changed();
     },
+    onDestroy() {
+      window.removeEventListener("scroll", onSelectionScroll, true);
+      window.removeEventListener("resize", onSelectionScroll);
+      hideSelectionFloat();
+    },
     onSelectionUpdate({ editor: e }) {
       const { from, to } = e.state.selection;
-      if (to > from)
+      if (to > from) {
         selectionContext = {
           from,
           to,
@@ -2242,13 +2271,37 @@ function renderWrite() {
           version: e.getHTML(),
           doc: current.id,
         };
+      } else {
+        selectionContext = null;
+      }
       selectedText = selectionContext?.text || "";
-      $("#selection-label").textContent = selectedText
-        ? "已选中 " + selectedText.length + " 字"
-        : "选中正文，让 AI 帮你推敲";
+      const label = $("#selection-label");
+      if (label)
+        label.textContent = selectedText
+          ? "已选中 " + selectedText.length + " 字"
+          : "选中正文，让 AI 帮你推敲";
+      if (!selectionDragging) placeSelectionFloat(e);
+      else hideSelectionFloat();
       syncAsterFace();
     },
     editorProps: {
+      handleDOMEvents: {
+        mousedown: () => {
+          selectionDragging = true;
+          hideSelectionFloat();
+          return false;
+        },
+        mouseup: () => {
+          selectionDragging = false;
+          if (editor) placeSelectionFloat(editor);
+          return false;
+        },
+        keyup: () => {
+          selectionDragging = false;
+          if (editor) placeSelectionFloat(editor);
+          return false;
+        },
+      },
       handlePaste(view, event) {
         const item = [...(event.clipboardData?.items || [])].find((i) =>
           i.type.startsWith("image/"),
@@ -2285,6 +2338,10 @@ function renderWrite() {
   editorHTML = editor.getHTML();
   selectedText = "";
   selectionContext = null;
+  selectionDragging = false;
+  hideSelectionFloat();
+  window.addEventListener("scroll", onSelectionScroll, true);
+  window.addEventListener("resize", onSelectionScroll);
   $("#article-materials").onclick = () => {
     if (assistantOpen && railMode === "materials") {
       assistantOpen = false;
@@ -2412,8 +2469,49 @@ function renderWrite() {
     openAssistant();
     tagSelection();
   };
+  const floatAdd = $("#selection-float-add");
+  if (floatAdd) {
+    floatAdd.onmousedown = (e) => e.preventDefault();
+    floatAdd.onclick = () => {
+      openAssistant();
+      tagSelection();
+      hideSelectionFloat();
+    };
+  }
   mountArticleOutline();
+  mountInlineReviewBar();
   renderAssistantRail();
+}
+
+/** 隐藏正文选区浮窗 */
+function hideSelectionFloat() {
+  const float = $("#selection-float");
+  if (float) float.hidden = true;
+}
+
+/**
+ * 将「添加到 AI 对话」浮窗定位到当前选区附近。
+ * @param {import('@tiptap/core').Editor} e
+ */
+function placeSelectionFloat(e) {
+  const float = $("#selection-float");
+  if (!float || !e) return;
+  const { from, to, empty } = e.state.selection;
+  if (empty || to <= from || previewMode) {
+    float.hidden = true;
+    return;
+  }
+  float.hidden = false;
+  const start = e.view.coordsAtPos(from);
+  const end = e.view.coordsAtPos(to);
+  const w = float.offsetWidth || 140;
+  const h = float.offsetHeight || 36;
+  let left = (start.left + end.right) / 2 - w / 2;
+  let top = Math.min(start.top, end.top) - h - 10;
+  left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+  if (top < 8) top = Math.max(start.bottom, end.bottom) + 8;
+  float.style.left = `${left}px`;
+  float.style.top = `${top}px`;
 }
 
 /**
@@ -2637,7 +2735,7 @@ function composeHunks(hunks) {
     .join("");
 }
 
-/** 修改建议卡片 HTML（支持逐段接受） */
+/** 修改建议侧栏卡片：只放总结，不放全文 diff（diff 已直接落在正文） */
 function reviewCardHTML() {
   if (
     !pending ||
@@ -2645,20 +2743,362 @@ function reviewCardHTML() {
     pending.conversationId !== conversation().id
   )
     return "";
-  const changes = (pending.hunks || []).filter((h) => h.kind === "change");
-  const hunkBlocks = changes.length
-    ? changes
-        .map((h) => {
-          const done = h.status !== "pending";
-          return `<div class="diff-hunk is-${h.status}" data-hunk="${esc(h.id)}"><div class="diff">${diffHTML(h.old, h.next)}</div>${
-            done
-              ? `<div class="diff-hunk-status">${h.status === "accepted" ? "已接受" : "已拒绝"}</div>`
-              : `<div class="row diff-hunk-actions"><button type="button" data-hunk-accept="${esc(h.id)}">接受</button><button type="button" data-hunk-reject="${esc(h.id)}">拒绝</button></div>`
-          }</div>`;
-        })
-        .join("")
-    : `<div class="diff">${diffHTML(pending.old, pending.next)}</div>`;
-  return `<div class="review-card"><div class="review-card-head"><h3>修改建议</h3><div class="row"><button type="button" id="accept" class="primary">全部接受</button><button type="button" id="reject">全部拒绝</button></div></div>${hunkBlocks}</div>`;
+  const n = (pending.hunks || []).filter((h) => h.kind === "change").length;
+  return `<div class="review-card review-card-summary"><div class="review-card-head"><h3>修改建议 · ${n} 处正在审阅</h3><div class="row"><button type="button" id="accept" class="primary">全部接受</button><button type="button" id="reject">全部拒绝</button></div></div><p class="muted">已进入正文审阅模式：逐条对比、接受 / 拒绝，正文与改后卡片均可直接手动改。</p></div>`;
+}
+
+/** 审阅中的改动列表（仅 change） */
+function reviewChanges() {
+  return (pending?.hunks || []).filter((h) => h.kind === "change");
+}
+
+/** 审阅进度：已决定 / 总数 */
+function reviewProgress() {
+  const list = reviewChanges();
+  const done = list.filter((h) => h.status !== "pending").length;
+  return { done, total: list.length };
+}
+
+/** 正文顶部审阅进度条已移入格式栏；保留空函数避免旧调用报错 */
+function inlineReviewBarHTML() {
+  return "";
+}
+
+/** 审阅纯文本（无 diff 高亮） */
+function reviewPlainHTML(text, empty = "（空段落）") {
+  const t = String(text ?? "").trim();
+  if (!t) return esc(empty);
+  return esc(t).replace(/\n/g, "<br>");
+}
+
+/** 改后行：默认纯文本 */
+function reviewNewHTML(h) {
+  return reviewPlainHTML(h.next, "（已删除）");
+}
+
+/** 原文行：hover 时展示的词级 diff 细节 */
+function reviewOldDiffHTML(h) {
+  return diffHTML(h.old, h.next) || reviewPlainHTML(h.old);
+}
+
+/** 未改动段落：按空行分段，保持文章阅读节奏 */
+function reviewEqualHTML(value) {
+  return String(value || "")
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `<p class="review-para">${esc(p).replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
+/** 审阅整页：待决定显示改后+原文；接受/拒绝后只保留最终正文 */
+function reviewPageHTML() {
+  if (!pending || pending.doc !== current?.id) return "";
+  const list = reviewChanges();
+  const idOf = (h) => list.findIndex((x) => x.id === h.id);
+  let n = 0;
+  const body = (pending.hunks || [])
+    .map((h) => {
+      if (h.kind === "equal") return reviewEqualHTML(h.value);
+      const i = idOf(h);
+      n = i;
+      if (h.status !== "pending") {
+        const finalText = h.status === "accepted" ? h.next : h.old;
+        const empty = h.status === "accepted" ? "（已删除）" : "（空段落）";
+        return `<section class="review-block is-decided is-${h.status}" data-review-hunk="${esc(h.id)}"><div class="review-resolved-wrap"><p class="review-para review-resolved">${reviewPlainHTML(finalText, empty)}</p><div class="review-float" role="group" aria-label="撤销本处决定"><button type="button" class="review-undo" data-review-undo="${esc(h.id)}" title="撤销${h.status === "accepted" ? "接受" : "拒绝"}">↩</button></div></div></section>`;
+      }
+      return `<section class="review-block" data-review-hunk="${esc(h.id)}"><div class="review-new" data-review-tune-open="${esc(h.id)}" title="双击可微调本处改后"><div class="review-new-body">${reviewNewHTML(h)}</div><div class="review-float" role="group" aria-label="第 ${i + 1} 处修改操作"><button type="button" class="review-ok" data-review-accept="${esc(h.id)}" title="接受本处（A）">✓</button><button type="button" class="review-no" data-review-reject="${esc(h.id)}" title="拒绝本处（X）">×</button></div></div><div class="review-old"><span class="review-old-plain">${reviewPlainHTML(h.old)}</span><span class="review-old-diff">${reviewOldDiffHTML(h)}</span></div><div class="review-tunebox" hidden><textarea rows="4" data-review-edit="${esc(h.id)}">${esc(h.next)}</textarea><div class="row"><button type="button" data-review-tune-save="${esc(h.id)}" class="primary">保存微调</button><button type="button" data-review-tune-cancel="${esc(h.id)}">取消</button></div></div></section>`;
+    })
+    .join("");
+  void n;
+  return `<div id="inline-review-list" class="review-page"><h1 class="review-title">${esc(current?.title || "未命名文章")}</h1><div class="review-article">${body}</div></div>`;
+}
+
+/** 进入审阅模式：编辑器收起，整页变为审阅界面（类似预览） */
+function enterReviewMode() {
+  reviewMode = true;
+  const list = reviewChanges();
+  const first = list.findIndex((h) => h.status === "pending");
+  reviewIndex = first >= 0 ? first : 0;
+  mountInlineReviewBar();
+  scrollReviewToCurrent(false);
+  renderPanel();
+}
+
+/** 退出审阅模式并恢复编辑器 */
+function exitReviewMode() {
+  reviewMode = false;
+  reviewIndex = 0;
+  $("#inline-review-bar")?.remove();
+  $("#inline-review-list")?.remove();
+  $("#inline-review-diff")?.remove();
+  document.querySelector(".paper-wrap .paper")?.classList.remove("is-reviewing");
+  const ed = $("#editor");
+  if (ed) ed.hidden = false;
+  const title = $("#title");
+  if (title) title.hidden = false;
+  syncFormatbarReviewMode(false);
+}
+
+/**
+ * 审阅时：隐藏编辑工具（含分组/审阅/专注/素材），改为「AI审阅中」+ 全部接受/拒绝/完成。
+ * @param {boolean} on
+ */
+function syncFormatbarReviewMode(on) {
+  const bar = document.querySelector(".paper-wrap .formatbar");
+  if (!bar) return;
+  bar.classList.toggle("is-reviewing", !!on);
+  bar.removeAttribute("hidden");
+  bar.querySelectorAll(".formatbar-edit-tools").forEach((el) => {
+    el.hidden = !!on;
+  });
+  const reviewTools = bar.querySelector(".formatbar-review-tools");
+  if (reviewTools) {
+    reviewTools.hidden = !on;
+    const tag = reviewTools.querySelector(".formatbar-review-tag");
+    if (tag) {
+      const { total } = reviewProgress();
+      const cur = Math.min(reviewIndex, Math.max(total - 1, 0));
+      tag.textContent =
+        total > 0 ? `AI审阅中 · ${cur + 1}/${total}` : "AI审阅中";
+    }
+    let demo = reviewTools.querySelector(".review-demo-badge");
+    if (reviewDemoActive) {
+      if (!demo) {
+        demo = document.createElement("span");
+        demo.className = "review-demo-badge";
+        demo.title = "开发审阅范例，操作不会写入仓库";
+        demo.textContent = "UI 演示";
+        reviewTools.prepend(demo);
+      }
+    } else {
+      demo?.remove();
+    }
+  }
+}
+
+/** 将审阅页滚动到当前条目 */
+function scrollReviewToCurrent(smooth = true) {
+  const list = reviewChanges();
+  const cur = list[Math.min(reviewIndex, Math.max(list.length - 1, 0))];
+  if (!cur) return;
+  document
+    .querySelector(`#inline-review-list [data-review-hunk="${CSS.escape(cur.id)}"]`)
+    ?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "center" });
+}
+
+/** 刷新审阅整页，编辑器在后台保持同步 */
+function refreshReviewUI() {
+  const paper = document.querySelector(".paper-wrap .paper");
+  if (!paper || !pending || pending.doc !== current?.id || !reviewMode) return;
+  const listEl = $("#inline-review-list");
+  const tmp = document.createElement("div");
+  tmp.innerHTML = reviewPageHTML();
+  const newList = tmp.querySelector("#inline-review-list");
+  if (listEl && newList) listEl.replaceWith(newList);
+  else if (newList) paper.insertAdjacentElement("afterbegin", newList);
+  syncFormatbarReviewMode(true);
+  bindInlineReviewBar();
+}
+
+/** 绑定审阅条带与逐条卡片事件 */
+function bindInlineReviewBar() {
+  const wrap = document.querySelector(".paper-wrap");
+  const paper = wrap?.querySelector(".paper");
+  if (!paper || !pending) return;
+  const list = reviewChanges();
+  const gotoHunk = (i) => {
+    if (!list.length) return;
+    reviewIndex = (i + list.length) % list.length;
+    refreshReviewUI();
+    scrollReviewToCurrent();
+  };
+  const root = wrap || paper;
+  const prevBtn = root.querySelector('[data-inline="prev"]');
+  const nextBtn = root.querySelector('[data-inline="next"]');
+  const acceptAll = root.querySelector('[data-inline="accept-all"]');
+  const rejectAll = root.querySelector('[data-inline="reject-all"]');
+  const finishBtn = root.querySelector('[data-inline="finish"]');
+  if (prevBtn) prevBtn.onclick = () => gotoHunk(reviewIndex - 1);
+  if (nextBtn) nextBtn.onclick = () => gotoHunk(reviewIndex + 1);
+  if (acceptAll)
+    acceptAll.onclick = () => {
+      pending.hunks?.forEach((h) => {
+        if (h.kind === "change") h.status = "accepted";
+      });
+      applyPendingResult(pending.next, "accepted");
+    };
+  if (rejectAll)
+    rejectAll.onclick = () => {
+      applyPendingResult(pending.old, "rejected");
+    };
+  if (finishBtn)
+    finishBtn.onclick = () => {
+      const undecided = reviewChanges().filter((h) => h.status === "pending");
+      if (undecided.length && !confirm(`还有 ${undecided.length} 条未决定，将按拒绝处理并完成。继续？`))
+        return;
+      undecided.forEach((h) => (h.status = "rejected"));
+      const next = composeHunks(pending.hunks);
+      const anyAccepted = pending.hunks.some(
+        (h) => h.kind === "change" && h.status === "accepted",
+      );
+      applyPendingResult(next, anyAccepted ? "accepted" : "rejected");
+    };
+  paper.querySelectorAll("[data-review-accept]").forEach((b) =>
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      decideHunk(b.getAttribute("data-review-accept"), true);
+    }),
+  );
+  paper.querySelectorAll("[data-review-reject]").forEach((b) =>
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      decideHunk(b.getAttribute("data-review-reject"), false);
+    }),
+  );
+  paper.querySelectorAll("[data-review-undo]").forEach((b) =>
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const h = pending.hunks.find((x) => x.id === b.getAttribute("data-review-undo"));
+      if (!h) return;
+      h.status = "pending";
+      reviewIndex = Math.max(0, reviewChanges().findIndex((x) => x.id === h.id));
+      if (editor && current) {
+        editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
+        sync();
+        changed();
+      }
+      refreshReviewUI();
+      renderPanel();
+    }),
+  );
+  paper.querySelectorAll("[data-review-edit]").forEach((ta) => {
+    ta.addEventListener("click", (e) => e.stopPropagation());
+    ta.addEventListener("keydown", (e) => e.stopPropagation());
+  });
+  paper.querySelectorAll("[data-review-hunk]").forEach((card) => {
+    card.addEventListener("click", () => {
+      const i = reviewChanges().findIndex((x) => x.id === card.getAttribute("data-review-hunk"));
+      if (i >= 0) {
+        reviewIndex = i;
+        refreshReviewUI();
+        scrollReviewToCurrent();
+      }
+    });
+  });
+  // 双击改后行展开微调
+  paper.querySelectorAll("[data-review-tune-open]").forEach((el) => {
+    el.addEventListener("dblclick", () => {
+      const id = el.getAttribute("data-review-tune-open");
+      const box = el.closest("[data-review-hunk]")?.querySelector(".review-tunebox");
+      if (!box) return;
+      box.hidden = false;
+      box.querySelector("textarea")?.focus();
+      void id;
+    });
+  });
+  paper.querySelectorAll("[data-review-tune-save]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const id = b.getAttribute("data-review-tune-save");
+      const h = pending?.hunks.find((x) => x.id === id);
+      const ta = paper.querySelector(`textarea[data-review-edit="${CSS.escape(id)}"]`);
+      if (!h || !ta) return;
+      h.next = ta.value;
+      if (editor && current) {
+        editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
+        sync();
+        changed();
+      }
+      refreshReviewUI();
+      renderPanel();
+    }),
+  );
+  paper.querySelectorAll("[data-review-tune-cancel]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const id = b.getAttribute("data-review-tune-cancel");
+      const box = paper.querySelector(`[data-review-hunk="${CSS.escape(id)}"] .review-tunebox`);
+      if (box) box.hidden = true;
+    }),
+  );
+  paper.querySelectorAll("[data-dot]").forEach((d) =>
+    d.addEventListener("click", (e) => {
+      e.stopPropagation();
+      reviewIndex = +d.getAttribute("data-dot") || 0;
+      refreshReviewUI();
+    }),
+  );
+  if (!bindInlineReviewBar._key) {
+    bindInlineReviewBar._key = (e) => {
+      if (!reviewMode || !pending || busy) return;
+      const t = e.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      const list = reviewChanges();
+      const cur = list[Math.min(reviewIndex, Math.max(list.length - 1, 0))];
+      if (!cur) return;
+      const k = e.key.toLowerCase();
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        reviewIndex = Math.min(reviewIndex + 1, list.length - 1);
+        refreshReviewUI();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        reviewIndex = Math.max(reviewIndex - 1, 0);
+        refreshReviewUI();
+      } else if (k === "a" || k === "u") {
+        e.preventDefault();
+        decideHunk(cur.id, true);
+      } else if (k === "x" || k === "r") {
+        e.preventDefault();
+        decideHunk(cur.id, false);
+      } else if (k === "e") {
+        e.preventDefault();
+        const box = document.querySelector(
+          `#inline-review-list [data-review-hunk="${CSS.escape(cur.id)}"] .review-tunebox`,
+        );
+        if (box) {
+          box.hidden = false;
+          box.querySelector("textarea")?.focus();
+        }
+      }
+    };
+    window.addEventListener("keydown", bindInlineReviewBar._key);
+  }
+}
+
+/** 挂载 / 刷新正文顶部审阅条及其按钮 */
+function mountInlineReviewBar() {
+  const paper = document.querySelector(".paper-wrap .paper");
+  if (!paper) return;
+  $("#inline-review-bar")?.remove();
+  $("#inline-review-list")?.remove();
+  $("#inline-review-diff")?.remove();
+  paper.classList.remove("is-reviewing");
+  if (!pending || pending.doc !== current?.id || previewMode || !reviewMode) {
+    const ed = $("#editor");
+    if (ed) ed.hidden = false;
+    const title = $("#title");
+    if (title) title.hidden = false;
+    syncFormatbarReviewMode(false);
+    return;
+  }
+  // 整页审阅：格式栏右侧换成审阅操作，正文改为审阅页
+  paper.classList.add("is-reviewing");
+  syncFormatbarReviewMode(true);
+  const ed = $("#editor");
+  if (ed) ed.hidden = true;
+  const title = $("#title");
+  if (title) title.hidden = true;
+  paper.insertAdjacentHTML("afterbegin", reviewPageHTML());
+  bindInlineReviewBar();
+}
+
+/** 用一句话总结本次改写，供侧栏展示（不重复全文） */
+function summarizeRewrite(oldText, nextText) {
+  const hunks = (pending?.hunks || []).filter((h) => h.kind === "change");
+  const n = hunks.length;
+  const first = hunks[0]?.next?.trim().split("\n").find(Boolean) || "";
+  const excerpt = first.length > 60 ? first.slice(0, 60) + "…" : first;
+  return `已进入审阅模式：改后稿已直接落在正文，共 ${n} 条${excerpt ? `，如：“${excerpt}”` : ""}。逐条对比接受 / 拒绝，正文与改后卡片都可直接手动改，完成后点审阅条的「完成」。`;
 }
 
 /** Agent 模式切换控件（pill） */
@@ -2726,16 +3166,23 @@ function bindAgentModeMenu() {
   });
 }
 
-/** 将 pending 合成结果写入编辑器 */
+/** 将 pending 合成结果写入编辑器（审阅模式：逐条决定后汇总应用） */
 function applyPendingResult(nextText, action) {
-  sync();
-  if (current.body !== pending.base) {
-    toast("正文已变化，请重新生成建议。");
+  if (!pending) return false;
+  if (reviewDemoActive) {
     pending = null;
-    renderPanel();
-    syncAsterFace();
-    return false;
+    exitReviewMode();
+    toast(
+      action === "accepted"
+        ? "演示：已模拟接受（未写入仓库）"
+        : "演示：已模拟拒绝（未写入仓库）",
+    );
+    queueMicrotask(() => {
+      if (loadReviewDemo({ silent: true })) render();
+    });
+    return true;
   }
+  sync();
   current.decisions ??= [];
   current.decisions.push({
     action,
@@ -2746,39 +3193,56 @@ function applyPendingResult(nextText, action) {
   if (action === "accepted") {
     current.snapshots.push({
       at: new Date().toISOString(),
+      body: pending.base,
+    });
+    if (editor && current.body !== nextText) {
+      editor.commands.setContent(safeHTML(nextText));
+      sync();
+    }
+    changed();
+    toast("已接受改后稿，可用 ⌘Z 撤回");
+  } else {
+    current.snapshots.push({
+      at: new Date().toISOString(),
       body: current.body,
     });
-    editor.commands.setContent(safeHTML(nextText));
-    sync();
+    if (editor) {
+      editor.commands.setContent(safeHTML(pending.old));
+      sync();
+    }
     changed();
-    toast("已应用，可用 ⌘Z 撤回");
-  } else {
-    changed();
+    toast("已恢复改前稿");
   }
   pending = null;
+  exitReviewMode();
   renderPanel();
   syncAsterFace();
   return true;
 }
 
-/** 接受/拒绝单个 hunk；全部决定后自动应用 */
+/** 接受/拒绝单个 hunk；正文实时跟随（接受即改后段，拒绝即原文段），审阅模式不自动退出 */
 function decideHunk(id, accept) {
   if (!pending?.hunks) return;
   const hunk = pending.hunks.find((h) => h.id === id && h.kind === "change");
   if (!hunk || hunk.status !== "pending") return;
   hunk.status = accept ? "accepted" : "rejected";
-  const left = pending.hunks.some(
-    (h) => h.kind === "change" && h.status === "pending",
-  );
+  if (editor && current) {
+    editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
+    sync();
+    changed();
+  }
+  const list = reviewChanges();
+  const nextPending = list.findIndex((h) => h.status === "pending");
+  reviewIndex = nextPending >= 0 ? nextPending : Math.min(reviewIndex, Math.max(list.length - 1, 0));
+  refreshReviewUI();
+  renderPanel();
+  const left = list.some((h) => h.status === "pending");
   if (left) {
-    renderPanel();
+    scrollReviewToCurrent();
     return;
   }
-  const next = composeHunks(pending.hunks);
-  const anyAccepted = pending.hunks.some(
-    (h) => h.kind === "change" && h.status === "accepted",
-  );
-  applyPendingResult(next, anyAccepted ? "accepted" : "rejected");
+  toast("全部已决定，点审阅条的「完成」汇总应用，或继续撤销某条。");
+  scrollReviewToCurrent(false);
 }
 
 function renderPanel() {
@@ -2803,6 +3267,7 @@ function renderPanel() {
             `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "你" : "aster"}</small><div>${m.parts ? m.parts.map((p) => (p.kind === "tag" ? referenceChipHTML(p.reference?.kind || "file", p.label) : esc(p.text))).join("") : esc(m.text)}</div></div>`,
         )
         .join("") || "";
+    if (busy) content += streamBubbleHTML();
   }
   panel.innerHTML = `<div class="panel-scroll">${reviewCardHTML()}${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="添加" aria-label="添加" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div></div>`;
   bindConversationHead();
@@ -2870,6 +3335,36 @@ function renderPanel() {
       applyPendingResult(pending.old, "rejected");
     };
 }
+/** 流式气泡 HTML：思考动画或逐字输出 */
+function streamBubbleHTML() {
+  if (streamThinking)
+    return `<div class="message assistant is-streaming" id="stream-bubble"><small class="message-role">aster · 思考中</small><div class="thinking"><span></span><span></span><span></span></div></div>`;
+  return `<div class="message assistant is-streaming" id="stream-bubble"><small class="message-role">aster · 输出中</small><div class="stream-text">${esc(streamText)}<span class="stream-caret"></span></div></div>`;
+}
+
+/** 将面板滚动到底部（流式输出跟随） */
+function scrollPanelToBottom() {
+  const scroller = document.querySelector("#panel .panel-scroll");
+  const bubble = $("#stream-bubble");
+  if (bubble) bubble.scrollIntoView({ block: "end" });
+  else if (scroller) scroller.scrollTop = scroller.scrollHeight;
+}
+
+/** 增量更新流式气泡，避免整页重绘 */
+function paintStreamBubble() {
+  const bubble = $("#stream-bubble");
+  if (!bubble) return;
+  if (streamThinking) return;
+  bubble.querySelector(".message-role").textContent = "aster · 输出中";
+  const body = bubble.querySelector(".stream-text");
+  if (body) {
+    body.childNodes[0]?.remove;
+    body.innerHTML = `${esc(streamText)}<span class="stream-caret"></span>`;
+  } else {
+    bubble.innerHTML = `<small class="message-role">aster · 输出中</small><div class="stream-text">${esc(streamText)}<span class="stream-caret"></span></div>`;
+  }
+  scrollPanelToBottom();
+}
 async function runTask(task) {
   if (busy) return toast("请等待当前任务，或停止后重试");
   sync();
@@ -2928,10 +3423,29 @@ async function runTask(task) {
   session.composerRefs = {};
   session.composerPosition = 1;
   busy = true;
+  streamText = "";
+  streamThinking = true;
   syncAsterFace();
   await persist();
   if (["review", "rewrite", "check"].includes(task)) tab = "chat";
   renderPanel();
+  scrollPanelToBottom();
+  unsubProgress?.();
+  unsubProgress =
+    typeof window.desk?.progress === "function"
+      ? window.desk.progress((chunk) => {
+          if (typeof chunk !== "string" || !chunk) return;
+          if (current?.id !== doc.id) return;
+          streamText += chunk;
+          if (streamThinking) {
+            streamThinking = false;
+            const bubble = $("#stream-bubble");
+            if (bubble)
+              bubble.innerHTML = `<small class="message-role">aster · 输出中</small><div class="stream-text"></div>`;
+          }
+          paintStreamBubble();
+        })
+      : null;
   const history = session.messages
     .slice(-8, -1)
     .map((x) => x.role + ": " + x.text)
@@ -2954,7 +3468,6 @@ async function runTask(task) {
       history,
     });
     if (!result) throw Error("Agent 未返回正文");
-    session.messages.push({ role: "assistant", text: result });
     if (task === "rewrite" && doc.id === current?.id) {
       pending = {
         doc: doc.id,
@@ -2964,6 +3477,20 @@ async function runTask(task) {
         next: result,
         hunks: buildEditHunks(body, result),
       };
+      // 改后稿直接落在正文，并进入审阅模式逐条对比；侧栏只留总结，不重复全文
+      session.messages.push({ role: "assistant", text: summarizeRewrite(body, result) });
+      current.snapshots.push({ at: new Date().toISOString(), body });
+      if (editor) {
+        editor.commands.setContent(safeHTML(result));
+        sync();
+        changed();
+      } else {
+        current.body = result;
+        changed();
+      }
+      enterReviewMode();
+    } else {
+      session.messages.push({ role: "assistant", text: result });
     }
     await persist();
   } catch (e) {
@@ -2977,6 +3504,9 @@ async function runTask(task) {
       text: "本次未完成：" + e.message,
     });
   } finally {
+    unsubProgress?.();
+    unsubProgress = null;
+    streamThinking = false;
     busy = false;
     syncAsterFace();
     await persist();
@@ -3939,16 +4469,45 @@ function agentInstalled(id) {
   return !!state.agents?.[id];
 }
 
+function ensureAgentsEnabledStore() {
+  if (!state.agentsEnabled || typeof state.agentsEnabled !== "object")
+    state.agentsEnabled = {};
+}
+
+/** Agent 是否在对话中可选；缺省视为启用 */
+function agentEnabled(id) {
+  ensureAgentsEnabledStore();
+  return state.agentsEnabled[id] !== false;
+}
+
+async function setAgentEnabled(id, on) {
+  ensureAgentsEnabledStore();
+  state.agentsEnabled = { ...state.agentsEnabled, [id]: !!on };
+  if (!on && state.provider === id) {
+    const fallback = selectableAgentProviders()[0];
+    if (fallback) {
+      state.provider = fallback.id;
+      state.model = "";
+    }
+  }
+  await persist();
+}
+
 /** 已安装的 Agent 列表 */
 function installedAgentProviders() {
   return AGENT_PROVIDERS.filter((p) => agentInstalled(p.id));
 }
 
-/** 当前侧栏展示用的 provider（优先已安装） */
+/** 对话中可选的 Agent（已安装且已启用） */
+function selectableAgentProviders() {
+  return installedAgentProviders().filter((p) => agentEnabled(p.id));
+}
+
+/** 当前侧栏展示用的 provider（优先已安装且已启用） */
 function railProviderId() {
-  const installed = installedAgentProviders();
-  if (installed.some((p) => p.id === state.provider)) return state.provider;
-  return installed[0]?.id || state.provider;
+  const selectable = selectableAgentProviders();
+  if (selectable.some((p) => p.id === state.provider)) return state.provider;
+  return selectable[0]?.id || state.provider;
 }
 
 /** 触发器文案：模型名，未指定时为「默认」 */
@@ -3966,7 +4525,7 @@ function modelPickerHTML() {
   const provider = railProviderId();
   const p = AGENT_PROVIDERS.find((x) => x.id === provider);
   const label = railModelLabel(provider);
-  const agents = installedAgentProviders();
+  const agents = selectableAgentProviders();
   const agentRows = agents.length
     ? agents
         .map((agent) => {
@@ -3991,7 +4550,7 @@ function modelPickerHTML() {
           </div>`;
         })
         .join("")
-    : `<p class="model-picker-empty">暂无已安装的 Agent</p>`;
+    : `<p class="model-picker-empty">暂无可用的 Agent</p>`;
   return `<div class="model-picker" id="model-picker">
     <button type="button" id="model-picker-trigger" class="model-picker-trigger" title="${esc(p?.label || "")} · ${esc(label)}" aria-label="选择模型：${esc(label)}" aria-haspopup="menu" aria-expanded="false">
       <span class="model-picker-logo">${agentLogoSvg(provider, 16)}</span>
@@ -4138,7 +4697,7 @@ function bindModelPicker() {
       e.stopPropagation();
       const provider = opt.getAttribute("data-provider") || "";
       const model = opt.getAttribute("data-model") || "";
-      if (!provider || !agentInstalled(provider)) {
+      if (!provider || !agentInstalled(provider) || !agentEnabled(provider)) {
         toast("未找到该 CLI");
         return;
       }
@@ -4212,19 +4771,25 @@ function openAgentDetail(id, tab = "connection") {
 
 function agentListItemHtml(p) {
   const installed = agentInstalled(p.id);
+  const enabled = agentEnabled(p.id);
   const isDefault = state.provider === p.id;
-  return `<button type="button" class="agent-list-item ${isDefault ? "is-default" : ""} ${installed ? "" : "is-missing"}" data-open-agent="${p.id}">
+  return `<div class="agent-list-item ${isDefault ? "is-default" : ""} ${installed ? "" : "is-missing"} ${enabled ? "" : "is-off"}" data-open-agent="${p.id}" role="button" tabindex="0">
   <div class="agent-card-logo">${agentLogoSvg(p.id)}</div>
   <span class="agent-list-main">
     <span class="agent-card-title">
       <strong>${esc(p.label)}</strong>
       ${isDefault ? `<span class="agent-badge agent-badge-default">默认</span>` : ""}
       <span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "已安装" : "未安装"}</span>
+      ${enabled ? "" : `<span class="agent-badge agent-badge-off">已关闭</span>`}
     </span>
     <span class="agent-card-blurb">${esc(p.blurb)}</span>
   </span>
+  <label class="agent-switch" title="${enabled ? "关闭后对话中不可选" : "启用以在对话中选择"}">
+    <input type="checkbox" role="switch" data-agent-enable="${p.id}" ${enabled ? "checked" : ""} aria-label="${enabled ? "关闭" : "启用"} ${esc(p.label)}">
+    <span class="agent-switch-track" aria-hidden="true"></span>
+  </label>
   <span class="account-list-chevron" aria-hidden="true">›</span>
-</button>`;
+</div>`;
 }
 
 function agentModelsPanelHtml(p, info) {
@@ -4320,7 +4885,14 @@ function bindAgentModelControls(p) {
   const refresh = $(`[data-agent-refresh="${p.id}"]`);
   if (refresh) refresh.onclick = async () => { refresh.disabled = true; refresh.textContent = "刷新中…"; await fillAgentCard(p, true); };
   const useDefault = $(`[data-agent-cli-default="${p.id}"]`);
-  if (useDefault) useDefault.onclick = async () => { state.provider = p.id; state.model = ""; await persistAgentModels(); render(); };
+  if (useDefault)
+    useDefault.onclick = async () => {
+      if (!agentEnabled(p.id)) await setAgentEnabled(p.id, true);
+      state.provider = p.id;
+      state.model = "";
+      await persistAgentModels();
+      render();
+    };
 
   const addBtn = $(`[data-agent-add-model="${p.id}"]`);
   const pick = $(`[data-agent-pick="${p.id}"]`);
@@ -4352,6 +4924,7 @@ function bindAgentModelControls(p) {
   $$(`[data-agent-use="${p.id}"]`).forEach((btn) => {
     btn.onclick = async () => {
       const model = btn.dataset.model || "";
+      if (!agentEnabled(p.id)) await setAgentEnabled(p.id, true);
       if (state.provider !== p.id) state.provider = p.id;
       state.model = model;
       await persistAgentModels();
@@ -4425,13 +4998,42 @@ async function mountAgentsSettings() {
     const next = await api("load");
     if (next?.agents) state.agents = next.agents;
     if (next?.agentModels) state.agentModels = next.agentModels;
+    if (next?.agentsEnabled) state.agentsEnabled = next.agentsEnabled;
   } catch {
     /* keep cached */
   }
   ensureAgentModelsStore();
+  ensureAgentsEnabledStore();
 
-  $$("[data-open-agent]").forEach((btn) => {
-    btn.onclick = () => openAgentDetail(btn.dataset.openAgent);
+  $$("[data-open-agent]").forEach((item) => {
+    const open = () => openAgentDetail(item.dataset.openAgent);
+    item.onclick = (e) => {
+      if (e.target.closest("[data-agent-enable], .agent-switch")) return;
+      open();
+    };
+    item.onkeydown = (e) => {
+      if (e.target.closest("[data-agent-enable], .agent-switch")) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        open();
+      }
+    };
+  });
+  $$("[data-agent-enable]").forEach((input) => {
+    input.onclick = (e) => e.stopPropagation();
+    input.onchange = async () => {
+      const id = input.getAttribute("data-agent-enable") || "";
+      if (!id) return;
+      input.disabled = true;
+      try {
+        await setAgentEnabled(id, input.checked);
+        render();
+      } catch (e) {
+        input.checked = !input.checked;
+        toast(e.message || "保存失败");
+        input.disabled = false;
+      }
+    };
   });
   mountAgentUsage($("#agent-usage"), api, AGENT_PROVIDERS, {
     mode: "overview",
@@ -4451,14 +5053,17 @@ async function renderAgentDetail() {
     const next = await api("load");
     if (next?.agents) state.agents = next.agents;
     if (next?.agentModels) state.agentModels = next.agentModels;
+    if (next?.agentsEnabled) state.agentsEnabled = next.agentsEnabled;
   } catch {
     /* keep cached */
   }
   ensureAgentModelsStore();
+  ensureAgentsEnabledStore();
   if (!["connection", "usage"].includes(agentDetailTab))
     agentDetailTab = "connection";
 
   const installed = agentInstalled(p.id);
+  const enabled = agentEnabled(p.id);
   const isDefault = state.provider === p.id;
   const tabs = [
     { id: "connection", title: "连接" },
@@ -4491,6 +5096,7 @@ async function renderAgentDetail() {
     if (setDefault)
       setDefault.onclick = async () => {
         if (!agentInstalled(p.id)) return toast("未找到该 CLI");
+        if (!agentEnabled(p.id)) await setAgentEnabled(p.id, true);
         state.provider = p.id;
         state.model = "";
         await persistAgentModels();
@@ -4528,7 +5134,7 @@ async function renderAgentDetail() {
       settingsSection({
         title: "基本信息",
         control: settingsPanel(
-          `<div class="account-overview-top agent-overview-top"><div class="agent-card-logo agent-overview-logo">${agentLogoSvg(p.id)}</div><div class="account-overview-info"><h2>${esc(p.label)}</h2><div class="account-stat-meta"><span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "已安装" : "未安装"}</span>${isDefault ? `<span class="agent-badge agent-badge-default">默认</span>` : ""}<span>${esc(p.blurb)}</span></div></div></div>`,
+          `<div class="account-overview-top agent-overview-top"><div class="agent-card-logo agent-overview-logo">${agentLogoSvg(p.id)}</div><div class="account-overview-info"><h2>${esc(p.label)}</h2><div class="account-stat-meta"><span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "已安装" : "未安装"}</span>${enabled ? "" : `<span class="agent-badge agent-badge-off">已关闭</span>`}${isDefault ? `<span class="agent-badge agent-badge-default">默认</span>` : ""}<span>${esc(p.blurb)}</span></div></div></div>`,
         ),
       }),
       settingsSection({
@@ -5795,9 +6401,83 @@ function renderCalendar(rows) {
   };
 }
 window.addEventListener("beforeunload", () => {
+  if (reviewDemoActive) return;
   sync();
   if (dirty) window.desk.flush(state);
 });
+
+/**
+ * 开发环境：用固定范文进入审阅 UI，方便改样式时不必反复调 AI。
+ * 打开 http://127.0.0.1:5173/?reviewDemo=1 ，热刷新会保持该状态。
+ * @param {{ silent?: boolean }} [opts]
+ */
+function loadReviewDemo(opts = {}) {
+  if (!isWeb()) return false;
+  const fixture = reviewDemoFixture;
+  if (!fixture?.old || !fixture?.next) return false;
+  ensureAccount();
+  const DEMO_ID = "__review_ui_demo__";
+  let doc = state.documents.find((d) => d.id === DEMO_ID);
+  if (!doc) {
+    doc = {
+      id: DEMO_ID,
+      title: (fixture.title || "审阅 UI 演示") + " · UI 演示",
+      body: fixture.next,
+      account: account || accountList()[0]?.id || "",
+      updated: new Date().toISOString(),
+      chat: [],
+      conversations: [],
+      titles: [],
+      prompts: [],
+      topics: [],
+      checks: [],
+      snapshots: [],
+      status: "draft",
+    };
+    state.documents.unshift(doc);
+  }
+  reviewDemoActive = true;
+  dirty = false;
+  account = doc.account || account;
+  current = doc;
+  page = "write";
+  previewMode = false;
+  previewDocId = null;
+  doc.title = (fixture.title || "审阅 UI 演示") + " · UI 演示";
+  doc.body = fixture.next;
+  delete doc.richHTML;
+  const session = conversation(doc);
+  pending = {
+    doc: doc.id,
+    conversationId: session.id,
+    base: fixture.old,
+    old: fixture.old,
+    next: fixture.next,
+    hunks: buildEditHunks(fixture.old, fixture.next),
+  };
+  reviewMode = true;
+  const first = reviewChanges().findIndex((h) => h.status === "pending");
+  reviewIndex = first >= 0 ? first : 0;
+  if (!opts.silent) {
+    const n = reviewChanges().length;
+    toast(`审阅 UI 演示已载入（${n} 处修改，不写入仓库）`);
+  }
+  return true;
+}
+
+/**
+ * URL ?reviewDemo=1 时自动进入审阅演示。
+ */
+function maybeLoadReviewDemoFromUrl() {
+  if (!isWeb()) return false;
+  try {
+    const q = new URLSearchParams(location.search);
+    if (!q.has("reviewDemo")) return false;
+    return loadReviewDemo({ silent: true });
+  } catch {
+    return false;
+  }
+}
 
 /**
  * 检测 GitHub 是否有新版本；手动触发时给出提示。
@@ -5855,7 +6535,13 @@ if (!isWeb()) {
     /* ignore */
   }
 }
+maybeLoadReviewDemoFromUrl();
 render();
 if (!isWeb()) {
   setTimeout(() => checkForAppUpdate({ manual: false }), 2500);
+}
+if (isWeb()) {
+  window.__inkdeskLoadReviewDemo = () => {
+    if (loadReviewDemo()) render();
+  };
 }

@@ -25,6 +25,11 @@ const defaults = {
   model: "",
   /** 各 Agent 用户收藏的模型 ID 列表 */
   agentModels: {},
+  /**
+   * 各 Agent 是否在对话中可选：providerId → boolean
+   * 缺省视为启用；关闭后仍可在设置中配置，但不出现在对话模型选择器中。
+   */
+  agentsEnabled: {},
   followers: {},
   metricDeltas: {},
   /** 各账号已发布文章的本地备份默认目录（无分组时回退） */
@@ -150,8 +155,8 @@ class DeskCore {
    */
   init(options) {
     const { dataDir, projectDir, readerPath } = options;
-    this.data = dataDir;
-    this.agentUsage = new AgentUsage(dataDir);
+    this.data = path.resolve(dataDir);
+    this.agentUsage = new AgentUsage(this.data);
     this.projectDir = projectDir;
     this.readerPath = readerPath;
     fs.mkdirSync(path.join(this.data, "assets"), { recursive: true });
@@ -181,6 +186,10 @@ class DeskCore {
         agentModels: {
           ...defaults.agentModels,
           ...(loaded.agentModels || {}),
+        },
+        agentsEnabled: {
+          ...defaults.agentsEnabled,
+          ...(loaded.agentsEnabled || {}),
         },
         wechatAccounts: {
           ...defaults.wechatAccounts,
@@ -323,6 +332,7 @@ class DeskCore {
       provider: this.store.provider,
       model: this.store.model,
       agentModels: this.store.agentModels || {},
+      agentsEnabled: this.store.agentsEnabled || {},
       followers: this.store.followers || {},
       metricDeltas: this.store.metricDeltas || {},
       backupPaths: this.store.backupPaths || {},
@@ -450,17 +460,20 @@ class DeskCore {
     return names ? this.findOnPath(names) : null;
   }
 
-  /** ZCode.app 内脚本需用 Electron/Node 启动 */
+  /** ZCode.app 内脚本需用 Electron/Node 启动，并注入内置 Provider 配置路径 */
   zcodeLaunch(exe) {
     if (exe && exe.endsWith("zcode.cjs") && exe.includes(`${path.sep}ZCode.app${path.sep}`)) {
       const appRoot = exe.slice(0, exe.indexOf(`${path.sep}Contents${path.sep}`));
       const binary = path.join(appRoot, "Contents", "MacOS", "ZCode");
       if (fs.existsSync(binary)) {
-        return {
-          cmd: binary,
-          prefixArgs: [exe],
-          env: { ELECTRON_RUN_AS_NODE: "1" },
-        };
+        const env = { ELECTRON_RUN_AS_NODE: "1" };
+        // glm/zcode.cjs 的相对路径解析对不上 app 内 config/，需显式传入内置配置
+        const bundled = [
+          path.join(appRoot, "Contents", "Resources", "config", "provider", "zcode-builtin.json"),
+          path.join(path.dirname(exe), "provider", "zcode-builtin.json"),
+        ].find((p) => fs.existsSync(p));
+        if (bundled) env.ZCODE_BUILTIN_PROVIDER_CONFIG_FILE = bundled;
+        return { cmd: binary, prefixArgs: [exe], env };
       }
     }
     return { cmd: exe, prefixArgs: [], env: {} };
@@ -629,12 +642,23 @@ class DeskCore {
     return "cursor";
   }
 
+  /** Agent 工作目录：绝对路径，避免 dataDir 已含 agent-work 时重复拼接。 */
+  agentWorkDir() {
+    const base = path.resolve(this.data || path.join(os.homedir(), ".inkdesk"));
+    fs.mkdirSync(base, { recursive: true });
+    if (path.basename(base) === "agent-work") return base;
+    const dir = path.join(base, "agent-work");
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+
   /**
    * 组装各 CLI 的启动参数。
    * @returns {{ cmd: string, args: string[], envExtra: object, stdinPrompt: boolean, parseZcodeJson: boolean, streamProgress: boolean, outFile: string|null }}
    */
   agentInvokeSpec(provider, exe, prompt, model, cwd) {
-    const outFile = path.join(cwd, "result-" + Date.now() + ".txt");
+    const workDir = path.resolve(cwd);
+    const outFile = path.join(workDir, "result-" + Date.now() + ".txt");
     let cmd = exe;
     let args = [];
     let envExtra = {};
@@ -653,7 +677,7 @@ class DeskCore {
         "--output-format",
         "stream-json",
         "--workspace",
-        cwd,
+        workDir,
       ];
       if (m) args.push("--model", m);
       args.push(prompt);
@@ -668,7 +692,7 @@ class DeskCore {
         "--color",
         "never",
         "-C",
-        cwd,
+        workDir,
       ];
       if (m) args.push("--model", m);
       args.push("-o", outFile, "-");
@@ -686,7 +710,7 @@ class DeskCore {
       if (m) args.push("--model", m);
       args.push(prompt);
     } else if (provider === "opencode") {
-      args = ["run", "--format", "json", "--dir", cwd];
+      args = ["run", "--format", "json", "--dir", workDir];
       if (m) args.push("-m", m);
       args.push(prompt);
     } else if (provider === "antigravity") {
@@ -705,7 +729,7 @@ class DeskCore {
         "--mode",
         "plan",
         "--cwd",
-        cwd,
+        workDir,
       ];
       parseZcodeJson = true;
     }
@@ -786,7 +810,7 @@ class DeskCore {
         installed: true,
         error: "已有任务运行中",
       };
-    const cwd = path.join(this.data, "agent-work");
+    const cwd = this.agentWorkDir();
     fs.mkdirSync(cwd, { recursive: true });
     const prompt =
       "请只回复一个词：ok。不要调用工具，不要解释，不要输出其它内容。";
@@ -1584,7 +1608,7 @@ class DeskCore {
     const provider = this.normalizeProvider(req.provider);
     const exe = this.executable(provider);
     if (!exe) throw Error("未找到 " + provider + " CLI，请安装并登录后重试。");
-    const cwd = path.join(this.data, "agent-work");
+    const cwd = this.agentWorkDir();
     fs.mkdirSync(cwd, { recursive: true });
     const skills = new Skills(this.vault);
     const mounted = skills.mount(req.account, req.skillIds, cwd);

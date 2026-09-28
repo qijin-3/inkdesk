@@ -74,7 +74,8 @@ const MIME = {
  * @param {import('http').ServerResponse} res
  */
 function serveStatic(urlPath, res) {
-  let rel = urlPath === "/" ? "/index.html" : urlPath.split("?")[0];
+  let rel = (urlPath || "/").split("?")[0] || "/";
+  if (rel === "/") rel = "/index.html";
   const file = path.join(ROOT, rel);
   if (!file.startsWith(ROOT + path.sep) && file !== path.join(ROOT, "index.html"))
     return false;
