@@ -9,6 +9,8 @@ vault.json
 # Electron packaging / preview builds
 dist/
 dist-*/
+releases/
+!releases/.gitkeep
 
 # Local UI verification captures
 screenshot-*.png

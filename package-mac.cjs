@@ -22,12 +22,13 @@ const ver = pkg.version;
 const displayName = pkg.productName || "Aster*";
 /** 文件系统安全的应用名（.app / zip / dmg） */
 const appName = "Aster";
-const outDir = path.join(root, `dist-${ver}`);
+const releaseDir = path.join(root, "releases");
+const outDir = path.join(releaseDir, `dist-${ver}`);
 const appPath = path.join(outDir, `${appName}-darwin-arm64`, `${appName}.app`);
 const zipName = `${appName}-mac-arm64-v${ver}.zip`;
 const dmgName = `${appName}-mac-arm64-v${ver}.dmg`;
-const zipOut = path.join(root, zipName);
-const dmgOut = path.join(root, dmgName);
+const zipOut = path.join(releaseDir, zipName);
+const dmgOut = path.join(releaseDir, dmgName);
 const bundleId = "com.qijin.aster";
 
 function run(cmd, args, opts = {}) {
@@ -56,11 +57,13 @@ function prepareApp(app) {
 }
 
 console.log(`Packaging ${displayName} v${ver}…`);
+fs.mkdirSync(releaseDir, { recursive: true });
 run("npm", ["run", "build"]);
 
 const ignore = [
   "^/data(/|$)",
   "^/dist",
+  "^/releases",
   "screenshot-",
   "/(vault|development-vault)\\.json$",
   "/(vault|knowledge|model|note-import|update)\\.test\\.cjs$",
