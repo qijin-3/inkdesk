@@ -105,3 +105,18 @@ test("agentListItemHtml 状态徽章", () => {
   });
   assert.match(off, /已关闭/);
 });
+
+test("agentModelsPanelHtml 三态与回填", async () => {
+  const st = () => ({ agents: { cursor: {}, zcode: {} }, agentsEnabled: {}, provider: "cursor", model: "", agentModels: {} });
+  let html = m.agentModelsPanelHtml(st(), { id: "codex", label: "ChatGPT", blurb: "" }, null);
+  assert.match(html, /安装并登录对应 CLI/);
+  html = m.agentModelsPanelHtml(st(), { id: "zcode", label: "ZCode", blurb: "" }, { current: "m9" });
+  assert.match(html, /m9/);
+  const s = st();
+  html = m.agentModelsPanelHtml(s, { id: "cursor", label: "Cursor", blurb: "" }, { models: ["m1"], source: "CLI" });
+  assert.match(html, /尚未添加模型/);
+  s.model = "m1";
+  html = m.agentModelsPanelHtml(s, { id: "cursor", label: "Cursor", blurb: "" }, { models: ["m1"], source: "CLI" });
+  assert.match(html, /使用中/);
+  assert.deepEqual(s.agentModels.cursor, ["m1"]);
+});

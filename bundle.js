@@ -30894,6 +30894,20 @@ function materialDrawerBodyHTML(r) {
   return `<p class="muted">\u5DF2\u4FDD\u7559\u539F\u6587\u4EF6\uFF0C\u5F53\u524D\u683C\u5F0F\u6682\u4E0D\u652F\u6301\u5185\u5D4C\u9884\u89C8\u3002</p><pre id="reference-text" class="material-preview is-code">${esc2(text)}</pre>`;
 }
 
+// ui/conversation.js
+function conversation(doc3) {
+  doc3.conversations ||= [];
+  if (!doc3.conversations.length)
+    doc3.conversations.push({
+      id: crypto.randomUUID(),
+      title: "\u65B0\u5BF9\u8BDD",
+      messages: doc3.chat || []
+    });
+  let c = doc3.conversations.find((c2) => c2.id === doc3.activeConversationId) || doc3.conversations[0];
+  doc3.activeConversationId = c.id;
+  return c;
+}
+
 // ui/agent-store.js
 var AGENT_PROVIDERS = [
   { id: "cursor", label: "Cursor", blurb: "Cursor Agent CLI" },
@@ -30993,6 +31007,49 @@ function agentListItemHtml(st, p) {
   </label>
   <span class="account-list-chevron" aria-hidden="true">\u203A</span>
 </div>`;
+}
+function agentModelsPanelHtml(st, p, info) {
+  const installed = agentInstalled(st, p.id);
+  if (!installed) {
+    return `<p class="settings-hint">\u5B89\u88C5\u5E76\u767B\u5F55\u5BF9\u5E94 CLI \u540E\uFF0C\u53EF\u6DFB\u52A0\u6A21\u578B\u5E76\u9010\u4E00\u6D4B\u8BD5\u8FDE\u901A\u3002</p>`;
+  }
+  if (p.id === "zcode" || info?.selectable === false) {
+    const current2 = info?.current || "";
+    return `<div class="agent-model-panel">
+      <p class="settings-hint">${current2 ? `CLI \u9ED8\u8BA4\u6A21\u578B\uFF1A<code>${esc2(current2)}</code>` : esc2(info?.error || "\u672A\u80FD\u8BFB\u53D6\u9ED8\u8BA4\u6A21\u578B")}</p>
+      <p class="settings-hint">${esc2(p.label)} \u6CBF\u7528 CLI \u9ED8\u8BA4\u6A21\u578B\uFF0C\u8FDE\u901A\u6027\u8BF7\u7528\u53F3\u4E0A\u89D2\u300C\u6D4B\u8BD5\u9ED8\u8BA4\u300D\u3002</p>
+    </div>`;
+  }
+  const saved = getAgentModelList(st, p.id);
+  if (!saved.length && st.provider === p.id && st.model) {
+    setAgentModelList(st, p.id, [st.model]);
+  }
+  const list2 = getAgentModelList(st, p.id);
+  const suggestions = agentSuggestionIds(st, p.id, info?.models || []);
+  const rows = list2.length ? list2.map((m) => {
+    const active = st.provider === p.id && st.model === m;
+    return `<li class="agent-model-item ${active ? "is-active" : ""}" data-model-row="${esc2(m)}">
+            <code class="agent-model-id">${esc2(m)}</code>${!(info?.models || []).includes(m) ? `<span class="agent-badge">\u81EA\u5B9A\u4E49 \xB7 \u672A\u6838\u9A8C</span>` : ""}
+            ${active ? `<span class="agent-badge agent-badge-default">\u4F7F\u7528\u4E2D</span>` : `<button type="button" class="ghost" data-agent-use="${p.id}" data-model="${esc2(m)}">\u4F7F\u7528</button>`}
+            <button type="button" class="ghost" data-agent-test-model="${p.id}" data-model="${esc2(m)}">\u6D4B\u8BD5</button>
+            <button type="button" class="ghost" data-agent-remove-model="${p.id}" data-model="${esc2(m)}">\u79FB\u9664</button>
+            <span class="agent-model-row-status" data-model-status="${esc2(m)}" role="status"></span>
+          </li>`;
+  }).join("") : `<li class="agent-model-empty settings-hint">\u5C1A\u672A\u6DFB\u52A0\u6A21\u578B\u3002\u4ECE\u4E0B\u65B9\u9009\u62E9\u6A21\u578B ID\uFF0C\u6216\u624B\u586B\u540E\u70B9\u300C\u6DFB\u52A0\u300D\u3002</li>`;
+  return `<div class="agent-model-panel">
+    <p class="settings-hint" role="status">${esc2(info?.source || "\u5C1A\u672A\u8BFB\u53D6\u6A21\u578B\u76EE\u5F55")}${info?.checkedAt ? ` \xB7 ${new Date(info.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}${info?.stale ? " \xB7 \u4E0A\u6B21\u6210\u529F\u7ED3\u679C" : ""}</p>
+    ${info?.error || info?.notice ? `<p class="settings-hint">${esc2(info.error || info.notice)}</p>` : ""}
+    <div class="agent-card-actions"><button type="button" class="ghost" data-agent-refresh="${p.id}">\u5237\u65B0\u6A21\u578B</button><button type="button" class="ghost" data-agent-cli-default="${p.id}">\u4F7F\u7528 CLI \u9ED8\u8BA4\u6A21\u578B</button></div>
+    <div class="agent-model-add">
+      <select class="agent-model-select" data-agent-preset="${p.id}" aria-label="\u5E38\u7528\u6A21\u578B">
+        <option value="">\u9009\u62E9\u6A21\u578B ID</option>
+        ${suggestions.map((m) => `<option value="${esc2(m)}">${esc2(m)}${!(info?.models || []).includes(m) ? " \xB7 \u5DF2\u4FDD\u5B58\uFF0C\u672A\u6838\u9A8C" : ""}</option>`).join("")}
+      </select>
+      <input class="agent-model-input" data-agent-pick="${p.id}" placeholder="\u6216\u624B\u52A8\u8F93\u5165\u6A21\u578B ID" autocomplete="off">
+      <button type="button" class="primary" data-agent-add-model="${p.id}">\u6DFB\u52A0</button>
+    </div>
+    <ul class="agent-model-list">${rows}</ul>
+  </div>`;
 }
 
 // node_modules/diff/libesm/diff/base.js
@@ -31604,6 +31661,26 @@ function protectStructure(oldText, nextText) {
   }
   return { next: next2, notes: dropped };
 }
+function summarizeRewrite(plan) {
+  const hunks = (pending?.hunks || []).filter((h2) => h2.kind === "change");
+  const n = hunks.length;
+  let add = 0, del2 = 0, polish = 0, punct = 0;
+  hunks.forEach((h2) => {
+    add += String(h2.next || "").length;
+    del2 += String(h2.old || "").length;
+    const o = String(h2.old || "").trim(), t = String(h2.next || "").trim();
+    if (o.replace(/[，。！？、；：“”‘’（）《》\s]/g, "") !== t.replace(/[，。！？、；：“”‘’（）《》\s]/g, "")) polish += 1;
+    else punct += 1;
+  });
+  const reasons = [];
+  if (polish) reasons.push(`${polish} \u5904\u6587\u5B57\u6DA6\u8272\uFF08\u63AA\u8F9E\u66F4\u987A\u3001\u53BB\u6389\u8D58\u5B57\uFF09`);
+  if (punct) reasons.push(`${punct} \u5904\u6807\u70B9 / \u65AD\u53E5\u5FAE\u8C03`);
+  if (pending?.protectNotes?.length) reasons.push(...pending.protectNotes);
+  else reasons.push("\u539F\u6587 Markdown\u3001\u6807\u9898\u5C42\u7EA7\u4E0E\u914D\u56FE\u5747\u5DF2\u4FDD\u7559\uFF0C\u672A\u52A8\u5927\u7ED3\u6784");
+  const first2 = hunks[0]?.next?.trim().split("\n").find(Boolean) || "";
+  const excerpt = first2.length > 48 ? first2.slice(0, 48) + "\u2026" : first2;
+  return `\u5BA1\u9605\u603B\u7ED3\uFF1A\u5171 ${n} \u5904\u4FEE\u6539\uFF08\u65B0\u589E\u7EA6 ${add} \u5B57 / \u539F\u6587\u7EA6 ${del2} \u5B57\uFF09\u3002${reasons.join("\uFF1B")}\u3002${excerpt ? `\u4F8B\u5982\uFF1A\u201C${excerpt}\u201D\u3002` : ""}\u539F\u6587\u672A\u88AB\u8986\u76D6\uFF0C\u53EF\u9010\u6761\u63A5\u53D7 / \u62D2\u7EDD\uFF0C\u5B8C\u6210\u540E\u70B9\u5BA1\u9605\u6761\u300C\u5B8C\u6210\u300D\u3002`;
+}
 
 // fixtures/review-demo.json
 var review_demo_default = {
@@ -31690,7 +31767,7 @@ var agentDetailId = null;
 var agentDetailTab = "connection";
 var current;
 var busy = false;
-var pending = null;
+var pending2 = null;
 var selectedText = "";
 var selectionContext = null;
 var selectionDragging = false;
@@ -31733,18 +31810,6 @@ function ensureAccount() {
   }
   const hit = list2.find((a) => sameAccount(a.id, account));
   account = hit ? hit.id : list2[0].id;
-}
-function conversation(doc3 = current) {
-  doc3.conversations ||= [];
-  if (!doc3.conversations.length)
-    doc3.conversations.push({
-      id: crypto.randomUUID(),
-      title: "\u65B0\u5BF9\u8BDD",
-      messages: doc3.chat || []
-    });
-  let c = doc3.conversations.find((c2) => c2.id === doc3.activeConversationId) || doc3.conversations[0];
-  doc3.activeConversationId = c.id;
-  return c;
 }
 var td = new TurndownService({ headingStyle: "atx" });
 td.use(gfm);
@@ -31847,7 +31912,7 @@ function showSaveConflictDialog(msg) {
       current = state.documents.find((d) => d.id === id) || state.documents.find((d) => sameAccount(d.account, account));
       dirty = false;
       docStore.saveConflict = false;
-      pending = null;
+      pending2 = null;
       m.remove();
       render2();
       toast("\u5DF2\u4ECE\u78C1\u76D8\u91CD\u65B0\u52A0\u8F7D");
@@ -31877,7 +31942,7 @@ function newDoc() {
   state.documents.unshift(d);
   current = d;
   page = "write";
-  pending = null;
+  pending2 = null;
   persist();
   render2();
 }
@@ -31891,7 +31956,7 @@ function sync() {
 }
 function render2() {
   saveProfileEditor = null;
-  if (!pending || pending.doc !== current?.id) {
+  if (!pending2 || pending2.doc !== current?.id) {
     reviewMode = false;
     reviewIndex = 0;
   }
@@ -31956,7 +32021,7 @@ function render2() {
       account = b.dataset.account;
       publishedSelection = /* @__PURE__ */ new Set();
       current = state.documents.find((d) => sameAccount(d.account, account));
-      pending = null;
+      pending2 = null;
       render2();
     };
     b.oncontextmenu = (e) => {
@@ -31986,7 +32051,7 @@ function render2() {
       persist();
       current = state.documents.find((d) => d.id === b.dataset.id);
       page = "write";
-      pending = null;
+      pending2 = null;
       render2();
     }
   );
@@ -32106,7 +32171,7 @@ async function deleteDraft(id) {
       page = current ? "write" : "dashboard";
     }
     dirty = false;
-    pending = null;
+    pending2 = null;
     render2();
     toast("\u8349\u7A3F\u5DF2\u5220\u9664");
   } catch (e) {
@@ -32277,7 +32342,7 @@ async function openVersionHistoryMenu() {
         sync();
       } else current.body = body;
       changed();
-      pending = null;
+      pending2 = null;
       close2();
       toast("\u7248\u672C\u5DF2\u6062\u590D\uFF0C\u6062\u590D\u524D\u7684\u6B63\u6587\u4E5F\u5DF2\u4FDD\u5B58");
       if (previewMode) renderWrite();
@@ -32310,7 +32375,7 @@ function bindFinalize() {
       if (!result || result.needsConfirmation) return;
       Object.assign(state, result);
       current = state.documents.find((d) => sameAccount(d.account, account));
-      pending = null;
+      pending2 = null;
       page = "dashboard";
       render2();
       toast("\u5DF2\u53D1\u5E03\u5E76\u79FB\u5165\u672C\u8D26\u53F7 Archive\uFF0C\u7248\u672C\u4E0E\u5BF9\u8BDD\u5DF2\u4FDD\u7559");
@@ -32322,7 +32387,7 @@ function bindFinalize() {
 function syncAsterFace() {
   let face = "idle";
   if (busy) face = "thinking";
-  else if (pending && pending.doc === current?.id && (pending.hunks?.length || pending.edits?.length || pending.next))
+  else if (pending2 && pending2.doc === current?.id && (pending2.hunks?.length || pending2.edits?.length || pending2.next))
     face = "idea";
   else {
     const sel = editor?.state?.selection;
@@ -32449,7 +32514,7 @@ function bindConversationHead() {
   const neu = $2("#new-conversation");
   if (!current || !sel) return;
   sel.innerHTML = conversationOptionsHTML();
-  sel.value = conversation().id;
+  sel.value = conversation(current).id;
   sel.onchange = (e) => {
     current.activeConversationId = e.target.value;
     persist();
@@ -33069,14 +33134,14 @@ function bindWorkspaceResize() {
   };
 }
 function reviewCardHTML() {
-  if (!pending || pending.doc !== current?.id || pending.conversationId !== conversation().id)
+  if (!pending2 || pending2.doc !== current?.id || pending2.conversationId !== conversation(current).id)
     return "";
-  const list2 = (pending.hunks || []).filter((h2) => h2.kind === "change");
+  const list2 = (pending2.hunks || []).filter((h2) => h2.kind === "change");
   const done = list2.filter((h2) => h2.status !== "pending").length;
   return `<div class="review-card review-card-summary review-card-inline"><div class="review-card-head"><h3>\u4FEE\u6539\u5EFA\u8BAE \xB7 ${done}/${list2.length} \u5DF2\u51B3\u5B9A</h3><div class="row"><button type="button" id="accept" class="primary">\u5168\u90E8\u63A5\u53D7</button><button type="button" id="reject">\u5168\u90E8\u62D2\u7EDD</button></div></div><p class="muted">\u6B63\u6587\u4FDD\u6301\u539F\u6587\uFF0C\u53EF\u9010\u6761\u5BF9\u6BD4\u63A5\u53D7 / \u62D2\u7EDD\uFF0C\u6539\u540E\u5361\u7247\u53EF\u76F4\u63A5\u624B\u52A8\u6539\u3002</p></div>`;
 }
 function reviewChanges() {
-  return (pending?.hunks || []).filter((h2) => h2.kind === "change");
+  return (pending2?.hunks || []).filter((h2) => h2.kind === "change");
 }
 function reviewProgress() {
   const list2 = reviewChanges();
@@ -33100,11 +33165,11 @@ function reviewEqualHTML(value) {
   return String(value || "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean).map((p) => `<p class="review-para">${esc2(p).replace(/\n/g, "<br>")}</p>`).join("");
 }
 function reviewPageHTML() {
-  if (!pending || pending.doc !== current?.id) return "";
+  if (!pending2 || pending2.doc !== current?.id) return "";
   const list2 = reviewChanges();
   const idOf = (h2) => list2.findIndex((x) => x.id === h2.id);
   let n = 0;
-  const body = (pending.hunks || []).map((h2) => {
+  const body = (pending2.hunks || []).map((h2) => {
     if (h2.kind === "equal") return reviewEqualHTML(h2.value);
     const i = idOf(h2);
     n = i;
@@ -33170,7 +33235,7 @@ function scrollReviewToCurrent(smooth = true) {
 }
 function refreshReviewUI() {
   const paper = document.querySelector(".paper-wrap .paper");
-  if (!paper || !pending || pending.doc !== current?.id || !reviewMode) return;
+  if (!paper || !pending2 || pending2.doc !== current?.id || !reviewMode) return;
   const listEl = $2("#inline-review-list");
   const tmp = document.createElement("div");
   tmp.innerHTML = reviewPageHTML();
@@ -33183,7 +33248,7 @@ function refreshReviewUI() {
 function bindInlineReviewBar() {
   const wrap2 = document.querySelector(".paper-wrap");
   const paper = wrap2?.querySelector(".paper");
-  if (!paper || !pending) return;
+  if (!paper || !pending2) return;
   const list2 = reviewChanges();
   const gotoHunk = (i) => {
     if (!list2.length) return;
@@ -33201,14 +33266,14 @@ function bindInlineReviewBar() {
   if (nextBtn) nextBtn.onclick = () => gotoHunk(reviewIndex + 1);
   if (acceptAll)
     acceptAll.onclick = () => {
-      pending.hunks?.forEach((h2) => {
+      pending2.hunks?.forEach((h2) => {
         if (h2.kind === "change") h2.status = "accepted";
       });
-      applyPendingResult(pending.next, "accepted");
+      applyPendingResult(pending2.next, "accepted");
     };
   if (rejectAll)
     rejectAll.onclick = () => {
-      applyPendingResult(pending.old, "rejected");
+      applyPendingResult(pending2.old, "rejected");
     };
   if (finishBtn)
     finishBtn.onclick = () => {
@@ -33216,8 +33281,8 @@ function bindInlineReviewBar() {
       if (undecided.length && !confirm(`\u8FD8\u6709 ${undecided.length} \u6761\u672A\u51B3\u5B9A\uFF0C\u5C06\u6309\u62D2\u7EDD\u5904\u7406\u5E76\u5B8C\u6210\u3002\u7EE7\u7EED\uFF1F`))
         return;
       undecided.forEach((h2) => h2.status = "rejected");
-      const next2 = composeHunks(pending.hunks);
-      const anyAccepted = pending.hunks.some(
+      const next2 = composeHunks(pending2.hunks);
+      const anyAccepted = pending2.hunks.some(
         (h2) => h2.kind === "change" && h2.status === "accepted"
       );
       applyPendingResult(next2, anyAccepted ? "accepted" : "rejected");
@@ -33237,12 +33302,12 @@ function bindInlineReviewBar() {
   paper.querySelectorAll("[data-review-undo]").forEach(
     (b) => b.addEventListener("click", (e) => {
       e.stopPropagation();
-      const h2 = pending.hunks.find((x) => x.id === b.getAttribute("data-review-undo"));
+      const h2 = pending2.hunks.find((x) => x.id === b.getAttribute("data-review-undo"));
       if (!h2) return;
       h2.status = "pending";
       reviewIndex = Math.max(0, reviewChanges().findIndex((x) => x.id === h2.id));
       if (editor && current) {
-        editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
+        editor.commands.setContent(safeHTML(composeHunks(pending2.hunks)));
         sync();
         changed();
       }
@@ -33254,7 +33319,7 @@ function bindInlineReviewBar() {
     const readNext = () => (el.innerText || "").replace(/\u00a0/g, " ").replace(/\n+$/, "");
     const applyLocal = () => {
       const id = el.getAttribute("data-review-edit");
-      const h2 = pending?.hunks.find((x) => x.id === id);
+      const h2 = pending2?.hunks.find((x) => x.id === id);
       if (!h2) return null;
       h2.next = readNext();
       const diff = el.closest("[data-review-hunk]")?.querySelector(".review-old-diff");
@@ -33264,7 +33329,7 @@ function bindInlineReviewBar() {
     const commitEditor = () => {
       if (!applyLocal()) return;
       if (editor && current) {
-        editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
+        editor.commands.setContent(safeHTML(composeHunks(pending2.hunks)));
         sync();
         changed();
       }
@@ -33294,7 +33359,7 @@ function bindInlineReviewBar() {
   );
   if (!bindInlineReviewBar._key) {
     bindInlineReviewBar._key = (e) => {
-      if (!reviewMode || !pending || busy) return;
+      if (!reviewMode || !pending2 || busy) return;
       const t = e.target;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
       const list3 = reviewChanges();
@@ -33332,7 +33397,7 @@ function mountInlineReviewBar() {
   $2("#inline-review-list")?.remove();
   $2("#inline-review-diff")?.remove();
   paper.classList.remove("is-reviewing");
-  if (!pending || pending.doc !== current?.id || previewMode || !reviewMode) {
+  if (!pending2 || pending2.doc !== current?.id || previewMode || !reviewMode) {
     const ed2 = $2("#editor");
     if (ed2) ed2.hidden = false;
     const title2 = $2("#title");
@@ -33348,26 +33413,6 @@ function mountInlineReviewBar() {
   if (title) title.hidden = true;
   paper.insertAdjacentHTML("afterbegin", reviewPageHTML());
   bindInlineReviewBar();
-}
-function summarizeRewrite(oldText, nextText) {
-  const hunks = (pending?.hunks || []).filter((h2) => h2.kind === "change");
-  const n = hunks.length;
-  let add = 0, del2 = 0, polish = 0, punct = 0;
-  hunks.forEach((h2) => {
-    add += String(h2.next || "").length;
-    del2 += String(h2.old || "").length;
-    const o = String(h2.old || "").trim(), t = String(h2.next || "").trim();
-    if (o.replace(/[，。！？、；：“”‘’（）《》\s]/g, "") !== t.replace(/[，。！？、；：“”‘’（）《》\s]/g, "")) polish += 1;
-    else punct += 1;
-  });
-  const reasons = [];
-  if (polish) reasons.push(`${polish} \u5904\u6587\u5B57\u6DA6\u8272\uFF08\u63AA\u8F9E\u66F4\u987A\u3001\u53BB\u6389\u8D58\u5B57\uFF09`);
-  if (punct) reasons.push(`${punct} \u5904\u6807\u70B9 / \u65AD\u53E5\u5FAE\u8C03`);
-  if (pending?.protectNotes?.length) reasons.push(...pending.protectNotes);
-  else reasons.push("\u539F\u6587 Markdown\u3001\u6807\u9898\u5C42\u7EA7\u4E0E\u914D\u56FE\u5747\u5DF2\u4FDD\u7559\uFF0C\u672A\u52A8\u5927\u7ED3\u6784");
-  const first2 = hunks[0]?.next?.trim().split("\n").find(Boolean) || "";
-  const excerpt = first2.length > 48 ? first2.slice(0, 48) + "\u2026" : first2;
-  return `\u5BA1\u9605\u603B\u7ED3\uFF1A\u5171 ${n} \u5904\u4FEE\u6539\uFF08\u65B0\u589E\u7EA6 ${add} \u5B57 / \u539F\u6587\u7EA6 ${del2} \u5B57\uFF09\u3002${reasons.join("\uFF1B")}\u3002${excerpt ? `\u4F8B\u5982\uFF1A\u201C${excerpt}\u201D\u3002` : ""}\u539F\u6587\u672A\u88AB\u8986\u76D6\uFF0C\u53EF\u9010\u6761\u63A5\u53D7 / \u62D2\u7EDD\uFF0C\u5B8C\u6210\u540E\u70B9\u5BA1\u9605\u6761\u300C\u5B8C\u6210\u300D\u3002`;
 }
 function agentModeHTML() {
   const edit2 = agentMode === "edit";
@@ -33423,9 +33468,9 @@ function bindAgentModeMenu() {
   });
 }
 function applyPendingResult(nextText, action) {
-  if (!pending) return false;
+  if (!pending2) return false;
   if (reviewDemoActive) {
-    pending = null;
+    pending2 = null;
     exitReviewMode();
     toast(
       action === "accepted" ? "\u6F14\u793A\uFF1A\u5DF2\u6A21\u62DF\u63A5\u53D7\uFF08\u672A\u5199\u5165\u4ED3\u5E93\uFF09" : "\u6F14\u793A\uFF1A\u5DF2\u6A21\u62DF\u62D2\u7EDD\uFF08\u672A\u5199\u5165\u4ED3\u5E93\uFF09"
@@ -33439,14 +33484,14 @@ function applyPendingResult(nextText, action) {
   current.decisions ??= [];
   current.decisions.push({
     action,
-    before: pending.old,
+    before: pending2.old,
     after: nextText,
     at: (/* @__PURE__ */ new Date()).toISOString()
   });
   if (action === "accepted") {
     current.snapshots.push({
       at: (/* @__PURE__ */ new Date()).toISOString(),
-      body: pending.base
+      body: pending2.base
     });
     if (editor && current.body !== nextText) {
       editor.commands.setContent(safeHTML(nextText));
@@ -33460,25 +33505,25 @@ function applyPendingResult(nextText, action) {
       body: current.body
     });
     if (editor) {
-      editor.commands.setContent(safeHTML(pending.old));
+      editor.commands.setContent(safeHTML(pending2.old));
       sync();
     }
     changed();
     toast("\u5DF2\u6062\u590D\u6539\u524D\u7A3F");
   }
-  pending = null;
+  pending2 = null;
   exitReviewMode();
   renderPanel();
   syncAsterFace();
   return true;
 }
 function decideHunk(id, accept) {
-  if (!pending?.hunks) return;
-  const hunk = pending.hunks.find((h2) => h2.id === id && h2.kind === "change");
+  if (!pending2?.hunks) return;
+  const hunk = pending2.hunks.find((h2) => h2.id === id && h2.kind === "change");
   if (!hunk || hunk.status !== "pending") return;
   hunk.status = accept ? "accepted" : "rejected";
   if (editor && current) {
-    editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
+    editor.commands.setContent(safeHTML(composeHunks(pending2.hunks)));
     sync();
     changed();
   }
@@ -33510,7 +33555,7 @@ function renderPanel() {
   let docChip = "";
   if (tab === "chat") {
     docChip = `<div class="conversation-doc-chip" title="${esc2(current?.id || "")}"><span class="conversation-doc-chip-icon">${I.file({ size: 14 })}</span><span class="conversation-doc-chip-text">${esc2(current?.title || "\u672A\u547D\u540D\u6587\u7AE0")}</span></div>`;
-    content = conversation().messages.map(
+    content = conversation(current).messages.map(
       (m) => `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "\u4F60" : "aster"}</small><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? referenceChipHTML(p.reference?.kind || "file", p.label) : esc2(p.text)).join("") : esc2(m.text)}</div></div>`
     ).join("") || "";
     if (busy) content += streamBubbleHTML();
@@ -33521,7 +33566,7 @@ function renderPanel() {
   $2("#send").onclick = () => busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
   bindAgentModeMenu();
   bindModelPicker();
-  composer = new Composer($2("#composer-input"), conversation(), {
+  composer = new Composer($2("#composer-input"), conversation(current), {
     changed: () => {
       dirty = true;
       docStore.deferPersist();
@@ -33558,20 +33603,20 @@ function renderPanel() {
   );
   if ($2("#accept"))
     $2("#accept").onclick = () => {
-      if (!pending) return;
-      if (pending.hunks) {
-        pending.hunks.forEach((h2) => {
+      if (!pending2) return;
+      if (pending2.hunks) {
+        pending2.hunks.forEach((h2) => {
           if (h2.kind === "change") h2.status = "accepted";
         });
-        applyPendingResult(composeHunks(pending.hunks), "accepted");
+        applyPendingResult(composeHunks(pending2.hunks), "accepted");
         return;
       }
-      applyPendingResult(pending.next, "accepted");
+      applyPendingResult(pending2.next, "accepted");
     };
   if ($2("#reject"))
     $2("#reject").onclick = () => {
-      if (!pending) return;
-      applyPendingResult(pending.old, "rejected");
+      if (!pending2) return;
+      applyPendingResult(pending2.old, "rejected");
     };
 }
 function streamBubbleHTML() {
@@ -33691,7 +33736,7 @@ async function runTask(task) {
     if (!result) throw Error("Agent \u672A\u8FD4\u56DE\u6B63\u6587");
     if (task === "rewrite" && doc3.id === current?.id) {
       const guarded = protectStructure(body, result);
-      pending = {
+      pending2 = {
         doc: doc3.id,
         conversationId: session.id,
         base: body,
@@ -33700,13 +33745,13 @@ async function runTask(task) {
         hunks: buildEditHunks(body, guarded.next),
         protectNotes: guarded.notes
       };
-      session.messages.push({ role: "assistant", text: summarizeRewrite(body, guarded.next) });
+      session.messages.push({ role: "assistant", text: summarizeRewrite(pending2) });
       current.snapshots.push({ at: (/* @__PURE__ */ new Date()).toISOString(), body });
       if (editor) {
-        editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
+        editor.commands.setContent(safeHTML(composeHunks(pending2.hunks)));
         sync();
       } else {
-        current.body = composeHunks(pending.hunks);
+        current.body = composeHunks(pending2.hunks);
         changed();
       }
       enterReviewMode();
@@ -34088,7 +34133,7 @@ async function movePublishedToDraft(paths) {
     }
     publishedPreview = null;
     dirty = false;
-    pending = null;
+    pending2 = null;
     if (list2.length === 1) {
       current = state.documents.find((d) => d.id === lastId) || state.documents.find((d) => sameAccount(d.account, account));
       page = current ? "write" : "dashboard";
@@ -34110,7 +34155,7 @@ async function refreshDashboardData() {
     Object.assign(state, result);
     current = state.documents.find((d) => d.id === id) || state.documents.find((d) => sameAccount(d.account, account));
     dirty = false;
-    pending = null;
+    pending2 = null;
     page = "dashboard";
     render2();
     toast(
@@ -34170,7 +34215,7 @@ async function renderTopics() {
     current = d;
     page = "write";
     tab = "topics";
-    pending = null;
+    pending2 = null;
     persist();
     render2();
   };
@@ -34370,7 +34415,7 @@ async function openTopicDrawer(rel, opts = {}) {
       current = d;
       page = "write";
       tab = "topics";
-      pending = null;
+      pending2 = null;
       persist();
       render2();
     } catch (err) {
@@ -34589,49 +34634,6 @@ function openAgentDetail(id, tab2 = "connection") {
   page = "agent";
   render2();
 }
-function agentModelsPanelHtml(p, info) {
-  const installed = agentInstalled(state, p.id);
-  if (!installed) {
-    return `<p class="settings-hint">\u5B89\u88C5\u5E76\u767B\u5F55\u5BF9\u5E94 CLI \u540E\uFF0C\u53EF\u6DFB\u52A0\u6A21\u578B\u5E76\u9010\u4E00\u6D4B\u8BD5\u8FDE\u901A\u3002</p>`;
-  }
-  if (p.id === "zcode" || info?.selectable === false) {
-    const current2 = info?.current || "";
-    return `<div class="agent-model-panel">
-      <p class="settings-hint">${current2 ? `CLI \u9ED8\u8BA4\u6A21\u578B\uFF1A<code>${esc2(current2)}</code>` : esc2(info?.error || "\u672A\u80FD\u8BFB\u53D6\u9ED8\u8BA4\u6A21\u578B")}</p>
-      <p class="settings-hint">${esc2(p.label)} \u6CBF\u7528 CLI \u9ED8\u8BA4\u6A21\u578B\uFF0C\u8FDE\u901A\u6027\u8BF7\u7528\u53F3\u4E0A\u89D2\u300C\u6D4B\u8BD5\u9ED8\u8BA4\u300D\u3002</p>
-    </div>`;
-  }
-  const saved = getAgentModelList(state, p.id);
-  if (!saved.length && state.provider === p.id && state.model) {
-    setAgentModelList(state, p.id, [state.model]);
-  }
-  const list2 = getAgentModelList(state, p.id);
-  const suggestions = agentSuggestionIds(state, p.id, info?.models || []);
-  const rows = list2.length ? list2.map((m) => {
-    const active = state.provider === p.id && state.model === m;
-    return `<li class="agent-model-item ${active ? "is-active" : ""}" data-model-row="${esc2(m)}">
-            <code class="agent-model-id">${esc2(m)}</code>${!(info?.models || []).includes(m) ? `<span class="agent-badge">\u81EA\u5B9A\u4E49 \xB7 \u672A\u6838\u9A8C</span>` : ""}
-            ${active ? `<span class="agent-badge agent-badge-default">\u4F7F\u7528\u4E2D</span>` : `<button type="button" class="ghost" data-agent-use="${p.id}" data-model="${esc2(m)}">\u4F7F\u7528</button>`}
-            <button type="button" class="ghost" data-agent-test-model="${p.id}" data-model="${esc2(m)}">\u6D4B\u8BD5</button>
-            <button type="button" class="ghost" data-agent-remove-model="${p.id}" data-model="${esc2(m)}">\u79FB\u9664</button>
-            <span class="agent-model-row-status" data-model-status="${esc2(m)}" role="status"></span>
-          </li>`;
-  }).join("") : `<li class="agent-model-empty settings-hint">\u5C1A\u672A\u6DFB\u52A0\u6A21\u578B\u3002\u4ECE\u4E0B\u65B9\u9009\u62E9\u6A21\u578B ID\uFF0C\u6216\u624B\u586B\u540E\u70B9\u300C\u6DFB\u52A0\u300D\u3002</li>`;
-  return `<div class="agent-model-panel">
-    <p class="settings-hint" role="status">${esc2(info?.source || "\u5C1A\u672A\u8BFB\u53D6\u6A21\u578B\u76EE\u5F55")}${info?.checkedAt ? ` \xB7 ${new Date(info.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}${info?.stale ? " \xB7 \u4E0A\u6B21\u6210\u529F\u7ED3\u679C" : ""}</p>
-    ${info?.error || info?.notice ? `<p class="settings-hint">${esc2(info.error || info.notice)}</p>` : ""}
-    <div class="agent-card-actions"><button type="button" class="ghost" data-agent-refresh="${p.id}">\u5237\u65B0\u6A21\u578B</button><button type="button" class="ghost" data-agent-cli-default="${p.id}">\u4F7F\u7528 CLI \u9ED8\u8BA4\u6A21\u578B</button></div>
-    <div class="agent-model-add">
-      <select class="agent-model-select" data-agent-preset="${p.id}" aria-label="\u5E38\u7528\u6A21\u578B">
-        <option value="">\u9009\u62E9\u6A21\u578B ID</option>
-        ${suggestions.map((m) => `<option value="${esc2(m)}">${esc2(m)}${!(info?.models || []).includes(m) ? " \xB7 \u5DF2\u4FDD\u5B58\uFF0C\u672A\u6838\u9A8C" : ""}</option>`).join("")}
-      </select>
-      <input class="agent-model-input" data-agent-pick="${p.id}" placeholder="\u6216\u624B\u52A8\u8F93\u5165\u6A21\u578B ID" autocomplete="off">
-      <button type="button" class="primary" data-agent-add-model="${p.id}">\u6DFB\u52A0</button>
-    </div>
-    <ul class="agent-model-list">${rows}</ul>
-  </div>`;
-}
 function setModelRowStatus(provider, model, text, kind = "") {
   const root2 = $2(`[data-agent-body="${provider}"]`) || $2(`.agent-card[data-agent="${provider}"]`) || document;
   const el = [...root2.querySelectorAll("[data-model-status]")].find(
@@ -34649,7 +34651,7 @@ async function fillAgentCard(p, refresh = false) {
   const body = $2(`[data-agent-body="${p.id}"]`);
   if (!body) return;
   if (!agentInstalled(state, p.id)) {
-    body.innerHTML = agentModelsPanelHtml(p, null);
+    body.innerHTML = agentModelsPanelHtml(state, p, null);
     return;
   }
   let info = { models: [], selectable: p.id !== "zcode", current: "" };
@@ -34663,7 +34665,7 @@ async function fillAgentCard(p, refresh = false) {
       error: e.message || "\u8BFB\u53D6\u5931\u8D25"
     };
   }
-  body.innerHTML = agentModelsPanelHtml(p, info);
+  body.innerHTML = agentModelsPanelHtml(state, p, info);
   bindAgentModelControls(p);
 }
 function bindAgentModelControls(p) {
@@ -35237,7 +35239,7 @@ function applyAccountState(result) {
   ensureAccount();
   current = state.documents.find((d) => d.id === id) || state.documents.find((d) => sameAccount(d.account, account)) || null;
   dirty = false;
-  pending = null;
+  pending2 = null;
   render2();
 }
 async function refreshVault() {
@@ -35825,7 +35827,7 @@ function loadReviewDemo(opts = {}) {
   doc3.body = fixture.next;
   delete doc3.richHTML;
   const session = conversation(doc3);
-  pending = {
+  pending2 = {
     doc: doc3.id,
     conversationId: session.id,
     base: fixture.old,

@@ -91,3 +91,15 @@ test("formatDelta 空值与符号", async () => {
   assert.equal(formatDelta(1200), "+1,200");
   assert.equal(formatDelta(-5), "-5");
 });
+
+test("conversation 建默认对话并选中", async () => {
+  const { conversation } = await load("ui/conversation.js", "conversation.test.cjs");
+  const doc = { chat: [{ role: "u", text: "hi" }] };
+  const c = conversation(doc);
+  assert.equal(c.title, "新对话");
+  assert.deepEqual(c.messages, [{ role: "u", text: "hi" }]);
+  assert.equal(doc.activeConversationId, c.id);
+  assert.equal(conversation(doc), c);
+  const doc2 = { conversations: [{ id: "a", messages: [] }, { id: "b", messages: [] }], activeConversationId: "b" };
+  assert.equal(conversation(doc2).id, "b");
+});

@@ -109,3 +109,25 @@ export function protectStructure(oldText, nextText) {
   }
   return { next, notes: dropped };
 }
+
+/** 用一句话总结本次改写，供侧栏展示（不重复全文） */
+export function summarizeRewrite(plan) {
+  const hunks = (plan?.hunks || []).filter((h) => h.kind === "change");
+  const n = hunks.length;
+  let add = 0, del = 0, polish = 0, punct = 0;
+  hunks.forEach((h) => {
+    add += String(h.next || "").length;
+    del += String(h.old || "").length;
+    const o = String(h.old || "").trim(), t = String(h.next || "").trim();
+    if (o.replace(/[，。！？、；：“”‘’（）《》\s]/g, "") !== t.replace(/[，。！？、；：“”‘’（）《》\s]/g, "")) polish += 1;
+    else punct += 1;
+  });
+  const reasons = [];
+  if (polish) reasons.push(`${polish} 处文字润色（措辞更顺、去掉赘字）`);
+  if (punct) reasons.push(`${punct} 处标点 / 断句微调`);
+  if (plan?.protectNotes?.length) reasons.push(...plan.protectNotes);
+  else reasons.push("原文 Markdown、标题层级与配图均已保留，未动大结构");
+  const first = hunks[0]?.next?.trim().split("\n").find(Boolean) || "";
+  const excerpt = first.length > 48 ? first.slice(0, 48) + "…" : first;
+  return `审阅总结：共 ${n} 处修改（新增约 ${add} 字 / 原文约 ${del} 字）。${reasons.join("；")}。${excerpt ? `例如：“${excerpt}”。` : ""}原文未被覆盖，可逐条接受 / 拒绝，完成后点审阅条「完成」。`;
+}

@@ -73,3 +73,17 @@ test("protectStructure 补回配图标题并提示", () => {
   const clean = mod.protectStructure("a", "a");
   assert.deepEqual(clean.notes, []);
 });
+
+test("summarizeRewrite 统计润色与标点", () => {
+  const plan = { hunks: [
+    { kind: "change", old: "你好，世界", next: "你好世界" },
+    { kind: "change", old: "abc", next: "abx" },
+    { kind: "equal", value: "same" },
+  ] };
+  const out = mod.summarizeRewrite(plan);
+  assert.match(out, /共 2 处修改/);
+  assert.match(out, /1 处文字润色/);
+  assert.match(out, /1 处标点 \/ 断句微调/);
+  assert.match(out, /未动大结构/);
+  assert.equal(mod.summarizeRewrite(null).includes("共 0 处修改"), true);
+});

@@ -55,6 +55,7 @@ import {
   materialPreviewCardHTML,
   materialDrawerBodyHTML,
 } from "./ui/materials-view.js";
+import { conversation } from "./ui/conversation.js";
 import {
   AGENT_PROVIDERS,
   settingsSection,
@@ -73,6 +74,7 @@ import {
   setAgentModelList,
   agentSuggestionIds,
   agentListItemHtml,
+  agentModelsPanelHtml,
 } from "./ui/agent-store.js";
 import {
   WECHAT_BLUE,
@@ -95,6 +97,7 @@ import {
   buildEditHunks,
   composeHunks,
   protectStructure,
+  summarizeRewrite,
 } from "./ui/review-diff.js";
 import reviewDemoFixture from "./fixtures/review-demo.json";
 let saveProfileEditor = null;
@@ -264,20 +267,6 @@ function ensureAccount() {
   account = hit ? hit.id : list[0].id;
 }
 
-function conversation(doc = current) {
-  doc.conversations ||= [];
-  if (!doc.conversations.length)
-    doc.conversations.push({
-      id: crypto.randomUUID(),
-      title: "新对话",
-      messages: doc.chat || [],
-    });
-  let c =
-    doc.conversations.find((c) => c.id === doc.activeConversationId) ||
-    doc.conversations[0];
-  doc.activeConversationId = c.id;
-  return c;
-}
 const td = new TurndownService({ headingStyle: "atx" });
 td.use(gfm);
 const escapeMarkdown = td.escape.bind(td);
@@ -1178,7 +1167,7 @@ function bindConversationHead() {
   const neu = $("#new-conversation");
   if (!current || !sel) return;
   sel.innerHTML = conversationOptionsHTML();
-  sel.value = conversation().id;
+  sel.value = conversation(current).id;
   sel.onchange = (e) => {
     current.activeConversationId = e.target.value;
     persist();
@@ -1894,7 +1883,7 @@ function reviewCardHTML() {
   if (
     !pending ||
     pending.doc !== current?.id ||
-    pending.conversationId !== conversation().id
+    pending.conversationId !== conversation(current).id
   )
     return "";
   const list = (pending.hunks || []).filter((h) => h.kind === "change");
@@ -2223,27 +2212,6 @@ function mountInlineReviewBar() {
   bindInlineReviewBar();
 }
 
-/** 用一句话总结本次改写，供侧栏展示（不重复全文） */
-function summarizeRewrite(oldText, nextText) {
-  const hunks = (pending?.hunks || []).filter((h) => h.kind === "change");
-  const n = hunks.length;
-  let add = 0, del = 0, polish = 0, punct = 0;
-  hunks.forEach((h) => {
-    add += String(h.next || "").length;
-    del += String(h.old || "").length;
-    const o = String(h.old || "").trim(), t = String(h.next || "").trim();
-    if (o.replace(/[，。！？、；：“”‘’（）《》\s]/g, "") !== t.replace(/[，。！？、；：“”‘’（）《》\s]/g, "")) polish += 1;
-    else punct += 1;
-  });
-  const reasons = [];
-  if (polish) reasons.push(`${polish} 处文字润色（措辞更顺、去掉赘字）`);
-  if (punct) reasons.push(`${punct} 处标点 / 断句微调`);
-  if (pending?.protectNotes?.length) reasons.push(...pending.protectNotes);
-  else reasons.push("原文 Markdown、标题层级与配图均已保留，未动大结构");
-  const first = hunks[0]?.next?.trim().split("\n").find(Boolean) || "";
-  const excerpt = first.length > 48 ? first.slice(0, 48) + "…" : first;
-  return `审阅总结：共 ${n} 处修改（新增约 ${add} 字 / 原文约 ${del} 字）。${reasons.join("；")}。${excerpt ? `例如：“${excerpt}”。` : ""}原文未被覆盖，可逐条接受 / 拒绝，完成后点审阅条「完成」。`;
-}
 
 /** Agent 模式切换控件（pill） */
 function agentModeHTML() {
@@ -2405,7 +2373,7 @@ function renderPanel() {
   if (tab === "chat") {
     docChip = `<div class="conversation-doc-chip" title="${esc(current?.id || "")}"><span class="conversation-doc-chip-icon">${I.file({ size: 14 })}</span><span class="conversation-doc-chip-text">${esc(current?.title || "未命名文章")}</span></div>`;
     content =
-      conversation()
+      conversation(current)
         .messages.map(
           (m) =>
             `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "你" : "aster"}</small><div>${m.parts ? m.parts.map((p) => (p.kind === "tag" ? referenceChipHTML(p.reference?.kind || "file", p.label) : esc(p.text))).join("") : esc(m.text)}</div></div>`,
@@ -2420,7 +2388,7 @@ function renderPanel() {
     busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
   bindAgentModeMenu();
   bindModelPicker();
-  composer = new Composer($("#composer-input"), conversation(), {
+  composer = new Composer($("#composer-input"), conversation(current), {
     changed: () => {
       dirty = true;
       docStore.deferPersist();
@@ -2624,7 +2592,7 @@ async function runTask(task) {
         protectNotes: guarded.notes,
       };
       // 非破坏式审阅：正文保持原文（pending 未决定时合成结果即原文），改后只在审阅页对比；侧栏只留总结小卡片
-      session.messages.push({ role: "assistant", text: summarizeRewrite(body, guarded.next) });
+      session.messages.push({ role: "assistant", text: summarizeRewrite(pending) });
       current.snapshots.push({ at: new Date().toISOString(), body });
       if (editor) {
         editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
@@ -3670,54 +3638,6 @@ function openAgentDetail(id, tab = "connection") {
 }
 
 
-function agentModelsPanelHtml(p, info) {
-  const installed = agentInstalled(state, p.id);
-  if (!installed) {
-    return `<p class="settings-hint">安装并登录对应 CLI 后，可添加模型并逐一测试连通。</p>`;
-  }
-  if (p.id === "zcode" || info?.selectable === false) {
-    const current = info?.current || "";
-    return `<div class="agent-model-panel">
-      <p class="settings-hint">${current ? `CLI 默认模型：<code>${esc(current)}</code>` : esc(info?.error || "未能读取默认模型")}</p>
-      <p class="settings-hint">${esc(p.label)} 沿用 CLI 默认模型，连通性请用右上角「测试默认」。</p>
-    </div>`;
-  }
-  const saved = getAgentModelList(state, p.id);
-  if (!saved.length && state.provider === p.id && state.model) {
-    setAgentModelList(state, p.id, [state.model]);
-  }
-  const list = getAgentModelList(state, p.id);
-  const suggestions = agentSuggestionIds(state, p.id, info?.models || []);
-  const rows = list.length
-    ? list
-        .map((m) => {
-          const active = state.provider === p.id && state.model === m;
-          return `<li class="agent-model-item ${active ? "is-active" : ""}" data-model-row="${esc(m)}">
-            <code class="agent-model-id">${esc(m)}</code>${!(info?.models || []).includes(m) ? `<span class="agent-badge">自定义 · 未核验</span>` : ""}
-            ${active ? `<span class="agent-badge agent-badge-default">使用中</span>` : `<button type="button" class="ghost" data-agent-use="${p.id}" data-model="${esc(m)}">使用</button>`}
-            <button type="button" class="ghost" data-agent-test-model="${p.id}" data-model="${esc(m)}">测试</button>
-            <button type="button" class="ghost" data-agent-remove-model="${p.id}" data-model="${esc(m)}">移除</button>
-            <span class="agent-model-row-status" data-model-status="${esc(m)}" role="status"></span>
-          </li>`;
-        })
-        .join("")
-    : `<li class="agent-model-empty settings-hint">尚未添加模型。从下方选择模型 ID，或手填后点「添加」。</li>`;
-
-  return `<div class="agent-model-panel">
-    <p class="settings-hint" role="status">${esc(info?.source || "尚未读取模型目录")}${info?.checkedAt ? ` · ${new Date(info.checkedAt).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}` : ""}${info?.stale ? " · 上次成功结果" : ""}</p>
-    ${info?.error || info?.notice ? `<p class="settings-hint">${esc(info.error || info.notice)}</p>` : ""}
-    <div class="agent-card-actions"><button type="button" class="ghost" data-agent-refresh="${p.id}">刷新模型</button><button type="button" class="ghost" data-agent-cli-default="${p.id}">使用 CLI 默认模型</button></div>
-    <div class="agent-model-add">
-      <select class="agent-model-select" data-agent-preset="${p.id}" aria-label="常用模型">
-        <option value="">选择模型 ID</option>
-        ${suggestions.map((m) => `<option value="${esc(m)}">${esc(m)}${!(info?.models || []).includes(m) ? " · 已保存，未核验" : ""}</option>`).join("")}
-      </select>
-      <input class="agent-model-input" data-agent-pick="${p.id}" placeholder="或手动输入模型 ID" autocomplete="off">
-      <button type="button" class="primary" data-agent-add-model="${p.id}">添加</button>
-    </div>
-    <ul class="agent-model-list">${rows}</ul>
-  </div>`;
-}
 
 function setModelRowStatus(provider, model, text, kind = "") {
   const root =
@@ -3741,7 +3661,7 @@ async function fillAgentCard(p, refresh = false) {
   const body = $(`[data-agent-body="${p.id}"]`);
   if (!body) return;
   if (!agentInstalled(state, p.id)) {
-    body.innerHTML = agentModelsPanelHtml(p, null);
+    body.innerHTML = agentModelsPanelHtml(state, p, null);
     return;
   }
   let info = { models: [], selectable: p.id !== "zcode", current: "" };
@@ -3755,7 +3675,7 @@ async function fillAgentCard(p, refresh = false) {
       error: e.message || "读取失败",
     };
   }
-  body.innerHTML = agentModelsPanelHtml(p, info);
+  body.innerHTML = agentModelsPanelHtml(state, p, info);
   bindAgentModelControls(p);
 }
 

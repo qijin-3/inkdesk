@@ -128,3 +128,52 @@ export function agentListItemHtml(st, p) {
 }
 
 /** 模型目录面板含回填副作用，保留在 renderer.js，本模块不导出 */
+
+export function agentModelsPanelHtml(st, p, info) {
+  const installed = agentInstalled(st, p.id);
+  if (!installed) {
+    return `<p class="settings-hint">安装并登录对应 CLI 后，可添加模型并逐一测试连通。</p>`;
+  }
+  if (p.id === "zcode" || info?.selectable === false) {
+    const current = info?.current || "";
+    return `<div class="agent-model-panel">
+      <p class="settings-hint">${current ? `CLI 默认模型：<code>${esc(current)}</code>` : esc(info?.error || "未能读取默认模型")}</p>
+      <p class="settings-hint">${esc(p.label)} 沿用 CLI 默认模型，连通性请用右上角「测试默认」。</p>
+    </div>`;
+  }
+  const saved = getAgentModelList(st, p.id);
+  if (!saved.length && st.provider === p.id && st.model) {
+    setAgentModelList(st, p.id, [st.model]);
+  }
+  const list = getAgentModelList(st, p.id);
+  const suggestions = agentSuggestionIds(st, p.id, info?.models || []);
+  const rows = list.length
+    ? list
+        .map((m) => {
+          const active = st.provider === p.id && st.model === m;
+          return `<li class="agent-model-item ${active ? "is-active" : ""}" data-model-row="${esc(m)}">
+            <code class="agent-model-id">${esc(m)}</code>${!(info?.models || []).includes(m) ? `<span class="agent-badge">自定义 · 未核验</span>` : ""}
+            ${active ? `<span class="agent-badge agent-badge-default">使用中</span>` : `<button type="button" class="ghost" data-agent-use="${p.id}" data-model="${esc(m)}">使用</button>`}
+            <button type="button" class="ghost" data-agent-test-model="${p.id}" data-model="${esc(m)}">测试</button>
+            <button type="button" class="ghost" data-agent-remove-model="${p.id}" data-model="${esc(m)}">移除</button>
+            <span class="agent-model-row-status" data-model-status="${esc(m)}" role="status"></span>
+          </li>`;
+        })
+        .join("")
+    : `<li class="agent-model-empty settings-hint">尚未添加模型。从下方选择模型 ID，或手填后点「添加」。</li>`;
+
+  return `<div class="agent-model-panel">
+    <p class="settings-hint" role="status">${esc(info?.source || "尚未读取模型目录")}${info?.checkedAt ? ` · ${new Date(info.checkedAt).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}` : ""}${info?.stale ? " · 上次成功结果" : ""}</p>
+    ${info?.error || info?.notice ? `<p class="settings-hint">${esc(info.error || info.notice)}</p>` : ""}
+    <div class="agent-card-actions"><button type="button" class="ghost" data-agent-refresh="${p.id}">刷新模型</button><button type="button" class="ghost" data-agent-cli-default="${p.id}">使用 CLI 默认模型</button></div>
+    <div class="agent-model-add">
+      <select class="agent-model-select" data-agent-preset="${p.id}" aria-label="常用模型">
+        <option value="">选择模型 ID</option>
+        ${suggestions.map((m) => `<option value="${esc(m)}">${esc(m)}${!(info?.models || []).includes(m) ? " · 已保存，未核验" : ""}</option>`).join("")}
+      </select>
+      <input class="agent-model-input" data-agent-pick="${p.id}" placeholder="或手动输入模型 ID" autocomplete="off">
+      <button type="button" class="primary" data-agent-add-model="${p.id}">添加</button>
+    </div>
+    <ul class="agent-model-list">${rows}</ul>
+  </div>`;
+}
