@@ -31662,7 +31662,7 @@ function protectStructure(oldText, nextText) {
   return { next: next2, notes: dropped };
 }
 function summarizeRewrite(plan) {
-  const hunks = (pending?.hunks || []).filter((h2) => h2.kind === "change");
+  const hunks = (plan?.hunks || []).filter((h2) => h2.kind === "change");
   const n = hunks.length;
   let add = 0, del2 = 0, polish = 0, punct = 0;
   hunks.forEach((h2) => {
@@ -31675,7 +31675,7 @@ function summarizeRewrite(plan) {
   const reasons = [];
   if (polish) reasons.push(`${polish} \u5904\u6587\u5B57\u6DA6\u8272\uFF08\u63AA\u8F9E\u66F4\u987A\u3001\u53BB\u6389\u8D58\u5B57\uFF09`);
   if (punct) reasons.push(`${punct} \u5904\u6807\u70B9 / \u65AD\u53E5\u5FAE\u8C03`);
-  if (pending?.protectNotes?.length) reasons.push(...pending.protectNotes);
+  if (plan?.protectNotes?.length) reasons.push(...plan.protectNotes);
   else reasons.push("\u539F\u6587 Markdown\u3001\u6807\u9898\u5C42\u7EA7\u4E0E\u914D\u56FE\u5747\u5DF2\u4FDD\u7559\uFF0C\u672A\u52A8\u5927\u7ED3\u6784");
   const first2 = hunks[0]?.next?.trim().split("\n").find(Boolean) || "";
   const excerpt = first2.length > 48 ? first2.slice(0, 48) + "\u2026" : first2;
@@ -31767,7 +31767,7 @@ var agentDetailId = null;
 var agentDetailTab = "connection";
 var current;
 var busy = false;
-var pending2 = null;
+var pending = null;
 var selectedText = "";
 var selectionContext = null;
 var selectionDragging = false;
@@ -31912,7 +31912,7 @@ function showSaveConflictDialog(msg) {
       current = state.documents.find((d) => d.id === id) || state.documents.find((d) => sameAccount(d.account, account));
       dirty = false;
       docStore.saveConflict = false;
-      pending2 = null;
+      pending = null;
       m.remove();
       render2();
       toast("\u5DF2\u4ECE\u78C1\u76D8\u91CD\u65B0\u52A0\u8F7D");
@@ -31942,7 +31942,7 @@ function newDoc() {
   state.documents.unshift(d);
   current = d;
   page = "write";
-  pending2 = null;
+  pending = null;
   persist();
   render2();
 }
@@ -31956,7 +31956,7 @@ function sync() {
 }
 function render2() {
   saveProfileEditor = null;
-  if (!pending2 || pending2.doc !== current?.id) {
+  if (!pending || pending.doc !== current?.id) {
     reviewMode = false;
     reviewIndex = 0;
   }
@@ -32021,7 +32021,7 @@ function render2() {
       account = b.dataset.account;
       publishedSelection = /* @__PURE__ */ new Set();
       current = state.documents.find((d) => sameAccount(d.account, account));
-      pending2 = null;
+      pending = null;
       render2();
     };
     b.oncontextmenu = (e) => {
@@ -32051,7 +32051,7 @@ function render2() {
       persist();
       current = state.documents.find((d) => d.id === b.dataset.id);
       page = "write";
-      pending2 = null;
+      pending = null;
       render2();
     }
   );
@@ -32171,7 +32171,7 @@ async function deleteDraft(id) {
       page = current ? "write" : "dashboard";
     }
     dirty = false;
-    pending2 = null;
+    pending = null;
     render2();
     toast("\u8349\u7A3F\u5DF2\u5220\u9664");
   } catch (e) {
@@ -32342,7 +32342,7 @@ async function openVersionHistoryMenu() {
         sync();
       } else current.body = body;
       changed();
-      pending2 = null;
+      pending = null;
       close2();
       toast("\u7248\u672C\u5DF2\u6062\u590D\uFF0C\u6062\u590D\u524D\u7684\u6B63\u6587\u4E5F\u5DF2\u4FDD\u5B58");
       if (previewMode) renderWrite();
@@ -32375,7 +32375,7 @@ function bindFinalize() {
       if (!result || result.needsConfirmation) return;
       Object.assign(state, result);
       current = state.documents.find((d) => sameAccount(d.account, account));
-      pending2 = null;
+      pending = null;
       page = "dashboard";
       render2();
       toast("\u5DF2\u53D1\u5E03\u5E76\u79FB\u5165\u672C\u8D26\u53F7 Archive\uFF0C\u7248\u672C\u4E0E\u5BF9\u8BDD\u5DF2\u4FDD\u7559");
@@ -32387,7 +32387,7 @@ function bindFinalize() {
 function syncAsterFace() {
   let face = "idle";
   if (busy) face = "thinking";
-  else if (pending2 && pending2.doc === current?.id && (pending2.hunks?.length || pending2.edits?.length || pending2.next))
+  else if (pending && pending.doc === current?.id && (pending.hunks?.length || pending.edits?.length || pending.next))
     face = "idea";
   else {
     const sel = editor?.state?.selection;
@@ -33134,14 +33134,14 @@ function bindWorkspaceResize() {
   };
 }
 function reviewCardHTML() {
-  if (!pending2 || pending2.doc !== current?.id || pending2.conversationId !== conversation(current).id)
+  if (!pending || pending.doc !== current?.id || pending.conversationId !== conversation(current).id)
     return "";
-  const list2 = (pending2.hunks || []).filter((h2) => h2.kind === "change");
+  const list2 = (pending.hunks || []).filter((h2) => h2.kind === "change");
   const done = list2.filter((h2) => h2.status !== "pending").length;
   return `<div class="review-card review-card-summary review-card-inline"><div class="review-card-head"><h3>\u4FEE\u6539\u5EFA\u8BAE \xB7 ${done}/${list2.length} \u5DF2\u51B3\u5B9A</h3><div class="row"><button type="button" id="accept" class="primary">\u5168\u90E8\u63A5\u53D7</button><button type="button" id="reject">\u5168\u90E8\u62D2\u7EDD</button></div></div><p class="muted">\u6B63\u6587\u4FDD\u6301\u539F\u6587\uFF0C\u53EF\u9010\u6761\u5BF9\u6BD4\u63A5\u53D7 / \u62D2\u7EDD\uFF0C\u6539\u540E\u5361\u7247\u53EF\u76F4\u63A5\u624B\u52A8\u6539\u3002</p></div>`;
 }
 function reviewChanges() {
-  return (pending2?.hunks || []).filter((h2) => h2.kind === "change");
+  return (pending?.hunks || []).filter((h2) => h2.kind === "change");
 }
 function reviewProgress() {
   const list2 = reviewChanges();
@@ -33165,11 +33165,11 @@ function reviewEqualHTML(value) {
   return String(value || "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean).map((p) => `<p class="review-para">${esc2(p).replace(/\n/g, "<br>")}</p>`).join("");
 }
 function reviewPageHTML() {
-  if (!pending2 || pending2.doc !== current?.id) return "";
+  if (!pending || pending.doc !== current?.id) return "";
   const list2 = reviewChanges();
   const idOf = (h2) => list2.findIndex((x) => x.id === h2.id);
   let n = 0;
-  const body = (pending2.hunks || []).map((h2) => {
+  const body = (pending.hunks || []).map((h2) => {
     if (h2.kind === "equal") return reviewEqualHTML(h2.value);
     const i = idOf(h2);
     n = i;
@@ -33235,7 +33235,7 @@ function scrollReviewToCurrent(smooth = true) {
 }
 function refreshReviewUI() {
   const paper = document.querySelector(".paper-wrap .paper");
-  if (!paper || !pending2 || pending2.doc !== current?.id || !reviewMode) return;
+  if (!paper || !pending || pending.doc !== current?.id || !reviewMode) return;
   const listEl = $2("#inline-review-list");
   const tmp = document.createElement("div");
   tmp.innerHTML = reviewPageHTML();
@@ -33248,7 +33248,7 @@ function refreshReviewUI() {
 function bindInlineReviewBar() {
   const wrap2 = document.querySelector(".paper-wrap");
   const paper = wrap2?.querySelector(".paper");
-  if (!paper || !pending2) return;
+  if (!paper || !pending) return;
   const list2 = reviewChanges();
   const gotoHunk = (i) => {
     if (!list2.length) return;
@@ -33266,14 +33266,14 @@ function bindInlineReviewBar() {
   if (nextBtn) nextBtn.onclick = () => gotoHunk(reviewIndex + 1);
   if (acceptAll)
     acceptAll.onclick = () => {
-      pending2.hunks?.forEach((h2) => {
+      pending.hunks?.forEach((h2) => {
         if (h2.kind === "change") h2.status = "accepted";
       });
-      applyPendingResult(pending2.next, "accepted");
+      applyPendingResult(pending.next, "accepted");
     };
   if (rejectAll)
     rejectAll.onclick = () => {
-      applyPendingResult(pending2.old, "rejected");
+      applyPendingResult(pending.old, "rejected");
     };
   if (finishBtn)
     finishBtn.onclick = () => {
@@ -33281,8 +33281,8 @@ function bindInlineReviewBar() {
       if (undecided.length && !confirm(`\u8FD8\u6709 ${undecided.length} \u6761\u672A\u51B3\u5B9A\uFF0C\u5C06\u6309\u62D2\u7EDD\u5904\u7406\u5E76\u5B8C\u6210\u3002\u7EE7\u7EED\uFF1F`))
         return;
       undecided.forEach((h2) => h2.status = "rejected");
-      const next2 = composeHunks(pending2.hunks);
-      const anyAccepted = pending2.hunks.some(
+      const next2 = composeHunks(pending.hunks);
+      const anyAccepted = pending.hunks.some(
         (h2) => h2.kind === "change" && h2.status === "accepted"
       );
       applyPendingResult(next2, anyAccepted ? "accepted" : "rejected");
@@ -33302,12 +33302,12 @@ function bindInlineReviewBar() {
   paper.querySelectorAll("[data-review-undo]").forEach(
     (b) => b.addEventListener("click", (e) => {
       e.stopPropagation();
-      const h2 = pending2.hunks.find((x) => x.id === b.getAttribute("data-review-undo"));
+      const h2 = pending.hunks.find((x) => x.id === b.getAttribute("data-review-undo"));
       if (!h2) return;
       h2.status = "pending";
       reviewIndex = Math.max(0, reviewChanges().findIndex((x) => x.id === h2.id));
       if (editor && current) {
-        editor.commands.setContent(safeHTML(composeHunks(pending2.hunks)));
+        editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
         sync();
         changed();
       }
@@ -33319,7 +33319,7 @@ function bindInlineReviewBar() {
     const readNext = () => (el.innerText || "").replace(/\u00a0/g, " ").replace(/\n+$/, "");
     const applyLocal = () => {
       const id = el.getAttribute("data-review-edit");
-      const h2 = pending2?.hunks.find((x) => x.id === id);
+      const h2 = pending?.hunks.find((x) => x.id === id);
       if (!h2) return null;
       h2.next = readNext();
       const diff = el.closest("[data-review-hunk]")?.querySelector(".review-old-diff");
@@ -33329,7 +33329,7 @@ function bindInlineReviewBar() {
     const commitEditor = () => {
       if (!applyLocal()) return;
       if (editor && current) {
-        editor.commands.setContent(safeHTML(composeHunks(pending2.hunks)));
+        editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
         sync();
         changed();
       }
@@ -33359,7 +33359,7 @@ function bindInlineReviewBar() {
   );
   if (!bindInlineReviewBar._key) {
     bindInlineReviewBar._key = (e) => {
-      if (!reviewMode || !pending2 || busy) return;
+      if (!reviewMode || !pending || busy) return;
       const t = e.target;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
       const list3 = reviewChanges();
@@ -33397,7 +33397,7 @@ function mountInlineReviewBar() {
   $2("#inline-review-list")?.remove();
   $2("#inline-review-diff")?.remove();
   paper.classList.remove("is-reviewing");
-  if (!pending2 || pending2.doc !== current?.id || previewMode || !reviewMode) {
+  if (!pending || pending.doc !== current?.id || previewMode || !reviewMode) {
     const ed2 = $2("#editor");
     if (ed2) ed2.hidden = false;
     const title2 = $2("#title");
@@ -33468,9 +33468,9 @@ function bindAgentModeMenu() {
   });
 }
 function applyPendingResult(nextText, action) {
-  if (!pending2) return false;
+  if (!pending) return false;
   if (reviewDemoActive) {
-    pending2 = null;
+    pending = null;
     exitReviewMode();
     toast(
       action === "accepted" ? "\u6F14\u793A\uFF1A\u5DF2\u6A21\u62DF\u63A5\u53D7\uFF08\u672A\u5199\u5165\u4ED3\u5E93\uFF09" : "\u6F14\u793A\uFF1A\u5DF2\u6A21\u62DF\u62D2\u7EDD\uFF08\u672A\u5199\u5165\u4ED3\u5E93\uFF09"
@@ -33484,14 +33484,14 @@ function applyPendingResult(nextText, action) {
   current.decisions ??= [];
   current.decisions.push({
     action,
-    before: pending2.old,
+    before: pending.old,
     after: nextText,
     at: (/* @__PURE__ */ new Date()).toISOString()
   });
   if (action === "accepted") {
     current.snapshots.push({
       at: (/* @__PURE__ */ new Date()).toISOString(),
-      body: pending2.base
+      body: pending.base
     });
     if (editor && current.body !== nextText) {
       editor.commands.setContent(safeHTML(nextText));
@@ -33505,25 +33505,25 @@ function applyPendingResult(nextText, action) {
       body: current.body
     });
     if (editor) {
-      editor.commands.setContent(safeHTML(pending2.old));
+      editor.commands.setContent(safeHTML(pending.old));
       sync();
     }
     changed();
     toast("\u5DF2\u6062\u590D\u6539\u524D\u7A3F");
   }
-  pending2 = null;
+  pending = null;
   exitReviewMode();
   renderPanel();
   syncAsterFace();
   return true;
 }
 function decideHunk(id, accept) {
-  if (!pending2?.hunks) return;
-  const hunk = pending2.hunks.find((h2) => h2.id === id && h2.kind === "change");
+  if (!pending?.hunks) return;
+  const hunk = pending.hunks.find((h2) => h2.id === id && h2.kind === "change");
   if (!hunk || hunk.status !== "pending") return;
   hunk.status = accept ? "accepted" : "rejected";
   if (editor && current) {
-    editor.commands.setContent(safeHTML(composeHunks(pending2.hunks)));
+    editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
     sync();
     changed();
   }
@@ -33603,20 +33603,20 @@ function renderPanel() {
   );
   if ($2("#accept"))
     $2("#accept").onclick = () => {
-      if (!pending2) return;
-      if (pending2.hunks) {
-        pending2.hunks.forEach((h2) => {
+      if (!pending) return;
+      if (pending.hunks) {
+        pending.hunks.forEach((h2) => {
           if (h2.kind === "change") h2.status = "accepted";
         });
-        applyPendingResult(composeHunks(pending2.hunks), "accepted");
+        applyPendingResult(composeHunks(pending.hunks), "accepted");
         return;
       }
-      applyPendingResult(pending2.next, "accepted");
+      applyPendingResult(pending.next, "accepted");
     };
   if ($2("#reject"))
     $2("#reject").onclick = () => {
-      if (!pending2) return;
-      applyPendingResult(pending2.old, "rejected");
+      if (!pending) return;
+      applyPendingResult(pending.old, "rejected");
     };
 }
 function streamBubbleHTML() {
@@ -33736,7 +33736,7 @@ async function runTask(task) {
     if (!result) throw Error("Agent \u672A\u8FD4\u56DE\u6B63\u6587");
     if (task === "rewrite" && doc3.id === current?.id) {
       const guarded = protectStructure(body, result);
-      pending2 = {
+      pending = {
         doc: doc3.id,
         conversationId: session.id,
         base: body,
@@ -33745,13 +33745,13 @@ async function runTask(task) {
         hunks: buildEditHunks(body, guarded.next),
         protectNotes: guarded.notes
       };
-      session.messages.push({ role: "assistant", text: summarizeRewrite(pending2) });
+      session.messages.push({ role: "assistant", text: summarizeRewrite(pending) });
       current.snapshots.push({ at: (/* @__PURE__ */ new Date()).toISOString(), body });
       if (editor) {
-        editor.commands.setContent(safeHTML(composeHunks(pending2.hunks)));
+        editor.commands.setContent(safeHTML(composeHunks(pending.hunks)));
         sync();
       } else {
-        current.body = composeHunks(pending2.hunks);
+        current.body = composeHunks(pending.hunks);
         changed();
       }
       enterReviewMode();
@@ -34133,7 +34133,7 @@ async function movePublishedToDraft(paths) {
     }
     publishedPreview = null;
     dirty = false;
-    pending2 = null;
+    pending = null;
     if (list2.length === 1) {
       current = state.documents.find((d) => d.id === lastId) || state.documents.find((d) => sameAccount(d.account, account));
       page = current ? "write" : "dashboard";
@@ -34155,7 +34155,7 @@ async function refreshDashboardData() {
     Object.assign(state, result);
     current = state.documents.find((d) => d.id === id) || state.documents.find((d) => sameAccount(d.account, account));
     dirty = false;
-    pending2 = null;
+    pending = null;
     page = "dashboard";
     render2();
     toast(
@@ -34215,7 +34215,7 @@ async function renderTopics() {
     current = d;
     page = "write";
     tab = "topics";
-    pending2 = null;
+    pending = null;
     persist();
     render2();
   };
@@ -34415,7 +34415,7 @@ async function openTopicDrawer(rel, opts = {}) {
       current = d;
       page = "write";
       tab = "topics";
-      pending2 = null;
+      pending = null;
       persist();
       render2();
     } catch (err) {
@@ -35239,7 +35239,7 @@ function applyAccountState(result) {
   ensureAccount();
   current = state.documents.find((d) => d.id === id) || state.documents.find((d) => sameAccount(d.account, account)) || null;
   dirty = false;
-  pending2 = null;
+  pending = null;
   render2();
 }
 async function refreshVault() {
@@ -35827,7 +35827,7 @@ function loadReviewDemo(opts = {}) {
   doc3.body = fixture.next;
   delete doc3.richHTML;
   const session = conversation(doc3);
-  pending2 = {
+  pending = {
     doc: doc3.id,
     conversationId: session.id,
     base: fixture.old,

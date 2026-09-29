@@ -1,7 +1,8 @@
-# agents.md — Inkdesk 代码约定（供 AI 与人类开发者共同遵守）
+# AGENTS.md — Inkdesk 代码约定（供 AI 与人类开发者共同遵守）
 
 > 目的：让未来的 AI 改代码时不自作主张。违反即打回。
-> 适用：Electron 主进程（`main.cjs` / `desk-core.cjs` / `core/*`）与渲染进程（`renderer.js` / `ui/*` / `store/*` / `services/*`）。
+> 适用：本文件及指令对 Claude Code、Cursor、GitHub Copilot、Codex、Windsurf 等所有遵循 AGENTS.md 约定读取根文件的 AI 工具生效。
+> 涉及：Electron 主进程（`main.cjs` / `desk-core.cjs` / `core/*`）与渲染进程（`renderer.js` / `ui/*` / `store/*` / `services/*`）。
 
 ## 铁律（违反即打回）
 
