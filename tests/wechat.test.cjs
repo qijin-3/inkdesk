@@ -1,0 +1,44 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const Wechat = require("../core/wechat.cjs");
+
+const core = (store = {}) => ({
+  store,
+  vault: null,
+  data: "/tmp/x",
+  wechatTokenCache: {},
+});
+
+test("publicWechatAccounts 跳过脏数据只吐快照", () => {
+  const out = Wechat.publicWechatAccounts(
+    core({ wechatAccounts: { a: { appId: "1", appSecret: "2", author: "n", coverPath: "c", extra: 1 }, b: null, c: "x" } }),
+  );
+  assert.deepEqual(out, { a: { appId: "1", appSecret: "2", author: "n", coverPath: "c" } });
+});
+
+test("wechatConfig 缺凭证抛错/回退全局", () => {
+  assert.throws(() => Wechat.wechatConfig(core({})), /AppID/);
+  const cfg = Wechat.wechatConfig(core({ wechat: { appId: " 1 ", appSecret: "2" } }));
+  assert.equal(cfg.appId, "1");
+});
+
+test("wechatTokenBucket 同 appId 同桶", () => {
+  const c = core({});
+  assert.equal(Wechat.wechatTokenBucket(c, "a"), Wechat.wechatTokenBucket(c, "a"));
+});
+
+test("loadWechatImageBuffer data URL 解析/拒绝", () => {
+  const tiny = "data:image/png;base64," + Buffer.from("hi").toString("base64");
+  const r = Wechat.loadWechatImageBuffer(core({}), tiny);
+  assert.equal(r.name, "block.png");
+  assert.equal(r.buf.toString(), "hi");
+  assert.equal(Wechat.loadWechatImageBuffer(core({}), "data:image/png;base64,"), null);
+  assert.equal(Wechat.loadWechatImageBuffer(core({}), null), null);
+  assert.equal(Wechat.loadWechatImageBuffer(core({}), "https://x/y.png"), null);
+});
+
+test("resolveWechatImageSrc 非法输入给 null", () => {
+  const c = core({});
+  assert.equal(Wechat.resolveWechatImageSrc(c, ""), null);
+  assert.equal(Wechat.resolveWechatImageSrc(c, "notaurl"), null);
+});

@@ -3,13 +3,15 @@
 const fs = require("fs");
 const path = require("path");
 const root = path.join(__dirname, "..");
+// 棘轮预算：以当前实测为基线 +5% 余量，只防回潮不追理想值。
+// 想压体积/行数时先降数字再改代码，让 CI 红在 Frequency 之前。
 const BUDGET = {
-  "bundle.js": 700 * 1024, // 目标 <700KB（当前约 1.3MB，M4 前为 warning）
-  "bundle.js.gz": 220 * 1024,
-  "renderer.js_lines": 800, // 最终目标；当前 6586，M2 前为 warning
-  "style.css_total_lines": 5857 + 7, // 已拆分为 styles/* + 入口；只防回潮
+  "bundle.js": 1450 * 1024,
+  "bundle.js.gz": 345 * 1024,
+  "renderer.js_lines": 5480,
+  "style.css_total_lines": 6160,
 };
-const MODE = process.argv.includes("--strict") ? "strict" : "warn";
+const MODE = process.argv.includes("--warn") ? "warn" : "strict";
 const failures = [];
 const warnings = [];
 function check(name, actual, budget) {
@@ -52,4 +54,4 @@ if (failures.length) {
   process.exit(1);
 }
 if (warnings.length && MODE === "warn")
-  console.log("[budget] warning 模式：不阻塞，仅提示（M4 转 strict）");
+  console.log("[budget] warning 模式：只提示不阻塞");

@@ -19,9 +19,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import { TableKit } from "@tiptap/extension-table";
 import { gfm } from "turndown-plugin-gfm";
-import { marked } from "marked";
 import TurndownService from "turndown";
-import { diffWords, diffLines } from "diff";
 import { calendar, validDate, publishSummary } from "./calendar.cjs";
 import { promptText, askText, askConfirm } from "./ui/dialog.js";
 import { showContextMenu } from "./ui/popover.js";
@@ -44,6 +42,19 @@ import {
 import { formatJsonPreview, inferMaterialKind, uint8ToBase64 } from "./ui/materials-meta.js";
 import { formatDelta } from "./ui/metrics.js";
 import { resolveBackupPlan } from "./services/backup-plan.js";
+import {
+  blockPlainText,
+  sanitizeRichHTML,
+  splitWechatH1,
+  safeHTML,
+  sanitizeHtmlPreview,
+} from "./ui/html.js";
+import { publishHTMLInner } from "./ui/publish.js";
+import { showUnmatchedMatcher } from "./ui/import-match.js";
+import {
+  materialPreviewCardHTML,
+  materialDrawerBodyHTML,
+} from "./ui/materials-view.js";
 import {
   AGENT_PROVIDERS,
   settingsSection,
@@ -319,138 +330,10 @@ td.addRule("headingSoftBreak", {
   },
 });
 
-/**
- * 从块级节点提取纯文本，将 &lt;br&gt; 转为换行（同一标题内的软换行）。
- * @param {Node} node
- * @returns {string}
- */
-function blockPlainText(node) {
-  let out = "";
-  /**
-   * @param {Node} n
-   */
-  function walk(n) {
-    if (n.nodeType === 3) out += n.textContent;
-    else if (n.nodeName === "BR") {
-      const cls = n.getAttribute?.("class") || "";
-      if (!cls.includes("ProseMirror-trailingBreak")) out += "\n";
-    } else if (n.childNodes?.length) for (const c of n.childNodes) walk(c);
-  }
-  walk(node);
-  return out
-    .replace(/[ \t]*\n[ \t]*/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
 
 
-/**
- * 清洗富文本 HTML，并按环境改写图片资源地址（避免整页正则误伤）。
- * @param {string} html
- * @returns {string}
- */
-function sanitizeRichHTML(html) {
-  const d = new DOMParser().parseFromString(html || "", "text/html");
-  d.querySelectorAll(
-    "script,iframe,object,embed,style,link,form,input,button",
-  ).forEach((n) => n.remove());
-  d.body.querySelectorAll("*").forEach((n) => {
-    [...n.attributes].forEach((a) => {
-      if (
-        a.name.startsWith("on") ||
-        a.name === "style" ||
-        (["href", "src"].includes(a.name) &&
-          !/^(https?:|inkasset:|\/api\/asset\/|data:image\/|blob:|[^:]*$)/i.test(
-            a.value,
-          ))
-      )
-        n.removeAttribute(a.name);
-    });
-  });
-  d.querySelectorAll("img[src]").forEach((img) => {
-    const src = img.getAttribute("src") || "";
-    if (isWeb()) {
-      if (src.startsWith("inkasset://vault/"))
-        img.setAttribute(
-          "src",
-          "/api/asset/vault/" + src.slice("inkasset://vault/".length),
-        );
-      else if (src.startsWith("inkasset://local/"))
-        img.setAttribute(
-          "src",
-          "/api/asset/local/" + src.slice("inkasset://local/".length),
-        );
-    } else if (src.startsWith("/api/asset/vault/"))
-      img.setAttribute(
-        "src",
-        "inkasset://vault/" + src.slice("/api/asset/vault/".length),
-      );
-    else if (src.startsWith("/api/asset/local/"))
-      img.setAttribute(
-        "src",
-        "inkasset://local/" + src.slice("/api/asset/local/".length),
-      );
-  });
-  return d.body.innerHTML;
-}
 
-/**
- * 将一级标题拆成中文主标题 + 英文副标题（若存在）；保留 Shift+Enter 软换行。
- * @param {HTMLElement} h1
- */
-function splitWechatH1(h1) {
-  if (h1.querySelector(".h1-en, .h1-zh")) return;
-  const soft = normalizeHeadingText(blockPlainText(h1)).split("\n");
-  if (!soft.length) return;
-  const doc = h1.ownerDocument;
-  const wrap = doc.createElement("span");
-  wrap.className = "h1-text";
 
-  /**
-   * 追加一行标题 span。
-   * @param {string} line
-   * @param {"h1-zh"|"h1-en"} cls
-   */
-  function addLine(line, cls) {
-    const span = doc.createElement("span");
-    span.className = cls;
-    if (cls === "h1-en") span.lang = "en";
-    span.textContent = line;
-    wrap.append(span);
-  }
-
-  if (soft.length > 1) {
-    for (let i = 0; i < soft.length; i++) {
-      const line = soft[i];
-      const isEn =
-        i === soft.length - 1 &&
-        /^[A-Za-z][A-Za-z0-9&/.,'’\- ]{0,60}$/.test(line);
-      addLine(line, isEn ? "h1-en" : "h1-zh");
-    }
-    h1.replaceChildren(wrap);
-    return;
-  }
-
-  const text = soft[0];
-  const m = text.match(
-    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/,
-  );
-  if (!m) return;
-  addLine(m[1].trim(), "h1-zh");
-  addLine(m[2].trim(), "h1-en");
-  h1.replaceChildren(wrap);
-}
-
-/**
- * 将 Markdown 转为可安全插入的 HTML。
- * @param {string} md
- */
-function safeHTML(md) {
-  return sanitizeRichHTML(
-    new DOMParser().parseFromString(marked.parse(md || ""), "text/html").body
-      .innerHTML,
-  );
-}
 
 /**
  * 预览用正文 HTML：优先编辑器快照（保留标题软换行与原始图片地址）。
@@ -461,27 +344,6 @@ function articleSourceHTML() {
   return safeHTML(current?.body || "");
 }
 
-/**
- * 清洗 HTML 片段用于素材预览（去掉脚本与危险属性）。
- * @param {string} html
- */
-function sanitizeHtmlPreview(html) {
-  const d = new DOMParser().parseFromString(html || "", "text/html");
-  d.querySelectorAll(
-    "script,iframe,object,embed,link,form,input,button,meta",
-  ).forEach((n) => n.remove());
-  d.body.querySelectorAll("*").forEach((n) => {
-    [...n.attributes].forEach((a) => {
-      if (
-        a.name.startsWith("on") ||
-        (["href", "src"].includes(a.name) &&
-          !/^(https?:|data:image\/|#|[^:]*$)/i.test(a.value))
-      )
-        n.removeAttribute(a.name);
-    });
-  });
-  return d.body.innerHTML;
-}
 
 
 /**
@@ -511,66 +373,7 @@ async function hydrateMaterialPreview(r) {
   }
 }
 
-/**
- * 生成素材预览卡片 HTML（展示内容缩略而非纯文件名）。
- * @param {object} r
- * @param {{ showRefCount?: boolean }} [opts]
- */
-function materialPreviewCardHTML(r, opts = {}) {
-  const kind = r.kind || inferMaterialKind(r.name) || "binary";
-  let body = "";
-  if (kind === "image") {
-    const src = assetUrl(
-      r.asset ||
-        (r.path ? "inkasset://vault/" + encodeURIComponent(r.path) : ""),
-    );
-    body = src
-      ? `<div class="mat-preview-media"><img src="${esc(src)}" alt="" loading="lazy"></div>`
-      : `<div class="mat-preview-placeholder">图片</div>`;
-  } else if (kind === "markdown") {
-    body = `<div class="mat-preview-body is-md">${safeHTML(r.preview || "")}</div>`;
-  } else if (kind === "html") {
-    body = `<div class="mat-preview-body is-html">${sanitizeHtmlPreview(r.preview || "")}</div>`;
-  } else if (kind === "json") {
-    body = `<pre class="mat-preview-body is-code">${esc(formatJsonPreview(r.preview || ""))}</pre>`;
-  } else if (kind === "text") {
-    body = `<pre class="mat-preview-body is-code">${esc(r.preview || "")}</pre>`;
-  } else {
-    body = `<div class="mat-preview-placeholder">${esc((r.name.split(".").pop() || "FILE").toUpperCase())}</div>`;
-  }
-  const refCount = Number(r.refCount) || 0;
-  const refBadge = opts.showRefCount
-    ? `<span class="mat-preview-refs" title="被 ${refCount} 篇文章引用">${I.link({ size: 12 })}<em>${refCount}</em></span>`
-    : "";
-  return `<article class="material-card material-preview-card" data-material="${r.id}" title="${esc(r.name)}"><button type="button" class="card-open" data-ref-preview="${r.id}" aria-label="${esc(r.name)}"><div class="mat-preview-frame">${body}</div><span class="mat-preview-name">${esc(r.name)}</span>${refBadge}</button></article>`;
-}
 
-/**
- * 渲染素材抽屉正文（按类型预览原格式）。
- * @param {object} r
- */
-function materialDrawerBodyHTML(r) {
-  const kind = r.kind || inferMaterialKind(r.name) || "binary";
-  const text = r.text || r.error || "";
-  if (kind === "image") {
-    const src = assetUrl(
-      r.asset ||
-        (r.path ? "inkasset://vault/" + encodeURIComponent(r.path) : ""),
-    );
-    return src
-      ? `<img class="preview-image" src="${esc(src)}" alt="${esc(r.name)}">`
-      : `<p class="muted">无法预览图片</p>`;
-  }
-  if (kind === "markdown")
-    return `<div id="reference-text" class="material-preview is-md">${safeHTML(text)}</div>`;
-  if (kind === "html")
-    return `<div id="reference-text" class="material-preview is-html">${sanitizeHtmlPreview(text)}</div>`;
-  if (kind === "json")
-    return `<pre id="reference-text" class="material-preview is-code">${esc(formatJsonPreview(text))}</pre>`;
-  if (kind === "text")
-    return `<pre id="reference-text" class="material-preview is-code">${esc(text)}</pre>`;
-  return `<p class="muted">已保留原文件，当前格式暂不支持内嵌预览。</p><pre id="reference-text" class="material-preview is-code">${esc(text)}</pre>`;
-}
 /**
  * 保存当前仓库快照（防抖由 docStore 拥有，见 store/doc-store.js）。
  * @returns {Promise<boolean>}
@@ -995,204 +798,6 @@ function enhanceWechatPreview(root = $("#article-preview")) {
  *   keepImages：保留正文图；blockImages：H1/H2/引用渲染为图片（草稿推送）
  */
 async function publishHTML(...a) { return time("publishHTML", publishHTMLInner, ...a); }
-async function publishHTMLInner(md, opts = {}) {
-  const serif = WECHAT_SERIF_PUBLISH;
-  const d = new DOMParser().parseFromString(safeHTML(md), "text/html");
-  if (opts.keepImages) {
-    // 草稿推送：把网页路径还原为 inkasset，供主进程解析本地文件
-    if (!isWeb())
-      d.querySelectorAll("img").forEach((img) => {
-        const src = img.getAttribute("src");
-        if (src?.startsWith("/api/asset/"))
-          img.src = src
-            .replace("/api/asset/vault/", "inkasset://vault/")
-            .replace("/api/asset/local/", "inkasset://local/");
-      });
-  } else {
-    d.querySelectorAll("img").forEach((img) => {
-      const p = d.createElement("p");
-      p.textContent = "【请上传图片：" + (img.alt || "正文配图") + "】";
-      img.replaceWith(p);
-    });
-  }
-
-  if (opts.blockImages) {
-    await document.fonts.ready;
-    let h1i = 0;
-    for (const h1 of [...d.querySelectorAll("h1")]) {
-      const num = String(++h1i).padStart(2, "0");
-      replaceWithWechatBlockImage(
-        d,
-        h1,
-        renderWechatH1Png(blockPlainText(h1), num),
-        "一级标题",
-        "56px 0 20px",
-      );
-    }
-    for (const h2 of [...d.querySelectorAll("h2")]) {
-      replaceWithWechatBlockImage(
-        d,
-        h2,
-        renderWechatH2Png(blockPlainText(h2)),
-        "二级标题",
-        "16px 0 14px",
-      );
-    }
-    for (const bq of [...d.querySelectorAll("blockquote")]) {
-      replaceWithWechatBlockImage(
-        d,
-        bq,
-        renderWechatQuotePng(bq.textContent),
-        "引用",
-        "20px 0",
-      );
-    }
-  } else {
-    d.querySelectorAll("h1").forEach((h1, i) => {
-      splitWechatH1(h1);
-      const num = String(i + 1).padStart(2, "0");
-      const text = h1.innerHTML;
-      h1.innerHTML = `<span style="flex:1;min-width:0;color:${WECHAT_BLUE};font-family:${serif};font-size:40px;font-weight:800;">${text}</span><span style="flex-shrink:0;display:inline-block;width:80px;height:80px;line-height:80px;text-align:center;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:64px;font-weight:800;">${num}</span>`;
-    });
-    // 二级标题：微信会重置 h1–h6 的 color，必须把白字写在 span 上
-    d.querySelectorAll("h2").forEach((h2) => {
-      const wrap = d.createElement("section");
-      wrap.setAttribute("data-wechat-h2", "1");
-      wrap.setAttribute(
-        "style",
-        "margin:16px 0 14px;padding:0;max-width:100%;",
-      );
-      const bar = d.createElement("section");
-      bar.setAttribute(
-        "style",
-        `display:inline-block;max-width:100%;box-sizing:border-box;padding:8px 10px;background-color:${WECHAT_BLUE};`,
-      );
-      const label = d.createElement("span");
-      label.setAttribute(
-        "style",
-        `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};line-height:1.25;`,
-      );
-      while (h2.firstChild) label.appendChild(h2.firstChild);
-      label.querySelectorAll("*").forEach((el) => {
-        el.setAttribute(
-          "style",
-          `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};`,
-        );
-      });
-      bar.appendChild(label);
-      wrap.appendChild(bar);
-      h2.replaceWith(wrap);
-    });
-    d.querySelectorAll("blockquote").forEach((bq) => {
-      if (bq.querySelector(".wechat-quote-mark")) return;
-      const mark = d.createElement("span");
-      mark.className = "wechat-quote-mark";
-      mark.textContent = "“";
-      mark.setAttribute(
-        "style",
-        `flex-shrink:0;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`,
-      );
-      bq.prepend(mark);
-    });
-  }
-
-  const styles = {
-    p: `margin:0 0 16px;line-height:1.75;font-size:15px;color:#111;font-family:${WECHAT_SANS};font-weight:400;`,
-    h1: `display:flex;align-items:flex-end;justify-content:space-between;gap:12px;font-size:40px;line-height:1.1;margin:56px 0 20px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
-    h3: `font-size:18px;margin:20px 0 12px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
-    blockquote: `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:20px 0;padding:8px;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:15px;font-weight:800;line-height:1.7;`,
-    li: `line-height:1.75;margin:6px 0;font-size:15px;font-family:${WECHAT_SANS};`,
-  };
-  Object.entries(styles).forEach(([tag, style]) =>
-    d.querySelectorAll(tag).forEach((n) => {
-      // 图片块外包的 p 已带 margin，勿覆盖
-      if (
-        tag === "p" &&
-        n.querySelector(
-          'img[alt="一级标题"], img[alt="二级标题"], img[alt="引用"]',
-        )
-      )
-        return;
-      // 仅含正文配图的段落：下边距交给图片
-      if (
-        tag === "p" &&
-        n.children.length === 1 &&
-        n.children[0].tagName === "IMG" &&
-        !["一级标题", "二级标题", "引用"].includes(
-          n.children[0].getAttribute("alt") || "",
-        )
-      ) {
-        const prev = n.getAttribute("style") || "";
-        const s = `margin:0;line-height:1.75;font-size:15px;color:#111;font-family:${WECHAT_SANS};font-weight:400;`;
-        n.setAttribute("style", prev ? `${prev};${s}` : s);
-        return;
-      }
-      const prev = n.getAttribute("style") || "";
-      n.setAttribute("style", prev ? `${prev};${style}` : style);
-    }),
-  );
-  // 正文加粗：跳过标题 / 引用 / 二级标题条，避免盖成黑字
-  d.querySelectorAll("strong").forEach((n) => {
-    if (n.closest("h1, blockquote, [data-wechat-h2]")) return;
-    n.setAttribute(
-      "style",
-      `font-weight:600;color:#111;font-family:${WECHAT_SANS};`,
-    );
-  });
-  if (!opts.blockImages) {
-    d.querySelectorAll("blockquote > *").forEach((el) => {
-      if (el.classList?.contains("wechat-quote-mark")) {
-        el.setAttribute(
-          "style",
-          `grid-column:1;grid-row:1;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`,
-        );
-        return;
-      }
-      const prev = el.getAttribute("style") || "";
-      el.setAttribute("style", `${prev};grid-column:2;`.replace(/^;/, ""));
-    });
-    d.querySelectorAll("blockquote p").forEach((p) =>
-      p.setAttribute(
-        "style",
-        `margin:0;grid-column:2;color:${WECHAT_BLUE};font-family:${serif};font-size:15px;font-weight:800;line-height:1.7;`,
-      ),
-    );
-    d.querySelectorAll("blockquote strong").forEach((el) =>
-      el.setAttribute(
-        "style",
-        `font-family:${serif};font-weight:800;color:${WECHAT_BLUE};`,
-      ),
-    );
-    d.querySelectorAll("h1 .h1-zh, h1 .h1-en, h1 span").forEach((el) => {
-      const prev = el.getAttribute("style") || "";
-      if (!/font-family/.test(prev))
-        el.setAttribute(
-          "style",
-          `${prev};font-family:${serif};color:${WECHAT_BLUE};`.replace(
-            /^;/,
-            "",
-          ),
-        );
-    });
-    d.querySelectorAll("h1 .h1-zh, h1 .h1-en").forEach((el) =>
-      el.setAttribute(
-        "style",
-        `display:block;font-size:40px;font-weight:800;line-height:1.1;color:${WECHAT_BLUE};font-family:${serif};`,
-      ),
-    );
-  }
-  // 正文配图：主题蓝 2px 边框（跳过标题/引用块图）
-  d.querySelectorAll("img").forEach((img) => {
-    if (
-      ["一级标题", "二级标题", "引用"].includes(img.getAttribute("alt") || "")
-    )
-      return;
-    const prev = img.getAttribute("style") || "";
-    const style = `max-width:100% !important;height:auto !important;box-sizing:border-box;border:2px solid ${WECHAT_BLUE};display:block;margin:0 0 24px;`;
-    img.setAttribute("style", prev ? `${prev};${style}` : style);
-  });
-  return `<section style="font-family:${WECHAT_SANS};padding:8px;color:#111;max-width:768px;">${d.body.innerHTML}</section>`;
-}
 
 /**
  * 生成小红书分页用的正文 HTML；优先编辑器快照。
@@ -2309,10 +1914,6 @@ function reviewProgress() {
   return { done, total: list.length };
 }
 
-/** 正文顶部审阅进度条已移入格式栏；保留空函数避免旧调用报错 */
-function inlineReviewBarHTML() {
-  return "";
-}
 
 /** 审阅纯文本（无 diff 高亮） */
 function reviewPlainHTML(text, empty = "（空段落）") {
@@ -3140,104 +2741,6 @@ function askFollowers(defaultVal) {
   });
 }
 
-/** 为未自动匹配的表格行选择归档文章（优先建议，默认近半年，可搜索） */
-function showUnmatchedMatcher(preview) {
-  return new Promise((resolve) => {
-    const archives = preview.archives || [];
-    const halfYearAgo = (() => {
-      const d = new Date();
-      d.setMonth(d.getMonth() - 6);
-      return [
-        d.getFullYear(),
-        String(d.getMonth() + 1).padStart(2, "0"),
-        String(d.getDate()).padStart(2, "0"),
-      ].join("-");
-    })();
-    /** 近半年归档；搜索时扩大到全量 */
-    const recent = () =>
-      archives.filter(
-        (a) => !a.date || String(a.date).slice(0, 10) >= halfYearAgo,
-      );
-    /** 按关键词筛选归档，无关键词时返回近半年列表 */
-    const filterArchives = (q) => {
-      const list = q ? archives : recent();
-      const key = String(q || "")
-        .trim()
-        .toLowerCase();
-      if (!key) return list;
-      return list.filter(
-        (a) =>
-          a.title.toLowerCase().includes(key) ||
-          String(a.date || "").includes(key),
-      );
-    };
-    /** 渲染单条未匹配行的下拉选项 */
-    const optionsHtml = (u, q = "") => {
-      const suggested = (u.suggestions || []).map((s) => s.path);
-      const list = filterArchives(q);
-      const merged = [];
-      const seen = new Set();
-      for (const s of u.suggestions || []) {
-        const a = archives.find((x) => x.path === s.path);
-        if (a && !seen.has(a.path)) {
-          seen.add(a.path);
-          merged.push({ ...a, hint: `建议 ${s.score}%` });
-        }
-      }
-      for (const a of list) {
-        if (!seen.has(a.path)) {
-          seen.add(a.path);
-          merged.push(a);
-        }
-      }
-      const preferred = u.suggestions?.[0]?.path || "";
-      return (
-        `<option value="">跳过</option>` +
-        merged
-          .map(
-            (a) =>
-              `<option value="${esc(a.path)}" ${a.path === preferred ? "selected" : ""}>${esc(a.title)}${a.date ? " · " + esc(String(a.date).slice(0, 10)) : ""}${a.hint ? " · " + a.hint : ""}</option>`,
-          )
-          .join("")
-      );
-    };
-    const m = document.createElement("div");
-    m.className = "modal";
-    m.innerHTML = `<div class="dialog import-dialog"><div class="row"><h2>未能自动匹配的笔记</h2><button type="button" id="close-unmatched">关闭</button></div><p>已按相似度给出建议；列表默认近半年，也可搜索全部归档。</p>${preview.unmatched
-      .map(
-        (u) =>
-          `<div class="match-row" data-index="${u.index}"><p><strong>${esc(u.row.title)}</strong>${u.row["首次发布时间"] ? `<small>${esc(u.row["首次发布时间"])}</small>` : ""}</p><input class="match-search" type="search" placeholder="搜索归档文章…"><select class="match-pick" aria-label="匹配归档">${optionsHtml(u)}</select></div>`,
-      )
-      .join(
-        "",
-      )}<div class="row"><button type="button" id="cancel-unmatched">取消导入</button><button type="button" id="confirm-unmatched" class="primary">确认匹配</button></div></div>`;
-    document.body.append(m);
-    m.querySelectorAll(".match-row").forEach((row) => {
-      const u = preview.unmatched.find((x) => x.index === +row.dataset.index);
-      const search = row.querySelector(".match-search");
-      const pick = row.querySelector(".match-pick");
-      search.oninput = () => {
-        const current = pick.value;
-        pick.innerHTML = optionsHtml(u, search.value);
-        if ([...pick.options].some((o) => o.value === current))
-          pick.value = current;
-      };
-    });
-    $("#close-unmatched").onclick = $("#cancel-unmatched").onclick = () => {
-      m.remove();
-      resolve(null);
-    };
-    $("#confirm-unmatched").onclick = () => {
-      const extra = [];
-      m.querySelectorAll(".match-row").forEach((row) => {
-        const path = row.querySelector(".match-pick").value;
-        if (path) extra.push({ index: +row.dataset.index, path });
-      });
-      m.remove();
-      resolve(extra);
-    };
-  });
-}
 
 
 /** 从 xlsx 导入笔记数据并更新归档 YAML */
@@ -4987,34 +4490,6 @@ async function refreshVault() {
     toast(e.message);
   }
 }
-function showMaterial(rel, body) {
-  const m = document.createElement("div");
-  m.className = "modal";
-  m.innerHTML = `<div class="dialog"><div class="row"><h2>${esc(rel.split("/").pop())}</h2><button id="close-material" class="icon-btn" title="关闭" aria-label="关闭">${I.close()}</button></div><div class="material-preview">${safeHTML(body)}</div>${current ? '<p class="notice">选中素材文字后，可将选段插入当前草稿。未选中文字时仅插入素材链接。</p><button id="insert-material" class="primary">插入到草稿末尾</button>' : ""}</div>`;
-  document.body.append(m);
-  $("#close-material").onclick = () => m.remove();
-  if ($("#insert-material"))
-    $("#insert-material").onclick = async () => {
-      const selection = window.getSelection();
-      const selected =
-        selection && $(".material-preview").contains(selection.anchorNode)
-          ? selection.toString()
-          : "";
-      current.body +=
-        "\n\n" +
-        (selected ? "> " + selected.split("\n").join("\n> ") + "\n\n" : "") +
-        "[[" +
-        rel.replace(/\.md$/, "") +
-        "]]";
-      current.materials ||= [];
-      if (!current.materials.includes(rel)) current.materials.push(rel);
-      dirty = true;
-      await persist();
-      m.remove();
-      page = "write";
-      render();
-    };
-}
 function putTag(reference, doc = current, session = conversation(doc)) {
   if (current?.id !== doc.id || conversation(doc).id !== session.id) {
     session.composerRefs ||= {};
@@ -5563,51 +5038,6 @@ async function renderAccountDetail() {
     toast(e.message);
   }
 }
-function showModelProposal(p, model) {
-  const m = document.createElement("div");
-  m.className = "modal";
-  m.innerHTML = `<div class="dialog proposal-dialog"><div class="row"><h2>调整现有账号模块</h2><button id="close-model-proposal">关闭</button></div>${p.changes
-    .map(
-      (c) =>
-        `<h3>${esc(model.definitions.find((d) => d.id === c.module).title)}</h3><p>${esc(c.reason)}</p><small>来源：${c.sources.map(esc).join("；")}</small><details><summary>查看差异</summary><div class="diff">${diffWords(
-          c.before,
-          c.content,
-        )
-          .map(
-            (x) =>
-              `<${x.added ? "ins" : x.removed ? "del" : "span"}>${esc(x.value)}</${x.added ? "ins" : x.removed ? "del" : "span"}>`,
-          )
-          .join(
-            "",
-          )}</div></details><textarea data-model-edit="${c.module}" rows="8" ${p.status !== "pending" ? "readonly" : ""}>${esc(c.content)}</textarea>`,
-    )
-    .join(
-      "",
-    )}${p.status === "pending" ? '<div class="row"><button id="reject-model">保留原设定</button><button id="apply-model" class="primary">采纳修改</button></div>' : ""}</div>`;
-  document.body.append(m);
-  $("#close-model-proposal").onclick = () => m.remove();
-  const decide = async (apply) => {
-    try {
-      await api("model-decide", {
-        account: p.account,
-        id: p.id,
-        apply,
-        edits: Object.fromEntries(
-          $$("[data-model-edit]").map((x) => [x.dataset.modelEdit, x.value]),
-        ),
-      });
-      m.remove();
-      if (page === "account") renderAccountDetail();
-    } catch (e) {
-      toast(e.message);
-    }
-  };
-  if ($("#apply-model")) {
-    $("#apply-model").onclick = () => decide(true);
-    $("#reject-model").onclick = () => decide(false);
-  }
-}
-
 function renderCalendar(rows) {
   const local = new Date(),
     today = [
