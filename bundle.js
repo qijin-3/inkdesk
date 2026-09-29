@@ -142,6 +142,43 @@ function mountAgentUsage(root2, api2, providers, opts = {}) {
   load();
 }
 
+// ui/dom.js
+var $ = (s, r = document) => r.querySelector(s);
+var $$ = (s, r = document) => [...r.querySelectorAll(s)];
+var api = (n, d) => window.desk.call(n, d);
+var esc2 = (s = "") => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+var fmtBytes = (n) => {
+  const v = Number(n) || 0;
+  if (v < 1024) return v + " B";
+  if (v < 1024 * 1024) return (v / 1024).toFixed(1) + " KB";
+  return (v / (1024 * 1024)).toFixed(1) + " MB";
+};
+var formatBytes = fmtBytes;
+var toastTimer = 0;
+function toast(t, opts) {
+  const el = $("#toast");
+  if (!el) return;
+  el.textContent = t;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  if (opts?.sticky) return;
+  toastTimer = setTimeout(() => el.classList.remove("show"), 3800);
+}
+function hideToast() {
+  clearTimeout(toastTimer);
+  $("#toast")?.classList.remove("show");
+}
+var isWeb = () => !!window.desk?.web;
+function assetUrl(src) {
+  if (typeof src !== "string") return src;
+  if (!isWeb()) return src;
+  if (src.startsWith("inkasset://vault/"))
+    return "/api/asset/vault/" + src.slice("inkasset://vault/".length);
+  if (src.startsWith("inkasset://local/"))
+    return "/api/asset/local/" + src.slice("inkasset://local/".length);
+  return src;
+}
+
 // node_modules/lucide/dist/esm/icons/at-sign.mjs
 var AtSign = [
   ["circle", { cx: "12", cy: "12", r: "4" }],
@@ -30462,6 +30499,407 @@ function tokenize2(value, options2) {
 // renderer.js
 var import_calendar = __toESM(require_calendar());
 
+// ui/dialog.js
+function promptText(title, opts = {}) {
+  return new Promise((resolve) => {
+    $("#text-prompt-modal")?.remove();
+    const m = document.createElement("div");
+    m.id = "text-prompt-modal";
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog" style="width:min(420px,92vw)"><h2>${esc2(title)}</h2><input id="text-prompt-input" type="text" value="${esc2(opts.value || "")}" placeholder="${esc2(opts.placeholder || "")}" autocomplete="off"><div class="row"><button type="button" id="text-prompt-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="text-prompt-ok">${esc2(opts.okLabel || "\u786E\u5B9A")}</button></div></div>`;
+    document.body.append(m);
+    const input = $("#text-prompt-input");
+    const done = (value) => {
+      m.remove();
+      resolve(value);
+    };
+    $("#text-prompt-cancel").onclick = () => done(null);
+    m.addEventListener("click", (e) => {
+      if (e.target === m) done(null);
+    });
+    const submit = () => {
+      const v = input.value.trim();
+      done(v || null);
+    };
+    $("#text-prompt-ok").onclick = submit;
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submit();
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        done(null);
+      }
+    });
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+  });
+}
+function askText(title, hint, value = "") {
+  return new Promise((resolve) => {
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog"><h2>${esc2(title)}</h2><p>${esc2(hint)}</p><input id="ask-text-input" value="${esc2(value)}" autocomplete="off"><div class="row"><button type="button" id="ask-text-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="ask-text-ok">\u786E\u5B9A</button></div></div>`;
+    document.body.append(m);
+    const input = $("#ask-text-input");
+    input?.focus();
+    input?.select();
+    const done = (v) => {
+      m.remove();
+      resolve(v);
+    };
+    $("#ask-text-cancel").onclick = () => done(null);
+    $("#ask-text-ok").onclick = () => done(input.value);
+    input?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") done(input.value);
+      if (e.key === "Escape") done(null);
+    });
+  });
+}
+function askConfirm(title, message) {
+  return new Promise((resolve) => {
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog"><h2>${esc2(title)}</h2><p>${esc2(message)}</p><div class="row"><button type="button" id="ask-confirm-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="ask-confirm-ok">\u786E\u5B9A</button></div></div>`;
+    document.body.append(m);
+    $("#ask-confirm-cancel").onclick = () => {
+      m.remove();
+      resolve(false);
+    };
+    $("#ask-confirm-ok").onclick = () => {
+      m.remove();
+      resolve(true);
+    };
+  });
+}
+
+// ui/popover.js
+function showContextMenu(x, y, items) {
+  $("#context-menu")?.remove();
+  const menu = document.createElement("div");
+  menu.id = "context-menu";
+  menu.className = "context-menu";
+  menu.style.left = Math.min(x, window.innerWidth - 180) + "px";
+  menu.style.top = Math.min(y, window.innerHeight - 80) + "px";
+  menu.innerHTML = items.map(
+    (it, i) => `<button type="button" data-ctx="${i}" class="${it.danger ? "danger" : ""}">${esc2(it.label)}</button>`
+  ).join("");
+  document.body.append(menu);
+  const close2 = () => {
+    menu.remove();
+    window.removeEventListener("click", close2);
+    window.removeEventListener("contextmenu", close2);
+    window.removeEventListener("scroll", close2, true);
+  };
+  [...menu.querySelectorAll("[data-ctx]")].forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      const item = items[+b.dataset.ctx];
+      close2();
+      item?.run();
+    };
+  });
+  setTimeout(() => {
+    window.addEventListener("click", close2);
+    window.addEventListener("contextmenu", close2);
+    window.addEventListener("scroll", close2, true);
+  }, 0);
+}
+
+// ui/groups.js
+function groupNames(st) {
+  return Object.keys(st.groups || {}).sort(
+    (a, b) => a.localeCompare(b, "zh")
+  );
+}
+function groupChipTone(name) {
+  let h2 = 0;
+  for (const c of String(name)) h2 = h2 * 31 + c.charCodeAt(0) >>> 0;
+  return h2 % 8;
+}
+function groupChipHtml(name) {
+  return `<span class="group-chip group-chip-${groupChipTone(name)}">${esc2(name)}</span>`;
+}
+function publishedGroup(st, rel) {
+  const row = (st.metrics || []).find((r) => r.path === rel);
+  const fromMetrics = typeof row?.["\u5206\u7EC4"] === "string" && row["\u5206\u7EC4"].trim() ? row["\u5206\u7EC4"].trim() : null;
+  if (fromMetrics) return fromMetrics;
+  const arch = (st.archives || []).find((a) => a.path === rel);
+  return arch?.group || null;
+}
+function backupPathFor(st, group, accountId) {
+  const g = typeof group === "string" ? group.trim() : "";
+  if (g && st.groups?.[g]?.backupPath) return st.groups[g].backupPath;
+  return st.backupPaths?.[accountId] || "";
+}
+function groupOptionsHtml(st, selected, opts = {}) {
+  const allowEmpty = opts.allowEmpty !== false;
+  const emptyLabel = opts.emptyLabel || "\u65E0\u5206\u7EC4";
+  const cur = typeof selected === "string" ? selected.trim() : "";
+  const names = new Set(groupNames(st));
+  if (cur) names.add(cur);
+  return `${allowEmpty ? `<option value="">${esc2(emptyLabel)}</option>` : ""}${[
+    ...names
+  ].sort((a, b) => a.localeCompare(b, "zh")).map(
+    (n) => `<option value="${esc2(n)}" ${n === cur ? "selected" : ""}>${esc2(n)}</option>`
+  ).join("")}`;
+}
+
+// ui/wechat-png.js
+var WECHAT_BLUE = "#0f3ff7";
+var WECHAT_BLUE_SOFT = "rgba(15, 63, 247, 0.2)";
+var WECHAT_SERIF = "'\u5BD2\u8749\u9526\u4E66\u5B8BCompact','Songti SC','STSong','\u534E\u6587\u5B8B\u4F53','\u5B8B\u4F53',SimSun,serif";
+var WECHAT_SERIF_PUBLISH = "Songti SC,STSong,\u534E\u6587\u5B8B\u4F53,\u5B8B\u4F53,SimSun,serif";
+var WECHAT_SANS = "'OPPO Sans 4.0','PingFang SC','Helvetica Neue',Arial,sans-serif";
+var WECHAT_BLOCK_W = 360;
+var WECHAT_BLOCK_SCALE = 4;
+function normalizeHeadingText(raw) {
+  return String(raw || "").split("\n").map((l) => l.replace(/[ \t]+/g, " ").trim()).filter(Boolean).join("\n");
+}
+function wechatWrapLines(ctx, text, maxW) {
+  const lines = [];
+  for (const para of String(text || "").split(/\n/)) {
+    let line = "";
+    for (const ch of Array.from(para)) {
+      if (line && ctx.measureText(line + ch).width > maxW) {
+        lines.push(line);
+        line = ch;
+      } else line += ch;
+    }
+    lines.push(line);
+  }
+  return lines.length ? lines : [""];
+}
+function wechatBlockCanvas(cssW, cssH) {
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.ceil(cssW * WECHAT_BLOCK_SCALE));
+  c.height = Math.max(1, Math.ceil(cssH * WECHAT_BLOCK_SCALE));
+  const ctx = c.getContext("2d");
+  ctx.scale(WECHAT_BLOCK_SCALE, WECHAT_BLOCK_SCALE);
+  ctx.textBaseline = "top";
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  return { c, ctx };
+}
+function splitH1ZhEn(one) {
+  const m = String(one || "").match(
+    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/
+  );
+  return m ? { zh: m[1].trim(), en: m[2].trim() } : { zh: one, en: "" };
+}
+function renderWechatH1Png(raw, num) {
+  const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
+  const badge = 48;
+  const gap = 10;
+  const textW = WECHAT_BLOCK_W - badge - gap;
+  const fontSize = 40;
+  const lineH = 44;
+  const measure = wechatBlockCanvas(1, 1).ctx;
+  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  let lines = [];
+  if (soft.length > 1) {
+    lines = soft.flatMap((para) => wechatWrapLines(measure, para, textW));
+  } else {
+    const { zh, en } = splitH1ZhEn(soft[0] || "");
+    lines = [
+      ...wechatWrapLines(measure, zh, textW),
+      ...en ? wechatWrapLines(measure, en, textW) : []
+    ];
+  }
+  const textH = Math.max(badge, lines.length * lineH);
+  const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, textH);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, WECHAT_BLOCK_W, textH);
+  ctx.fillStyle = WECHAT_BLUE;
+  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  let y = textH - lines.length * lineH;
+  for (const line of lines) {
+    ctx.fillText(line, 0, y);
+    y += lineH;
+  }
+  const bx = WECHAT_BLOCK_W - badge;
+  const by = textH - badge;
+  ctx.fillStyle = WECHAT_BLUE_SOFT;
+  ctx.fillRect(bx, by, badge, badge);
+  ctx.fillStyle = WECHAT_BLUE;
+  const numSize = 36;
+  ctx.font = `800 ${numSize}px ${WECHAT_SERIF}`;
+  const nw = ctx.measureText(num).width;
+  ctx.fillText(num, bx + (badge - nw) / 2, by + (badge - numSize) / 2);
+  return c.toDataURL("image/png");
+}
+function renderWechatH2Png(raw) {
+  const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
+  const padX = 10;
+  const padY = 8;
+  const fontSize = 20;
+  const lineH = 25;
+  const maxInner = WECHAT_BLOCK_W - padX * 2;
+  const measure = wechatBlockCanvas(1, 1).ctx;
+  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  const lines = soft.flatMap(
+    (para) => wechatWrapLines(measure, para, maxInner)
+  );
+  const innerW = Math.min(
+    maxInner,
+    Math.ceil(Math.max(...lines.map((l) => measure.measureText(l).width), 1))
+  );
+  const boxW = Math.min(WECHAT_BLOCK_W, innerW + padX * 2);
+  const boxH = Math.max(lineH + padY * 2, lines.length * lineH + padY * 2);
+  const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, boxH);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
+  ctx.fillStyle = WECHAT_BLUE;
+  ctx.fillRect(0, 0, boxW, boxH);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  let y = padY;
+  for (const line of lines) {
+    ctx.fillText(line, padX, y);
+    y += lineH;
+  }
+  return c.toDataURL("image/png");
+}
+function renderWechatQuotePng(raw) {
+  const text = String(raw || "").replace(/\s+/g, " ").trim();
+  const pad = 8;
+  const markSize = 23;
+  const fontSize = 15;
+  const lineH = 26;
+  const markW = 20;
+  const gap = 8;
+  const textW = WECHAT_BLOCK_W - pad * 2 - markW - gap;
+  const measure = wechatBlockCanvas(1, 1).ctx;
+  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  const lines = wechatWrapLines(measure, text, textW);
+  const boxH = Math.max(markSize + pad * 2, lines.length * lineH + pad * 2);
+  const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, boxH);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
+  ctx.fillStyle = WECHAT_BLUE_SOFT;
+  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
+  ctx.fillStyle = WECHAT_BLUE;
+  ctx.font = `800 ${markSize}px ${WECHAT_SERIF}`;
+  ctx.fillText("\u201C", pad, pad);
+  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  let y = pad + 4;
+  const tx = pad + markW + gap;
+  for (const line of lines) {
+    ctx.fillText(line, tx, y);
+    y += lineH;
+  }
+  return c.toDataURL("image/png");
+}
+function replaceWithWechatBlockImage(d, el, dataUrl, alt, margin) {
+  const wrap2 = d.createElement("section");
+  wrap2.setAttribute(
+    "style",
+    `margin:${margin};padding:0;max-width:100%;box-sizing:border-box;`
+  );
+  const img = d.createElement("img");
+  img.setAttribute("src", dataUrl);
+  img.setAttribute("alt", alt);
+  img.setAttribute("width", String(WECHAT_BLOCK_W));
+  img.setAttribute(
+    "style",
+    "width:100% !important;max-width:100% !important;height:auto !important;display:block !important;margin:0 !important;border:0;vertical-align:top;"
+  );
+  wrap2.appendChild(img);
+  el.replaceWith(wrap2);
+}
+
+// ui/review-diff.js
+function diffHTML(oldText, nextText) {
+  return diffWords(oldText || "", nextText || "").map(
+    (p) => `<${p.added ? "ins" : p.removed ? "del" : "span"}>${esc2(p.value)}</${p.added ? "ins" : p.removed ? "del" : "span"}>`
+  ).join("");
+}
+function buildEditHunks(oldText, nextText) {
+  const parts = diffLines(oldText || "", nextText || "");
+  const hunks = [];
+  for (let i = 0; i < parts.length; ) {
+    const p = parts[i];
+    if (!p.added && !p.removed) {
+      hunks.push({ kind: "equal", value: p.value });
+      i += 1;
+      continue;
+    }
+    let old = "", next2 = "";
+    while (i < parts.length && (parts[i].added || parts[i].removed)) {
+      if (parts[i].removed) old += parts[i].value;
+      if (parts[i].added) next2 += parts[i].value;
+      i += 1;
+    }
+    hunks.push({
+      kind: "change",
+      id: crypto.randomUUID(),
+      old,
+      next: next2,
+      status: "pending"
+    });
+  }
+  if (!hunks.some((h2) => h2.kind === "change")) {
+    hunks.length = 0;
+    hunks.push({
+      kind: "change",
+      id: crypto.randomUUID(),
+      old: oldText || "",
+      next: nextText || "",
+      status: "pending"
+    });
+  }
+  const IMG = /!\[[^\]]*\]\([^)]+\)/g;
+  for (const h2 of hunks) {
+    if (h2.kind !== "change") continue;
+    const oldImgs = [...String(h2.old || "").matchAll(IMG)].map((m) => m[0]);
+    const missing = [...new Set(oldImgs)].filter((s) => !String(h2.next || "").includes(s));
+    if (missing.length) h2.next = String(h2.next || "") + (String(h2.next || "").endsWith("\n") ? "" : "\n") + missing.join("\n") + "\n";
+    const oldHeads = String(h2.old || "").split("\n").filter((l) => /^#{1,6}\s/.test(l.trim()));
+    const missH = [...new Set(oldHeads.map((l) => l.trim()))].filter((s) => !String(h2.next || "").includes(s));
+    if (missH.length) h2.next = missH.join("\n") + "\n" + String(h2.next || "");
+    if (String(h2.old || "").trim() === String(h2.next || "").trim()) {
+      h2.kind = "equal";
+      h2.value = h2.old;
+      delete h2.id;
+      delete h2.status;
+    }
+  }
+  return hunks;
+}
+function composeHunks(hunks) {
+  return (hunks || []).map((h2) => {
+    if (h2.kind === "equal") return h2.value;
+    return h2.status === "accepted" ? h2.next : h2.old;
+  }).join("");
+}
+function protectStructure(oldText, nextText) {
+  let next2 = String(nextText || "");
+  const dropped = [];
+  const imgs = [...String(oldText || "").matchAll(/!\[[^\]]*\]\([^)]+\)/g)].map((m) => m[0]);
+  const missingImgs = [...new Set(imgs)].filter((s) => !next2.includes(s));
+  if (missingImgs.length) {
+    next2 += (next2.endsWith("\n") ? "" : "\n") + "\n" + missingImgs.join("\n") + "\n";
+    dropped.push(`\u5DF2\u4FDD\u62A4\u914D\u56FE ${missingImgs.length} \u5F20\uFF08\u6539\u540E\u7A3F\u8BEF\u5220\uFF0C\u5DF2\u81EA\u52A8\u4FDD\u7559\u5728\u539F\u6587\u4F4D\u7F6E\u9644\u8FD1\uFF09`);
+  }
+  const heads = String(oldText || "").split("\n").filter((l) => /^#{1,6}\s/.test(l.trim()));
+  const missingHeads = [...new Set(heads)].filter((s) => !next2.includes(s.trim()));
+  if (missingHeads.length) {
+    dropped.push(`\u6807\u9898\u7ED3\u6784 ${missingHeads.length} \u5904\u5728\u6539\u540E\u7A3F\u4E2D\u7F3A\u5931\uFF0C\u5DF2\u4FDD\u7559\u539F\u6587\u6807\u9898`);
+    missingHeads.forEach((h2) => {
+      if (!next2.includes(h2.trim())) next2 = h2 + "\n" + next2;
+    });
+  }
+  const fences2 = (String(oldText || "").match(/```/g) || []).length;
+  const nextFences = (next2.match(/```/g) || []).length;
+  if (fences2 % 2 === 0 && fences2 > 0 && nextFences !== fences2) {
+    dropped.push("\u68C0\u6D4B\u5230\u4EE3\u7801\u5757\u53EF\u80FD\u88AB\u7834\u574F\uFF0C\u5DF2\u5C3D\u91CF\u4FDD\u7559\u539F\u6587\u4EE3\u7801\u56F4\u680F");
+  }
+  return { next: next2, notes: dropped };
+}
+
 // fixtures/review-demo.json
 var review_demo_default = {
   title: "\u7528AI\u505A\u4E86\u4E00\u4E2A\u89E3\u8C1C\u6E38\u620F",
@@ -30477,20 +30915,6 @@ var heatmapYear = (/* @__PURE__ */ new Date()).getFullYear();
 var metricsSort = "\u9605\u8BFB";
 var publishedSelection = /* @__PURE__ */ new Set();
 var materialsFilter = "all";
-var $ = (s) => document.querySelector(s);
-var api = (n, d) => window.desk.call(n, d);
-function isWeb() {
-  return !!window.desk?.web;
-}
-function assetUrl(src) {
-  if (typeof src !== "string") return src;
-  if (!isWeb()) return src;
-  if (src.startsWith("inkasset://vault/"))
-    return "/api/asset/vault/" + src.slice("inkasset://vault/".length);
-  if (src.startsWith("inkasset://local/"))
-    return "/api/asset/local/" + src.slice("inkasset://local/".length);
-  return src;
-}
 function pickFiles({ multiple = false, accept = "" } = {}) {
   return new Promise((resolve) => {
     const input = document.createElement("input");
@@ -30537,10 +30961,6 @@ async function pickImagePayload() {
     type: f.type
   };
 }
-var esc2 = (s) => String(s ?? "").replace(
-  /[&<>"']/g,
-  (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
-);
 var state;
 var editor;
 var page = "dashboard";
@@ -30692,9 +31112,6 @@ function blockPlainText2(node) {
   walk(node);
   return out.replace(/[ \t]*\n[ \t]*/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
-function normalizeHeadingText(raw) {
-  return String(raw || "").split("\n").map((l) => l.replace(/[ \t]+/g, " ").trim()).filter(Boolean).join("\n");
-}
 function sanitizeRichHTML(html2) {
   const d = new DOMParser().parseFromString(html2 || "", "text/html");
   d.querySelectorAll(
@@ -30805,12 +31222,6 @@ function inferMaterialKind(name) {
     return "text";
   return "binary";
 }
-function formatBytes(n) {
-  const v = Number(n) || 0;
-  if (v < 1024) return v + " B";
-  if (v < 1024 * 1024) return (v / 1024).toFixed(1) + " KB";
-  return (v / (1024 * 1024)).toFixed(1) + " MB";
-}
 async function hydrateMaterialPreview(r) {
   const kind = r.kind || inferMaterialKind(r.name);
   const asset = r.asset || (kind === "image" && r.path ? "inkasset://vault/" + encodeURIComponent(r.path) : "");
@@ -30870,58 +31281,6 @@ function materialDrawerBodyHTML(r) {
   if (kind === "text")
     return `<pre id="reference-text" class="material-preview is-code">${esc2(text)}</pre>`;
   return `<p class="muted">\u5DF2\u4FDD\u7559\u539F\u6587\u4EF6\uFF0C\u5F53\u524D\u683C\u5F0F\u6682\u4E0D\u652F\u6301\u5185\u5D4C\u9884\u89C8\u3002</p><pre id="reference-text" class="material-preview is-code">${esc2(text)}</pre>`;
-}
-var toastTimer = 0;
-function toast(t, opts) {
-  const el = $("#toast");
-  if (!el) return;
-  el.textContent = t;
-  el.classList.add("show");
-  clearTimeout(toastTimer);
-  if (opts?.sticky) return;
-  toastTimer = setTimeout(() => el.classList.remove("show"), 3800);
-}
-function hideToast() {
-  clearTimeout(toastTimer);
-  $("#toast")?.classList.remove("show");
-}
-function promptText(title, opts = {}) {
-  return new Promise((resolve) => {
-    $("#text-prompt-modal")?.remove();
-    const m = document.createElement("div");
-    m.id = "text-prompt-modal";
-    m.className = "modal";
-    m.innerHTML = `<div class="dialog" style="width:min(420px,92vw)"><h2>${esc2(title)}</h2><input id="text-prompt-input" type="text" value="${esc2(opts.value || "")}" placeholder="${esc2(opts.placeholder || "")}" autocomplete="off"><div class="row"><button type="button" id="text-prompt-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="text-prompt-ok">${esc2(opts.okLabel || "\u786E\u5B9A")}</button></div></div>`;
-    document.body.append(m);
-    const input = $("#text-prompt-input");
-    const done = (value) => {
-      m.remove();
-      resolve(value);
-    };
-    $("#text-prompt-cancel").onclick = () => done(null);
-    m.addEventListener("click", (e) => {
-      if (e.target === m) done(null);
-    });
-    const submit = () => {
-      const v = input.value.trim();
-      done(v || null);
-    };
-    $("#text-prompt-ok").onclick = submit;
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        submit();
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        done(null);
-      }
-    });
-    requestAnimationFrame(() => {
-      input.focus();
-      input.select();
-    });
-  });
 }
 async function persist() {
   clearTimeout(saveTimer);
@@ -31139,37 +31498,6 @@ function render2() {
     };
   });
 }
-function showContextMenu(x, y, items) {
-  $("#context-menu")?.remove();
-  const menu = document.createElement("div");
-  menu.id = "context-menu";
-  menu.className = "context-menu";
-  menu.style.left = Math.min(x, window.innerWidth - 180) + "px";
-  menu.style.top = Math.min(y, window.innerHeight - 80) + "px";
-  menu.innerHTML = items.map(
-    (it, i) => `<button type="button" data-ctx="${i}" class="${it.danger ? "danger" : ""}">${esc2(it.label)}</button>`
-  ).join("");
-  document.body.append(menu);
-  const close2 = () => {
-    menu.remove();
-    window.removeEventListener("click", close2);
-    window.removeEventListener("contextmenu", close2);
-    window.removeEventListener("scroll", close2, true);
-  };
-  [...menu.querySelectorAll("[data-ctx]")].forEach((b) => {
-    b.onclick = (e) => {
-      e.stopPropagation();
-      const item = items[+b.dataset.ctx];
-      close2();
-      item?.run();
-    };
-  });
-  setTimeout(() => {
-    window.addEventListener("click", close2);
-    window.addEventListener("contextmenu", close2);
-    window.addEventListener("scroll", close2, true);
-  }, 0);
-}
 async function openComposerAddMenu(anchor) {
   if ($("#composer-add-menu")) {
     dismissActiveComposerMenu();
@@ -31278,166 +31606,6 @@ async function deleteDraft(id) {
   } catch (e) {
     toast(e.message);
   }
-}
-function $$(s) {
-  return [...document.querySelectorAll(s)];
-}
-var WECHAT_BLUE = "#0f3ff7";
-var WECHAT_BLUE_SOFT = "rgba(15, 63, 247, 0.2)";
-var WECHAT_SERIF = "'\u5BD2\u8749\u9526\u4E66\u5B8BCompact','Songti SC','STSong','\u534E\u6587\u5B8B\u4F53','\u5B8B\u4F53',SimSun,serif";
-var WECHAT_SERIF_PUBLISH = "Songti SC,STSong,\u534E\u6587\u5B8B\u4F53,\u5B8B\u4F53,SimSun,serif";
-var WECHAT_SANS = "'OPPO Sans 4.0','PingFang SC','Helvetica Neue',Arial,sans-serif";
-var WECHAT_BLOCK_W = 360;
-var WECHAT_BLOCK_SCALE = 4;
-function wechatWrapLines(ctx, text, maxW) {
-  const lines = [];
-  for (const para of String(text || "").split(/\n/)) {
-    let line = "";
-    for (const ch of Array.from(para)) {
-      if (line && ctx.measureText(line + ch).width > maxW) {
-        lines.push(line);
-        line = ch;
-      } else line += ch;
-    }
-    lines.push(line);
-  }
-  return lines.length ? lines : [""];
-}
-function wechatBlockCanvas(cssW, cssH) {
-  const c = document.createElement("canvas");
-  c.width = Math.max(1, Math.ceil(cssW * WECHAT_BLOCK_SCALE));
-  c.height = Math.max(1, Math.ceil(cssH * WECHAT_BLOCK_SCALE));
-  const ctx = c.getContext("2d");
-  ctx.scale(WECHAT_BLOCK_SCALE, WECHAT_BLOCK_SCALE);
-  ctx.textBaseline = "top";
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  return { c, ctx };
-}
-function renderWechatH1Png(raw, num) {
-  const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
-  const badge = 48;
-  const gap = 10;
-  const textW = WECHAT_BLOCK_W - badge - gap;
-  const fontSize = 40;
-  const lineH = 44;
-  const measure = wechatBlockCanvas(1, 1).ctx;
-  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  let lines = [];
-  if (soft.length > 1) {
-    lines = soft.flatMap((para) => wechatWrapLines(measure, para, textW));
-  } else {
-    const one = soft[0] || "";
-    const m = one.match(
-      /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/
-    );
-    const zh = m ? m[1].trim() : one;
-    const en = m ? m[2].trim() : "";
-    lines = [
-      ...wechatWrapLines(measure, zh, textW),
-      ...en ? wechatWrapLines(measure, en, textW) : []
-    ];
-  }
-  const textH = Math.max(badge, lines.length * lineH);
-  const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, textH);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, WECHAT_BLOCK_W, textH);
-  ctx.fillStyle = WECHAT_BLUE;
-  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  let y = textH - lines.length * lineH;
-  for (const line of lines) {
-    ctx.fillText(line, 0, y);
-    y += lineH;
-  }
-  const bx = WECHAT_BLOCK_W - badge;
-  const by = textH - badge;
-  ctx.fillStyle = WECHAT_BLUE_SOFT;
-  ctx.fillRect(bx, by, badge, badge);
-  ctx.fillStyle = WECHAT_BLUE;
-  const numSize = 36;
-  ctx.font = `800 ${numSize}px ${WECHAT_SERIF}`;
-  const nw = ctx.measureText(num).width;
-  ctx.fillText(num, bx + (badge - nw) / 2, by + (badge - numSize) / 2);
-  return c.toDataURL("image/png");
-}
-function renderWechatH2Png(raw) {
-  const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
-  const padX = 10;
-  const padY = 8;
-  const fontSize = 20;
-  const lineH = 25;
-  const maxInner = WECHAT_BLOCK_W - padX * 2;
-  const measure = wechatBlockCanvas(1, 1).ctx;
-  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  const lines = soft.flatMap(
-    (para) => wechatWrapLines(measure, para, maxInner)
-  );
-  const innerW = Math.min(
-    maxInner,
-    Math.ceil(Math.max(...lines.map((l) => measure.measureText(l).width), 1))
-  );
-  const boxW = Math.min(WECHAT_BLOCK_W, innerW + padX * 2);
-  const boxH = Math.max(lineH + padY * 2, lines.length * lineH + padY * 2);
-  const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, boxH);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
-  ctx.fillStyle = WECHAT_BLUE;
-  ctx.fillRect(0, 0, boxW, boxH);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  let y = padY;
-  for (const line of lines) {
-    ctx.fillText(line, padX, y);
-    y += lineH;
-  }
-  return c.toDataURL("image/png");
-}
-function renderWechatQuotePng(raw) {
-  const text = String(raw || "").replace(/\s+/g, " ").trim();
-  const pad = 8;
-  const markSize = 23;
-  const fontSize = 15;
-  const lineH = 26;
-  const markW = 20;
-  const gap = 8;
-  const textW = WECHAT_BLOCK_W - pad * 2 - markW - gap;
-  const measure = wechatBlockCanvas(1, 1).ctx;
-  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  const lines = wechatWrapLines(measure, text, textW);
-  const boxH = Math.max(markSize + pad * 2, lines.length * lineH + pad * 2);
-  const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, boxH);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
-  ctx.fillStyle = WECHAT_BLUE_SOFT;
-  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
-  ctx.fillStyle = WECHAT_BLUE;
-  ctx.font = `800 ${markSize}px ${WECHAT_SERIF}`;
-  ctx.fillText("\u201C", pad, pad);
-  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  let y = pad + 4;
-  const tx = pad + markW + gap;
-  for (const line of lines) {
-    ctx.fillText(line, tx, y);
-    y += lineH;
-  }
-  return c.toDataURL("image/png");
-}
-function replaceWithWechatBlockImage(d, el, dataUrl, alt, margin) {
-  const wrap2 = d.createElement("section");
-  wrap2.setAttribute(
-    "style",
-    `margin:${margin};padding:0;max-width:100%;box-sizing:border-box;`
-  );
-  const img = d.createElement("img");
-  img.setAttribute("src", dataUrl);
-  img.setAttribute("alt", alt);
-  img.setAttribute("width", String(WECHAT_BLOCK_W));
-  img.setAttribute(
-    "style",
-    "width:100% !important;max-width:100% !important;height:auto !important;display:block !important;margin:0 !important;border:0;vertical-align:top;"
-  );
-  wrap2.appendChild(img);
-  el.replaceWith(wrap2);
 }
 function enhanceWechatPreview(root2 = $("#article-preview")) {
   if (!root2) return;
@@ -32181,7 +32349,7 @@ function renderWrite() {
   }
   unmountAster?.();
   unmountAster = null;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="\u5BA1\u9605" aria-haspopup="true" aria-expanded="false">${I.eye()} \u5BA1\u9605</button><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></div><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">\u5BA1\u9605\u4E2D</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">\u5168\u90E8\u63A5\u53D7</button><button type="button" data-inline="reject-all">\u5168\u90E8\u62D2\u7EDD</button><button type="button" data-inline="finish" class="primary">\u5B8C\u6210</button></div></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc2(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD</span></button></div></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(state, current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="\u5BA1\u9605" aria-haspopup="true" aria-expanded="false">${I.eye()} \u5BA1\u9605</button><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></div><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">\u5BA1\u9605\u4E2D</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">\u5168\u90E8\u63A5\u53D7</button><button type="button" data-inline="reject-all">\u5168\u90E8\u62D2\u7EDD</button><button type="button" data-inline="finish" class="primary">\u5B8C\u6210</button></div></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc2(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD</span></button></div></div>`;
   unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
   const onSelectionScroll = () => {
@@ -32308,7 +32476,7 @@ function renderWrite() {
         await persist();
         const sel = $("#article-group");
         if (sel) {
-          sel.innerHTML = groupOptionsHtml(current.group) + `<option value="__new__">\uFF0B \u65B0\u5EFA\u5206\u7EC4\u2026</option>`;
+          sel.innerHTML = groupOptionsHtml(state, current.group) + `<option value="__new__">\uFF0B \u65B0\u5EFA\u5206\u7EC4\u2026</option>`;
           sel.value = current.group;
         }
         toast(`\u5DF2\u521B\u5EFA\u5E76\u9009\u7528\u300C${name}\u300D`);
@@ -32559,69 +32727,6 @@ function bindWorkspaceResize() {
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   };
-}
-function diffHTML(oldText, nextText) {
-  return diffWords(oldText || "", nextText || "").map(
-    (p) => `<${p.added ? "ins" : p.removed ? "del" : "span"}>${esc2(p.value)}</${p.added ? "ins" : p.removed ? "del" : "span"}>`
-  ).join("");
-}
-function buildEditHunks(oldText, nextText) {
-  const parts = diffLines(oldText || "", nextText || "");
-  const hunks = [];
-  for (let i = 0; i < parts.length; ) {
-    const p = parts[i];
-    if (!p.added && !p.removed) {
-      hunks.push({ kind: "equal", value: p.value });
-      i += 1;
-      continue;
-    }
-    let old = "", next2 = "";
-    while (i < parts.length && (parts[i].added || parts[i].removed)) {
-      if (parts[i].removed) old += parts[i].value;
-      if (parts[i].added) next2 += parts[i].value;
-      i += 1;
-    }
-    hunks.push({
-      kind: "change",
-      id: crypto.randomUUID(),
-      old,
-      next: next2,
-      status: "pending"
-    });
-  }
-  if (!hunks.some((h2) => h2.kind === "change")) {
-    hunks.length = 0;
-    hunks.push({
-      kind: "change",
-      id: crypto.randomUUID(),
-      old: oldText || "",
-      next: nextText || "",
-      status: "pending"
-    });
-  }
-  const IMG = /!\[[^\]]*\]\([^)]+\)/g;
-  for (const h2 of hunks) {
-    if (h2.kind !== "change") continue;
-    const oldImgs = [...String(h2.old || "").matchAll(IMG)].map((m) => m[0]);
-    const missing = [...new Set(oldImgs)].filter((s) => !String(h2.next || "").includes(s));
-    if (missing.length) h2.next = String(h2.next || "") + (String(h2.next || "").endsWith("\n") ? "" : "\n") + missing.join("\n") + "\n";
-    const oldHeads = String(h2.old || "").split("\n").filter((l) => /^#{1,6}\s/.test(l.trim()));
-    const missH = [...new Set(oldHeads.map((l) => l.trim()))].filter((s) => !String(h2.next || "").includes(s));
-    if (missH.length) h2.next = missH.join("\n") + "\n" + String(h2.next || "");
-    if (String(h2.old || "").trim() === String(h2.next || "").trim()) {
-      h2.kind = "equal";
-      h2.value = h2.old;
-      delete h2.id;
-      delete h2.status;
-    }
-  }
-  return hunks;
-}
-function composeHunks(hunks) {
-  return (hunks || []).map((h2) => {
-    if (h2.kind === "equal") return h2.value;
-    return h2.status === "accepted" ? h2.next : h2.old;
-  }).join("");
 }
 function reviewCardHTML() {
   if (!pending || pending.doc !== current?.id || pending.conversationId !== conversation().id)
@@ -32903,30 +33008,6 @@ function mountInlineReviewBar() {
   if (title) title.hidden = true;
   paper.insertAdjacentHTML("afterbegin", reviewPageHTML());
   bindInlineReviewBar();
-}
-function protectStructure(oldText, nextText) {
-  let next2 = String(nextText || "");
-  const dropped = [];
-  const imgs = [...String(oldText || "").matchAll(/!\[[^\]]*\]\([^)]+\)/g)].map((m) => m[0]);
-  const missingImgs = [...new Set(imgs)].filter((s) => !next2.includes(s));
-  if (missingImgs.length) {
-    next2 += (next2.endsWith("\n") ? "" : "\n") + "\n" + missingImgs.join("\n") + "\n";
-    dropped.push(`\u5DF2\u4FDD\u62A4\u914D\u56FE ${missingImgs.length} \u5F20\uFF08\u6539\u540E\u7A3F\u8BEF\u5220\uFF0C\u5DF2\u81EA\u52A8\u4FDD\u7559\u5728\u539F\u6587\u4F4D\u7F6E\u9644\u8FD1\uFF09`);
-  }
-  const heads = String(oldText || "").split("\n").filter((l) => /^#{1,6}\s/.test(l.trim()));
-  const missingHeads = [...new Set(heads)].filter((s) => !next2.includes(s.trim()));
-  if (missingHeads.length) {
-    dropped.push(`\u6807\u9898\u7ED3\u6784 ${missingHeads.length} \u5904\u5728\u6539\u540E\u7A3F\u4E2D\u7F3A\u5931\uFF0C\u5DF2\u4FDD\u7559\u539F\u6587\u6807\u9898`);
-    missingHeads.forEach((h2) => {
-      if (!next2.includes(h2.trim())) next2 = h2 + "\n" + next2;
-    });
-  }
-  const fences2 = (String(oldText || "").match(/```/g) || []).length;
-  const nextFences = (next2.match(/```/g) || []).length;
-  if (fences2 % 2 === 0 && fences2 > 0 && nextFences !== fences2) {
-    dropped.push("\u68C0\u6D4B\u5230\u4EE3\u7801\u5757\u53EF\u80FD\u88AB\u7834\u574F\uFF0C\u5DF2\u5C3D\u91CF\u4FDD\u7559\u539F\u6587\u4EE3\u7801\u56F4\u680F");
-  }
-  return { next: next2, notes: dropped };
 }
 function summarizeRewrite(oldText, nextText) {
   const hunks = (pending?.hunks || []).filter((h2) => h2.kind === "change");
@@ -33611,14 +33692,14 @@ async function setPublishedGroups(paths) {
   const list2 = (Array.isArray(paths) ? paths : [paths]).filter(Boolean);
   if (!list2.length) return;
   const currentGroups = [
-    ...new Set(list2.map((rel) => publishedGroup(rel) || ""))
+    ...new Set(list2.map((rel) => publishedGroup(state, rel) || ""))
   ];
   const selected = currentGroups.length === 1 ? currentGroups[0] || "" : "";
   $("#group-set-modal")?.remove();
   const m = document.createElement("div");
   m.id = "group-set-modal";
   m.className = "modal";
-  m.innerHTML = `<div class="dialog"><h2>\u8BBE\u7F6E\u5206\u7EC4</h2><label>\u5206\u7EC4<select id="group-set-select">${groupOptionsHtml(selected)}</select></label><label>\u6216\u65B0\u5EFA\u5206\u7EC4<input id="group-set-new" placeholder="\u8F93\u5165\u65B0\u5206\u7EC4\u540D\u79F0" autocomplete="off"></label><div class="row"><button type="button" id="group-set-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="group-set-ok">\u4FDD\u5B58</button></div></div>`;
+  m.innerHTML = `<div class="dialog"><h2>\u8BBE\u7F6E\u5206\u7EC4</h2><label>\u5206\u7EC4<select id="group-set-select">${groupOptionsHtml(state, selected)}</select></label><label>\u6216\u65B0\u5EFA\u5206\u7EC4<input id="group-set-new" placeholder="\u8F93\u5165\u65B0\u5206\u7EC4\u540D\u79F0" autocomplete="off"></label><div class="row"><button type="button" id="group-set-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="group-set-ok">\u4FDD\u5B58</button></div></div>`;
   document.body.append(m);
   $("#group-set-cancel").onclick = () => m.remove();
   $("#group-set-ok").onclick = async () => {
@@ -33656,14 +33737,14 @@ async function backupPublishedArticle(paths) {
   if (!list2.length) return;
   const first2 = list2[0];
   const accountId = (state.archives || []).find((a) => a.path === first2)?.account || first2.split("/")[0] || account;
-  const groups = [...new Set(list2.map((rel) => publishedGroup(rel) || ""))];
+  const groups = [...new Set(list2.map((rel) => publishedGroup(state, rel) || ""))];
   const singleGroup = groups.length === 1 ? groups[0] || null : null;
   const mixedGroups = groups.length > 1;
-  const defaultPath = singleGroup ? backupPathFor(singleGroup, accountId) : "";
+  const defaultPath = singleGroup ? backupPathFor(state, singleGroup, accountId) : "";
   const perPathDefaults = list2.map((rel) => ({
     rel,
-    group: publishedGroup(rel),
-    dest: backupPathFor(publishedGroup(rel), accountId)
+    group: publishedGroup(state, rel),
+    dest: backupPathFor(state, publishedGroup(state, rel), accountId)
   }));
   const allHaveDefault = perPathDefaults.every((x) => x.dest);
   const label = list2.length === 1 ? `\u300C${publishedPreview?.path === first2 ? publishedPreview.title : (state.archives || []).find((a) => a.path === first2)?.title || first2.split("/").pop().replace(/\.md$/, "") || "\u6587\u7AE0"}\u300D` : `\u9009\u4E2D\u7684 ${list2.length} \u7BC7\u6587\u7AE0`;
@@ -34718,7 +34799,7 @@ function renderSettings() {
       `<p class="settings-empty">\u5C1A\u672A\u6DFB\u52A0\u8D26\u53F7\u3002\u53EF\u9009\u62E9\u4ED3\u5E93\u5185\u5DF2\u6709\u6587\u4EF6\u5939\uFF0C\u6216\u65B0\u5EFA\u8D26\u53F7\u3002</p>`
     ))
   });
-  const groups = groupNames();
+  const groups = groupNames(state);
   const groupsBody = settingsSection({
     control: `<div class="settings-panel-toolbar"><button type="button" class="primary" id="create-group">${I.plus()} \u65B0\u5EFA\u5206\u7EC4</button></div>` + (groups.length ? settingsPanel(
       `<table class="groups-table"><thead><tr><th>\u5206\u7EC4</th><th>\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84</th><th class="groups-actions-col">\u64CD\u4F5C</th></tr></thead><tbody>${groups.map((name) => {
@@ -34891,43 +34972,6 @@ async function pickGroupBackupPath(name) {
     toast(e.message || "\u8BBE\u7F6E\u5931\u8D25");
   }
 }
-function groupNames() {
-  return Object.keys(state.groups || {}).sort(
-    (a, b) => a.localeCompare(b, "zh")
-  );
-}
-function groupChipTone(name) {
-  let h2 = 0;
-  for (const c of String(name)) h2 = h2 * 31 + c.charCodeAt(0) >>> 0;
-  return h2 % 8;
-}
-function groupChipHtml(name) {
-  return `<span class="group-chip group-chip-${groupChipTone(name)}">${esc2(name)}</span>`;
-}
-function publishedGroup(rel) {
-  const row = (state.metrics || []).find((r) => r.path === rel);
-  const fromMetrics = typeof row?.["\u5206\u7EC4"] === "string" && row["\u5206\u7EC4"].trim() ? row["\u5206\u7EC4"].trim() : null;
-  if (fromMetrics) return fromMetrics;
-  const arch = (state.archives || []).find((a) => a.path === rel);
-  return arch?.group || null;
-}
-function backupPathFor(group, accountId) {
-  const g = typeof group === "string" ? group.trim() : "";
-  if (g && state.groups?.[g]?.backupPath) return state.groups[g].backupPath;
-  return state.backupPaths?.[accountId] || "";
-}
-function groupOptionsHtml(selected, opts = {}) {
-  const allowEmpty = opts.allowEmpty !== false;
-  const emptyLabel = opts.emptyLabel || "\u65E0\u5206\u7EC4";
-  const cur = typeof selected === "string" ? selected.trim() : "";
-  const names = new Set(groupNames());
-  if (cur) names.add(cur);
-  return `${allowEmpty ? `<option value="">${esc2(emptyLabel)}</option>` : ""}${[
-    ...names
-  ].sort((a, b) => a.localeCompare(b, "zh")).map(
-    (n) => `<option value="${esc2(n)}" ${n === cur ? "selected" : ""}>${esc2(n)}</option>`
-  ).join("")}`;
-}
 async function pickAccountBackupPath(accountId) {
   if (isWeb()) return toast("\u9009\u62E9\u5907\u4EFD\u8DEF\u5F84\u4EC5\u652F\u6301\u684C\u9762\u7AEF");
   if (!accountId) return toast("\u8D26\u53F7\u65E0\u6548");
@@ -34993,43 +35037,6 @@ async function pickAndSetAccountAvatar(accountId) {
   } catch (e) {
     toast(e.message || "\u5934\u50CF\u66F4\u65B0\u5931\u8D25");
   }
-}
-function askText(title, hint, value = "") {
-  return new Promise((resolve) => {
-    const m = document.createElement("div");
-    m.className = "modal";
-    m.innerHTML = `<div class="dialog"><h2>${esc2(title)}</h2><p>${esc2(hint)}</p><input id="ask-text-input" value="${esc2(value)}" autocomplete="off"><div class="row"><button type="button" id="ask-text-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="ask-text-ok">\u786E\u5B9A</button></div></div>`;
-    document.body.append(m);
-    const input = $("#ask-text-input");
-    input?.focus();
-    input?.select();
-    const done = (v) => {
-      m.remove();
-      resolve(v);
-    };
-    $("#ask-text-cancel").onclick = () => done(null);
-    $("#ask-text-ok").onclick = () => done(input.value);
-    input?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") done(input.value);
-      if (e.key === "Escape") done(null);
-    });
-  });
-}
-function askConfirm(title, message) {
-  return new Promise((resolve) => {
-    const m = document.createElement("div");
-    m.className = "modal";
-    m.innerHTML = `<div class="dialog"><h2>${esc2(title)}</h2><p>${esc2(message)}</p><div class="row"><button type="button" id="ask-confirm-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="ask-confirm-ok">\u786E\u5B9A</button></div></div>`;
-    document.body.append(m);
-    $("#ask-confirm-cancel").onclick = () => {
-      m.remove();
-      resolve(false);
-    };
-    $("#ask-confirm-ok").onclick = () => {
-      m.remove();
-      resolve(true);
-    };
-  });
 }
 async function pickAndRegisterAccountFolder() {
   try {

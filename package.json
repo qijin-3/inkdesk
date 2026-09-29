@@ -9,10 +9,11 @@
     "dev": "node dev.cjs",
     "dev:server": "node server.cjs",
     "build:watch": "esbuild renderer.js --bundle --format=esm --outfile=bundle.js --watch",
-    "test": "node --test test.cjs vault.test.cjs knowledge.test.cjs model.test.cjs note-import.test.cjs skills.test.cjs agent-models.test.cjs agent-usage.test.cjs update.test.cjs",
+    "test": "node --test test.cjs vault.test.cjs knowledge.test.cjs model.test.cjs note-import.test.cjs skills.test.cjs agent-models.test.cjs agent-usage.test.cjs update.test.cjs review-diff.test.cjs wechat-png.test.cjs groups.test.cjs",
     "package:mac": "node package-mac.cjs",
     "build": "esbuild renderer.js --bundle --format=esm --outfile=bundle.js",
     "test:ui": "node smoke-ui.cjs && node review-ui.cjs && node skills-ui-test.cjs && node heatmap-ui.cjs && node agents-ui.cjs && node usage-ui.cjs",
+    "test:budget": "node scripts/budget-check.cjs",
     "test:skills": "node skills-ui-test.cjs",
     "test:agents": "node agents-ui.cjs"
   },

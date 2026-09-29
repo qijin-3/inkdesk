@@ -1,5 +1,38 @@
-// @extracted from renderer.js 1152-1341 — 后续改为 export 函数后由 renderer import
-function wechatWrapLines(ctx, text, maxW) {
+export const WECHAT_BLUE = "#0f3ff7";
+export const WECHAT_BLUE_SOFT = "rgba(15, 63, 247, 0.2)";
+/** 本地预览：寒蝉优先，回退到系统宋体（勿用无衬线，避免退化成黑体） */
+export const WECHAT_SERIF =
+  "'寒蝉锦书宋Compact','Songti SC','STSong','华文宋体','宋体',SimSun,serif";
+/**
+ * 公众号粘贴专用：不含自定义字体。
+ * 微信遇到未知字体名常会丢弃整段 font-family，从而退化成黑体。
+ */
+export const WECHAT_SERIF_PUBLISH = "Songti SC,STSong,华文宋体,宋体,SimSun,serif";
+export const WECHAT_SANS =
+  "'OPPO Sans 4.0','PingFang SC','Helvetica Neue',Arial,sans-serif";
+
+/**
+ * 推送用标题/引用图。
+ * 逻辑宽取手机微信正文区约 360px（非整页 677）：图会按栏宽 100% 显示，
+ * 若按 677 画 15px 字，缩到 ~360 后只剩约 8px，会远小于正文。
+ * 4x → 约 1440px，Retina 仍清晰。
+ */
+export const WECHAT_BLOCK_W = 360;
+export const WECHAT_BLOCK_SCALE = 4;
+
+export function normalizeHeadingText(raw) {
+  return String(raw || "")
+    .split("\n")
+    .map((l) => l.replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
+ * 按中文字符换行。
+ * @param {CanvasRenderingContext2D} ctx
+ */
+export function wechatWrapLines(ctx, text, maxW) {
   const lines = [];
   for (const para of String(text || "").split(/\n/)) {
     let line = "";
@@ -19,7 +52,7 @@ function wechatWrapLines(ctx, text, maxW) {
  * @param {number} cssW
  * @param {number} cssH
  */
-function wechatBlockCanvas(cssW, cssH) {
+export function wechatBlockCanvas(cssW, cssH) {
   const c = document.createElement("canvas");
   c.width = Math.max(1, Math.ceil(cssW * WECHAT_BLOCK_SCALE));
   c.height = Math.max(1, Math.ceil(cssH * WECHAT_BLOCK_SCALE));
@@ -32,11 +65,22 @@ function wechatBlockCanvas(cssW, cssH) {
 }
 
 /**
+ * 单行一级标题按“中文 + 空格 + 英文”拆成主副标题（原 renderWechatH1Png 内联逻辑，原样抽出）。
+ * @returns {{ zh: string, en: string }}
+ */
+export function splitH1ZhEn(one) {
+  const m = String(one || "").match(
+    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/,
+  );
+  return m ? { zh: m[1].trim(), en: m[2].trim() } : { zh: one, en: "" };
+}
+
+/**
  * 画一级标题图（蓝字 + 序号方块）；保留标题内软换行。
  * @param {string} raw
  * @param {string} num
  */
-function renderWechatH1Png(raw, num) {
+export function renderWechatH1Png(raw, num) {
   const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
   const badge = 48;
   const gap = 10;
@@ -51,12 +95,7 @@ function renderWechatH1Png(raw, num) {
   if (soft.length > 1) {
     lines = soft.flatMap((para) => wechatWrapLines(measure, para, textW));
   } else {
-    const one = soft[0] || "";
-    const m = one.match(
-      /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/,
-    );
-    const zh = m ? m[1].trim() : one;
-    const en = m ? m[2].trim() : "";
+    const { zh, en } = splitH1ZhEn(soft[0] || "");
     lines = [
       ...wechatWrapLines(measure, zh, textW),
       ...(en ? wechatWrapLines(measure, en, textW) : []),
@@ -90,7 +129,7 @@ function renderWechatH1Png(raw, num) {
  * 画二级标题：整行定宽画布，蓝条按文字真实宽度左对齐；保留软换行。
  * @param {string} raw
  */
-function renderWechatH2Png(raw) {
+export function renderWechatH2Png(raw) {
   const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
   const padX = 10;
   const padY = 8;
@@ -127,7 +166,7 @@ function renderWechatH2Png(raw) {
  * 画引用块图。
  * @param {string} raw
  */
-function renderWechatQuotePng(raw) {
+export function renderWechatQuotePng(raw) {
   const text = String(raw || "")
     .replace(/\s+/g, " ")
     .trim();
@@ -168,7 +207,7 @@ function renderWechatQuotePng(raw) {
  * @param {string} alt
  * @param {string} margin
  */
-function replaceWithWechatBlockImage(d, el, dataUrl, alt, margin) {
+export function replaceWithWechatBlockImage(d, el, dataUrl, alt, margin) {
   const wrap = d.createElement("section");
   wrap.setAttribute(
     "style",
@@ -185,7 +224,3 @@ function replaceWithWechatBlockImage(d, el, dataUrl, alt, margin) {
   wrap.appendChild(img);
   el.replaceWith(wrap);
 }
-
-/**
- * 增强公众号预览 DOM：中英标题拆分，并写入关键元素内联样式（避免 CSS 缓存/继承干扰）。
- */

@@ -1,4 +1,14 @@
 import { mountAgentUsage } from "./agent-usage-ui.js";
+import { $,
+  $$,
+  api,
+  esc,
+  formatBytes,
+  toast,
+  hideToast,
+  isWeb,
+  assetUrl,
+} from "./ui/dom.js";
 import { mountSkillsSettings, skillAvailableFor } from "./skills-ui.js";
 import { bindSocialPreview } from "./social-layout.js";
 import { Composer, referenceChipHTML } from "./composer.js";
@@ -13,6 +23,38 @@ import { marked } from "marked";
 import TurndownService from "turndown";
 import { diffWords, diffLines } from "diff";
 import { calendar, validDate, publishSummary } from "./calendar.cjs";
+import { promptText, askText, askConfirm } from "./ui/dialog.js";
+import { showContextMenu } from "./ui/popover.js";
+import {
+  groupNames,
+  groupChipTone,
+  groupChipHtml,
+  publishedGroup,
+  backupPathFor,
+  groupOptionsHtml,
+} from "./ui/groups.js";
+import {
+  WECHAT_BLUE,
+  WECHAT_BLUE_SOFT,
+  WECHAT_SERIF,
+  WECHAT_SERIF_PUBLISH,
+  WECHAT_SANS,
+  WECHAT_BLOCK_W,
+  WECHAT_BLOCK_SCALE,
+  normalizeHeadingText,
+  wechatWrapLines,
+  wechatBlockCanvas,
+  renderWechatH1Png,
+  renderWechatH2Png,
+  renderWechatQuotePng,
+  replaceWithWechatBlockImage,
+} from "./ui/wechat-png.js";
+import {
+  diffHTML,
+  buildEditHunks,
+  composeHunks,
+  protectStructure,
+} from "./ui/review-diff.js";
 import reviewDemoFixture from "./fixtures/review-demo.json";
 let saveProfileEditor = null;
 let composer = null,
@@ -24,28 +66,6 @@ let metricsSort = "阅读";
 /** 仪表盘已发布文章多选路径 */
 let publishedSelection = new Set();
 let materialsFilter = "all";
-const $ = (s) => document.querySelector(s),
-  api = (n, d) => window.desk.call(n, d);
-
-/** 是否在浏览器开发预览模式 */
-function isWeb() {
-  return !!window.desk?.web;
-}
-
-/**
- * 资源地址：网页端走 /api/asset，桌面端保留 inkasset 协议（由主进程托管）。
- * @param {string} src
- */
-function assetUrl(src) {
-  if (typeof src !== "string") return src;
-  if (!isWeb()) return src;
-  if (src.startsWith("inkasset://vault/"))
-    return "/api/asset/vault/" + src.slice("inkasset://vault/".length);
-  if (src.startsWith("inkasset://local/"))
-    return "/api/asset/local/" + src.slice("inkasset://local/".length);
-  return src;
-}
-
 /** 打开系统文件选择器 */
 function pickFiles({ multiple = false, accept = "" } = {}) {
   return new Promise((resolve) => {
@@ -99,14 +119,6 @@ async function pickImagePayload() {
     type: f.type,
   };
 }
-const esc = (s) =>
-  String(s ?? "").replace(
-    /[&<>"']/g,
-    (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        c
-      ],
-  );
 let state,
   editor,
   page = "dashboard",
@@ -335,18 +347,6 @@ function blockPlainText(node) {
     .trim();
 }
 
-/**
- * 规范化标题文本：保留软换行，仅折叠同行空白。
- * @param {string} raw
- * @returns {string}
- */
-function normalizeHeadingText(raw) {
-  return String(raw || "")
-    .split("\n")
-    .map((l) => l.replace(/[ \t]+/g, " ").trim())
-    .filter(Boolean)
-    .join("\n");
-}
 
 /**
  * 清洗富文本 HTML，并按环境改写图片资源地址（避免整页正则误伤）。
@@ -518,17 +518,6 @@ function inferMaterialKind(name) {
 }
 
 /**
- * 格式化字节大小。
- * @param {number} n
- */
-function formatBytes(n) {
-  const v = Number(n) || 0;
-  if (v < 1024) return v + " B";
-  if (v < 1024 * 1024) return (v / 1024).toFixed(1) + " KB";
-  return (v / (1024 * 1024)).toFixed(1) + " MB";
-}
-
-/**
  * 补全预览字段：类型、图片地址、文本摘要。
  * @param {object} r
  */
@@ -615,72 +604,12 @@ function materialDrawerBodyHTML(r) {
     return `<pre id="reference-text" class="material-preview is-code">${esc(text)}</pre>`;
   return `<p class="muted">已保留原文件，当前格式暂不支持内嵌预览。</p><pre id="reference-text" class="material-preview is-code">${esc(text)}</pre>`;
 }
-let toastTimer = 0;
-/**
- * 顶部轻提示。
- * @param {string} t 文案
- * @param {{ sticky?: boolean }} [opts] sticky 时不自动消失（拖拽悬停用）
- */
-function toast(t, opts) {
-  const el = $("#toast");
-  if (!el) return;
-  el.textContent = t;
-  el.classList.add("show");
-  clearTimeout(toastTimer);
-  if (opts?.sticky) return;
-  toastTimer = setTimeout(() => el.classList.remove("show"), 3800);
-}
-/** 立刻收起顶部提示 */
-function hideToast() {
-  clearTimeout(toastTimer);
-  $("#toast")?.classList.remove("show");
-}
-
 /**
  * Electron 无 window.prompt，用本地弹窗收集单行文本。
  * @param {string} title
  * @param {{ value?: string, placeholder?: string, okLabel?: string }} [opts]
  * @returns {Promise<string|null>} 确认返回 trim 后文本，取消返回 null
  */
-function promptText(title, opts = {}) {
-  return new Promise((resolve) => {
-    $("#text-prompt-modal")?.remove();
-    const m = document.createElement("div");
-    m.id = "text-prompt-modal";
-    m.className = "modal";
-    m.innerHTML = `<div class="dialog" style="width:min(420px,92vw)"><h2>${esc(title)}</h2><input id="text-prompt-input" type="text" value="${esc(opts.value || "")}" placeholder="${esc(opts.placeholder || "")}" autocomplete="off"><div class="row"><button type="button" id="text-prompt-cancel">取消</button><button type="button" class="primary" id="text-prompt-ok">${esc(opts.okLabel || "确定")}</button></div></div>`;
-    document.body.append(m);
-    const input = $("#text-prompt-input");
-    const done = (value) => {
-      m.remove();
-      resolve(value);
-    };
-    $("#text-prompt-cancel").onclick = () => done(null);
-    m.addEventListener("click", (e) => {
-      if (e.target === m) done(null);
-    });
-    const submit = () => {
-      const v = input.value.trim();
-      done(v || null);
-    };
-    $("#text-prompt-ok").onclick = submit;
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        submit();
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        done(null);
-      }
-    });
-    requestAnimationFrame(() => {
-      input.focus();
-      input.select();
-    });
-  });
-}
-
 async function persist() {
   clearTimeout(saveTimer);
   if (reviewDemoActive) {
@@ -951,41 +880,6 @@ function render() {
  * @param {number} y
  * @param {{ label: string, danger?: boolean, run: () => void }[]} items
  */
-function showContextMenu(x, y, items) {
-  $("#context-menu")?.remove();
-  const menu = document.createElement("div");
-  menu.id = "context-menu";
-  menu.className = "context-menu";
-  menu.style.left = Math.min(x, window.innerWidth - 180) + "px";
-  menu.style.top = Math.min(y, window.innerHeight - 80) + "px";
-  menu.innerHTML = items
-    .map(
-      (it, i) =>
-        `<button type="button" data-ctx="${i}" class="${it.danger ? "danger" : ""}">${esc(it.label)}</button>`,
-    )
-    .join("");
-  document.body.append(menu);
-  const close = () => {
-    menu.remove();
-    window.removeEventListener("click", close);
-    window.removeEventListener("contextmenu", close);
-    window.removeEventListener("scroll", close, true);
-  };
-  [...menu.querySelectorAll("[data-ctx]")].forEach((b) => {
-    b.onclick = (e) => {
-      e.stopPropagation();
-      const item = items[+b.dataset.ctx];
-      close();
-      item?.run();
-    };
-  });
-  setTimeout(() => {
-    window.addEventListener("click", close);
-    window.addEventListener("contextmenu", close);
-    window.addEventListener("scroll", close, true);
-  }, 0);
-}
-
 /**
  * Composer「+」菜单：添加文件 / 素材，以及本次技能开关（GPT 风格分区）。
  * @param {HTMLElement} anchor
@@ -1117,224 +1011,7 @@ async function deleteDraft(id) {
     toast(e.message);
   }
 }
-function $$(s) {
-  return [...document.querySelectorAll(s)];
-}
 
-const WECHAT_BLUE = "#0f3ff7";
-const WECHAT_BLUE_SOFT = "rgba(15, 63, 247, 0.2)";
-/** 本地预览：寒蝉优先，回退到系统宋体（勿用无衬线，避免退化成黑体） */
-const WECHAT_SERIF =
-  "'寒蝉锦书宋Compact','Songti SC','STSong','华文宋体','宋体',SimSun,serif";
-/**
- * 公众号粘贴专用：不含自定义字体。
- * 微信遇到未知字体名常会丢弃整段 font-family，从而退化成黑体。
- */
-const WECHAT_SERIF_PUBLISH = "Songti SC,STSong,华文宋体,宋体,SimSun,serif";
-const WECHAT_SANS =
-  "'OPPO Sans 4.0','PingFang SC','Helvetica Neue',Arial,sans-serif";
-
-/**
- * 推送用标题/引用图。
- * 逻辑宽取手机微信正文区约 360px（非整页 677）：图会按栏宽 100% 显示，
- * 若按 677 画 15px 字，缩到 ~360 后只剩约 8px，会远小于正文。
- * 4x → 约 1440px，Retina 仍清晰。
- */
-const WECHAT_BLOCK_W = 360;
-const WECHAT_BLOCK_SCALE = 4;
-
-/**
- * 按中文字符换行。
- * @param {CanvasRenderingContext2D} ctx
- * @param {string} text
- * @param {number} maxW
- */
-function wechatWrapLines(ctx, text, maxW) {
-  const lines = [];
-  for (const para of String(text || "").split(/\n/)) {
-    let line = "";
-    for (const ch of Array.from(para)) {
-      if (line && ctx.measureText(line + ch).width > maxW) {
-        lines.push(line);
-        line = ch;
-      } else line += ch;
-    }
-    lines.push(line);
-  }
-  return lines.length ? lines : [""];
-}
-
-/**
- * 创建高清画布（逻辑像素 × scale）。
- * @param {number} cssW
- * @param {number} cssH
- */
-function wechatBlockCanvas(cssW, cssH) {
-  const c = document.createElement("canvas");
-  c.width = Math.max(1, Math.ceil(cssW * WECHAT_BLOCK_SCALE));
-  c.height = Math.max(1, Math.ceil(cssH * WECHAT_BLOCK_SCALE));
-  const ctx = c.getContext("2d");
-  ctx.scale(WECHAT_BLOCK_SCALE, WECHAT_BLOCK_SCALE);
-  ctx.textBaseline = "top";
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  return { c, ctx };
-}
-
-/**
- * 画一级标题图（蓝字 + 序号方块）；保留标题内软换行。
- * @param {string} raw
- * @param {string} num
- */
-function renderWechatH1Png(raw, num) {
-  const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
-  const badge = 48;
-  const gap = 10;
-  const textW = WECHAT_BLOCK_W - badge - gap;
-  const fontSize = 40;
-  const lineH = 44;
-  const measure = wechatBlockCanvas(1, 1).ctx;
-  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-
-  /** @type {string[]} */
-  let lines = [];
-  if (soft.length > 1) {
-    lines = soft.flatMap((para) => wechatWrapLines(measure, para, textW));
-  } else {
-    const one = soft[0] || "";
-    const m = one.match(
-      /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/,
-    );
-    const zh = m ? m[1].trim() : one;
-    const en = m ? m[2].trim() : "";
-    lines = [
-      ...wechatWrapLines(measure, zh, textW),
-      ...(en ? wechatWrapLines(measure, en, textW) : []),
-    ];
-  }
-
-  const textH = Math.max(badge, lines.length * lineH);
-  const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, textH);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, WECHAT_BLOCK_W, textH);
-  ctx.fillStyle = WECHAT_BLUE;
-  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  let y = textH - lines.length * lineH;
-  for (const line of lines) {
-    ctx.fillText(line, 0, y);
-    y += lineH;
-  }
-  const bx = WECHAT_BLOCK_W - badge;
-  const by = textH - badge;
-  ctx.fillStyle = WECHAT_BLUE_SOFT;
-  ctx.fillRect(bx, by, badge, badge);
-  ctx.fillStyle = WECHAT_BLUE;
-  const numSize = 36;
-  ctx.font = `800 ${numSize}px ${WECHAT_SERIF}`;
-  const nw = ctx.measureText(num).width;
-  ctx.fillText(num, bx + (badge - nw) / 2, by + (badge - numSize) / 2);
-  return c.toDataURL("image/png");
-}
-
-/**
- * 画二级标题：整行定宽画布，蓝条按文字真实宽度左对齐；保留软换行。
- * @param {string} raw
- */
-function renderWechatH2Png(raw) {
-  const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
-  const padX = 10;
-  const padY = 8;
-  const fontSize = 20;
-  const lineH = 25;
-  const maxInner = WECHAT_BLOCK_W - padX * 2;
-  const measure = wechatBlockCanvas(1, 1).ctx;
-  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  const lines = soft.flatMap((para) =>
-    wechatWrapLines(measure, para, maxInner),
-  );
-  const innerW = Math.min(
-    maxInner,
-    Math.ceil(Math.max(...lines.map((l) => measure.measureText(l).width), 1)),
-  );
-  const boxW = Math.min(WECHAT_BLOCK_W, innerW + padX * 2);
-  const boxH = Math.max(lineH + padY * 2, lines.length * lineH + padY * 2);
-  const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, boxH);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
-  ctx.fillStyle = WECHAT_BLUE;
-  ctx.fillRect(0, 0, boxW, boxH);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  let y = padY;
-  for (const line of lines) {
-    ctx.fillText(line, padX, y);
-    y += lineH;
-  }
-  return c.toDataURL("image/png");
-}
-
-/**
- * 画引用块图。
- * @param {string} raw
- */
-function renderWechatQuotePng(raw) {
-  const text = String(raw || "")
-    .replace(/\s+/g, " ")
-    .trim();
-  const pad = 8;
-  const markSize = 23;
-  const fontSize = 15;
-  const lineH = 26;
-  const markW = 20;
-  const gap = 8;
-  const textW = WECHAT_BLOCK_W - pad * 2 - markW - gap;
-  const measure = wechatBlockCanvas(1, 1).ctx;
-  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  const lines = wechatWrapLines(measure, text, textW);
-  const boxH = Math.max(markSize + pad * 2, lines.length * lineH + pad * 2);
-  const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, boxH);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
-  ctx.fillStyle = WECHAT_BLUE_SOFT;
-  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
-  ctx.fillStyle = WECHAT_BLUE;
-  ctx.font = `800 ${markSize}px ${WECHAT_SERIF}`;
-  ctx.fillText("“", pad, pad);
-  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  let y = pad + 4;
-  const tx = pad + markW + gap;
-  for (const line of lines) {
-    ctx.fillText(line, tx, y);
-    y += lineH;
-  }
-  return c.toDataURL("image/png");
-}
-
-/**
- * 用图片节点替换块级元素：按栏宽 100% 铺满，字号与正文同尺度。
- * @param {Document} d
- * @param {Element} el
- * @param {string} dataUrl
- * @param {string} alt
- * @param {string} margin
- */
-function replaceWithWechatBlockImage(d, el, dataUrl, alt, margin) {
-  const wrap = d.createElement("section");
-  wrap.setAttribute(
-    "style",
-    `margin:${margin};padding:0;max-width:100%;box-sizing:border-box;`,
-  );
-  const img = d.createElement("img");
-  img.setAttribute("src", dataUrl);
-  img.setAttribute("alt", alt);
-  img.setAttribute("width", String(WECHAT_BLOCK_W));
-  img.setAttribute(
-    "style",
-    "width:100% !important;max-width:100% !important;height:auto !important;display:block !important;margin:0 !important;border:0;vertical-align:top;",
-  );
-  wrap.appendChild(img);
-  el.replaceWith(wrap);
-}
 
 /**
  * 增强公众号预览 DOM：中英标题拆分，并写入关键元素内联样式（避免 CSS 缓存/继承干扰）。
@@ -2239,7 +1916,7 @@ function renderWrite() {
   unmountAster?.();
   unmountAster = null;
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="审阅" aria-haspopup="true" aria-expanded="false">${I.eye()} 审阅</button><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></div><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">审阅中</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">全部接受</button><button type="button" data-inline="reject-all">全部拒绝</button><button type="button" data-inline="finish" class="primary">完成</button></div></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>添加到 AI 对话</span></button></div></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(state, current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="审阅" aria-haspopup="true" aria-expanded="false">${I.eye()} 审阅</button><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></div><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">审阅中</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">全部接受</button><button type="button" data-inline="reject-all">全部拒绝</button><button type="button" data-inline="finish" class="primary">完成</button></div></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>添加到 AI 对话</span></button></div></div>`;
   unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
   const onSelectionScroll = () => {
@@ -2372,7 +2049,7 @@ function renderWrite() {
         const sel = $("#article-group");
         if (sel) {
           sel.innerHTML =
-            groupOptionsHtml(current.group) +
+            groupOptionsHtml(state, current.group) +
             `<option value="__new__">＋ 新建分组…</option>`;
           sel.value = current.group;
         }
@@ -2670,86 +2347,6 @@ function bindWorkspaceResize() {
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   };
-}
-
-/** 词级差异 HTML */
-function diffHTML(oldText, nextText) {
-  return diffWords(oldText || "", nextText || "")
-    .map(
-      (p) =>
-        `<${p.added ? "ins" : p.removed ? "del" : "span"}>${esc(p.value)}</${p.added ? "ins" : p.removed ? "del" : "span"}>`,
-    )
-    .join("");
-}
-
-/**
- * 将全文新旧稿拆成可逐段接受/拒绝的 hunk（行级 diff）。
- * @param {string} oldText
- * @param {string} nextText
- */
-function buildEditHunks(oldText, nextText) {
-  const parts = diffLines(oldText || "", nextText || "");
-  const hunks = [];
-  for (let i = 0; i < parts.length; ) {
-    const p = parts[i];
-    if (!p.added && !p.removed) {
-      hunks.push({ kind: "equal", value: p.value });
-      i += 1;
-      continue;
-    }
-    let old = "",
-      next = "";
-    while (i < parts.length && (parts[i].added || parts[i].removed)) {
-      if (parts[i].removed) old += parts[i].value;
-      if (parts[i].added) next += parts[i].value;
-      i += 1;
-    }
-    hunks.push({
-      kind: "change",
-      id: crypto.randomUUID(),
-      old,
-      next,
-      status: "pending",
-    });
-  }
-  if (!hunks.some((h) => h.kind === "change")) {
-    hunks.length = 0;
-    hunks.push({
-      kind: "change",
-      id: crypto.randomUUID(),
-      old: oldText || "",
-      next: nextText || "",
-      status: "pending",
-    });
-  }
-  // hunk 级结构保护：改后若删掉配图 / 标题行，强制保留原文该行，只审阅其余文字
-  const IMG = /!\[[^\]]*\]\([^)]+\)/g;
-  for (const h of hunks) {
-    if (h.kind !== "change") continue;
-    const oldImgs = [...String(h.old || "").matchAll(IMG)].map((m) => m[0]);
-    const missing = [...new Set(oldImgs)].filter((s) => !String(h.next || "").includes(s));
-    if (missing.length) h.next = String(h.next || "") + (String(h.next || "").endsWith("\n") ? "" : "\n") + missing.join("\n") + "\n";
-    const oldHeads = String(h.old || "").split("\n").filter((l) => /^#{1,6}\s/.test(l.trim()));
-    const missH = [...new Set(oldHeads.map((l) => l.trim()))].filter((s) => !String(h.next || "").includes(s));
-    if (missH.length) h.next = missH.join("\n") + "\n" + String(h.next || "");
-    if (String(h.old || "").trim() === String(h.next || "").trim()) {
-      h.kind = "equal";
-      h.value = h.old;
-      delete h.id;
-      delete h.status;
-    }
-  }
-  return hunks;
-}
-
-/** 按 hunk 决定合成最终正文 */
-function composeHunks(hunks) {
-  return (hunks || [])
-    .map((h) => {
-      if (h.kind === "equal") return h.value;
-      return h.status === "accepted" ? h.next : h.old;
-    })
-    .join("");
 }
 
 /** 修改建议小卡片：紧跟在总结气泡下方，只放进度与操作，不放全文 diff */
@@ -3088,32 +2685,6 @@ function mountInlineReviewBar() {
   if (title) title.hidden = true;
   paper.insertAdjacentHTML("afterbegin", reviewPageHTML());
   bindInlineReviewBar();
-}
-
-/** 结构保护：改后稿若丢了原文的图片 / 标题 / 代码围栏，自动补回，避免破坏性改写 */
-function protectStructure(oldText, nextText) {
-  let next = String(nextText || "");
-  const dropped = [];
-  const imgs = [...String(oldText || "").matchAll(/!\[[^\]]*\]\([^)]+\)/g)].map((m) => m[0]);
-  const missingImgs = [...new Set(imgs)].filter((s) => !next.includes(s));
-  if (missingImgs.length) {
-    next += (next.endsWith("\n") ? "" : "\n") + "\n" + missingImgs.join("\n") + "\n";
-    dropped.push(`已保护配图 ${missingImgs.length} 张（改后稿误删，已自动保留在原文位置附近）`);
-  }
-  const heads = String(oldText || "").split("\n").filter((l) => /^#{1,6}\s/.test(l.trim()));
-  const missingHeads = [...new Set(heads)].filter((s) => !next.includes(s.trim()));
-  if (missingHeads.length) {
-    dropped.push(`标题结构 ${missingHeads.length} 处在改后稿中缺失，已保留原文标题`);
-    missingHeads.forEach((h) => {
-      if (!next.includes(h.trim())) next = h + "\n" + next;
-    });
-  }
-  const fences = (String(oldText || "").match(/```/g) || []).length;
-  const nextFences = (next.match(/```/g) || []).length;
-  if (fences % 2 === 0 && fences > 0 && nextFences !== fences) {
-    dropped.push("检测到代码块可能被破坏，已尽量保留原文代码围栏");
-  }
-  return { next, notes: dropped };
 }
 
 /** 用一句话总结本次改写，供侧栏展示（不重复全文） */
@@ -3907,14 +3478,14 @@ async function setPublishedGroups(paths) {
   const list = (Array.isArray(paths) ? paths : [paths]).filter(Boolean);
   if (!list.length) return;
   const currentGroups = [
-    ...new Set(list.map((rel) => publishedGroup(rel) || "")),
+    ...new Set(list.map((rel) => publishedGroup(state, rel) || "")),
   ];
   const selected = currentGroups.length === 1 ? currentGroups[0] || "" : "";
   $("#group-set-modal")?.remove();
   const m = document.createElement("div");
   m.id = "group-set-modal";
   m.className = "modal";
-  m.innerHTML = `<div class="dialog"><h2>设置分组</h2><label>分组<select id="group-set-select">${groupOptionsHtml(selected)}</select></label><label>或新建分组<input id="group-set-new" placeholder="输入新分组名称" autocomplete="off"></label><div class="row"><button type="button" id="group-set-cancel">取消</button><button type="button" class="primary" id="group-set-ok">保存</button></div></div>`;
+  m.innerHTML = `<div class="dialog"><h2>设置分组</h2><label>分组<select id="group-set-select">${groupOptionsHtml(state, selected)}</select></label><label>或新建分组<input id="group-set-new" placeholder="输入新分组名称" autocomplete="off"></label><div class="row"><button type="button" id="group-set-cancel">取消</button><button type="button" class="primary" id="group-set-ok">保存</button></div></div>`;
   document.body.append(m);
   $("#group-set-cancel").onclick = () => m.remove();
   $("#group-set-ok").onclick = async () => {
@@ -3967,14 +3538,14 @@ async function backupPublishedArticle(paths) {
     (state.archives || []).find((a) => a.path === first)?.account ||
     first.split("/")[0] ||
     account;
-  const groups = [...new Set(list.map((rel) => publishedGroup(rel) || ""))];
+  const groups = [...new Set(list.map((rel) => publishedGroup(state, rel) || ""))];
   const singleGroup = groups.length === 1 ? groups[0] || null : null;
   const mixedGroups = groups.length > 1;
-  const defaultPath = singleGroup ? backupPathFor(singleGroup, accountId) : "";
+  const defaultPath = singleGroup ? backupPathFor(state, singleGroup, accountId) : "";
   const perPathDefaults = list.map((rel) => ({
     rel,
-    group: publishedGroup(rel),
-    dest: backupPathFor(publishedGroup(rel), accountId),
+    group: publishedGroup(state, rel),
+    dest: backupPathFor(state, publishedGroup(state, rel), accountId),
   }));
   const allHaveDefault = perPathDefaults.every((x) => x.dest);
   const label =
@@ -5253,7 +4824,7 @@ function renderSettings() {
           )),
   });
 
-  const groups = groupNames();
+  const groups = groupNames(state);
   const groupsBody = settingsSection({
     control:
       `<div class="settings-panel-toolbar"><button type="button" class="primary" id="create-group">${I.plus()} 新建分组</button></div>` +
@@ -5457,82 +5028,6 @@ async function pickGroupBackupPath(name) {
   }
 }
 
-/**
- * 已注册的分组名称（按中文排序）。
- * @returns {string[]}
- */
-function groupNames() {
-  return Object.keys(state.groups || {}).sort((a, b) =>
-    a.localeCompare(b, "zh"),
-  );
-}
-
-/**
- * 按分组名稳定映射到色板序号。
- * @param {string} name
- */
-function groupChipTone(name) {
-  let h = 0;
-  for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return h % 8;
-}
-
-/**
- * 分组圆角标签 HTML。
- * @param {string} name
- */
-function groupChipHtml(name) {
-  return `<span class="group-chip group-chip-${groupChipTone(name)}">${esc(name)}</span>`;
-}
-
-/**
- * 读取已发布文章的分组标签。
- * @param {string} rel
- * @returns {string|null}
- */
-function publishedGroup(rel) {
-  const row = (state.metrics || []).find((r) => r.path === rel);
-  const fromMetrics =
-    typeof row?.["分组"] === "string" && row["分组"].trim()
-      ? row["分组"].trim()
-      : null;
-  if (fromMetrics) return fromMetrics;
-  const arch = (state.archives || []).find((a) => a.path === rel);
-  return arch?.group || null;
-}
-
-/**
- * 按分组解析本地同步默认路径；无分组路径时回退到账号路径。
- * @param {string|null|undefined} group
- * @param {string} accountId
- */
-function backupPathFor(group, accountId) {
-  const g = typeof group === "string" ? group.trim() : "";
-  if (g && state.groups?.[g]?.backupPath) return state.groups[g].backupPath;
-  return state.backupPaths?.[accountId] || "";
-}
-
-/**
- * 分组下拉选项 HTML。
- * @param {string|null|undefined} selected
- * @param {{ allowEmpty?: boolean, emptyLabel?: string }} [opts]
- */
-function groupOptionsHtml(selected, opts = {}) {
-  const allowEmpty = opts.allowEmpty !== false;
-  const emptyLabel = opts.emptyLabel || "无分组";
-  const cur = typeof selected === "string" ? selected.trim() : "";
-  const names = new Set(groupNames());
-  if (cur) names.add(cur);
-  return `${allowEmpty ? `<option value="">${esc(emptyLabel)}</option>` : ""}${[
-    ...names,
-  ]
-    .sort((a, b) => a.localeCompare(b, "zh"))
-    .map(
-      (n) =>
-        `<option value="${esc(n)}" ${n === cur ? "selected" : ""}>${esc(n)}</option>`,
-    )
-    .join("")}`;
-}
 
 /**
  * 为账号选择并保存本地备份默认目录。
@@ -5630,51 +5125,6 @@ async function pickAndSetAccountAvatar(accountId) {
  * @param {string} [value]
  * @returns {Promise<string|null>}
  */
-function askText(title, hint, value = "") {
-  return new Promise((resolve) => {
-    const m = document.createElement("div");
-    m.className = "modal";
-    m.innerHTML = `<div class="dialog"><h2>${esc(title)}</h2><p>${esc(hint)}</p><input id="ask-text-input" value="${esc(value)}" autocomplete="off"><div class="row"><button type="button" id="ask-text-cancel">取消</button><button type="button" class="primary" id="ask-text-ok">确定</button></div></div>`;
-    document.body.append(m);
-    const input = $("#ask-text-input");
-    input?.focus();
-    input?.select();
-    const done = (v) => {
-      m.remove();
-      resolve(v);
-    };
-    $("#ask-text-cancel").onclick = () => done(null);
-    $("#ask-text-ok").onclick = () => done(input.value);
-    input?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") done(input.value);
-      if (e.key === "Escape") done(null);
-    });
-  });
-}
-
-/**
- * 确认对话框（替代 confirm，网页端更可靠）。
- * @param {string} title
- * @param {string} message
- * @returns {Promise<boolean>}
- */
-function askConfirm(title, message) {
-  return new Promise((resolve) => {
-    const m = document.createElement("div");
-    m.className = "modal";
-    m.innerHTML = `<div class="dialog"><h2>${esc(title)}</h2><p>${esc(message)}</p><div class="row"><button type="button" id="ask-confirm-cancel">取消</button><button type="button" class="primary" id="ask-confirm-ok">确定</button></div></div>`;
-    document.body.append(m);
-    $("#ask-confirm-cancel").onclick = () => {
-      m.remove();
-      resolve(false);
-    };
-    $("#ask-confirm-ok").onclick = () => {
-      m.remove();
-      resolve(true);
-    };
-  });
-}
-
 /**
  * 选择仓库内文件夹并注册为账号（桌面弹系统对话框，网页列出可选目录）。
  */
