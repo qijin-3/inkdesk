@@ -23,7 +23,7 @@ const { _electron: electron } = require("@playwright/test"),
   delete env.ELECTRON_RUN_AS_NODE;
   let app;
   try {
-    app = await electron.launch({ args: [path.resolve("main.cjs")], env });
+    app = await electron.launch({ args: [path.resolve(__dirname, "..", "main.cjs")], env });
     const w = await app.firstWindow();
     await w.locator('[data-page="settings"]').click();
     await w.locator('[data-settings-tab="skills"]').click();

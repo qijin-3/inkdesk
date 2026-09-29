@@ -3,9 +3,9 @@ const test = require("node:test"),
   fs = require("node:fs"),
   os = require("node:os"),
   path = require("node:path");
-const { Vault } = require("./vault.cjs"),
-  { Knowledge } = require("./knowledge.cjs"),
-  { AccountModel, resolveRefs } = require("./account-model.cjs");
+const { Vault } = require("../vault.cjs"),
+  { Knowledge } = require("../knowledge.cjs"),
+  { AccountModel, resolveRefs } = require("../account-model.cjs");
 function setup(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ink-model-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

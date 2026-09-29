@@ -168,7 +168,7 @@ function hideToast() {
   clearTimeout(toastTimer);
   $("#toast")?.classList.remove("show");
 }
-var isWeb = () => !!window.desk?.web;
+var isWeb = () => typeof window === "undefined" ? false : !!window.desk?.web;
 function assetUrl(src) {
   if (typeof src !== "string") return src;
   if (!isWeb()) return src;
@@ -2152,12 +2152,12 @@ var Mark = class _Mark {
   Create a properly sorted mark set from null, a single mark, or an
   unsorted array of marks.
   */
-  static setFrom(marks) {
-    if (!marks || Array.isArray(marks) && marks.length == 0)
+  static setFrom(marks2) {
+    if (!marks2 || Array.isArray(marks2) && marks2.length == 0)
       return _Mark.none;
-    if (marks instanceof _Mark)
-      return [marks];
-    let copy2 = marks.slice();
+    if (marks2 instanceof _Mark)
+      return [marks2];
+    let copy2 = marks2.slice();
     copy2.sort((a, b) => a.type.rank - b.type.rank);
     return copy2;
   }
@@ -2527,11 +2527,11 @@ var ResolvedPos = class _ResolvedPos {
       main = other2;
       other2 = tmp;
     }
-    let marks = main.marks;
-    for (var i = 0; i < marks.length; i++)
-      if (marks[i].type.spec.inclusive === false && (!other2 || !marks[i].isInSet(other2.marks)))
-        marks = marks[i--].removeFromSet(marks);
-    return marks;
+    let marks2 = main.marks;
+    for (var i = 0; i < marks2.length; i++)
+      if (marks2[i].type.spec.inclusive === false && (!other2 || !marks2[i].isInSet(other2.marks)))
+        marks2 = marks2[i--].removeFromSet(marks2);
+    return marks2;
   }
   /**
   Get the marks after the current position, if any, except those
@@ -2545,11 +2545,11 @@ var ResolvedPos = class _ResolvedPos {
     let after = this.parent.maybeChild(this.index());
     if (!after || !after.isInline)
       return null;
-    let marks = after.marks, next2 = $end.parent.maybeChild($end.index());
-    for (var i = 0; i < marks.length; i++)
-      if (marks[i].type.spec.inclusive === false && (!next2 || !marks[i].isInSet(next2.marks)))
-        marks = marks[i--].removeFromSet(marks);
-    return marks;
+    let marks2 = after.marks, next2 = $end.parent.maybeChild($end.index());
+    for (var i = 0; i < marks2.length; i++)
+      if (marks2[i].type.spec.inclusive === false && (!next2 || !marks2[i].isInSet(next2.marks)))
+        marks2 = marks2[i--].removeFromSet(marks2);
+    return marks2;
   }
   /**
   The depth up to which this position and the given (non-resolved)
@@ -2701,10 +2701,10 @@ var Node = class _Node {
   /**
   @internal
   */
-  constructor(type, attrs, content, marks = Mark.none) {
+  constructor(type, attrs, content, marks2 = Mark.none) {
     this.type = type;
     this.attrs = attrs;
-    this.marks = marks;
+    this.marks = marks2;
     this.content = content || Fragment.empty;
   }
   /**
@@ -2818,8 +2818,8 @@ var Node = class _Node {
   Check whether this node's markup correspond to the given type,
   attributes, and marks.
   */
-  hasMarkup(type, attrs, marks) {
-    return this.type == type && compareDeep(this.attrs, attrs || type.defaultAttrs || emptyAttrs) && Mark.sameSet(this.marks, marks || Mark.none);
+  hasMarkup(type, attrs, marks2) {
+    return this.type == type && compareDeep(this.attrs, attrs || type.defaultAttrs || emptyAttrs) && Mark.sameSet(this.marks, marks2 || Mark.none);
   }
   /**
   Create a new node with the same markup as this node, containing
@@ -2834,8 +2834,8 @@ var Node = class _Node {
   Create a copy of this node, with the given set of marks instead
   of the node's own marks.
   */
-  mark(marks) {
-    return marks == this.marks ? this : new _Node(this.type, this.attrs, this.content, marks);
+  mark(marks2) {
+    return marks2 == this.marks ? this : new _Node(this.type, this.attrs, this.content, marks2);
   }
   /**
   Create a copy of this node with only the content between the
@@ -3025,8 +3025,8 @@ var Node = class _Node {
   Test whether replacing the range `from` to `to` (by index) with
   a node of the given type would leave the node's content valid.
   */
-  canReplaceWith(from2, to, type, marks) {
-    if (marks && !this.type.allowsMarks(marks))
+  canReplaceWith(from2, to, type, marks2) {
+    if (marks2 && !this.type.allowsMarks(marks2))
       return false;
     let start = this.contentMatchAt(from2).matchType(type);
     let end = start && start.matchFragment(this.content, to);
@@ -3082,19 +3082,19 @@ var Node = class _Node {
   static fromJSON(schema, json) {
     if (!json)
       throw new RangeError("Invalid input for Node.fromJSON");
-    let marks = void 0;
+    let marks2 = void 0;
     if (json.marks) {
       if (!Array.isArray(json.marks))
         throw new RangeError("Invalid mark data for Node.fromJSON");
-      marks = json.marks.map(schema.markFromJSON);
+      marks2 = json.marks.map(schema.markFromJSON);
     }
     if (json.type == "text") {
       if (typeof json.text != "string")
         throw new RangeError("Invalid text node in JSON");
-      return schema.text(json.text, marks);
+      return schema.text(json.text, marks2);
     }
     let content = Fragment.fromJSON(schema, json.content);
-    let node = schema.nodeType(json.type).create(json.attrs, content, marks);
+    let node = schema.nodeType(json.type).create(json.attrs, content, marks2);
     node.type.checkAttrs(node.attrs);
     return node;
   }
@@ -3104,8 +3104,8 @@ var TextNode = class _TextNode extends Node {
   /**
   @internal
   */
-  constructor(type, attrs, content, marks) {
-    super(type, attrs, null, marks);
+  constructor(type, attrs, content, marks2) {
+    super(type, attrs, null, marks2);
     if (!content)
       throw new RangeError("Empty text nodes are not allowed");
     this.text = content;
@@ -3124,8 +3124,8 @@ var TextNode = class _TextNode extends Node {
   get nodeSize() {
     return this.text.length;
   }
-  mark(marks) {
-    return marks == this.marks ? this : new _TextNode(this.type, this.attrs, this.text, marks);
+  mark(marks2) {
+    return marks2 == this.marks ? this : new _TextNode(this.type, this.attrs, this.text, marks2);
   }
   withText(text) {
     if (text == this.text)
@@ -3146,9 +3146,9 @@ var TextNode = class _TextNode extends Node {
     return base2;
   }
 };
-function wrapMarks(marks, str) {
-  for (let i = marks.length - 1; i >= 0; i--)
-    str = marks[i].type.name + "(" + str + ")";
+function wrapMarks(marks2, str) {
+  for (let i = marks2.length - 1; i >= 0; i--)
+    str = marks2[i].type.name + "(" + str + ")";
   return str;
 }
 var ContentMatch = class _ContentMatch {
@@ -3683,20 +3683,20 @@ var NodeType = class _NodeType {
   `null`. Similarly `marks` may be `null` to default to the empty
   set of marks.
   */
-  create(attrs = null, content, marks) {
+  create(attrs = null, content, marks2) {
     if (this.isText)
       throw new Error("NodeType.create can't construct text nodes");
-    return new Node(this, this.computeAttrs(attrs), Fragment.from(content), Mark.setFrom(marks));
+    return new Node(this, this.computeAttrs(attrs), Fragment.from(content), Mark.setFrom(marks2));
   }
   /**
   Like [`create`](https://prosemirror.net/docs/ref/#model.NodeType.create), but check the given content
   against the node type's content restrictions, and throw an error
   if it doesn't match.
   */
-  createChecked(attrs = null, content, marks) {
+  createChecked(attrs = null, content, marks2) {
     content = Fragment.from(content);
     this.checkContent(content);
-    return new Node(this, this.computeAttrs(attrs), content, Mark.setFrom(marks));
+    return new Node(this, this.computeAttrs(attrs), content, Mark.setFrom(marks2));
   }
   /**
   Like [`create`](https://prosemirror.net/docs/ref/#model.NodeType.create), but see if it is
@@ -3706,7 +3706,7 @@ var NodeType = class _NodeType {
   always be created, this will always succeed if you pass null or
   `Fragment.empty` as content.
   */
-  createAndFill(attrs = null, content, marks) {
+  createAndFill(attrs = null, content, marks2) {
     attrs = this.computeAttrs(attrs);
     content = Fragment.from(content);
     if (content.size) {
@@ -3719,7 +3719,7 @@ var NodeType = class _NodeType {
     let after = matched && matched.fillBefore(Fragment.empty, true);
     if (!after)
       return null;
-    return new Node(this, attrs, content.append(after), Mark.setFrom(marks));
+    return new Node(this, attrs, content.append(after), Mark.setFrom(marks2));
   }
   /**
   Returns true if the given fragment is valid content for this node
@@ -3758,30 +3758,30 @@ var NodeType = class _NodeType {
   /**
   Test whether the given set of marks are allowed in this node.
   */
-  allowsMarks(marks) {
+  allowsMarks(marks2) {
     if (this.markSet == null)
       return true;
-    for (let i = 0; i < marks.length; i++)
-      if (!this.allowsMarkType(marks[i].type))
+    for (let i = 0; i < marks2.length; i++)
+      if (!this.allowsMarkType(marks2[i].type))
         return false;
     return true;
   }
   /**
   Removes the marks that are not allowed in this node from the given set.
   */
-  allowedMarks(marks) {
+  allowedMarks(marks2) {
     if (this.markSet == null)
-      return marks;
+      return marks2;
     let copy2;
-    for (let i = 0; i < marks.length; i++) {
-      if (!this.allowsMarkType(marks[i].type)) {
+    for (let i = 0; i < marks2.length; i++) {
+      if (!this.allowsMarkType(marks2[i].type)) {
         if (!copy2)
-          copy2 = marks.slice(0, i);
+          copy2 = marks2.slice(0, i);
       } else if (copy2) {
-        copy2.push(marks[i]);
+        copy2.push(marks2[i]);
       }
     }
-    return !copy2 ? marks : copy2.length ? copy2 : Mark.none;
+    return !copy2 ? marks2 : copy2.length ? copy2 : Mark.none;
   }
   /**
   @internal
@@ -3844,9 +3844,9 @@ var MarkType = class _MarkType {
   /**
   @internal
   */
-  static compile(marks, schema) {
+  static compile(marks2, schema) {
     let result = /* @__PURE__ */ Object.create(null), rank = 0;
-    marks.forEach((name, spec) => result[name] = new _MarkType(name, rank++, schema, spec));
+    marks2.forEach((name, spec) => result[name] = new _MarkType(name, rank++, schema, spec));
     return result;
   }
   /**
@@ -3926,22 +3926,22 @@ var Schema = class {
   `content` may be a `Fragment`, `null`, a `Node`, or an array of
   nodes.
   */
-  node(type, attrs = null, content, marks) {
+  node(type, attrs = null, content, marks2) {
     if (typeof type == "string")
       type = this.nodeType(type);
     else if (!(type instanceof NodeType))
       throw new RangeError("Invalid node type: " + type);
     else if (type.schema != this)
       throw new RangeError("Node type from different schema used (" + type.name + ")");
-    return type.createChecked(attrs, content, marks);
+    return type.createChecked(attrs, content, marks2);
   }
   /**
   Create a text node in the schema. Empty text nodes are not
   allowed.
   */
-  text(text, marks) {
+  text(text, marks2) {
     let type = this.nodes.text;
-    return new TextNode(type, type.defaultAttrs, text, Mark.setFrom(marks));
+    return new TextNode(type, type.defaultAttrs, text, Mark.setFrom(marks2));
   }
   /**
   Create a mark with the given type and attributes.
@@ -3961,10 +3961,10 @@ var Schema = class {
     return found2;
   }
 };
-function gatherMarks(schema, marks) {
+function gatherMarks(schema, marks2) {
   let found2 = [];
-  for (let i = 0; i < marks.length; i++) {
-    let name = marks[i], mark = schema.marks[name], ok = mark;
+  for (let i = 0; i < marks2.length; i++) {
+    let name = marks2[i], mark = schema.marks[name], ok = mark;
     if (mark) {
       found2.push(mark);
     } else {
@@ -3975,7 +3975,7 @@ function gatherMarks(schema, marks) {
       }
     }
     if (!ok)
-      throw new SyntaxError("Unknown mark type: '" + marks[i] + "'");
+      throw new SyntaxError("Unknown mark type: '" + marks2[i] + "'");
   }
   return found2;
 }
@@ -4167,10 +4167,10 @@ function wsOptionsFor(type, preserveWhitespace, base2) {
   return type && type.whitespace == "pre" ? OPT_PRESERVE_WS | OPT_PRESERVE_WS_FULL : base2 & ~OPT_OPEN_LEFT;
 }
 var NodeContext = class {
-  constructor(type, attrs, marks, solid, match, options2) {
+  constructor(type, attrs, marks2, solid, match, options2) {
     this.type = type;
     this.attrs = attrs;
-    this.marks = marks;
+    this.marks = marks2;
     this.solid = solid;
     this.options = options2;
     this.content = [];
@@ -4245,13 +4245,13 @@ var ParseContext = class {
   // Add a DOM node to the content. Text is inserted as text node,
   // otherwise, the node is passed to `addElement` or, if it has a
   // `style` attribute, `addElementWithStyles`.
-  addDOM(dom, marks) {
+  addDOM(dom, marks2) {
     if (dom.nodeType == 3)
-      this.addTextNode(dom, marks);
+      this.addTextNode(dom, marks2);
     else if (dom.nodeType == 1)
-      this.addElement(dom, marks);
+      this.addElement(dom, marks2);
   }
-  addTextNode(dom, marks) {
+  addTextNode(dom, marks2) {
     let value = dom.nodeValue;
     let top = this.top, preserveWS = top.options & OPT_PRESERVE_WS_FULL ? "full" : this.localPreserveWS || (top.options & OPT_PRESERVE_WS) > 0;
     let { schema } = this.parser;
@@ -4270,16 +4270,16 @@ var ParseContext = class {
         let lines = value.split(/\r?\n|\r/);
         for (let i = 0; i < lines.length; i++) {
           if (i)
-            this.insertNode(schema.linebreakReplacement.create(), marks, true);
+            this.insertNode(schema.linebreakReplacement.create(), marks2, true);
           if (lines[i])
-            this.insertNode(schema.text(lines[i]), marks, !/\S/.test(lines[i]));
+            this.insertNode(schema.text(lines[i]), marks2, !/\S/.test(lines[i]));
         }
         value = "";
       } else {
         value = value.replace(/\r?\n|\r/g, " ");
       }
       if (value)
-        this.insertNode(schema.text(value), marks, !/\S/.test(value));
+        this.insertNode(schema.text(value), marks2, !/\S/.test(value));
       this.findInText(dom);
     } else {
       this.findInside(dom);
@@ -4287,7 +4287,7 @@ var ParseContext = class {
   }
   // Try to find a handler for the given tag and use that to parse. If
   // none is found, the element's content nodes are added directly.
-  addElement(dom, marks, matchAfter) {
+  addElement(dom, marks2, matchAfter) {
     let outerWS = this.localPreserveWS, top = this.top;
     if (dom.tagName == "PRE" || /pre/.test(dom.style && dom.style.whiteSpace))
       this.localPreserveWS = true;
@@ -4297,7 +4297,7 @@ var ParseContext = class {
     let rule = this.options.ruleFromNode && this.options.ruleFromNode(dom) || (ruleID = this.parser.matchTag(dom, this, matchAfter));
     out: if (rule ? rule.ignore : ignoreTags.hasOwnProperty(name)) {
       this.findInside(dom);
-      this.ignoreFallback(dom, marks);
+      this.ignoreFallback(dom, marks2);
     } else if (!rule || rule.skip || rule.closeParent) {
       if (rule && rule.closeParent)
         this.open = Math.max(0, this.open - 1);
@@ -4313,36 +4313,36 @@ var ParseContext = class {
         if (!top.type)
           this.needsBlock = true;
       } else if (!dom.firstChild) {
-        this.leafFallback(dom, marks);
+        this.leafFallback(dom, marks2);
         break out;
       }
-      let innerMarks = rule && rule.skip ? marks : this.readStyles(dom, marks);
+      let innerMarks = rule && rule.skip ? marks2 : this.readStyles(dom, marks2);
       if (innerMarks)
         this.addAll(dom, innerMarks);
       if (sync2)
         this.sync(top);
       this.needsBlock = oldNeedsBlock;
     } else {
-      let innerMarks = this.readStyles(dom, marks);
+      let innerMarks = this.readStyles(dom, marks2);
       if (innerMarks)
         this.addElementByRule(dom, rule, innerMarks, rule.consuming === false ? ruleID : void 0);
     }
     this.localPreserveWS = outerWS;
   }
   // Called for leaf DOM nodes that would otherwise be ignored
-  leafFallback(dom, marks) {
+  leafFallback(dom, marks2) {
     if (dom.nodeName == "BR" && this.top.type && this.top.type.inlineContent)
-      this.addTextNode(dom.ownerDocument.createTextNode("\n"), marks);
+      this.addTextNode(dom.ownerDocument.createTextNode("\n"), marks2);
   }
   // Called for ignored nodes
-  ignoreFallback(dom, marks) {
+  ignoreFallback(dom, marks2) {
     if (dom.nodeName == "BR" && (!this.top.type || !this.top.type.inlineContent))
-      this.findPlace(this.parser.schema.text("-"), marks, true);
+      this.findPlace(this.parser.schema.text("-"), marks2, true);
   }
   // Run any style parser associated with the node's styles. Either
   // return an updated array of marks, or null to indicate some of the
   // styles had a rule with `ignore` set.
-  readStyles(dom, marks) {
+  readStyles(dom, marks2) {
     let styles = dom.style;
     if (styles && styles.length)
       for (let i = 0; i < this.parser.matchedStyles.length; i++) {
@@ -4355,45 +4355,45 @@ var ParseContext = class {
             if (rule.ignore)
               return null;
             if (rule.clearMark)
-              marks = marks.filter((m) => !rule.clearMark(m));
+              marks2 = marks2.filter((m) => !rule.clearMark(m));
             else
-              marks = marks.concat(this.parser.schema.marks[rule.mark].create(rule.attrs));
+              marks2 = marks2.concat(this.parser.schema.marks[rule.mark].create(rule.attrs));
             if (rule.consuming === false)
               after = rule;
             else
               break;
           }
       }
-    return marks;
+    return marks2;
   }
   // Look up a handler for the given node. If none are found, return
   // false. Otherwise, apply it, use its return value to drive the way
   // the node's content is wrapped, and return true.
-  addElementByRule(dom, rule, marks, continueAfter) {
+  addElementByRule(dom, rule, marks2, continueAfter) {
     let sync2, nodeType;
     if (rule.node) {
       nodeType = this.parser.schema.nodes[rule.node];
       if (!nodeType.isLeaf) {
-        let inner = this.enter(nodeType, rule.attrs || null, marks, rule.preserveWhitespace);
+        let inner = this.enter(nodeType, rule.attrs || null, marks2, rule.preserveWhitespace);
         if (inner) {
           sync2 = true;
-          marks = inner;
+          marks2 = inner;
         }
-      } else if (!this.insertNode(nodeType.create(rule.attrs), marks, dom.nodeName == "BR")) {
-        this.leafFallback(dom, marks);
+      } else if (!this.insertNode(nodeType.create(rule.attrs), marks2, dom.nodeName == "BR")) {
+        this.leafFallback(dom, marks2);
       }
     } else {
       let markType = this.parser.schema.marks[rule.mark];
-      marks = marks.concat(markType.create(rule.attrs));
+      marks2 = marks2.concat(markType.create(rule.attrs));
     }
     let startIn = this.top;
     if (nodeType && nodeType.isLeaf) {
       this.findInside(dom);
     } else if (continueAfter) {
-      this.addElement(dom, marks, continueAfter);
+      this.addElement(dom, marks2, continueAfter);
     } else if (rule.getContent) {
       this.findInside(dom);
-      rule.getContent(dom, this.parser.schema).forEach((node) => this.insertNode(node, marks, false));
+      rule.getContent(dom, this.parser.schema).forEach((node) => this.insertNode(node, marks2, false));
     } else {
       let contentDOM = dom;
       if (typeof rule.contentElement == "string")
@@ -4403,7 +4403,7 @@ var ParseContext = class {
       else if (rule.contentElement)
         contentDOM = rule.contentElement;
       this.findAround(dom, contentDOM, true);
-      this.addAll(contentDOM, marks);
+      this.addAll(contentDOM, marks2);
       this.findAround(dom, contentDOM, false);
     }
     if (sync2 && this.sync(startIn))
@@ -4412,18 +4412,18 @@ var ParseContext = class {
   // Add all child nodes between `startIndex` and `endIndex` (or the
   // whole node, if not given). If `sync` is passed, use it to
   // synchronize after every block element.
-  addAll(parent, marks, startIndex, endIndex) {
+  addAll(parent, marks2, startIndex, endIndex) {
     let index = startIndex || 0;
     for (let dom = startIndex ? parent.childNodes[startIndex] : parent.firstChild, end = endIndex == null ? null : parent.childNodes[endIndex]; dom != end; dom = dom.nextSibling, ++index) {
       this.findAtPoint(parent, index);
-      this.addDOM(dom, marks);
+      this.addDOM(dom, marks2);
     }
     this.findAtPoint(parent, index);
   }
   // Try to find a way to fit the given node type into the current
   // context. May add intermediate wrappers and/or leave non-solid
   // nodes that we're in.
-  findPlace(node, marks, cautious) {
+  findPlace(node, marks2, cautious) {
     let route, sync2;
     for (let depth = this.open, penalty = 0; depth >= 0; depth--) {
       let cx = this.nodes[depth];
@@ -4444,17 +4444,17 @@ var ParseContext = class {
       return null;
     this.sync(sync2);
     for (let i = 0; i < route.length; i++)
-      marks = this.enterInner(route[i], null, marks, false);
-    return marks;
+      marks2 = this.enterInner(route[i], null, marks2, false);
+    return marks2;
   }
   // Try to insert the given node, adjusting the context when needed.
-  insertNode(node, marks, cautious) {
+  insertNode(node, marks2, cautious) {
     if (node.isInline && this.needsBlock && !this.top.type) {
       let block2 = this.textblockFromContext();
       if (block2)
-        marks = this.enterInner(block2, null, marks);
+        marks2 = this.enterInner(block2, null, marks2);
     }
-    let innerMarks = this.findPlace(node, marks, cautious);
+    let innerMarks = this.findPlace(node, marks2, cautious);
     if (innerMarks) {
       this.closeExtra();
       let top = this.top;
@@ -4471,14 +4471,14 @@ var ParseContext = class {
   }
   // Try to start a node of the given type, adjusting the context when
   // necessary.
-  enter(type, attrs, marks, preserveWS) {
-    let innerMarks = this.findPlace(type.create(attrs), marks, false);
+  enter(type, attrs, marks2, preserveWS) {
+    let innerMarks = this.findPlace(type.create(attrs), marks2, false);
     if (innerMarks)
-      innerMarks = this.enterInner(type, attrs, marks, true, preserveWS);
+      innerMarks = this.enterInner(type, attrs, marks2, true, preserveWS);
     return innerMarks;
   }
   // Open a node of the given type
-  enterInner(type, attrs, marks, solid = false, preserveWS) {
+  enterInner(type, attrs, marks2, solid = false, preserveWS) {
     this.closeExtra();
     let top = this.top;
     top.match = top.match && top.match.matchType(type);
@@ -4486,7 +4486,7 @@ var ParseContext = class {
     if (top.options & OPT_OPEN_LEFT && top.content.length == 0)
       options2 |= OPT_OPEN_LEFT;
     let applyMarks = Mark.none;
-    marks = marks.filter((m) => {
+    marks2 = marks2.filter((m) => {
       if (top.type ? top.type.allowsMarkType(m.type) : markMayApply(m.type, type)) {
         applyMarks = m.addToSet(applyMarks);
         return false;
@@ -4495,7 +4495,7 @@ var ParseContext = class {
     });
     this.nodes.push(new NodeContext(type, attrs, applyMarks, solid, null, options2));
     this.open++;
-    return marks;
+    return marks2;
   }
   // Make sure all nodes above this.open are finished and added to
   // their parents
@@ -4662,9 +4662,9 @@ var DOMSerializer = class _DOMSerializer {
   serializer may be `null` to indicate that marks of that type
   should not be serialized.
   */
-  constructor(nodes, marks) {
+  constructor(nodes, marks2) {
     this.nodes = nodes;
-    this.marks = marks;
+    this.marks = marks2;
   }
   /**
   Serialize the content of this fragment to a DOM fragment. When
@@ -5592,16 +5592,16 @@ function addMark(tr2, from2, to, mark) {
   tr2.doc.nodesBetween(from2, to, (node, pos, parent) => {
     if (!node.isInline)
       return;
-    let marks = node.marks;
-    if (!mark.isInSet(marks) && parent.type.allowsMarkType(mark.type)) {
+    let marks2 = node.marks;
+    if (!mark.isInSet(marks2) && parent.type.allowsMarkType(mark.type)) {
       let start = Math.max(pos, from2), end = Math.min(pos + node.nodeSize, to);
-      let newSet = mark.addToSet(marks);
-      for (let i = 0; i < marks.length; i++) {
-        if (!marks[i].isInSet(newSet)) {
-          if (removing && removing.to == start && removing.mark.eq(marks[i]))
+      let newSet = mark.addToSet(marks2);
+      for (let i = 0; i < marks2.length; i++) {
+        if (!marks2[i].isInSet(newSet)) {
+          if (removing && removing.to == start && removing.mark.eq(marks2[i]))
             removing.to = end;
           else
-            removed.push(removing = new RemoveMarkStep(start, end, marks[i]));
+            removed.push(removing = new RemoveMarkStep(start, end, marks2[i]));
         }
       }
       if (adding && adding.to == start)
@@ -5822,13 +5822,13 @@ function canChangeType(doc3, pos, type) {
   let $pos = doc3.resolve(pos), index = $pos.index();
   return $pos.parent.canReplaceWith(index, index + 1, type);
 }
-function setNodeMarkup(tr2, pos, type, attrs, marks) {
+function setNodeMarkup(tr2, pos, type, attrs, marks2) {
   let node = tr2.doc.nodeAt(pos);
   if (!node)
     throw new RangeError("No node at given position");
   if (!type)
     type = node.type;
-  let newNode = type.create(attrs, null, marks || node.marks);
+  let newNode = type.create(attrs, null, marks2 || node.marks);
   if (node.isLeaf)
     return tr2.replaceWith(pos, pos + node.nodeSize, newNode);
   if (!type.validContent(node.content))
@@ -6646,8 +6646,8 @@ var Transform = class {
   Change the type, attributes, and/or marks of the node at `pos`.
   When `type` isn't given, the existing node type is preserved,
   */
-  setNodeMarkup(pos, type, attrs = null, marks) {
-    setNodeMarkup(this, pos, type, attrs, marks);
+  setNodeMarkup(pos, type, attrs = null, marks2) {
+    setNodeMarkup(this, pos, type, attrs, marks2);
     return this;
   }
   /**
@@ -6958,9 +6958,9 @@ var TextSelection = class _TextSelection extends Selection {
   replace(tr2, content = Slice.empty) {
     super.replace(tr2, content);
     if (content == Slice.empty) {
-      let marks = this.$from.marksAcross(this.$to);
-      if (marks)
-        tr2.ensureMarks(marks);
+      let marks2 = this.$from.marksAcross(this.$to);
+      if (marks2)
+        tr2.ensureMarks(marks2);
     }
   }
   eq(other2) {
@@ -7226,8 +7226,8 @@ var Transaction = class extends Transform {
   /**
   Set the current stored marks.
   */
-  setStoredMarks(marks) {
-    this.storedMarks = marks;
+  setStoredMarks(marks2) {
+    this.storedMarks = marks2;
     this.updated |= UPDATED_MARKS;
     return this;
   }
@@ -7236,9 +7236,9 @@ var Transaction = class extends Transform {
   at the selection, match the given set of marks. Does nothing if
   this is already the case.
   */
-  ensureMarks(marks) {
-    if (!Mark.sameSet(this.storedMarks || this.selection.$from.marks(), marks))
-      this.setStoredMarks(marks);
+  ensureMarks(marks2) {
+    if (!Mark.sameSet(this.storedMarks || this.selection.$from.marks(), marks2))
+      this.setStoredMarks(marks2);
     return this;
   }
   /**
@@ -7270,8 +7270,8 @@ var Transaction = class extends Transform {
   /**
   Update the timestamp for the transaction.
   */
-  setTime(time) {
-    this.time = time;
+  setTime(time2) {
+    this.time = time2;
     return this;
   }
   /**
@@ -7315,12 +7315,12 @@ var Transaction = class extends Transform {
         to = from2;
       if (!text)
         return this.deleteRange(from2, to);
-      let marks = this.storedMarks;
-      if (!marks) {
+      let marks2 = this.storedMarks;
+      if (!marks2) {
         let $from = this.doc.resolve(from2);
-        marks = to == from2 ? $from.marks() : $from.marksAcross(this.doc.resolve(to));
+        marks2 = to == from2 ? $from.marks() : $from.marksAcross(this.doc.resolve(to));
       }
-      this.replaceRangeWith(from2, to, schema.text(text, marks));
+      this.replaceRangeWith(from2, to, schema.text(text, marks2));
       if (!this.selection.empty && this.selection.to == from2 + text.length)
         this.setSelection(Selection.near(this.selection.$to));
       return this;
@@ -9940,10 +9940,10 @@ var ViewTreeUpdater = class {
   }
   // Sync the current stack of mark descs with the given array of
   // marks, reusing existing mark descs when possible.
-  syncToMarks(marks, inline2, view, parentIndex) {
+  syncToMarks(marks2, inline2, view, parentIndex) {
     let keep = 0, depth = this.stack.length >> 1;
-    let maxKeep = Math.min(depth, marks.length);
-    while (keep < maxKeep && (keep == depth - 1 ? this.top : this.stack[keep + 1 << 1]).matchesMark(marks[keep]) && marks[keep].type.spec.spanning !== false)
+    let maxKeep = Math.min(depth, marks2.length);
+    while (keep < maxKeep && (keep == depth - 1 ? this.top : this.stack[keep + 1 << 1]).matchesMark(marks2[keep]) && marks2[keep].type.spec.spanning !== false)
       keep++;
     while (keep < depth) {
       this.destroyRest();
@@ -9952,22 +9952,22 @@ var ViewTreeUpdater = class {
       this.top = this.stack.pop();
       depth--;
     }
-    while (depth < marks.length) {
+    while (depth < marks2.length) {
       this.stack.push(this.top, this.index + 1);
       let found2 = -1, scanTo = this.top.children.length;
       if (parentIndex < this.preMatch.index)
         scanTo = Math.min(this.index + 3, scanTo);
       for (let i = this.index; i < scanTo; i++) {
         let next2 = this.top.children[i];
-        if (next2.matchesMark(marks[depth]) && !this.isLocked(next2.dom)) {
+        if (next2.matchesMark(marks2[depth]) && !this.isLocked(next2.dom)) {
           found2 = i;
           break;
         }
       }
       if (found2 < 0 && this.index < this.top.children.length) {
         let cur = this.top.children[this.index];
-        if (cur instanceof MarkViewDesc && cur.dirty != NODE_DIRTY && cur.mark.type == marks[depth].type && cur.spec.update && !this.isLocked(cur.dom) && cur.spec.update(marks[depth])) {
-          cur.mark = marks[depth];
+        if (cur instanceof MarkViewDesc && cur.dirty != NODE_DIRTY && cur.mark.type == marks2[depth].type && cur.spec.update && !this.isLocked(cur.dom) && cur.spec.update(marks2[depth])) {
+          cur.mark = marks2[depth];
           found2 = this.index;
           this.changed = true;
         }
@@ -9979,7 +9979,7 @@ var ViewTreeUpdater = class {
         }
         this.top = this.top.children[this.index];
       } else {
-        let markDesc = MarkViewDesc.create(this.top, marks[depth], inline2, view);
+        let markDesc = MarkViewDesc.create(this.top, marks2[depth], inline2, view);
         this.top.children.splice(this.index, 0, markDesc);
         this.top = markDesc;
         this.changed = true;
@@ -10867,13 +10867,13 @@ function parseFromClipboard(view, text, html2, plainText, $context) {
     if (parsed) {
       slice2 = parsed;
     } else {
-      let marks = $context.marks();
+      let marks2 = $context.marks();
       let { schema } = view.state, serializer = DOMSerializer.fromSchema(schema);
       dom = document.createElement("div");
       text.split(/(?:\r\n?|\n)+/).forEach((block2) => {
         let p = dom.appendChild(document.createElement("p"));
         if (block2)
-          p.appendChild(serializer.serializeNode(schema.text(block2, marks)));
+          p.appendChild(serializer.serializeNode(schema.text(block2, marks2)));
       });
     }
   } else {
@@ -12994,9 +12994,9 @@ function readDOMChange(view, from2, to, typeOver, addedNodes) {
         setTimeout(() => selectionToDOM(view), 20);
       }
       let tr2 = mkTr(view.state.tr.delete(chFrom, chTo));
-      let marks = doc3.resolve(change.start).marksAcross(doc3.resolve(change.endA));
-      if (marks)
-        tr2.ensureMarks(marks);
+      let marks2 = doc3.resolve(change.start).marksAcross(doc3.resolve(change.endA));
+      if (marks2)
+        tr2.ensureMarks(marks2);
       view.dispatch(tr2);
     } else if (
       // Adding or removing a mark
@@ -14103,13 +14103,13 @@ function objectIncludes(object1, object2, options2 = { strict: true }) {
     return object2[key] === object1[key];
   });
 }
-function findMarkInSet(marks, type, attributes = {}) {
-  return marks.find((item) => {
+function findMarkInSet(marks2, type, attributes = {}) {
+  return marks2.find((item) => {
     return item.type === type && objectIncludes(Object.fromEntries(Object.keys(attributes).map((k) => [k, item.attrs[k]])), attributes);
   });
 }
-function isMarkInSet(marks, type, attributes = {}) {
-  return !!findMarkInSet(marks, type, attributes);
+function isMarkInSet(marks2, type, attributes = {}) {
+  return !!findMarkInSet(marks2, type, attributes);
 }
 function getMarkRange($pos, type, attributes) {
   if (!$pos || !type) return;
@@ -14668,14 +14668,14 @@ var setContent = (content, { errorOnInvalidContent, emitUpdate = true, parseOpti
 function getMarkAttributes(state2, typeOrName) {
   const type = getMarkType(typeOrName, state2.schema);
   const { from: from2, to, empty: empty2 } = state2.selection;
-  const marks = [];
+  const marks2 = [];
   if (empty2) {
-    if (state2.storedMarks) marks.push(...state2.storedMarks);
-    marks.push(...state2.selection.$head.marks());
+    if (state2.storedMarks) marks2.push(...state2.storedMarks);
+    marks2.push(...state2.selection.$head.marks());
   } else state2.doc.nodesBetween(from2, to, (node) => {
-    marks.push(...node.marks);
+    marks2.push(...node.marks);
   });
-  const mark = marks.find((markItem) => markItem.type.name === type.name);
+  const mark = marks2.find((markItem) => markItem.type.name === type.name);
   if (!mark) return {};
   return { ...mark.attrs };
 }
@@ -15005,7 +15005,7 @@ function getSchemaByResolvedExtensions(extensions, editor2) {
     if (renderText) schema.toText = renderText;
     return [extension.name, schema];
   }));
-  const marks = Object.fromEntries(markExtensions.map((extension) => {
+  const marks2 = Object.fromEntries(markExtensions.map((extension) => {
     const extensionAttributes = allAttributes.filter((attribute) => attribute.type === extension.name);
     const context = {
       name: extension.name,
@@ -15040,7 +15040,7 @@ function getSchemaByResolvedExtensions(extensions, editor2) {
   return new Schema({
     topNode,
     nodes,
-    marks
+    marks: marks2
   });
 }
 function findDuplicates(items) {
@@ -15166,24 +15166,24 @@ function getChangedRanges(transform) {
   return simplifyChangedRanges(changes);
 }
 function getMarksBetween(from2, to, doc3) {
-  const marks = [];
+  const marks2 = [];
   if (from2 === to) doc3.resolve(from2).marks().forEach((mark) => {
     const range = getMarkRange(doc3.resolve(from2), mark.type);
     if (!range) return;
-    marks.push({
+    marks2.push({
       mark,
       ...range
     });
   });
   else doc3.nodesBetween(from2, to, (node, pos) => {
     if (!node || (node === null || node === void 0 ? void 0 : node.nodeSize) === void 0) return;
-    marks.push(...node.marks.map((mark) => ({
+    marks2.push(...node.marks.map((mark) => ({
       from: pos,
       to: pos + node.nodeSize,
       mark
     })));
   });
-  return marks;
+  return marks2;
 }
 var getNodeAtPosition = (state2, typeOrName, pos, maxDepth = 20) => {
   const $pos = state2.doc.resolve(pos);
@@ -15291,11 +15291,11 @@ var isAtStartOfNode = (state2) => {
   if ($from.parentOffset > 0 || $from.pos !== $to.pos) return false;
   return true;
 };
-function isExtensionRulesEnabled(extension, enabled) {
-  if (Array.isArray(enabled)) return enabled.some((enabledExtension) => {
+function isExtensionRulesEnabled(extension, enabled2) {
+  if (Array.isArray(enabled2)) return enabled2.some((enabledExtension) => {
     return (typeof enabledExtension === "string" ? enabledExtension : enabledExtension.name) === extension.name;
   });
-  return enabled;
+  return enabled2;
 }
 function isList(name, extensions) {
   const { nodeExtensions } = splitExtensions(extensions);
@@ -15494,9 +15494,9 @@ var sinkListItem$1 = (typeOrName) => ({ state: state2, dispatch }) => {
   return sinkListItem(type)(state2, dispatch);
 };
 function ensureMarks(state2, splittableMarks) {
-  const marks = state2.storedMarks || state2.selection.$to.parentOffset && state2.selection.$from.marks();
-  if (marks) {
-    const filteredMarks = marks.filter((mark) => splittableMarks === null || splittableMarks === void 0 ? void 0 : splittableMarks.includes(mark.type.name));
+  const marks2 = state2.storedMarks || state2.selection.$to.parentOffset && state2.selection.$from.marks();
+  if (marks2) {
+    const filteredMarks = marks2.filter((mark) => splittableMarks === null || splittableMarks === void 0 ? void 0 : splittableMarks.includes(mark.type.name));
     state2.tr.ensureMarks(filteredMarks);
   }
 }
@@ -15601,10 +15601,10 @@ var splitListItem = (typeOrName, overrideAttrs = {}) => ({ tr: tr2, state: state
   if (dispatch) {
     const { selection, storedMarks } = state2;
     const { splittableMarks } = editor2.extensionManager;
-    const marks = storedMarks || selection.$to.parentOffset && selection.$from.marks();
+    const marks2 = storedMarks || selection.$to.parentOffset && selection.$from.marks();
     tr2.split($from.pos, 2, types).scrollIntoView();
-    if (!marks || !dispatch) return true;
-    const filteredMarks = marks.filter((mark) => splittableMarks.includes(mark.type.name));
+    if (!marks2 || !dispatch) return true;
+    const filteredMarks = marks2.filter((mark) => splittableMarks.includes(mark.type.name));
     tr2.ensureMarks(filteredMarks);
   }
   return true;
@@ -15652,7 +15652,7 @@ var toggleList = (listTypeOrName, itemTypeOrName, keepMarks, attributes = {}) =>
   const { selection, storedMarks } = state2;
   const { $from, $to } = selection;
   const range = $from.blockRange($to);
-  const marks = storedMarks || selection.$to.parentOffset && selection.$from.marks();
+  const marks2 = storedMarks || selection.$to.parentOffset && selection.$from.marks();
   if (!range) return false;
   const parentList = findParentNode((node) => isList(node.type.name, extensions))(selection);
   const isAllSelection = selection.from === 0 && selection.to === state2.doc.content.size;
@@ -15682,13 +15682,13 @@ var toggleList = (listTypeOrName, itemTypeOrName, keepMarks, attributes = {}) =>
       return true;
     }).command(() => joinListBackwards(tr2, listType)).command(() => joinListForwards(tr2, listType)).run();
   }
-  if (!keepMarks || !marks || !dispatch) return chain().command(() => {
+  if (!keepMarks || !marks2 || !dispatch) return chain().command(() => {
     if (can().wrapInList(listType, attributes)) return true;
     return commands.clearNodes();
   }).wrapInList(listType, attributes).command(() => joinListBackwards(tr2, listType)).command(() => joinListForwards(tr2, listType)).run();
   return chain().command(() => {
     const canWrapInList = can().wrapInList(listType, attributes);
-    const filteredMarks = marks.filter((mark) => splittableMarks.includes(mark.type.name));
+    const filteredMarks = marks2.filter((mark) => splittableMarks.includes(mark.type.name));
     tr2.ensureMarks(filteredMarks);
     if (canWrapInList) return true;
     return commands.clearNodes();
@@ -15728,8 +15728,8 @@ var undoInputRule = () => ({ state: state2, dispatch }) => {
         const toUndo = undoable.transform;
         for (let j = toUndo.steps.length - 1; j >= 0; j -= 1) tr2.step(toUndo.steps[j].invert(toUndo.docs[j]));
         if (undoable.text) {
-          const marks = tr2.doc.resolve(undoable.from).marks();
-          tr2.replaceWith(undoable.from, undoable.to, state2.schema.text(undoable.text, marks));
+          const marks2 = tr2.doc.resolve(undoable.from).marks();
+          tr2.replaceWith(undoable.from, undoable.to, state2.schema.text(undoable.text, marks2));
         } else tr2.delete(undoable.from, undoable.to);
       }
       return true;
@@ -18463,9 +18463,9 @@ function wrappingInputRule(config) {
       if (config.keepMarks && config.editor) {
         const { selection, storedMarks } = state2;
         const { splittableMarks } = config.editor.extensionManager;
-        const marks = storedMarks || selection.$to.parentOffset && selection.$from.marks();
-        if (marks) {
-          const filteredMarks = marks.filter((mark) => splittableMarks.includes(mark.type.name));
+        const marks2 = storedMarks || selection.$to.parentOffset && selection.$from.marks();
+        if (marks2) {
+          const filteredMarks = marks2.filter((mark) => splittableMarks.includes(mark.type.name));
           tr2.ensureMarks(filteredMarks);
         }
       }
@@ -19570,10 +19570,10 @@ var HardBreak = Node2.create({
         if (selection.$from.parent.type.spec.isolating) return false;
         const { keepMarks } = this.options;
         const { splittableMarks } = editor2.extensionManager;
-        const marks = storedMarks || selection.$to.parentOffset && selection.$from.marks();
+        const marks2 = storedMarks || selection.$to.parentOffset && selection.$from.marks();
         return chain().insertContent({ type: this.name }).command(({ tr: tr2, dispatch }) => {
-          if (dispatch && marks && keepMarks) {
-            const filteredMarks = marks.filter((mark) => splittableMarks.includes(mark.type.name));
+          if (dispatch && marks2 && keepMarks) {
+            const filteredMarks = marks2.filter((mark) => splittableMarks.includes(mark.type.name));
             tr2.ensureMarks(filteredMarks);
           }
           return true;
@@ -30648,6 +30648,302 @@ function groupOptionsHtml(st, selected, opts = {}) {
   ).join("")}`;
 }
 
+// store/doc-store.js
+function createDocStore(deps) {
+  let saveTimer = 0;
+  const store = {
+    saveConflict: false,
+    async persist() {
+      clearTimeout(saveTimer);
+      if (deps.isReviewDemo()) {
+        deps.setSavedStatus("\u6F14\u793A\u4E2D \xB7 \u4E0D\u4FDD\u5B58");
+        deps.setDirty(false);
+        return true;
+      }
+      if (store.saveConflict) return false;
+      const state2 = deps.getState();
+      try {
+        const before = JSON.stringify(state2);
+        await deps.api("save", state2);
+        if (before === JSON.stringify(state2)) deps.setDirty(false);
+        deps.setSavedStatus("");
+        return true;
+      } catch (e) {
+        const msg = e && e.message || String(e);
+        if (/外部修改|外部移动|草稿已在外部/.test(msg)) {
+          deps.onExternalConflict(msg);
+          return false;
+        }
+        deps.toast("\u4FDD\u5B58\u5931\u8D25\uFF1A" + msg);
+        return false;
+      }
+    },
+    /** 内容变化：刷新侧栏卡片，标记 dirty，500ms 防抖保存 */
+    markChanged(delay = 500) {
+      const current2 = deps.getCurrent();
+      const card = current2 && deps.queryCard(current2.id);
+      if (card) {
+        card.querySelector("span").textContent = current2.title;
+        card.querySelector("small").textContent = (/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN") + " \xB7 " + current2.body.length + " \u5B57";
+      }
+      deps.setDirty(true);
+      if (current2) current2.updated = (/* @__PURE__ */ new Date()).toISOString();
+      deps.setSavedStatus("\u4FDD\u5B58\u4E2D\u2026");
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => store.persist(), delay);
+    },
+    /** 延迟触发一次保存（审阅流程用），会取消已排队的防抖 */
+    deferPersist(delay = 500) {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => store.persist(), delay);
+    },
+    cancelPending() {
+      clearTimeout(saveTimer);
+    }
+  };
+  return store;
+}
+
+// ui/perf.js
+var marks = /* @__PURE__ */ new Map();
+function enabled() {
+  try {
+    return typeof performance !== "undefined" && typeof localStorage !== "undefined" && localStorage.getItem("inkdesk:perf") !== "0";
+  } catch {
+    return typeof performance !== "undefined";
+  }
+}
+function perfStart(name) {
+  if (!enabled()) return 0;
+  const t = performance.now();
+  marks.set(name, t);
+  try {
+    performance.mark(`inkdesk:${name}:start`);
+  } catch {
+  }
+  return t;
+}
+function perfEnd(name) {
+  if (!enabled()) return 0;
+  const t0 = marks.get(name) ?? 0;
+  const dt = performance.now() - t0;
+  marks.delete(name);
+  try {
+    performance.mark(`inkdesk:${name}:end`);
+    performance.measure(`inkdesk:${name}`, `inkdesk:${name}:start`, `inkdesk:${name}:end`);
+  } catch {
+  }
+  try {
+    const g = window.__inkdeskPerf = window.__inkdeskPerf || {};
+    const arr = g[name] = g[name] || [];
+    arr.push(Math.round(dt * 10) / 10);
+    if (arr.length > 50) arr.shift();
+  } catch {
+  }
+  return dt;
+}
+function time(name, fn, ...args) {
+  perfStart(name);
+  try {
+    return fn(...args);
+  } finally {
+    perfEnd(name);
+  }
+}
+
+// ui/accounts.js
+function sameAccount(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const key = (id) => {
+    if (id === "AI" || id.endsWith("_AI")) return "AI";
+    if (id === "Dev" || id.endsWith("_Dev")) return "Dev";
+    return id;
+  };
+  return key(a) === key(b);
+}
+function accountInitial(label) {
+  const s = String(label || "?").trim();
+  return Array.from(s)[0] || "?";
+}
+function accountAvatarHtml(a, extraClass = "") {
+  if (a.avatar) {
+    const src = assetUrl("inkasset://vault/" + encodeURIComponent(a.avatar));
+    return `<img class="account-avatar-img ${extraClass}" src="${esc2(src)}" alt="" draggable="false">`;
+  }
+  return `<span class="account-avatar-fallback ${extraClass}" aria-hidden="true">${esc2(accountInitial(a.label))}</span>`;
+}
+
+// ui/materials-meta.js
+function formatJsonPreview(text) {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text || "";
+  }
+}
+function inferMaterialKind(name) {
+  const ext = String(name || "").split(".").pop().toLowerCase();
+  if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) return "image";
+  if (["md", "markdown"].includes(ext)) return "markdown";
+  if (["html", "htm"].includes(ext)) return "html";
+  if (ext === "json") return "json";
+  if (["txt", "csv", "yaml", "yml", "log", "tsv", "xml"].includes(ext))
+    return "text";
+  return "binary";
+}
+function uint8ToBase64(buf) {
+  let s = "";
+  const step = 32768;
+  for (let i = 0; i < buf.length; i += step) {
+    s += String.fromCharCode(...buf.subarray(i, i + step));
+  }
+  return btoa(s);
+}
+
+// ui/metrics.js
+function formatDelta(n) {
+  if (n == null || n === 0 || !Number.isFinite(Number(n))) return "";
+  const v = Number(n);
+  return (v > 0 ? "+" : "") + v.toLocaleString();
+}
+
+// services/backup-plan.js
+function resolveBackupPlan(st, { paths, account: account2, preview }) {
+  const list2 = (Array.isArray(paths) ? paths : [paths]).filter(Boolean);
+  if (!list2.length) return null;
+  const first2 = list2[0];
+  const accountId = (st.archives || []).find((a) => a.path === first2)?.account || first2.split("/")[0] || account2;
+  const groups = [...new Set(list2.map((rel) => publishedGroup(st, rel) || ""))];
+  const singleGroup = groups.length === 1 ? groups[0] || null : null;
+  const mixedGroups = groups.length > 1;
+  const defaultPath = singleGroup ? backupPathFor(st, singleGroup, accountId) : "";
+  const perPathDefaults = list2.map((rel) => ({
+    rel,
+    group: publishedGroup(st, rel),
+    dest: backupPathFor(st, publishedGroup(st, rel), accountId)
+  }));
+  const allHaveDefault = perPathDefaults.every((x) => x.dest);
+  const titleOf = (rel) => preview?.path === rel ? preview.title : (st.archives || []).find((a) => a.path === rel)?.title || rel.split("/").pop().replace(/\.md$/, "") || "\u6587\u7AE0";
+  const label = list2.length === 1 ? `\u300C${titleOf(first2)}\u300D` : `\u9009\u4E2D\u7684 ${list2.length} \u7BC7\u6587\u7AE0`;
+  const rememberTarget = singleGroup ? `\u5206\u7EC4\u300C${singleGroup}\u300D` : mixedGroups ? "\uFF08\u591A\u5206\u7EC4\u65F6\u8BF7\u5206\u522B\u8BBE\u7F6E\uFF09" : "\u8BE5\u8D26\u53F7";
+  const defaultHint = mixedGroups ? allHaveDefault ? "\u5404\u5206\u7EC4\u5DF2\u914D\u7F6E\u9ED8\u8BA4\u8DEF\u5F84\uFF0C\u53EF\u6309\u5206\u7EC4\u5206\u522B\u540C\u6B65" : "\u9009\u4E2D\u6587\u7AE0\u5206\u7EC4\u4E0D\u540C\u6216\u672A\u914D\u7F6E\u8DEF\u5F84\uFF0C\u8BF7\u9009\u62E9\u7EDF\u4E00\u8DEF\u5F84\uFF0C\u6216\u5148\u8BBE\u7F6E\u5206\u7EC4" : defaultPath ? defaultPath : singleGroup ? `\u5206\u7EC4\u300C${singleGroup}\u300D\u672A\u8BBE\u7F6E\uFF08\u53EF\u5728\u8BBE\u7F6E \xB7 \u5206\u7EC4\u4E2D\u914D\u7F6E\uFF09` : "\u672A\u8BBE\u7F6E\uFF08\u53EF\u5148\u4E3A\u6587\u7AE0\u6307\u5B9A\u5206\u7EC4\uFF0C\u6216\u5728\u8BBE\u7F6E \xB7 \u8D26\u53F7\u4E2D\u914D\u7F6E\uFF09";
+  return {
+    list: list2,
+    accountId,
+    groups,
+    singleGroup,
+    mixedGroups,
+    defaultPath,
+    perPathDefaults,
+    allHaveDefault,
+    label,
+    rememberTarget,
+    defaultHint
+  };
+}
+
+// ui/agent-store.js
+var AGENT_PROVIDERS = [
+  { id: "cursor", label: "Cursor", blurb: "Cursor Agent CLI" },
+  { id: "codex", label: "ChatGPT", blurb: "OpenAI Codex CLI" },
+  { id: "claude", label: "Claude Code", blurb: "Anthropic Claude Code" },
+  { id: "zcode", label: "ZCode", blurb: "Z.ai ZCode\uFF08\u6CBF\u7528 CLI \u9ED8\u8BA4\u6A21\u578B\uFF09" },
+  { id: "opencode", label: "OpenCode", blurb: "OpenCode CLI" },
+  { id: "antigravity", label: "Antigravity", blurb: "Google Antigravity\uFF08agy\uFF09" }
+];
+function settingsSection({ title, control, className = "" }) {
+  const titleHtml = title ? `<h3 class="settings-section-title">${esc2(title)}</h3>` : "";
+  return `<section class="settings-section ${className}">${titleHtml}<div class="settings-section-control">${control}</div></section>`;
+}
+function settingsPanel(inner, className = "") {
+  return `<div class="settings-panel ${className}">${inner}</div>`;
+}
+function settingsField(label, controlHtml) {
+  return `<label class="settings-field"><span class="settings-field-label">${esc2(label)}</span>${controlHtml}</label>`;
+}
+function agentLogoSvg(id, size = 28) {
+  const extensions = {
+    cursor: "png",
+    codex: "png",
+    claude: "ico",
+    zcode: "png",
+    opencode: "svg",
+    antigravity: "ico"
+  };
+  return extensions[id] ? `<img src="assets/agents/${id}.${extensions[id]}" width="${size}" height="${size}" style="object-fit:contain" alt="">` : "";
+}
+function agentInstalled(st, id) {
+  return !!st.agents?.[id];
+}
+function ensureAgentsEnabledStore(st) {
+  if (!st.agentsEnabled || typeof st.agentsEnabled !== "object")
+    st.agentsEnabled = {};
+}
+function agentEnabled(st, id) {
+  ensureAgentsEnabledStore(st);
+  return st.agentsEnabled[id] !== false;
+}
+function installedAgentProviders(st) {
+  return AGENT_PROVIDERS.filter((p) => agentInstalled(st, p.id));
+}
+function selectableAgentProviders(st) {
+  return installedAgentProviders(st).filter((p) => agentEnabled(st, p.id));
+}
+function railProviderId(st) {
+  const selectable = selectableAgentProviders(st);
+  if (selectable.some((p) => p.id === st.provider)) return st.provider;
+  return selectable[0]?.id || st.provider;
+}
+function railModelLabel(st, provider = railProviderId(st)) {
+  if (provider === st.provider && st.model) return st.model;
+  if (provider === st.provider) return "\u9ED8\u8BA4";
+  const p = AGENT_PROVIDERS.find((x) => x.id === provider);
+  return p?.label || "\u9009\u62E9\u6A21\u578B";
+}
+function ensureAgentModelsStore(st) {
+  if (!st.agentModels || typeof st.agentModels !== "object")
+    st.agentModels = {};
+}
+function getAgentModelList(st, provider) {
+  ensureAgentModelsStore(st);
+  const list2 = st.agentModels[provider];
+  return Array.isArray(list2) ? list2.filter(Boolean) : [];
+}
+function setAgentModelList(st, provider, list2) {
+  ensureAgentModelsStore(st);
+  st.agentModels = {
+    ...st.agentModels,
+    [provider]: [...new Set(list2.map((x) => String(x).trim()).filter(Boolean))]
+  };
+}
+function agentSuggestionIds(st, provider, discovered = []) {
+  const saved = getAgentModelList(st, provider);
+  return [.../* @__PURE__ */ new Set([...discovered, ...saved])];
+}
+function agentListItemHtml(st, p) {
+  const installed = agentInstalled(st, p.id);
+  const enabled2 = agentEnabled(st, p.id);
+  const isDefault = st.provider === p.id;
+  return `<div class="agent-list-item ${isDefault ? "is-default" : ""} ${installed ? "" : "is-missing"} ${enabled2 ? "" : "is-off"}" data-open-agent="${p.id}" role="button" tabindex="0">
+  <div class="agent-card-logo">${agentLogoSvg(p.id)}</div>
+  <span class="agent-list-main">
+    <span class="agent-card-title">
+      <strong>${esc2(p.label)}</strong>
+      ${isDefault ? `<span class="agent-badge agent-badge-default">\u9ED8\u8BA4</span>` : ""}
+      <span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "\u5DF2\u5B89\u88C5" : "\u672A\u5B89\u88C5"}</span>
+      ${enabled2 ? "" : `<span class="agent-badge agent-badge-off">\u5DF2\u5173\u95ED</span>`}
+    </span>
+    <span class="agent-card-blurb">${esc2(p.blurb)}</span>
+  </span>
+  <label class="agent-switch" title="${enabled2 ? "\u5173\u95ED\u540E\u5BF9\u8BDD\u4E2D\u4E0D\u53EF\u9009" : "\u542F\u7528\u4EE5\u5728\u5BF9\u8BDD\u4E2D\u9009\u62E9"}">
+    <input type="checkbox" role="switch" data-agent-enable="${p.id}" ${enabled2 ? "checked" : ""} aria-label="${enabled2 ? "\u5173\u95ED" : "\u542F\u7528"} ${esc2(p.label)}">
+    <span class="agent-switch-track" aria-hidden="true"></span>
+  </label>
+  <span class="account-list-chevron" aria-hidden="true">\u203A</span>
+</div>`;
+}
+
 // ui/wechat-png.js
 var WECHAT_BLUE = "#0f3ff7";
 var WECHAT_BLUE_SOFT = "rgba(15, 63, 247, 0.2)";
@@ -30915,6 +31211,20 @@ var heatmapYear = (/* @__PURE__ */ new Date()).getFullYear();
 var metricsSort = "\u9605\u8BFB";
 var publishedSelection = /* @__PURE__ */ new Set();
 var materialsFilter = "all";
+var docStore = createDocStore({
+  getState: () => state,
+  getCurrent: () => current,
+  isReviewDemo: () => reviewDemoActive,
+  isDirty: () => dirty,
+  setDirty: (v) => {
+    dirty = v;
+  },
+  api,
+  toast,
+  setSavedStatus,
+  onExternalConflict: (msg) => showSaveConflictDialog(msg),
+  queryCard: (id) => document.querySelector('[data-id="' + id + '"]')
+});
 function pickFiles({ multiple = false, accept = "" } = {}) {
   return new Promise((resolve) => {
     const input = document.createElement("input");
@@ -30970,7 +31280,6 @@ var settingsTab = "config";
 var agentDetailId = null;
 var agentDetailTab = "connection";
 var current;
-var saveTimer;
 var busy = false;
 var pending = null;
 var selectedText = "";
@@ -30994,7 +31303,6 @@ var assistantOpen = false;
 var railMode = "assistant";
 var outlineOpen = false;
 var outlineExpanded = false;
-var saveConflict = false;
 var unmountAster = null;
 var unmountAsterRail = null;
 function accountList() {
@@ -31007,27 +31315,6 @@ async function openAccountDetail(accountId, tab2 = "detail") {
   accountDetailTab = tab2;
   page = "account";
   render2();
-}
-function sameAccount(a, b) {
-  if (!a || !b) return false;
-  if (a === b) return true;
-  const key = (id) => {
-    if (id === "AI" || id.endsWith("_AI")) return "AI";
-    if (id === "Dev" || id.endsWith("_Dev")) return "Dev";
-    return id;
-  };
-  return key(a) === key(b);
-}
-function accountInitial(label) {
-  const s = String(label || "?").trim();
-  return Array.from(s)[0] || "?";
-}
-function accountAvatarHtml(a, extraClass = "") {
-  if (a.avatar) {
-    const src = assetUrl("inkasset://vault/" + encodeURIComponent(a.avatar));
-    return `<img class="account-avatar-img ${extraClass}" src="${esc2(src)}" alt="" draggable="false">`;
-  }
-  return `<span class="account-avatar-fallback ${extraClass}" aria-hidden="true">${esc2(accountInitial(a.label))}</span>`;
 }
 function ensureAccount() {
   const list2 = accountList();
@@ -31205,23 +31492,6 @@ function sanitizeHtmlPreview(html2) {
   });
   return d.body.innerHTML;
 }
-function formatJsonPreview(text) {
-  try {
-    return JSON.stringify(JSON.parse(text), null, 2);
-  } catch {
-    return text || "";
-  }
-}
-function inferMaterialKind(name) {
-  const ext = String(name || "").split(".").pop().toLowerCase();
-  if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) return "image";
-  if (["md", "markdown"].includes(ext)) return "markdown";
-  if (["html", "htm"].includes(ext)) return "html";
-  if (ext === "json") return "json";
-  if (["txt", "csv", "yaml", "yml", "log", "tsv", "xml"].includes(ext))
-    return "text";
-  return "binary";
-}
 async function hydrateMaterialPreview(r) {
   const kind = r.kind || inferMaterialKind(r.name);
   const asset = r.asset || (kind === "image" && r.path ? "inkasset://vault/" + encodeURIComponent(r.path) : "");
@@ -31283,28 +31553,7 @@ function materialDrawerBodyHTML(r) {
   return `<p class="muted">\u5DF2\u4FDD\u7559\u539F\u6587\u4EF6\uFF0C\u5F53\u524D\u683C\u5F0F\u6682\u4E0D\u652F\u6301\u5185\u5D4C\u9884\u89C8\u3002</p><pre id="reference-text" class="material-preview is-code">${esc2(text)}</pre>`;
 }
 async function persist() {
-  clearTimeout(saveTimer);
-  if (reviewDemoActive) {
-    setSavedStatus("\u6F14\u793A\u4E2D \xB7 \u4E0D\u4FDD\u5B58");
-    dirty = false;
-    return true;
-  }
-  if (saveConflict) return false;
-  try {
-    const before = JSON.stringify(state);
-    await api("save", state);
-    if (before === JSON.stringify(state)) dirty = false;
-    setSavedStatus("");
-    return true;
-  } catch (e) {
-    const msg = e.message || String(e);
-    if (/外部修改|外部移动|草稿已在外部/.test(msg)) {
-      showSaveConflictDialog(msg);
-      return false;
-    }
-    toast("\u4FDD\u5B58\u5931\u8D25\uFF1A" + msg);
-    return false;
-  }
+  return docStore.persist();
 }
 function setSavedStatus(text) {
   const n = $("#saved");
@@ -31313,8 +31562,8 @@ function setSavedStatus(text) {
   n.hidden = !text;
 }
 function showSaveConflictDialog(msg) {
-  if (saveConflict) return;
-  saveConflict = true;
+  if (docStore.saveConflict) return;
+  docStore.saveConflict = true;
   setSavedStatus("\u4FDD\u5B58\u5DF2\u6682\u505C");
   toast("\u4FDD\u5B58\u5931\u8D25\uFF1A" + msg);
   if ($("#save-conflict-modal")) return;
@@ -31331,7 +31580,7 @@ function showSaveConflictDialog(msg) {
       Object.assign(state, result);
       current = state.documents.find((d) => d.id === id) || state.documents.find((d) => sameAccount(d.account, account));
       dirty = false;
-      saveConflict = false;
+      docStore.saveConflict = false;
       pending = null;
       m.remove();
       render2();
@@ -31342,16 +31591,7 @@ function showSaveConflictDialog(msg) {
   };
 }
 function changed() {
-  const card = document.querySelector('[data-id="' + current.id + '"]');
-  if (card) {
-    card.querySelector("span").textContent = current.title;
-    card.querySelector("small").textContent = (/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN") + " \xB7 " + current.body.length + " \u5B57";
-  }
-  dirty = true;
-  current.updated = (/* @__PURE__ */ new Date()).toISOString();
-  setSavedStatus("\u4FDD\u5B58\u4E2D\u2026");
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(persist, 500);
+  docStore.markChanged();
 }
 function newDoc() {
   if (!account) return toast("\u8BF7\u5148\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7");
@@ -31643,7 +31883,10 @@ function enhanceWechatPreview(root2 = $("#article-preview")) {
     });
   });
 }
-async function publishHTML(md, opts = {}) {
+async function publishHTML(...a) {
+  return time("publishHTML", publishHTMLInner, ...a);
+}
+async function publishHTMLInner(md, opts = {}) {
   const serif = WECHAT_SERIF_PUBLISH;
   const d = new DOMParser().parseFromString(safeHTML(md), "text/html");
   if (opts.keepImages) {
@@ -32278,7 +32521,10 @@ function removeArticleOutline() {
     delete outline._place;
   }
 }
-function renderPreview() {
+function renderPreview(...a) {
+  return time("renderPreview", renderPreviewInner, ...a);
+}
+function renderPreviewInner() {
   previewDocId = current.id;
   removeArticleOutline();
   if (previewPane !== "social") previewPane = "wechat";
@@ -32299,7 +32545,10 @@ function renderPreview() {
     web: isWeb()
   });
 }
-function renderPublishedPreview() {
+function renderPublishedPreview(...a) {
+  return time("renderPublishedPreview", renderPublishedPreviewInner, ...a);
+}
+function renderPublishedPreviewInner() {
   if (!publishedPreview) {
     page = "dashboard";
     return renderDashboard();
@@ -32333,7 +32582,10 @@ function renderPublishedPreview() {
     web: isWeb()
   });
 }
-function renderWrite() {
+function renderWrite(...a) {
+  return time("renderWrite", renderWriteInner, ...a);
+}
+function renderWriteInner() {
   if (!current) {
     $("#main").innerHTML = `<div class="empty"><span class="eyebrow">A SPACE FOR YOUR WORDS</span><h1>\u628A\u60F3\u8BF4\u7684\u8BDD\uFF0C\u5199\u4E0B\u6765\u3002</h1><p>\u4ECE\u8349\u7A3F\u5F00\u59CB\uFF0C\u6216\u5BFC\u5165\u5DF2\u6709\u6587\u7AE0\u3002AI \u5728\u4F60\u9700\u8981\u65F6\u5E2E\u5FD9\u3002</p><button class="primary" id="start">${I.plus()} \u65B0\u5EFA\u6587\u7AE0</button></div>`;
     $("#start").onclick = newDoc;
@@ -33184,8 +33436,7 @@ function renderPanel() {
   composer = new Composer($("#composer-input"), conversation(), {
     changed: () => {
       dirty = true;
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(persist, 500);
+      docStore.deferPersist();
     },
     send: () => $("#send").click(),
     picker: () => chooseChatFile()
@@ -33544,11 +33795,6 @@ function showUnmatchedMatcher(preview) {
     };
   });
 }
-function formatDelta(n) {
-  if (n == null || n === 0 || !Number.isFinite(Number(n))) return "";
-  const v = Number(n);
-  return (v > 0 ? "+" : "") + v.toLocaleString();
-}
 async function runNoteImport() {
   try {
     const filePayload = await pickNoteTable();
@@ -33584,7 +33830,10 @@ async function runNoteImport() {
     toast(e.message);
   }
 }
-function renderDashboard() {
+function renderDashboard(...a) {
+  return time("renderDashboard", renderDashboardInner, ...a);
+}
+function renderDashboardInner() {
   const rows = state.metrics.filter((r) => sameAccount(r["\u8D26\u53F7"], account));
   const deltas = state.metricDeltas?.[account] || null;
   const sum = (k) => rows.some((r) => r[k] !== null) ? rows.reduce((s, r) => s + (r[k] || 0), 0).toLocaleString() : "\u2014";
@@ -33733,23 +33982,20 @@ async function openPublishedPreview(rel) {
 }
 async function backupPublishedArticle(paths) {
   if (isWeb()) return toast("\u672C\u5730\u540C\u6B65\u4EC5\u652F\u6301\u684C\u9762\u7AEF");
-  const list2 = (Array.isArray(paths) ? paths : [paths]).filter(Boolean);
-  if (!list2.length) return;
-  const first2 = list2[0];
-  const accountId = (state.archives || []).find((a) => a.path === first2)?.account || first2.split("/")[0] || account;
-  const groups = [...new Set(list2.map((rel) => publishedGroup(state, rel) || ""))];
-  const singleGroup = groups.length === 1 ? groups[0] || null : null;
-  const mixedGroups = groups.length > 1;
-  const defaultPath = singleGroup ? backupPathFor(state, singleGroup, accountId) : "";
-  const perPathDefaults = list2.map((rel) => ({
-    rel,
-    group: publishedGroup(state, rel),
-    dest: backupPathFor(state, publishedGroup(state, rel), accountId)
-  }));
-  const allHaveDefault = perPathDefaults.every((x) => x.dest);
-  const label = list2.length === 1 ? `\u300C${publishedPreview?.path === first2 ? publishedPreview.title : (state.archives || []).find((a) => a.path === first2)?.title || first2.split("/").pop().replace(/\.md$/, "") || "\u6587\u7AE0"}\u300D` : `\u9009\u4E2D\u7684 ${list2.length} \u7BC7\u6587\u7AE0`;
-  const rememberTarget = singleGroup ? `\u5206\u7EC4\u300C${singleGroup}\u300D` : mixedGroups ? "\uFF08\u591A\u5206\u7EC4\u65F6\u8BF7\u5206\u522B\u8BBE\u7F6E\uFF09" : "\u8BE5\u8D26\u53F7";
-  const defaultHint = mixedGroups ? allHaveDefault ? "\u5404\u5206\u7EC4\u5DF2\u914D\u7F6E\u9ED8\u8BA4\u8DEF\u5F84\uFF0C\u53EF\u6309\u5206\u7EC4\u5206\u522B\u540C\u6B65" : "\u9009\u4E2D\u6587\u7AE0\u5206\u7EC4\u4E0D\u540C\u6216\u672A\u914D\u7F6E\u8DEF\u5F84\uFF0C\u8BF7\u9009\u62E9\u7EDF\u4E00\u8DEF\u5F84\uFF0C\u6216\u5148\u8BBE\u7F6E\u5206\u7EC4" : defaultPath ? defaultPath : singleGroup ? `\u5206\u7EC4\u300C${singleGroup}\u300D\u672A\u8BBE\u7F6E\uFF08\u53EF\u5728\u8BBE\u7F6E \xB7 \u5206\u7EC4\u4E2D\u914D\u7F6E\uFF09` : "\u672A\u8BBE\u7F6E\uFF08\u53EF\u5148\u4E3A\u6587\u7AE0\u6307\u5B9A\u5206\u7EC4\uFF0C\u6216\u5728\u8BBE\u7F6E \xB7 \u8D26\u53F7\u4E2D\u914D\u7F6E\uFF09";
+  const plan = resolveBackupPlan(state, { paths, account, preview: publishedPreview });
+  if (!plan) return;
+  const {
+    list: list2,
+    accountId,
+    singleGroup,
+    mixedGroups,
+    defaultPath,
+    perPathDefaults,
+    allHaveDefault,
+    label,
+    rememberTarget,
+    defaultHint
+  } = plan;
   const runBackup = async (destDir, remember2) => {
     let ok = 0;
     for (const rel of list2) {
@@ -34124,51 +34370,11 @@ async function openTopicDrawer(rel, opts = {}) {
     }
   };
 }
-function settingsSection({ title, control, className = "" }) {
-  const titleHtml = title ? `<h3 class="settings-section-title">${esc2(title)}</h3>` : "";
-  return `<section class="settings-section ${className}">${titleHtml}<div class="settings-section-control">${control}</div></section>`;
-}
-function settingsPanel(inner, className = "") {
-  return `<div class="settings-panel ${className}">${inner}</div>`;
-}
-function settingsField(label, controlHtml) {
-  return `<label class="settings-field"><span class="settings-field-label">${esc2(label)}</span>${controlHtml}</label>`;
-}
-var AGENT_PROVIDERS = [
-  { id: "cursor", label: "Cursor", blurb: "Cursor Agent CLI" },
-  { id: "codex", label: "ChatGPT", blurb: "OpenAI Codex CLI" },
-  { id: "claude", label: "Claude Code", blurb: "Anthropic Claude Code" },
-  { id: "zcode", label: "ZCode", blurb: "Z.ai ZCode\uFF08\u6CBF\u7528 CLI \u9ED8\u8BA4\u6A21\u578B\uFF09" },
-  { id: "opencode", label: "OpenCode", blurb: "OpenCode CLI" },
-  { id: "antigravity", label: "Antigravity", blurb: "Google Antigravity\uFF08agy\uFF09" }
-];
-function agentLogoSvg(id, size = 28) {
-  const extensions = {
-    cursor: "png",
-    codex: "png",
-    claude: "ico",
-    zcode: "png",
-    opencode: "svg",
-    antigravity: "ico"
-  };
-  return extensions[id] ? `<img src="assets/agents/${id}.${extensions[id]}" width="${size}" height="${size}" style="object-fit:contain" alt="">` : "";
-}
-function agentInstalled(id) {
-  return !!state.agents?.[id];
-}
-function ensureAgentsEnabledStore() {
-  if (!state.agentsEnabled || typeof state.agentsEnabled !== "object")
-    state.agentsEnabled = {};
-}
-function agentEnabled(id) {
-  ensureAgentsEnabledStore();
-  return state.agentsEnabled[id] !== false;
-}
 async function setAgentEnabled(id, on) {
-  ensureAgentsEnabledStore();
+  ensureAgentsEnabledStore(state);
   state.agentsEnabled = { ...state.agentsEnabled, [id]: !!on };
   if (!on && state.provider === id) {
-    const fallback = selectableAgentProviders()[0];
+    const fallback = selectableAgentProviders(state)[0];
     if (fallback) {
       state.provider = fallback.id;
       state.model = "";
@@ -34176,30 +34382,13 @@ async function setAgentEnabled(id, on) {
   }
   await persist();
 }
-function installedAgentProviders() {
-  return AGENT_PROVIDERS.filter((p) => agentInstalled(p.id));
-}
-function selectableAgentProviders() {
-  return installedAgentProviders().filter((p) => agentEnabled(p.id));
-}
-function railProviderId() {
-  const selectable = selectableAgentProviders();
-  if (selectable.some((p) => p.id === state.provider)) return state.provider;
-  return selectable[0]?.id || state.provider;
-}
-function railModelLabel(provider = railProviderId()) {
-  if (provider === state.provider && state.model) return state.model;
-  if (provider === state.provider) return "\u9ED8\u8BA4";
-  const p = AGENT_PROVIDERS.find((x) => x.id === provider);
-  return p?.label || "\u9009\u62E9\u6A21\u578B";
-}
 function modelPickerHTML() {
-  const provider = railProviderId();
+  const provider = railProviderId(state);
   const p = AGENT_PROVIDERS.find((x) => x.id === provider);
-  const label = railModelLabel(provider);
-  const agents = selectableAgentProviders();
+  const label = railModelLabel(state, provider);
+  const agents = selectableAgentProviders(state);
   const agentRows = agents.length ? agents.map((agent2) => {
-    const models = agent2.id === "zcode" ? [] : getAgentModelList(agent2.id);
+    const models = agent2.id === "zcode" ? [] : getAgentModelList(state, agent2.id);
     const usingAgent = state.provider === agent2.id;
     const modelBtns = [
       `<button type="button" role="menuitemradio" class="model-picker-option" data-provider="${agent2.id}" data-model="" aria-checked="${usingAgent && !state.model}">${usingAgent && !state.model ? "\u2713 " : ""}\u9ED8\u8BA4</button>`,
@@ -34316,7 +34505,7 @@ function bindModelPicker() {
     activeComposerMenuDismiss = closeAll;
     placeMenu();
     const active = root2.querySelector(
-      `.model-picker-agent[data-agent="${CSS.escape(railProviderId())}"]`
+      `.model-picker-agent[data-agent="${CSS.escape(railProviderId(state))}"]`
     );
     if (active) openSubmenu(active);
     onDocPointer = (ev) => {
@@ -34349,7 +34538,7 @@ function bindModelPicker() {
       e.stopPropagation();
       const provider = opt.getAttribute("data-provider") || "";
       const model = opt.getAttribute("data-model") || "";
-      if (!provider || !agentInstalled(provider) || !agentEnabled(provider)) {
+      if (!provider || !agentInstalled(state, provider) || !agentEnabled(state, provider)) {
         toast("\u672A\u627E\u5230\u8BE5 CLI");
         return;
       }
@@ -34357,7 +34546,7 @@ function bindModelPicker() {
       state.model = model;
       closeAll();
       await persistAgentModels();
-      const label = railModelLabel(provider);
+      const label = railModelLabel(state, provider);
       const logo = trigger.querySelector(".model-picker-logo");
       const text = trigger.querySelector(".model-picker-label");
       if (logo) logo.innerHTML = agentLogoSvg(provider, 16);
@@ -34386,56 +34575,14 @@ function bindModelPicker() {
     };
   });
 }
-function ensureAgentModelsStore() {
-  if (!state.agentModels || typeof state.agentModels !== "object")
-    state.agentModels = {};
-}
-function getAgentModelList(provider) {
-  ensureAgentModelsStore();
-  const list2 = state.agentModels[provider];
-  return Array.isArray(list2) ? list2.filter(Boolean) : [];
-}
-function setAgentModelList(provider, list2) {
-  ensureAgentModelsStore();
-  state.agentModels = {
-    ...state.agentModels,
-    [provider]: [...new Set(list2.map((x) => String(x).trim()).filter(Boolean))]
-  };
-}
-function agentSuggestionIds(provider, discovered = []) {
-  const saved = getAgentModelList(provider);
-  return [.../* @__PURE__ */ new Set([...discovered, ...saved])];
-}
 function openAgentDetail(id, tab2 = "connection") {
   agentDetailId = id;
   agentDetailTab = tab2;
   page = "agent";
   render2();
 }
-function agentListItemHtml(p) {
-  const installed = agentInstalled(p.id);
-  const enabled = agentEnabled(p.id);
-  const isDefault = state.provider === p.id;
-  return `<div class="agent-list-item ${isDefault ? "is-default" : ""} ${installed ? "" : "is-missing"} ${enabled ? "" : "is-off"}" data-open-agent="${p.id}" role="button" tabindex="0">
-  <div class="agent-card-logo">${agentLogoSvg(p.id)}</div>
-  <span class="agent-list-main">
-    <span class="agent-card-title">
-      <strong>${esc2(p.label)}</strong>
-      ${isDefault ? `<span class="agent-badge agent-badge-default">\u9ED8\u8BA4</span>` : ""}
-      <span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "\u5DF2\u5B89\u88C5" : "\u672A\u5B89\u88C5"}</span>
-      ${enabled ? "" : `<span class="agent-badge agent-badge-off">\u5DF2\u5173\u95ED</span>`}
-    </span>
-    <span class="agent-card-blurb">${esc2(p.blurb)}</span>
-  </span>
-  <label class="agent-switch" title="${enabled ? "\u5173\u95ED\u540E\u5BF9\u8BDD\u4E2D\u4E0D\u53EF\u9009" : "\u542F\u7528\u4EE5\u5728\u5BF9\u8BDD\u4E2D\u9009\u62E9"}">
-    <input type="checkbox" role="switch" data-agent-enable="${p.id}" ${enabled ? "checked" : ""} aria-label="${enabled ? "\u5173\u95ED" : "\u542F\u7528"} ${esc2(p.label)}">
-    <span class="agent-switch-track" aria-hidden="true"></span>
-  </label>
-  <span class="account-list-chevron" aria-hidden="true">\u203A</span>
-</div>`;
-}
 function agentModelsPanelHtml(p, info) {
-  const installed = agentInstalled(p.id);
+  const installed = agentInstalled(state, p.id);
   if (!installed) {
     return `<p class="settings-hint">\u5B89\u88C5\u5E76\u767B\u5F55\u5BF9\u5E94 CLI \u540E\uFF0C\u53EF\u6DFB\u52A0\u6A21\u578B\u5E76\u9010\u4E00\u6D4B\u8BD5\u8FDE\u901A\u3002</p>`;
   }
@@ -34446,12 +34593,12 @@ function agentModelsPanelHtml(p, info) {
       <p class="settings-hint">${esc2(p.label)} \u6CBF\u7528 CLI \u9ED8\u8BA4\u6A21\u578B\uFF0C\u8FDE\u901A\u6027\u8BF7\u7528\u53F3\u4E0A\u89D2\u300C\u6D4B\u8BD5\u9ED8\u8BA4\u300D\u3002</p>
     </div>`;
   }
-  const saved = getAgentModelList(p.id);
+  const saved = getAgentModelList(state, p.id);
   if (!saved.length && state.provider === p.id && state.model) {
-    setAgentModelList(p.id, [state.model]);
+    setAgentModelList(state, p.id, [state.model]);
   }
-  const list2 = getAgentModelList(p.id);
-  const suggestions = agentSuggestionIds(p.id, info?.models || []);
+  const list2 = getAgentModelList(state, p.id);
+  const suggestions = agentSuggestionIds(state, p.id, info?.models || []);
   const rows = list2.length ? list2.map((m) => {
     const active = state.provider === p.id && state.model === m;
     return `<li class="agent-model-item ${active ? "is-active" : ""}" data-model-row="${esc2(m)}">
@@ -34487,13 +34634,13 @@ function setModelRowStatus(provider, model, text, kind = "") {
   el.dataset.kind = kind;
 }
 async function persistAgentModels() {
-  ensureAgentModelsStore();
+  ensureAgentModelsStore(state);
   await persist();
 }
 async function fillAgentCard(p, refresh = false) {
   const body = $(`[data-agent-body="${p.id}"]`);
   if (!body) return;
-  if (!agentInstalled(p.id)) {
+  if (!agentInstalled(state, p.id)) {
     body.innerHTML = agentModelsPanelHtml(p, null);
     return;
   }
@@ -34521,7 +34668,7 @@ function bindAgentModelControls(p) {
   const useDefault = $(`[data-agent-cli-default="${p.id}"]`);
   if (useDefault)
     useDefault.onclick = async () => {
-      if (!agentEnabled(p.id)) await setAgentEnabled(p.id, true);
+      if (!agentEnabled(state, p.id)) await setAgentEnabled(p.id, true);
       state.provider = p.id;
       state.model = "";
       await persistAgentModels();
@@ -34537,8 +34684,8 @@ function bindAgentModelControls(p) {
   const addModel = async () => {
     const value = (pick?.value || "").trim();
     if (!value) return toast("\u8BF7\u8F93\u5165\u6216\u9009\u62E9\u6A21\u578B ID");
-    const next2 = [...getAgentModelList(p.id), value];
-    setAgentModelList(p.id, next2);
+    const next2 = [...getAgentModelList(state, p.id), value];
+    setAgentModelList(state, p.id, next2);
     await persistAgentModels();
     if (pick) pick.value = "";
     if (preset) preset.value = "";
@@ -34556,7 +34703,7 @@ function bindAgentModelControls(p) {
   $$(`[data-agent-use="${p.id}"]`).forEach((btn) => {
     btn.onclick = async () => {
       const model = btn.dataset.model || "";
-      if (!agentEnabled(p.id)) await setAgentEnabled(p.id, true);
+      if (!agentEnabled(state, p.id)) await setAgentEnabled(p.id, true);
       if (state.provider !== p.id) state.provider = p.id;
       state.model = model;
       await persistAgentModels();
@@ -34568,8 +34715,9 @@ function bindAgentModelControls(p) {
     btn.onclick = async () => {
       const model = btn.dataset.model || "";
       setAgentModelList(
+        state,
         p.id,
-        getAgentModelList(p.id).filter((m) => m !== model)
+        getAgentModelList(state, p.id).filter((m) => m !== model)
       );
       if (state.provider === p.id && state.model === model) state.model = "";
       await persistAgentModels();
@@ -34602,7 +34750,7 @@ function bindAgentModelControls(p) {
 }
 async function runAgentDefaultTest(id) {
   const p = AGENT_PROVIDERS.find((x) => x.id === id);
-  if (!agentInstalled(id)) return toast("\u672A\u627E\u5230\u8BE5 CLI");
+  if (!agentInstalled(state, id)) return toast("\u672A\u627E\u5230\u8BE5 CLI");
   const btn = $(`[data-agent-test-default="${id}"]`) || $("#agent-test-default");
   if (btn) btn.disabled = true;
   toast(`${p?.label || id}\uFF1A\u6D4B\u8BD5 CLI \u9ED8\u8BA4\u2026`);
@@ -34627,8 +34775,8 @@ async function mountAgentsSettings() {
     if (next2?.agentsEnabled) state.agentsEnabled = next2.agentsEnabled;
   } catch {
   }
-  ensureAgentModelsStore();
-  ensureAgentsEnabledStore();
+  ensureAgentModelsStore(state);
+  ensureAgentsEnabledStore(state);
   $$("[data-open-agent]").forEach((item) => {
     const open = () => openAgentDetail(item.dataset.openAgent);
     item.onclick = (e) => {
@@ -34679,12 +34827,12 @@ async function renderAgentDetail() {
     if (next2?.agentsEnabled) state.agentsEnabled = next2.agentsEnabled;
   } catch {
   }
-  ensureAgentModelsStore();
-  ensureAgentsEnabledStore();
+  ensureAgentModelsStore(state);
+  ensureAgentsEnabledStore(state);
   if (!["connection", "usage"].includes(agentDetailTab))
     agentDetailTab = "connection";
-  const installed = agentInstalled(p.id);
-  const enabled = agentEnabled(p.id);
+  const installed = agentInstalled(state, p.id);
+  const enabled2 = agentEnabled(state, p.id);
   const isDefault = state.provider === p.id;
   const tabs = [
     { id: "connection", title: "\u8FDE\u63A5" },
@@ -34707,8 +34855,8 @@ async function renderAgentDetail() {
     const setDefault = $("#agent-set-default");
     if (setDefault)
       setDefault.onclick = async () => {
-        if (!agentInstalled(p.id)) return toast("\u672A\u627E\u5230\u8BE5 CLI");
-        if (!agentEnabled(p.id)) await setAgentEnabled(p.id, true);
+        if (!agentInstalled(state, p.id)) return toast("\u672A\u627E\u5230\u8BE5 CLI");
+        if (!agentEnabled(state, p.id)) await setAgentEnabled(p.id, true);
         state.provider = p.id;
         state.model = "";
         await persistAgentModels();
@@ -34744,7 +34892,7 @@ async function renderAgentDetail() {
       settingsSection({
         title: "\u57FA\u672C\u4FE1\u606F",
         control: settingsPanel(
-          `<div class="account-overview-top agent-overview-top"><div class="agent-card-logo agent-overview-logo">${agentLogoSvg(p.id)}</div><div class="account-overview-info"><h2>${esc2(p.label)}</h2><div class="account-stat-meta"><span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "\u5DF2\u5B89\u88C5" : "\u672A\u5B89\u88C5"}</span>${enabled ? "" : `<span class="agent-badge agent-badge-off">\u5DF2\u5173\u95ED</span>`}${isDefault ? `<span class="agent-badge agent-badge-default">\u9ED8\u8BA4</span>` : ""}<span>${esc2(p.blurb)}</span></div></div></div>`
+          `<div class="account-overview-top agent-overview-top"><div class="agent-card-logo agent-overview-logo">${agentLogoSvg(p.id)}</div><div class="account-overview-info"><h2>${esc2(p.label)}</h2><div class="account-stat-meta"><span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "\u5DF2\u5B89\u88C5" : "\u672A\u5B89\u88C5"}</span>${enabled2 ? "" : `<span class="agent-badge agent-badge-off">\u5DF2\u5173\u95ED</span>`}${isDefault ? `<span class="agent-badge agent-badge-default">\u9ED8\u8BA4</span>` : ""}<span>${esc2(p.blurb)}</span></div></div></div>`
         )
       }),
       settingsSection({
@@ -34987,14 +35135,6 @@ async function pickAccountBackupPath(accountId) {
   } catch (e) {
     toast(e.message || "\u8BBE\u7F6E\u5931\u8D25");
   }
-}
-function uint8ToBase64(buf) {
-  let s = "";
-  const step = 32768;
-  for (let i = 0; i < buf.length; i += step) {
-    s += String.fromCharCode(...buf.subarray(i, i + step));
-  }
-  return btoa(s);
 }
 function pickImageFile() {
   return new Promise((resolve) => {

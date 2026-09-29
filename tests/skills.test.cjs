@@ -3,7 +3,7 @@ const { test } = require("node:test"),
   fs = require("node:fs"),
   os = require("node:os"),
   path = require("node:path");
-const { Skills, SKILLS_ROOT } = require("./skills.cjs");
+const { Skills, SKILLS_ROOT } = require("../skills.cjs");
 
 function vaultStub(root) {
   return {

@@ -4,7 +4,7 @@ const {_electron:electron}=require('@playwright/test'),assert=require('node:asse
  const bin=path.join(dir,'bin');fs.mkdirSync(bin);
  for(const name of ['cursor','codex','claude','zcode','opencode','antigravity'])fs.writeFileSync(path.join(bin,name),'#!/bin/sh\nexit 0\n',{mode:0o755});
  const env={...process.env,INKDESK_DATA:dir,INKDESK_VAULT:root,PATH:`${bin}${path.delimiter}${process.env.PATH||''}`};delete env.ELECTRON_RUN_AS_NODE;
- app=await electron.launch({...(process.env.ASIDE_TEST_APP ? {executablePath:process.env.ASIDE_TEST_APP,args:[]} : {args:[path.resolve('main.cjs')]}),env});const w=await app.firstWindow();
+ app=await electron.launch({...(process.env.ASIDE_TEST_APP ? {executablePath:process.env.ASIDE_TEST_APP,args:[]} : {args:[path.resolve(__dirname, "..", "main.cjs")]}),env});const w=await app.firstWindow();
  await app.evaluate(({ipcMain})=>{ipcMain.removeHandler('agent-models');ipcMain.handle('agent-models',(_,req)=>({models:[req.provider==='codex'?'gpt-current':'claude-current'],source:'CLI 实时模型目录',checkedAt:Date.now(),selectable:req.provider!=='zcode'}));});
  await w.locator('[data-page="settings"]').click();await w.locator('[data-settings-tab="agents"]').click();
  assert.equal(await w.locator('[data-open-agent="codex"] .agent-card-title strong').textContent(),'ChatGPT');

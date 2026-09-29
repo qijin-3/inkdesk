@@ -14,7 +14,7 @@ test.before(async () => {
     "review-diff.cjs",
   );
   await esbuild.build({
-    entryPoints: [path.join(__dirname, "ui", "review-diff.js")],
+    entryPoints: [path.join(__dirname, "..", "ui", "review-diff.js")],
     outfile: out,
     format: "cjs",
     platform: "node",

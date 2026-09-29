@@ -5,7 +5,7 @@ const {
   assetDownloadUrl,
   assertPackageBuffer,
   cmpVersion,
-} = require("./update.cjs");
+} = require("../update.cjs");
 
 test("pickMacAsset prefers zip over dmg", () => {
   const asset = pickMacAsset({

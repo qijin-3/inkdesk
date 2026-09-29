@@ -31,7 +31,8 @@ export function hideToast() {
   clearTimeout(toastTimer);
   $("#toast")?.classList.remove("show");
 }
-export const isWeb = () => !!window.desk?.web;
+export const isWeb = () =>
+  typeof window === "undefined" ? false : !!window.desk?.web;
 export function assetUrl(src) {
   if (typeof src !== "string") return src;
   if (!isWeb()) return src;

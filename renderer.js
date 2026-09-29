@@ -33,6 +33,36 @@ import {
   backupPathFor,
   groupOptionsHtml,
 } from "./ui/groups.js";
+import { createDocStore } from "./store/doc-store.js";
+import { time } from "./ui/perf.js";
+import {
+  sameAccount,
+  accountInitial,
+  accountLabelOf,
+  accountAvatarHtml,
+} from "./ui/accounts.js";
+import { formatJsonPreview, inferMaterialKind, uint8ToBase64 } from "./ui/materials-meta.js";
+import { formatDelta } from "./ui/metrics.js";
+import { resolveBackupPlan } from "./services/backup-plan.js";
+import {
+  AGENT_PROVIDERS,
+  settingsSection,
+  settingsPanel,
+  settingsField,
+  agentLogoSvg,
+  agentInstalled,
+  ensureAgentsEnabledStore,
+  agentEnabled,
+  installedAgentProviders,
+  selectableAgentProviders,
+  railProviderId,
+  railModelLabel,
+  ensureAgentModelsStore,
+  getAgentModelList,
+  setAgentModelList,
+  agentSuggestionIds,
+  agentListItemHtml,
+} from "./ui/agent-store.js";
 import {
   WECHAT_BLUE,
   WECHAT_BLUE_SOFT,
@@ -66,6 +96,21 @@ let metricsSort = "阅读";
 /** 仪表盘已发布文章多选路径 */
 let publishedSelection = new Set();
 let materialsFilter = "all";
+/** 文档保存协议：防抖 timer 与冲突标志由 store 拥有 */
+const docStore = createDocStore({
+  getState: () => state,
+  getCurrent: () => current,
+  isReviewDemo: () => reviewDemoActive,
+  isDirty: () => dirty,
+  setDirty: (v) => {
+    dirty = v;
+  },
+  api,
+  toast,
+  setSavedStatus,
+  onExternalConflict: (msg) => showSaveConflictDialog(msg),
+  queryCard: (id) => document.querySelector('[data-id="' + id + '"]'),
+});
 /** 打开系统文件选择器 */
 function pickFiles({ multiple = false, accept = "" } = {}) {
   return new Promise((resolve) => {
@@ -131,7 +176,6 @@ let state,
   /** 模型子页 Tab：连接 | 使用统计 */
   agentDetailTab = "connection",
   current,
-  saveTimer,
   busy = false,
   pending = null,
   sourceFiles = [],
@@ -167,8 +211,7 @@ let railMode = "assistant";
 let outlineOpen = false;
 /** 文章大纲是否展开全部层级（默认仅最高级） */
 let outlineExpanded = false;
-/** 磁盘冲突中：抑制重复 toast，直到用户刷新或放弃 */
-let saveConflict = false;
+/** 磁盘冲突中：抑制重复 toast，直到用户刷新或放弃（标志位由 docStore 拥有） */
 /** Aster FAB 卸载（眨眼 / 视线跟随） */
 let unmountAster = null;
 /** 侧栏头像 Aster 卸载 */
@@ -181,16 +224,6 @@ function accountList() {
   return state?.accounts || [];
 }
 
-/**
- * 账号展示名。
- * @param {string} id
- */
-function accountLabelOf(id) {
-  return (
-    accountList().find((a) => a.id === id)?.label ||
-    String(id || "").replace(/_/g, " ")
-  );
-}
 
 /**
  * 打开账号详情页并切到指定子 tab。
@@ -206,43 +239,6 @@ async function openAccountDetail(accountId, tab = "detail") {
   render();
 }
 
-/**
- * 兼容旧 AI/Dev 与文件夹名的账号比较。
- * @param {string} a
- * @param {string} b
- */
-function sameAccount(a, b) {
-  if (!a || !b) return false;
-  if (a === b) return true;
-  const key = (id) => {
-    if (id === "AI" || id.endsWith("_AI")) return "AI";
-    if (id === "Dev" || id.endsWith("_Dev")) return "Dev";
-    return id;
-  };
-  return key(a) === key(b);
-}
-
-/**
- * 账号展示名首字（无头像时用作占位）。
- * @param {string} label
- */
-function accountInitial(label) {
-  const s = String(label || "?").trim();
-  return Array.from(s)[0] || "?";
-}
-
-/**
- * 账号头像 HTML：有图用图，否则显示首字。
- * @param {{ label?: string, avatar?: string }} a
- * @param {string} [extraClass]
- */
-function accountAvatarHtml(a, extraClass = "") {
-  if (a.avatar) {
-    const src = assetUrl("inkasset://vault/" + encodeURIComponent(a.avatar));
-    return `<img class="account-avatar-img ${extraClass}" src="${esc(src)}" alt="" draggable="false">`;
-  }
-  return `<span class="account-avatar-fallback ${extraClass}" aria-hidden="true">${esc(accountInitial(a.label))}</span>`;
-}
 
 /**
  * 保证当前选中账号仍在列表中。
@@ -487,35 +483,6 @@ function sanitizeHtmlPreview(html) {
   return d.body.innerHTML;
 }
 
-/**
- * 格式化 JSON 预览文本。
- * @param {string} text
- */
-function formatJsonPreview(text) {
-  try {
-    return JSON.stringify(JSON.parse(text), null, 2);
-  } catch {
-    return text || "";
-  }
-}
-
-/**
- * 根据文件名推断素材类型（后端未返回 kind 时的回退）。
- * @param {string} name
- */
-function inferMaterialKind(name) {
-  const ext = String(name || "")
-    .split(".")
-    .pop()
-    .toLowerCase();
-  if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) return "image";
-  if (["md", "markdown"].includes(ext)) return "markdown";
-  if (["html", "htm"].includes(ext)) return "html";
-  if (ext === "json") return "json";
-  if (["txt", "csv", "yaml", "yml", "log", "tsv", "xml"].includes(ext))
-    return "text";
-  return "binary";
-}
 
 /**
  * 补全预览字段：类型、图片地址、文本摘要。
@@ -605,34 +572,11 @@ function materialDrawerBodyHTML(r) {
   return `<p class="muted">已保留原文件，当前格式暂不支持内嵌预览。</p><pre id="reference-text" class="material-preview is-code">${esc(text)}</pre>`;
 }
 /**
- * Electron 无 window.prompt，用本地弹窗收集单行文本。
- * @param {string} title
- * @param {{ value?: string, placeholder?: string, okLabel?: string }} [opts]
- * @returns {Promise<string|null>} 确认返回 trim 后文本，取消返回 null
+ * 保存当前仓库快照（防抖由 docStore 拥有，见 store/doc-store.js）。
+ * @returns {Promise<boolean>}
  */
 async function persist() {
-  clearTimeout(saveTimer);
-  if (reviewDemoActive) {
-    setSavedStatus("演示中 · 不保存");
-    dirty = false;
-    return true;
-  }
-  if (saveConflict) return false;
-  try {
-    const before = JSON.stringify(state);
-    await api("save", state);
-    if (before === JSON.stringify(state)) dirty = false;
-    setSavedStatus("");
-    return true;
-  } catch (e) {
-    const msg = e.message || String(e);
-    if (/外部修改|外部移动|草稿已在外部/.test(msg)) {
-      showSaveConflictDialog(msg);
-      return false;
-    }
-    toast("保存失败：" + msg);
-    return false;
-  }
+  return docStore.persist();
 }
 
 /**
@@ -651,8 +595,8 @@ function setSavedStatus(text) {
  * @param {string} msg
  */
 function showSaveConflictDialog(msg) {
-  if (saveConflict) return;
-  saveConflict = true;
+  if (docStore.saveConflict) return;
+  docStore.saveConflict = true;
   setSavedStatus("保存已暂停");
   toast("保存失败：" + msg);
   if ($("#save-conflict-modal")) return;
@@ -672,7 +616,7 @@ function showSaveConflictDialog(msg) {
         state.documents.find((d) => d.id === id) ||
         state.documents.find((d) => sameAccount(d.account, account));
       dirty = false;
-      saveConflict = false;
+      docStore.saveConflict = false;
       pending = null;
       m.remove();
       render();
@@ -683,20 +627,7 @@ function showSaveConflictDialog(msg) {
   };
 }
 function changed() {
-  const card = document.querySelector('[data-id="' + current.id + '"]');
-  if (card) {
-    card.querySelector("span").textContent = current.title;
-    card.querySelector("small").textContent =
-      new Date().toLocaleDateString("zh-CN") +
-      " · " +
-      current.body.length +
-      " 字";
-  }
-  dirty = true;
-  current.updated = new Date().toISOString();
-  setSavedStatus("保存中…");
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(persist, 500);
+  docStore.markChanged();
 }
 function newDoc() {
   if (!account) return toast("请先在设置中添加账号");
@@ -1063,7 +994,8 @@ function enhanceWechatPreview(root = $("#article-preview")) {
  * @param {{ keepImages?: boolean, blockImages?: boolean }} [opts]
  *   keepImages：保留正文图；blockImages：H1/H2/引用渲染为图片（草稿推送）
  */
-async function publishHTML(md, opts = {}) {
+async function publishHTML(...a) { return time("publishHTML", publishHTMLInner, ...a); }
+async function publishHTMLInner(md, opts = {}) {
   const serif = WECHAT_SERIF_PUBLISH;
   const d = new DOMParser().parseFromString(safeHTML(md), "text/html");
   if (opts.keepImages) {
@@ -1833,7 +1765,8 @@ function removeArticleOutline() {
 /**
  * 渲染预览模式：顶栏分栏切换公众号 / 小红书；侧栏收起。
  */
-function renderPreview() {
+function renderPreview(...a) { return time("renderPreview", renderPreviewInner, ...a); }
+function renderPreviewInner() {
   previewDocId = current.id;
   removeArticleOutline();
   if (previewPane !== "social") previewPane = "wechat";
@@ -1860,7 +1793,8 @@ function renderPreview() {
 /**
  * 渲染已发布文章的排版预览（公众号 / 小红书），与草稿预览同结构。
  */
-function renderPublishedPreview() {
+function renderPublishedPreview(...a) { return time("renderPublishedPreview", renderPublishedPreviewInner, ...a); }
+function renderPublishedPreviewInner() {
   if (!publishedPreview) {
     page = "dashboard";
     return renderDashboard();
@@ -1898,7 +1832,8 @@ function renderPublishedPreview() {
   });
 }
 
-function renderWrite() {
+function renderWrite(...a) { return time("renderWrite", renderWriteInner, ...a); }
+function renderWriteInner() {
   if (!current) {
     $("#main").innerHTML =
       `<div class="empty"><span class="eyebrow">A SPACE FOR YOUR WORDS</span><h1>把想说的话，写下来。</h1><p>从草稿开始，或导入已有文章。AI 在你需要时帮忙。</p><button class="primary" id="start">${I.plus()} 新建文章</button></div>`;
@@ -2887,8 +2822,7 @@ function renderPanel() {
   composer = new Composer($("#composer-input"), conversation(), {
     changed: () => {
       dirty = true;
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(persist, 500);
+      docStore.deferPersist();
     },
     send: () => $("#send").click(),
     picker: () => chooseChatFile(),
@@ -3305,12 +3239,6 @@ function showUnmatchedMatcher(preview) {
   });
 }
 
-/** 格式化增减：+12 / -3；无变化返回空串 */
-function formatDelta(n) {
-  if (n == null || n === 0 || !Number.isFinite(Number(n))) return "";
-  const v = Number(n);
-  return (v > 0 ? "+" : "") + v.toLocaleString();
-}
 
 /** 从 xlsx 导入笔记数据并更新归档 YAML */
 async function runNoteImport() {
@@ -3349,7 +3277,8 @@ async function runNoteImport() {
   }
 }
 
-function renderDashboard() {
+function renderDashboard(...a) { return time("renderDashboard", renderDashboardInner, ...a); }
+function renderDashboardInner() {
   const rows = state.metrics.filter((r) => sameAccount(r["账号"], account));
   const deltas = state.metricDeltas?.[account] || null;
   const sum = (k) =>
@@ -3531,47 +3460,10 @@ async function openPublishedPreview(rel) {
  */
 async function backupPublishedArticle(paths) {
   if (isWeb()) return toast("本地同步仅支持桌面端");
-  const list = (Array.isArray(paths) ? paths : [paths]).filter(Boolean);
-  if (!list.length) return;
-  const first = list[0];
-  const accountId =
-    (state.archives || []).find((a) => a.path === first)?.account ||
-    first.split("/")[0] ||
-    account;
-  const groups = [...new Set(list.map((rel) => publishedGroup(state, rel) || ""))];
-  const singleGroup = groups.length === 1 ? groups[0] || null : null;
-  const mixedGroups = groups.length > 1;
-  const defaultPath = singleGroup ? backupPathFor(state, singleGroup, accountId) : "";
-  const perPathDefaults = list.map((rel) => ({
-    rel,
-    group: publishedGroup(state, rel),
-    dest: backupPathFor(state, publishedGroup(state, rel), accountId),
-  }));
-  const allHaveDefault = perPathDefaults.every((x) => x.dest);
-  const label =
-    list.length === 1
-      ? `「${
-          publishedPreview?.path === first
-            ? publishedPreview.title
-            : (state.archives || []).find((a) => a.path === first)?.title ||
-              first.split("/").pop().replace(/\.md$/, "") ||
-              "文章"
-        }」`
-      : `选中的 ${list.length} 篇文章`;
-  const rememberTarget = singleGroup
-    ? `分组「${singleGroup}」`
-    : mixedGroups
-      ? "（多分组时请分别设置）"
-      : "该账号";
-  const defaultHint = mixedGroups
-    ? allHaveDefault
-      ? "各分组已配置默认路径，可按分组分别同步"
-      : "选中文章分组不同或未配置路径，请选择统一路径，或先设置分组"
-    : defaultPath
-      ? defaultPath
-      : singleGroup
-        ? `分组「${singleGroup}」未设置（可在设置 · 分组中配置）`
-        : "未设置（可先为文章指定分组，或在设置 · 账号中配置）";
+  const plan = resolveBackupPlan(state, { paths, account, preview: publishedPreview });
+  if (!plan) return;
+  const { list, accountId, singleGroup, mixedGroups, defaultPath, perPathDefaults,
+    allHaveDefault, label, rememberTarget, defaultHint } = plan;
 
   /** @param {string} destDir @param {boolean} [remember] */
   const runBackup = async (destDir, remember) => {
@@ -4031,70 +3923,12 @@ async function openTopicDrawer(rel, opts = {}) {
   };
 }
 
-/**
- * 设置页分区；title 可选，省略则不渲染分区标题。
- * @param {{ title?: string, control: string, className?: string }} opts
- */
-function settingsSection({ title, control, className = "" }) {
-  const titleHtml = title
-    ? `<h3 class="settings-section-title">${esc(title)}</h3>`
-    : "";
-  return `<section class="settings-section ${className}">${titleHtml}<div class="settings-section-control">${control}</div></section>`;
-}
-
-/** 右侧白底面板 */
-function settingsPanel(inner, className = "") {
-  return `<div class="settings-panel ${className}">${inner}</div>`;
-}
-
-/** 面板内表单字段 */
-function settingsField(label, controlHtml) {
-  return `<label class="settings-field"><span class="settings-field-label">${esc(label)}</span>${controlHtml}</label>`;
-}
-
-const AGENT_PROVIDERS = [
-  { id: "cursor", label: "Cursor", blurb: "Cursor Agent CLI" },
-  { id: "codex", label: "ChatGPT", blurb: "OpenAI Codex CLI" },
-  { id: "claude", label: "Claude Code", blurb: "Anthropic Claude Code" },
-  { id: "zcode", label: "ZCode", blurb: "Z.ai ZCode（沿用 CLI 默认模型）" },
-  { id: "opencode", label: "OpenCode", blurb: "OpenCode CLI" },
-  { id: "antigravity", label: "Antigravity", blurb: "Google Antigravity（agy）" },
-];
-
-function agentLogoSvg(id, size = 28) {
-  const extensions = {
-    cursor: "png",
-    codex: "png",
-    claude: "ico",
-    zcode: "png",
-    opencode: "svg",
-    antigravity: "ico",
-  };
-  return extensions[id]
-    ? `<img src="assets/agents/${id}.${extensions[id]}" width="${size}" height="${size}" style="object-fit:contain" alt="">`
-    : "";
-}
-
-function agentInstalled(id) {
-  return !!state.agents?.[id];
-}
-
-function ensureAgentsEnabledStore() {
-  if (!state.agentsEnabled || typeof state.agentsEnabled !== "object")
-    state.agentsEnabled = {};
-}
-
-/** Agent 是否在对话中可选；缺省视为启用 */
-function agentEnabled(id) {
-  ensureAgentsEnabledStore();
-  return state.agentsEnabled[id] !== false;
-}
 
 async function setAgentEnabled(id, on) {
-  ensureAgentsEnabledStore();
+  ensureAgentsEnabledStore(state);
   state.agentsEnabled = { ...state.agentsEnabled, [id]: !!on };
   if (!on && state.provider === id) {
-    const fallback = selectableAgentProviders()[0];
+    const fallback = selectableAgentProviders(state)[0];
     if (fallback) {
       state.provider = fallback.id;
       state.model = "";
@@ -4103,44 +3937,20 @@ async function setAgentEnabled(id, on) {
   await persist();
 }
 
-/** 已安装的 Agent 列表 */
-function installedAgentProviders() {
-  return AGENT_PROVIDERS.filter((p) => agentInstalled(p.id));
-}
-
-/** 对话中可选的 Agent（已安装且已启用） */
-function selectableAgentProviders() {
-  return installedAgentProviders().filter((p) => agentEnabled(p.id));
-}
-
-/** 当前侧栏展示用的 provider（优先已安装且已启用） */
-function railProviderId() {
-  const selectable = selectableAgentProviders();
-  if (selectable.some((p) => p.id === state.provider)) return state.provider;
-  return selectable[0]?.id || state.provider;
-}
-
-/** 触发器文案：模型名，未指定时为「默认」 */
-function railModelLabel(provider = railProviderId()) {
-  if (provider === state.provider && state.model) return state.model;
-  if (provider === state.provider) return "默认";
-  const p = AGENT_PROVIDERS.find((x) => x.id === provider);
-  return p?.label || "选择模型";
-}
 
 /**
  * 侧栏 Agent / 模型联级选择器 HTML。
  */
 function modelPickerHTML() {
-  const provider = railProviderId();
+  const provider = railProviderId(state);
   const p = AGENT_PROVIDERS.find((x) => x.id === provider);
-  const label = railModelLabel(provider);
-  const agents = selectableAgentProviders();
+  const label = railModelLabel(state, provider);
+  const agents = selectableAgentProviders(state);
   const agentRows = agents.length
     ? agents
         .map((agent) => {
           const models =
-            agent.id === "zcode" ? [] : getAgentModelList(agent.id);
+            agent.id === "zcode" ? [] : getAgentModelList(state, agent.id);
           const usingAgent = state.provider === agent.id;
           const modelBtns = [
             `<button type="button" role="menuitemradio" class="model-picker-option" data-provider="${agent.id}" data-model="" aria-checked="${usingAgent && !state.model}">${usingAgent && !state.model ? "✓ " : ""}默认</button>`,
@@ -4273,7 +4083,7 @@ function bindModelPicker() {
     activeComposerMenuDismiss = closeAll;
     placeMenu();
     const active = root.querySelector(
-      `.model-picker-agent[data-agent="${CSS.escape(railProviderId())}"]`,
+      `.model-picker-agent[data-agent="${CSS.escape(railProviderId(state))}"]`,
     );
     if (active) openSubmenu(active);
     onDocPointer = (ev) => {
@@ -4307,7 +4117,7 @@ function bindModelPicker() {
       e.stopPropagation();
       const provider = opt.getAttribute("data-provider") || "";
       const model = opt.getAttribute("data-model") || "";
-      if (!provider || !agentInstalled(provider) || !agentEnabled(provider)) {
+      if (!provider || !agentInstalled(state, provider) || !agentEnabled(state, provider)) {
         toast("未找到该 CLI");
         return;
       }
@@ -4315,7 +4125,7 @@ function bindModelPicker() {
       state.model = model;
       closeAll();
       await persistAgentModels();
-      const label = railModelLabel(provider);
+      const label = railModelLabel(state, provider);
       const logo = trigger.querySelector(".model-picker-logo");
       const text = trigger.querySelector(".model-picker-label");
       if (logo) logo.innerHTML = agentLogoSvg(provider, 16);
@@ -4348,29 +4158,6 @@ function bindModelPicker() {
   });
 }
 
-function ensureAgentModelsStore() {
-  if (!state.agentModels || typeof state.agentModels !== "object")
-    state.agentModels = {};
-}
-
-function getAgentModelList(provider) {
-  ensureAgentModelsStore();
-  const list = state.agentModels[provider];
-  return Array.isArray(list) ? list.filter(Boolean) : [];
-}
-
-function setAgentModelList(provider, list) {
-  ensureAgentModelsStore();
-  state.agentModels = {
-    ...state.agentModels,
-    [provider]: [...new Set(list.map((x) => String(x).trim()).filter(Boolean))],
-  };
-}
-
-function agentSuggestionIds(provider, discovered = []) {
-  const saved = getAgentModelList(provider);
-  return [...new Set([...discovered, ...saved])];
-}
 
 function openAgentDetail(id, tab = "connection") {
   agentDetailId = id;
@@ -4379,31 +4166,9 @@ function openAgentDetail(id, tab = "connection") {
   render();
 }
 
-function agentListItemHtml(p) {
-  const installed = agentInstalled(p.id);
-  const enabled = agentEnabled(p.id);
-  const isDefault = state.provider === p.id;
-  return `<div class="agent-list-item ${isDefault ? "is-default" : ""} ${installed ? "" : "is-missing"} ${enabled ? "" : "is-off"}" data-open-agent="${p.id}" role="button" tabindex="0">
-  <div class="agent-card-logo">${agentLogoSvg(p.id)}</div>
-  <span class="agent-list-main">
-    <span class="agent-card-title">
-      <strong>${esc(p.label)}</strong>
-      ${isDefault ? `<span class="agent-badge agent-badge-default">默认</span>` : ""}
-      <span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "已安装" : "未安装"}</span>
-      ${enabled ? "" : `<span class="agent-badge agent-badge-off">已关闭</span>`}
-    </span>
-    <span class="agent-card-blurb">${esc(p.blurb)}</span>
-  </span>
-  <label class="agent-switch" title="${enabled ? "关闭后对话中不可选" : "启用以在对话中选择"}">
-    <input type="checkbox" role="switch" data-agent-enable="${p.id}" ${enabled ? "checked" : ""} aria-label="${enabled ? "关闭" : "启用"} ${esc(p.label)}">
-    <span class="agent-switch-track" aria-hidden="true"></span>
-  </label>
-  <span class="account-list-chevron" aria-hidden="true">›</span>
-</div>`;
-}
 
 function agentModelsPanelHtml(p, info) {
-  const installed = agentInstalled(p.id);
+  const installed = agentInstalled(state, p.id);
   if (!installed) {
     return `<p class="settings-hint">安装并登录对应 CLI 后，可添加模型并逐一测试连通。</p>`;
   }
@@ -4414,12 +4179,12 @@ function agentModelsPanelHtml(p, info) {
       <p class="settings-hint">${esc(p.label)} 沿用 CLI 默认模型，连通性请用右上角「测试默认」。</p>
     </div>`;
   }
-  const saved = getAgentModelList(p.id);
+  const saved = getAgentModelList(state, p.id);
   if (!saved.length && state.provider === p.id && state.model) {
-    setAgentModelList(p.id, [state.model]);
+    setAgentModelList(state, p.id, [state.model]);
   }
-  const list = getAgentModelList(p.id);
-  const suggestions = agentSuggestionIds(p.id, info?.models || []);
+  const list = getAgentModelList(state, p.id);
+  const suggestions = agentSuggestionIds(state, p.id, info?.models || []);
   const rows = list.length
     ? list
         .map((m) => {
@@ -4465,14 +4230,14 @@ function setModelRowStatus(provider, model, text, kind = "") {
 }
 
 async function persistAgentModels() {
-  ensureAgentModelsStore();
+  ensureAgentModelsStore(state);
   await persist();
 }
 
 async function fillAgentCard(p, refresh = false) {
   const body = $(`[data-agent-body="${p.id}"]`);
   if (!body) return;
-  if (!agentInstalled(p.id)) {
+  if (!agentInstalled(state, p.id)) {
     body.innerHTML = agentModelsPanelHtml(p, null);
     return;
   }
@@ -4497,7 +4262,7 @@ function bindAgentModelControls(p) {
   const useDefault = $(`[data-agent-cli-default="${p.id}"]`);
   if (useDefault)
     useDefault.onclick = async () => {
-      if (!agentEnabled(p.id)) await setAgentEnabled(p.id, true);
+      if (!agentEnabled(state, p.id)) await setAgentEnabled(p.id, true);
       state.provider = p.id;
       state.model = "";
       await persistAgentModels();
@@ -4514,8 +4279,8 @@ function bindAgentModelControls(p) {
   const addModel = async () => {
     const value = (pick?.value || "").trim();
     if (!value) return toast("请输入或选择模型 ID");
-    const next = [...getAgentModelList(p.id), value];
-    setAgentModelList(p.id, next);
+    const next = [...getAgentModelList(state, p.id), value];
+    setAgentModelList(state, p.id, next);
     await persistAgentModels();
     if (pick) pick.value = "";
     if (preset) preset.value = "";
@@ -4534,7 +4299,7 @@ function bindAgentModelControls(p) {
   $$(`[data-agent-use="${p.id}"]`).forEach((btn) => {
     btn.onclick = async () => {
       const model = btn.dataset.model || "";
-      if (!agentEnabled(p.id)) await setAgentEnabled(p.id, true);
+      if (!agentEnabled(state, p.id)) await setAgentEnabled(p.id, true);
       if (state.provider !== p.id) state.provider = p.id;
       state.model = model;
       await persistAgentModels();
@@ -4546,9 +4311,9 @@ function bindAgentModelControls(p) {
   $$(`[data-agent-remove-model="${p.id}"]`).forEach((btn) => {
     btn.onclick = async () => {
       const model = btn.dataset.model || "";
-      setAgentModelList(
+      setAgentModelList(state, 
         p.id,
-        getAgentModelList(p.id).filter((m) => m !== model),
+        getAgentModelList(state, p.id).filter((m) => m !== model),
       );
       if (state.provider === p.id && state.model === model) state.model = "";
       await persistAgentModels();
@@ -4583,7 +4348,7 @@ function bindAgentModelControls(p) {
 
 async function runAgentDefaultTest(id) {
   const p = AGENT_PROVIDERS.find((x) => x.id === id);
-  if (!agentInstalled(id)) return toast("未找到该 CLI");
+  if (!agentInstalled(state, id)) return toast("未找到该 CLI");
   const btn =
     $(`[data-agent-test-default="${id}"]`) || $("#agent-test-default");
   if (btn) btn.disabled = true;
@@ -4612,8 +4377,8 @@ async function mountAgentsSettings() {
   } catch {
     /* keep cached */
   }
-  ensureAgentModelsStore();
-  ensureAgentsEnabledStore();
+  ensureAgentModelsStore(state);
+  ensureAgentsEnabledStore(state);
 
   $$("[data-open-agent]").forEach((item) => {
     const open = () => openAgentDetail(item.dataset.openAgent);
@@ -4667,13 +4432,13 @@ async function renderAgentDetail() {
   } catch {
     /* keep cached */
   }
-  ensureAgentModelsStore();
-  ensureAgentsEnabledStore();
+  ensureAgentModelsStore(state);
+  ensureAgentsEnabledStore(state);
   if (!["connection", "usage"].includes(agentDetailTab))
     agentDetailTab = "connection";
 
-  const installed = agentInstalled(p.id);
-  const enabled = agentEnabled(p.id);
+  const installed = agentInstalled(state, p.id);
+  const enabled = agentEnabled(state, p.id);
   const isDefault = state.provider === p.id;
   const tabs = [
     { id: "connection", title: "连接" },
@@ -4705,8 +4470,8 @@ async function renderAgentDetail() {
     const setDefault = $("#agent-set-default");
     if (setDefault)
       setDefault.onclick = async () => {
-        if (!agentInstalled(p.id)) return toast("未找到该 CLI");
-        if (!agentEnabled(p.id)) await setAgentEnabled(p.id, true);
+        if (!agentInstalled(state, p.id)) return toast("未找到该 CLI");
+        if (!agentEnabled(state, p.id)) await setAgentEnabled(p.id, true);
         state.provider = p.id;
         state.model = "";
         await persistAgentModels();
@@ -5050,18 +4815,6 @@ async function pickAccountBackupPath(accountId) {
   }
 }
 
-/**
- * Uint8Array 转 Base64（分块，避免大图撑爆调用栈）。
- * @param {Uint8Array} buf
- */
-function uint8ToBase64(buf) {
-  let s = "";
-  const step = 0x8000;
-  for (let i = 0; i < buf.length; i += step) {
-    s += String.fromCharCode(...buf.subarray(i, i + step));
-  }
-  return btoa(s);
-}
 
 /**
  * 网页端弹出图片文件选择。

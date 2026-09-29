@@ -32,7 +32,7 @@ function hashes(dir, result = {}) {
     data = fs.mkdtempSync(path.join(os.tmpdir(), "ink-real-"));
   const env = { ...process.env, INKDESK_DATA: data, INKDESK_VAULT: root };
   delete env.ELECTRON_RUN_AS_NODE;
-  const app = await electron.launch({ args: [path.resolve("main.cjs")], env });
+  const app = await electron.launch({ args: [path.resolve(__dirname, "..", "main.cjs")], env });
   try {
     const w = await app.firstWindow();
     w.setDefaultTimeout(10000);

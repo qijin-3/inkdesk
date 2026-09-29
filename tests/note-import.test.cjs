@@ -8,7 +8,7 @@ const {
   rowToYaml,
   matchNoteRows,
   parsePublishDate,
-} = require("./note-import.cjs");
+} = require("../note-import.cjs");
 
 test("parse xlsx note table and match archives", () => {
   assert.equal(parsePublishDate("2026年08月15日13时12分39秒"), "2026-08-15");

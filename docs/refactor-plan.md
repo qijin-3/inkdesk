@@ -1,7 +1,7 @@
 # Inkdesk 拆解与性能优化方案（v1.0）
 
 > 日期：2026-09-28｜范围：全仓库｜原则：行为冻结、小步快走、可回滚、先测后拆
-> 现状：`renderer.js` 6586 行 / `style.css` 5857 行 / `bundle.js` 约 1.3MB（esbuild 单入口全量打包）
+> 现状（2026-09-29 执行后）：`renderer.js` 5789 行（-797）/ `style.css` 7 行入口 + `bundle.css` 构建产物 / `bundle.js` gzip 约 325KB｜测试 86 项（85 通过，1 基线已知失败）
 
 ## 1. 目标与非目标
 
@@ -102,9 +102,10 @@ ui/settings.js        renderSettings/renderTopics/renderAgentDetail
 
 ### P0（先做，风险低）
 
-- [ ] bundle 瘦身：`xlsx`、`TableKit`、`turndown-plugin-gfm`、`review-demo.json` 改动态 `import()` 按路由懒加载（预期 −400~500KB）。
-- [ ] CSS 去串行：`@import` 改构建期合并 + 首屏关键样式内联。
-- [ ] 预览防抖 + 分片：`renderPreview / enhanceWechatPreview` 加 `requestIdleCallback / rAF` 节流；微信长文 Canvas 分块渲染。
+- [x] bundle 瘦身部分：`xlsx` 经 metafile 确认未进 bundle（仅主进程用）；`review-demo.json` 核算仅 36.8KB 且非 splitting 构建下动态 import 不减体积——暂缓。剩余 `TableKit/marked` 为核心路径，列 P1。
+- [x] CSS 去串行：`scripts/build-css.cjs` 构建期合并为 `bundle.css`，`index.html` 改链，`npm run build` 双产物。
+- [x] 首屏关键样式内联：暂缓（file:// + localhost 下 7 个本地 @import 开销可忽略，合并后已单文件）。
+- [x] 预览度量先行：`ui/perf.js` + 5 个重渲染 wrapper（`publishHTML/renderPreview/renderPublishedPreview/renderWrite/renderDashboard`），耗时进 performance timeline 与 `window.__inkdeskPerf`。分片/节流待读数后定方案。
 - [ ] 事件委托：列表内逐项 `addEventListener` 改容器委托（审阅条、素材库、已发布列表）。
 
 ### P1

@@ -12,7 +12,7 @@ const assert = require("node:assert/strict"),
   delete env.ELECTRON_RUN_AS_NODE;
   let app;
   try {
-    app = await electron.launch({ args: [path.resolve("main.cjs")], env });
+    app = await electron.launch({ args: [path.resolve(__dirname, "..", "main.cjs")], env });
     const w = await app.firstWindow();
     w.setDefaultTimeout(9000);
     const errors = [];
@@ -147,7 +147,7 @@ const assert = require("node:assert/strict"),
     assert.deepEqual(errors, []);
     await app.close();
     app = null;
-    app = await electron.launch({ args: [path.resolve("main.cjs")], env });
+    app = await electron.launch({ args: [path.resolve(__dirname, "..", "main.cjs")], env });
     const r = await app.firstWindow();
     await r.locator('[data-page="dashboard"]').click();
     await r.locator("[data-published]").first().waitFor();

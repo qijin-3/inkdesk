@@ -7,7 +7,7 @@ let mod;
 test.before(async () => {
   // 同 review-diff：ESM 源码经 esbuild 转 CJS 后测试，保证测的是同一份实现。
   await esbuild.build({
-    entryPoints: [path.join(__dirname, "ui", "groups.js")],
+    entryPoints: [path.join(__dirname, "..", "ui", "groups.js")],
     outfile: "/tmp/groups.test.cjs",
     format: "cjs",
     platform: "node",

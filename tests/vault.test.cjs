@@ -3,7 +3,7 @@ const test = require("node:test"),
   fs = require("node:fs"),
   os = require("node:os"),
   path = require("node:path");
-const { Vault, split } = require("./vault.cjs");
+const { Vault, split } = require("../vault.cjs");
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ink-vault-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

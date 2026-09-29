@@ -10,7 +10,7 @@ const path = require("node:path");
     fs.mkdirSync(path.join(vaultRoot, "Demo_AI", sub), { recursive: true });
   const env = { ...process.env, INKDESK_DATA: dir, INKDESK_VAULT: vaultRoot };
   delete env.ELECTRON_RUN_AS_NODE;
-  const app = await electron.launch({ args: [path.resolve("main.cjs")], env });
+  const app = await electron.launch({ args: [path.resolve(__dirname, "..", "main.cjs")], env });
   try {
     const win = await app.firstWindow();
     const errors = [];

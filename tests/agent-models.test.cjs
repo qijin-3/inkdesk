@@ -1,7 +1,7 @@
 const test=require('node:test'), assert=require('node:assert/strict');
 const {PassThrough}=require('node:stream'),{EventEmitter}=require('node:events');
-const {parseModelLines,codexModels}=require('./agent-models.cjs');
-const {DeskCore}=require('./desk-core.cjs');
+const {parseModelLines,codexModels}=require("../agent-models.cjs");
+const {DeskCore}=require("../desk-core.cjs");
 test('model parser retains Claude IDs and rejects help, display names and prose',()=>{
  assert.deepEqual(parseModelLines('Available models\nauto - Auto\nclaude-opus-5-high - Opus\nopenai/gpt-6-sol\nUsage: codex models\nGemini 3 Pro (High)\noptions\nclaude-opus-5-high - duplicate'),['auto','claude-opus-5-high','openai/gpt-6-sol']);
 });

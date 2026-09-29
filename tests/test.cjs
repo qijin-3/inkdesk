@@ -3,7 +3,7 @@ const test = require("node:test"),
   fs = require("node:fs"),
   os = require("node:os"),
   path = require("node:path");
-const { within, parseCSV, proposedApply } = require("./core.cjs");
+const { within, parseCSV, proposedApply } = require("../core.cjs");
 test("reject stale article proposal", () => {
   assert.throws(() => proposedApply("human edit", "old", "AI edit"));
   assert.equal(proposedApply("old", "old", "new"), "new");

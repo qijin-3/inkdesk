@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
-const {AgentUsage,normalizeUsage}=require('./agent-usage.cjs');const {AgentOutput}=require('./agent-output.cjs');const {DeskCore}=require('./desk-core.cjs');
+const {AgentUsage,normalizeUsage}=require("../agent-usage.cjs");const {AgentOutput}=require("../agent-output.cjs");const {DeskCore}=require("../desk-core.cjs");
 function setup(t){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'aside-usage-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));return {dir,usage:new AgentUsage(dir)};}
 test('calls, conversations, tests and unknown tokens remain distinct and survive reload',t=>{
  const {dir,usage}=setup(t);const m={provider:'codex',account:'a',articleId:'d',conversationId:'c'};

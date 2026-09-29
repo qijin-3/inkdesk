@@ -3,9 +3,9 @@ const test = require("node:test"),
   fs = require("node:fs"),
   path = require("node:path"),
   os = require("node:os");
-const { Vault } = require("./vault.cjs"),
-  { Knowledge } = require("./knowledge.cjs"),
-  { calendar, validDate, publishSummary } = require("./calendar.cjs");
+const { Vault } = require("../vault.cjs"),
+  { Knowledge } = require("../knowledge.cjs"),
+  { calendar, validDate, publishSummary } = require("../calendar.cjs");
 function setup(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ink-knowledge-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
