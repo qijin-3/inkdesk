@@ -68,6 +68,34 @@ function accountLabel(folder) {
   return String(folder || "").replace(/_/g, " ");
 }
 
+/** 账号模式：小红书（现有）或 X */
+const ACCOUNT_MODES = new Set(["xhs", "x"]);
+
+/**
+ * 规范化账号模式；缺省或非法值回退为小红书。
+ * @param {unknown} mode
+ * @returns {"xhs"|"x"}
+ */
+function normalizeAccountMode(mode) {
+  const m = String(mode || "").trim().toLowerCase();
+  return ACCOUNT_MODES.has(m) ? m : "xhs";
+}
+
+/**
+ * 将注册表条目归一为标准账号对象。
+ * @param {{ folder: string, label?: string, avatar?: string, mode?: string }} a
+ */
+function normalizeAccountEntry(a) {
+  const folder = a.folder;
+  return {
+    id: folder,
+    folder,
+    label: a.label || accountLabel(folder),
+    avatar: a.avatar || "",
+    mode: normalizeAccountMode(a.mode),
+  };
+}
+
 const compact = (account) =>
   `# ${accountLabel(account)} · 写作约定\n\n## 我是谁\n持续记录自己的判断与实践，写给关心同类问题的读者。\n\n## 怎么表达\n- 像与朋友聊天，具体、坦诚；保留自己的判断和不确定性。\n- 从真实问题或经历出发，有用时给出例子；不强制套结构、金句或行动清单。\n- 不编造经历、效果、引用和数据；避免焦虑营销与夸张承诺。\n\n## 怎么协作\n- 我写、我决定；AI 只处理本次按钮或对话的要求，改稿先预览。\n- 核查区分事实、观点和推测；没有来源的关键事实标为待核实。\n- 定稿前由我确认，保存版本后移入本账号 Archive；平台数据来自文章 YAML。\n`;
 class Vault {
@@ -113,12 +141,7 @@ class Vault {
     if (stored && Array.isArray(stored.accounts)) {
       this.accounts = stored.accounts
         .filter((a) => a?.folder)
-        .map((a) => ({
-          id: a.folder,
-          folder: a.folder,
-          label: a.label || accountLabel(a.folder),
-          avatar: a.avatar || "",
-        }))
+        .map((a) => normalizeAccountEntry(a))
         .sort((a, b) => a.label.localeCompare(b.label, "zh"));
       return this.accounts;
     }
@@ -132,12 +155,7 @@ class Vault {
         )
           continue;
         if (this.looksLikeAccount(e.name))
-          byId.set(e.name, {
-            id: e.name,
-            folder: e.name,
-            label: accountLabel(e.name),
-            avatar: "",
-          });
+          byId.set(e.name, normalizeAccountEntry({ folder: e.name }));
       }
     }
     this.accounts = [...byId.values()].sort((a, b) =>
@@ -194,13 +212,17 @@ class Vault {
   /**
    * 新建账号：创建文件夹与四个标准子目录。
    * @param {string} name
+   * @param {{ mode?: string }} [opts]
    */
-  createAccount(name) {
+  createAccount(name, opts = {}) {
     const folder = accountFolderName(name);
     if (fs.existsSync(this.p(folder)) && this.accounts.some((a) => a.id === folder))
       throw Error("账号已存在");
     this.ensureAccountDirs(folder);
-    const entry = { id: folder, folder, label: accountLabel(folder), avatar: "" };
+    const entry = normalizeAccountEntry({
+      folder,
+      mode: opts?.mode,
+    });
     this.accounts = this.accounts.filter((a) => a.id !== folder).concat(entry);
     this.accounts.sort((a, b) => a.label.localeCompare(b.label, "zh"));
     this.writeJSON(this.meta + "/accounts.json", { accounts: this.accounts });
@@ -210,8 +232,9 @@ class Vault {
   /**
    * 将 vault 内已有文件夹注册为账号（并补齐四个标准子目录）。
    * @param {string} folderOrAbs 相对 vault 的文件夹名，或绝对路径
+   * @param {{ mode?: string }} [opts]
    */
-  registerAccount(folderOrAbs) {
+  registerAccount(folderOrAbs, opts = {}) {
     let folder = String(folderOrAbs || "").trim();
     if (path.isAbsolute(folder)) {
       const abs = fs.realpathSync(folder);
@@ -224,16 +247,30 @@ class Vault {
     folder = accountFolderName(folder);
     this.ensureAccountDirs(folder);
     const prev = this.accounts.find((a) => a.id === folder);
-    const entry = {
-      id: folder,
+    const entry = normalizeAccountEntry({
       folder,
-      label: accountLabel(folder),
       avatar: prev?.avatar || "",
-    };
+      mode: opts?.mode ?? prev?.mode,
+    });
     this.accounts = this.accounts.filter((a) => a.id !== folder).concat(entry);
     this.accounts.sort((a, b) => a.label.localeCompare(b.label, "zh"));
     this.writeJSON(this.meta + "/accounts.json", { accounts: this.accounts });
     return entry;
+  }
+
+  /**
+   * 读取账号模式（缺省小红书）。
+   * @param {string} id
+   * @returns {"xhs"|"x"}
+   */
+  accountMode(id) {
+    try {
+      const folder = this.resolveAccountId(id);
+      const acc = this.accounts.find((a) => a.id === folder);
+      return normalizeAccountMode(acc?.mode);
+    } catch {
+      return "xhs";
+    }
   }
 
   /**
@@ -283,6 +320,7 @@ class Vault {
       folder,
       label: acc?.label || accountLabel(folder),
       avatar: acc?.avatar || "",
+      mode: normalizeAccountMode(acc?.mode),
       path: base,
       bytes,
       files: filesCount,
@@ -482,7 +520,17 @@ class Vault {
                 path: rel,
               };
               row["阅读"] = number(fields["观看量"] ?? fields["阅读"]);
-              for (const k of ["收藏", "评论", "涨粉", "曝光", "点赞", "分享"])
+              for (const k of [
+                "收藏",
+                "评论",
+                "涨粉",
+                "曝光",
+                "点赞",
+                "分享",
+                "互动",
+                "回复",
+                "转发",
+              ])
                 row[k] = number(fields[k]);
               metrics.push(row);
               archives.push({
@@ -1180,4 +1228,11 @@ function number(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
-module.exports = { Vault, split, clean, compact };
+module.exports = {
+  Vault,
+  split,
+  clean,
+  compact,
+  normalizeAccountMode,
+  normalizeAccountEntry,
+};

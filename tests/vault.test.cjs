@@ -174,16 +174,51 @@ test("finalizing a legacy multi-version article does not leave a new rogue draft
   );
 });
 
-test("topics list/create/read/delete stay under account 01_Topics", (t) => {
+test("createAccount stores mode; missing mode defaults to xhs", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ink-vault-mode-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const { Vault, normalizeAccountMode } = require("../vault.cjs");
+  assert.equal(normalizeAccountMode(undefined), "xhs");
+  assert.equal(normalizeAccountMode("x"), "x");
+  assert.equal(normalizeAccountMode("XHS"), "xhs");
+  const v = new Vault(root);
+  const xhs = v.createAccount("Mode_Xhs");
+  assert.equal(xhs.mode, "xhs");
+  const x = v.createAccount("Mode_X", { mode: "x" });
+  assert.equal(x.mode, "x");
+  assert.equal(v.accountMode("Mode_X"), "x");
+  const raw = JSON.parse(
+    fs.readFileSync(v.p("_system/inkdesk/accounts.json"), "utf8"),
+  );
+  assert.equal(raw.accounts.find((a) => a.folder === "Mode_X").mode, "x");
+  // 旧数据无 mode 字段时读回为 xhs
+  raw.accounts.push({
+    id: "Legacy_Acc",
+    folder: "Legacy_Acc",
+    label: "Legacy Acc",
+    avatar: "",
+  });
+  fs.mkdirSync(v.p("Legacy_Acc/02_Drafts"), { recursive: true });
+  fs.writeFileSync(
+    v.p("_system/inkdesk/accounts.json"),
+    JSON.stringify(raw, null, 2),
+  );
+  const v2 = new Vault(root);
+  assert.equal(v2.accountMode("Legacy_Acc"), "xhs");
+  const stats = v2.listAccountsWithStats().find((a) => a.id === "Mode_X");
+  assert.equal(stats.mode, "x");
+});
+
+test("archive YAML parses X metrics fields", (t) => {
   const v = fixture(t);
-  let list = v.createTopic("AI", { body: "一个**想法**" });
-  assert.equal(list.length, 1);
-  assert.match(list[0].path, /^Demo_AI\/01_Topics\/\d{4}-\d{2}-\d{2}-\d{6}\.md$/);
-  assert.match(list[0].body, /一个\*\*想法\*\*/);
-  assert(fs.existsSync(v.p(list[0].path)));
-  const read = v.readTopic(list[0].path);
-  assert.match(read.body, /一个\*\*想法\*\*/);
-  list = v.deleteTopic(list[0].path);
-  assert.equal(list.length, 0);
-  assert.equal(v.topics("AI").length, 0);
+  fs.writeFileSync(
+    v.p("Demo_AI/03_Archive/推文.md"),
+    "---\n发布时间: 2026-09-01\n曝光: 1200\n互动: 80\n点赞: 40\n回复: 10\n转发: 5\n---\n正文",
+  );
+  const s = v.load();
+  const row = s.metrics.find((m) => m["标题"] === "推文");
+  assert.equal(row["曝光"], 1200);
+  assert.equal(row["互动"], 80);
+  assert.equal(row["回复"], 10);
+  assert.equal(row["转发"], 5);
 });

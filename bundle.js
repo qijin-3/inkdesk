@@ -27881,24 +27881,76 @@ function promptText(title, opts = {}) {
     });
   });
 }
-function askText(title, hint, value = "") {
+function askCreateAccount() {
   return new Promise((resolve) => {
     const m = document.createElement("div");
     m.className = "modal";
-    m.innerHTML = `<div class="dialog"><h2>${esc2(title)}</h2><p>${esc2(hint)}</p><input id="ask-text-input" value="${esc2(value)}" autocomplete="off"><div class="row"><button type="button" id="ask-text-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="ask-text-ok">\u786E\u5B9A</button></div></div>`;
+    m.innerHTML = `<div class="dialog account-create-dialog"><h2>\u65B0\u5EFA\u8D26\u53F7</h2><label class="account-create-field">\u8D26\u53F7\u540D\u79F0<input id="ask-account-name" type="text" value="" placeholder="\u4F8B\u5982\uFF1A\u91D1\u5947_AI" autocomplete="off"></label><div class="account-mode-label">\u8D26\u53F7\u6A21\u5F0F</div><div class="account-mode-cards" role="radiogroup" aria-label="\u8D26\u53F7\u6A21\u5F0F"><label class="account-mode-card is-selected"><input type="radio" name="account-mode" value="xhs" checked><img class="account-mode-card-img" src="assets/mode-xhs.png" alt="" draggable="false"><strong>\u5C0F\u7EA2\u4E66</strong></label><label class="account-mode-card"><input type="radio" name="account-mode" value="x"><img class="account-mode-card-img" src="assets/mode-x.png" alt="" draggable="false"><strong>X</strong></label></div><div class="row"><button type="button" id="ask-account-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="ask-account-ok">\u521B\u5EFA</button></div></div>`;
     document.body.append(m);
-    const input = $2("#ask-text-input");
+    const input = $2("#ask-account-name");
     input?.focus();
-    input?.select();
+    const syncCards = () => {
+      m.querySelectorAll(".account-mode-card").forEach((card) => {
+        const on = card.querySelector("input")?.checked;
+        card.classList.toggle("is-selected", !!on);
+      });
+    };
+    m.querySelectorAll('input[name="account-mode"]').forEach((r) => {
+      r.addEventListener("change", syncCards);
+    });
     const done = (v) => {
       m.remove();
       resolve(v);
     };
-    $2("#ask-text-cancel").onclick = () => done(null);
-    $2("#ask-text-ok").onclick = () => done(input.value);
+    $2("#ask-account-cancel").onclick = () => done(null);
+    const submit = () => {
+      const name = input.value.trim();
+      if (!name) return;
+      const mode = m.querySelector('input[name="account-mode"]:checked')?.value === "x" ? "x" : "xhs";
+      done({ name, mode });
+    };
+    $2("#ask-account-ok").onclick = submit;
     input?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") done(input.value);
-      if (e.key === "Escape") done(null);
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submit();
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        done(null);
+      }
+    });
+  });
+}
+function askAccountMode() {
+  return new Promise((resolve) => {
+    const m = document.createElement("div");
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog account-create-dialog"><h2>\u9009\u62E9\u8D26\u53F7\u6A21\u5F0F</h2><div class="account-mode-label">\u8D26\u53F7\u6A21\u5F0F</div><div class="account-mode-cards" role="radiogroup" aria-label="\u8D26\u53F7\u6A21\u5F0F"><label class="account-mode-card is-selected"><input type="radio" name="account-mode" value="xhs" checked><img class="account-mode-card-img" src="assets/mode-xhs.png" alt="" draggable="false"><strong>\u5C0F\u7EA2\u4E66</strong></label><label class="account-mode-card"><input type="radio" name="account-mode" value="x"><img class="account-mode-card-img" src="assets/mode-x.png" alt="" draggable="false"><strong>X</strong></label></div><div class="row"><button type="button" id="ask-mode-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="ask-mode-ok">\u7EE7\u7EED</button></div></div>`;
+    document.body.append(m);
+    const syncCards = () => {
+      m.querySelectorAll(".account-mode-card").forEach((card) => {
+        const on = card.querySelector("input")?.checked;
+        card.classList.toggle("is-selected", !!on);
+      });
+    };
+    m.querySelectorAll('input[name="account-mode"]').forEach((r) => {
+      r.addEventListener("change", syncCards);
+    });
+    const done = (v) => {
+      m.remove();
+      resolve(v);
+    };
+    $2("#ask-mode-cancel").onclick = () => done(null);
+    $2("#ask-mode-ok").onclick = () => {
+      const mode = m.querySelector('input[name="account-mode"]:checked')?.value === "x" ? "x" : "xhs";
+      done(mode);
+    };
+    m.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        done(null);
+      }
     });
   });
 }
@@ -28095,6 +28147,17 @@ function time(name, fn, ...args) {
 }
 
 // ui/accounts.js
+function normalizeAccountMode(mode) {
+  const m = String(mode || "").trim().toLowerCase();
+  return m === "x" ? "x" : "xhs";
+}
+function accountModeLabel(mode) {
+  return normalizeAccountMode(mode) === "x" ? "X" : "\u5C0F\u7EA2\u4E66";
+}
+function accountModeOf(list2, id) {
+  const acc = (list2 || []).find((a) => a.id === id);
+  return normalizeAccountMode(acc?.mode);
+}
 function sameAccount(a, b) {
   if (!a || !b) return false;
   if (a === b) return true;
@@ -31794,6 +31857,12 @@ var unmountAsterRail = null;
 function accountList() {
   return state?.accounts || [];
 }
+function currentAccountMode() {
+  return accountModeOf(accountList(), account);
+}
+function isXAccount() {
+  return currentAccountMode() === "x";
+}
 async function openAccountDetail(accountId, tab2 = "detail") {
   if (page === "account" && saveProfileEditor && !await saveProfileEditor())
     return;
@@ -32240,6 +32309,7 @@ function publishedSourceHTML(md = publishedPreview?.body) {
   return d.body.innerHTML;
 }
 function togglePreview() {
+  if (isXAccount()) return;
   sync();
   if (editor && current) {
     current.richHTML = editor.getHTML();
@@ -32264,7 +32334,7 @@ function togglePreview() {
 }
 var closeVersionDropdown = null;
 function bindArticleHeader() {
-  $2("#layout").onclick = togglePreview;
+  if ($2("#layout")) $2("#layout").onclick = togglePreview;
   $2("#save-version").onclick = async () => {
     closeVersionDropdown?.();
     sync();
@@ -32707,12 +32777,24 @@ function renderPublishedPreviewInner() {
     return renderDashboard();
   }
   removeArticleOutline();
-  if (previewPane !== "social") previewPane = "wechat";
   const doc3 = {
     title: publishedPreview.title,
     body: publishedPreview.body
   };
   const html2 = publishedSourceHTML(doc3.body);
+  if (isXAccount()) {
+    $2("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${esc2(publishedPreview.path.split("/").pop())} <span>${(doc3.body || "").length} \u5B57</span></div></div><div class="header-actions"><button type="button" id="published-backup">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" id="published-to-draft">\u79FB\u56DE\u8349\u7A3F</button><button id="layout" class="primary">\u8FD4\u56DE</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper"><h1 class="preview-title">${esc2(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${html2}</div></article></section></div>`;
+    $2("#layout").onclick = () => {
+      publishedPreview = null;
+      page = "dashboard";
+      render2();
+    };
+    $2("#published-to-draft").onclick = () => movePublishedToDraft(publishedPreview.path);
+    $2("#published-backup").onclick = () => backupPublishedArticle(publishedPreview.path);
+    renderAssistantRail();
+    return;
+  }
+  if (previewPane !== "social") previewPane = "wechat";
   $2("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${esc2(publishedPreview.path.split("/").pop())} <span>${(doc3.body || "").length} \u5B57</span></div></div><div class="header-actions"><button type="button" id="published-backup">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" id="published-to-draft">\u79FB\u56DE\u8349\u7A3F</button><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc2(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${html2}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
   $2("#layout").onclick = () => {
     publishedPreview = null;
@@ -32749,12 +32831,18 @@ function renderWriteInner() {
     previewMode = false;
   tab = "chat";
   if (previewMode) {
-    renderPreview();
-    return;
+    if (isXAccount()) {
+      previewMode = false;
+      previewDocId = null;
+    } else {
+      renderPreview();
+      return;
+    }
   }
   unmountAster?.();
   unmountAster = null;
-  $2("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(state, current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="\u5BA1\u9605" aria-haspopup="true" aria-expanded="false">${I.eye()} \u5BA1\u9605</button><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></div><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">\u5BA1\u9605\u4E2D</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">\u5168\u90E8\u63A5\u53D7</button><button type="button" data-inline="reject-all">\u5168\u90E8\u62D2\u7EDD</button><button type="button" data-inline="finish" class="primary">\u5B8C\u6210</button></div></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc2(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD</span></button></div></div>`;
+  const previewBtn = isXAccount() ? "" : `<button id="layout">\u9884\u89C8</button>`;
+  $2("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div>${previewBtn}<button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(state, current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="\u5BA1\u9605" aria-haspopup="true" aria-expanded="false">${I.eye()} \u5BA1\u9605</button><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></div><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">\u5BA1\u9605\u4E2D</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">\u5168\u90E8\u63A5\u53D7</button><button type="button" data-inline="reject-all">\u5168\u90E8\u62D2\u7EDD</button><button type="button" data-inline="finish" class="primary">\u5B8C\u6210</button></div></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc2(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD</span></button></div></div>`;
   unmountAster = mountAster($2("#toggle-assistant"));
   syncAsterFace();
   const onSelectionScroll = () => {
@@ -33816,12 +33904,13 @@ async function pushWechatDraft(doc3) {
   }
 }
 async function pickNoteTable() {
+  const xMode = isXAccount();
   if (!isWeb()) {
-    const filePath = await api("pick-note-table");
+    const filePath = await api("pick-note-table", { mode: currentAccountMode() });
     return filePath ? { filePath } : null;
   }
   const files = await pickFiles({
-    accept: ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    accept: xMode ? ".csv,text/csv" : ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   });
   const f = files[0];
   if (!f) return null;
@@ -33889,6 +33978,7 @@ function renderDashboard(...a) {
 function renderDashboardInner() {
   const rows = state.metrics.filter((r) => sameAccount(r["\u8D26\u53F7"], account));
   const deltas = state.metricDeltas?.[account] || null;
+  const xMode = isXAccount();
   const sum = (k) => rows.some((r) => r[k] !== null) ? rows.reduce((s, r) => s + (r[k] || 0), 0).toLocaleString() : "\u2014";
   const deltaMark = (key) => {
     const text = formatDelta(deltas?.[key]);
@@ -33902,13 +33992,21 @@ function renderDashboardInner() {
     const cls = Number(deltas.articles[path][key]) > 0 ? "up" : "down";
     return ` <em class="delta ${cls}">${text}</em>`;
   };
-  const sortKeys = [
+  const sortKeys = xMode ? [
+    ["\u66DD\u5149", "\u6309\u66DD\u5149"],
+    ["\u70B9\u8D5E", "\u6309\u70B9\u8D5E"],
+    ["\u56DE\u590D", "\u6309\u56DE\u590D"],
+    ["\u8F6C\u53D1", "\u6309\u8F6C\u53D1"],
+    ["\u65E5\u671F", "\u6309\u65E5\u671F"]
+  ] : [
     ["\u9605\u8BFB", "\u6309\u9605\u8BFB\u91CF"],
     ["\u6536\u85CF", "\u6309\u6536\u85CF"],
     ["\u70B9\u8D5E", "\u6309\u70B9\u8D5E"],
     ["\u6DA8\u7C89", "\u6309\u6DA8\u7C89"],
     ["\u65E5\u671F", "\u6309\u65E5\u671F"]
   ];
+  const allowedSort = new Set(sortKeys.map(([k]) => k));
+  if (!allowedSort.has(metricsSort)) metricsSort = xMode ? "\u66DD\u5149" : "\u9605\u8BFB";
   const sorted = [...rows].sort((a, b) => {
     if (metricsSort === "\u65E5\u671F")
       return String(b["\u65E5\u671F"] || "").localeCompare(String(a["\u65E5\u671F"] || ""));
@@ -33920,7 +34018,15 @@ function renderDashboardInner() {
   );
   const selectedCount = publishedSelection.size;
   const allSelected = sorted.length > 0 && selectedCount === sorted.length;
-  $2("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BA9\u6BCF\u4E00\u6B21\u8868\u8FBE\uFF0C\u90FD\u6709\u56DE\u54CD\u3002</h1></div><div class="header-actions"><button type="button" id="refresh-dashboard" class="ghost icon-btn" title="\u4ECE\u78C1\u76D8\u540C\u6B65\u672C\u5730\u6570\u636E" aria-label="\u5237\u65B0">${I.refresh({ size: 18 })}</button><button id="import-notes" class="primary">\u66F4\u65B0\u6570\u636E</button></div></header><section class="dashboard"><div class="stats">${[
+  const statCards = xMode ? [
+    ["\u7C89\u4E1D\u91CF", "\u7C89\u4E1D\u91CF"],
+    ["\u66DD\u5149", "\u603B\u66DD\u5149"],
+    ["\u4E92\u52A8", "\u603B\u4E92\u52A8"],
+    ["\u70B9\u8D5E", "\u603B\u70B9\u8D5E"],
+    ["\u56DE\u590D", "\u603B\u56DE\u590D"],
+    ["\u8F6C\u53D1", "\u603B\u8F6C\u53D1"],
+    ["\u6587\u7AE0", "\u603B\u5E16\u5B50\u6570\u91CF"]
+  ] : [
     ["\u7C89\u4E1D\u91CF", "\u7C89\u4E1D\u91CF"],
     ["\u9605\u8BFB", "\u603B\u9605\u8BFB"],
     ["\u70B9\u8D5E", "\u603B\u70B9\u8D5E"],
@@ -33928,15 +34034,20 @@ function renderDashboardInner() {
     ["\u8BC4\u8BBA", "\u603B\u8BC4\u8BBA"],
     ["\u6DA8\u7C89", "\u6587\u7AE0\u6DA8\u7C89\u5408\u8BA1"],
     ["\u6587\u7AE0", "\u603B\u6587\u7AE0\u6570\u91CF"]
-  ].map(
+  ];
+  const tableHead = xMode ? "<th>\u5E16\u5B50</th><th>\u5206\u7EC4</th><th>\u65E5\u671F</th><th>\u66DD\u5149</th><th>\u70B9\u8D5E</th><th>\u56DE\u590D</th><th>\u8F6C\u53D1</th>" : "<th>\u6587\u7AE0</th><th>\u5206\u7EC4</th><th>\u65E5\u671F</th><th>\u9605\u8BFB</th><th>\u70B9\u8D5E</th><th>\u6536\u85CF</th><th>\u6DA8\u7C89</th>";
+  const tableRow = (r) => {
+    const on = publishedSelection.has(r.path);
+    const g = typeof r["\u5206\u7EC4"] === "string" && r["\u5206\u7EC4"].trim() ? r["\u5206\u7EC4"].trim() : "";
+    const cells = xMode ? `<td>${r["\u66DD\u5149"] ?? "\u2014"}${cellDelta(r.path, "\u66DD\u5149")}</td><td>${r["\u70B9\u8D5E"] ?? "\u2014"}${cellDelta(r.path, "\u70B9\u8D5E")}</td><td>${r["\u56DE\u590D"] ?? "\u2014"}${cellDelta(r.path, "\u56DE\u590D")}</td><td>${r["\u8F6C\u53D1"] ?? "\u2014"}${cellDelta(r.path, "\u8F6C\u53D1")}</td>` : `<td>${r["\u9605\u8BFB"] ?? "\u2014"}${cellDelta(r.path, "\u9605\u8BFB")}</td><td>${r["\u70B9\u8D5E"] ?? "\u2014"}${cellDelta(r.path, "\u70B9\u8D5E")}</td><td>${r["\u6536\u85CF"] ?? "\u2014"}${cellDelta(r.path, "\u6536\u85CF")}</td><td>${r["\u6DA8\u7C89"] ?? "\u2014"}${cellDelta(r.path, "\u6DA8\u7C89")}</td>`;
+    return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc2(r.path)}" aria-label="\u9009\u62E9 ${esc2(r["\u6807\u9898"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc2(r.path)}">${esc2(r["\u6807\u9898"])}</button></td><td class="published-group">${g ? groupChipHtml(g) : "\u2014"}</td><td>${esc2(r["\u65E5\u671F"])}</td>${cells}</tr>`;
+  };
+  const emptyHint = xMode ? '<div class="empty-data">\u8FD8\u6CA1\u6709\u6570\u636E\u3002<p>\u5E16\u5B50\u5F52\u6863\u540E\uFF0C\u5BFC\u5165 X Analytics CSV \u6216\u5728 YAML \u4E2D\u586B\u5199\u66DD\u5149/\u4E92\u52A8\u7B49\u5B57\u6BB5\u5373\u53EF\u67E5\u770B\u3002</p></div>' : '<div class="empty-data">\u8FD8\u6CA1\u6709\u6570\u636E\u3002<p>\u6587\u7AE0\u5F52\u6863\u540E\uFF0C\u5728 YAML \u4E2D\u586B\u5199\u5E73\u53F0\u6570\u636E\u5373\u53EF\u67E5\u770B\u3002</p></div>';
+  $2("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BA9\u6BCF\u4E00\u6B21\u8868\u8FBE\uFF0C\u90FD\u6709\u56DE\u54CD\u3002</h1></div><div class="header-actions"><button type="button" id="refresh-dashboard" class="ghost icon-btn" title="\u4ECE\u78C1\u76D8\u540C\u6B65\u672C\u5730\u6570\u636E" aria-label="\u5237\u65B0">${I.refresh({ size: 18 })}</button><button id="import-notes" class="primary">\u66F4\u65B0\u6570\u636E</button></div></header><section class="dashboard"><div class="stats">${statCards.map(
     ([k, l]) => `<div><small>${l}</small><strong title="${k === "\u6DA8\u7C89" ? "\u6C47\u603B\u6587\u7AE0 YAML \u7684\u6DA8\u7C89\u5B57\u6BB5\uFF0C\u4E0D\u662F\u8D26\u53F7\u51C0\u589E\u7C89\u4E1D\uFF0C\u4E5F\u4E0D\u662F\u5DE5\u4F5C\u53F0\u4F30\u7B97" : k === "\u7C89\u4E1D\u91CF" ? "\u5BFC\u5165\u6570\u636E\u65F6\u586B\u5199\u7684\u5F53\u524D\u7C89\u4E1D\u91CF" : ""}">${k === "\u6587\u7AE0" ? rows.length.toLocaleString() : k === "\u7C89\u4E1D\u91CF" ? state.followers?.[account] != null ? Number(state.followers[account]).toLocaleString() : "\u2014" : sum(k)}${deltaMark(k)}</strong></div>`
   ).join(
     ""
-  )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>\u5DF2\u53D1\u5E03</h3><div id="published-bulk" class="published-bulk" ${selectedCount ? "" : "hidden"}><span class="published-bulk-count">\u5DF2\u9009 ${selectedCount}</span><button type="button" id="bulk-group">${I.tags()} \u8BBE\u7F6E\u5206\u7EC4</button><button type="button" id="bulk-backup">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" id="bulk-to-draft">\u79FB\u56DE\u8349\u7A3F</button><button type="button" class="ghost" id="bulk-clear">\u53D6\u6D88\u9009\u62E9</button></div><select id="metrics-sort" aria-label="\u6587\u7AE0\u6392\u5E8F\u65B9\u5F0F">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${rows.length ? `<table class="published-table"><thead><tr><th class="published-check"><input type="checkbox" id="published-select-all" aria-label="\u5168\u9009" ${allSelected ? "checked" : ""} ${selectedCount && !allSelected ? 'data-indeterminate="1"' : ""}></th><th>\u6587\u7AE0</th><th>\u5206\u7EC4</th><th>\u65E5\u671F</th><th>\u9605\u8BFB</th><th>\u70B9\u8D5E</th><th>\u6536\u85CF</th><th>\u6DA8\u7C89</th></tr></thead><tbody>${sorted.map((r) => {
-    const on = publishedSelection.has(r.path);
-    const g = typeof r["\u5206\u7EC4"] === "string" && r["\u5206\u7EC4"].trim() ? r["\u5206\u7EC4"].trim() : "";
-    return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc2(r.path)}" aria-label="\u9009\u62E9 ${esc2(r["\u6807\u9898"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc2(r.path)}">${esc2(r["\u6807\u9898"])}</button></td><td class="published-group">${g ? groupChipHtml(g) : "\u2014"}</td><td>${esc2(r["\u65E5\u671F"])}</td><td>${r["\u9605\u8BFB"] ?? "\u2014"}${cellDelta(r.path, "\u9605\u8BFB")}</td><td>${r["\u70B9\u8D5E"] ?? "\u2014"}${cellDelta(r.path, "\u70B9\u8D5E")}</td><td>${r["\u6536\u85CF"] ?? "\u2014"}${cellDelta(r.path, "\u6536\u85CF")}</td><td>${r["\u6DA8\u7C89"] ?? "\u2014"}${cellDelta(r.path, "\u6DA8\u7C89")}</td></tr>`;
-  }).join("")}</tbody></table>` : '<div class="empty-data">\u8FD8\u6CA1\u6709\u6570\u636E\u3002<p>\u6587\u7AE0\u5F52\u6863\u540E\uFF0C\u5728 YAML \u4E2D\u586B\u5199\u5E73\u53F0\u6570\u636E\u5373\u53EF\u67E5\u770B\u3002</p></div>'}</div></section>`;
+  )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>\u5DF2\u53D1\u5E03</h3><div id="published-bulk" class="published-bulk" ${selectedCount ? "" : "hidden"}><span class="published-bulk-count">\u5DF2\u9009 ${selectedCount}</span><button type="button" id="bulk-group">${I.tags()} \u8BBE\u7F6E\u5206\u7EC4</button><button type="button" id="bulk-backup">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" id="bulk-to-draft">\u79FB\u56DE\u8349\u7A3F</button><button type="button" class="ghost" id="bulk-clear">\u53D6\u6D88\u9009\u62E9</button></div><select id="metrics-sort" aria-label="\u6587\u7AE0\u6392\u5E8F\u65B9\u5F0F">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${rows.length ? `<table class="published-table"><thead><tr><th class="published-check"><input type="checkbox" id="published-select-all" aria-label="\u5168\u9009" ${allSelected ? "checked" : ""} ${selectedCount && !allSelected ? 'data-indeterminate="1"' : ""}></th>${tableHead}</tr></thead><tbody>${sorted.map(tableRow).join("")}</tbody></table>` : emptyHint}</div></section>`;
   renderCalendar(rows);
   $2("#metrics-sort").onchange = (e) => {
     metricsSort = e.target.value;
@@ -33976,13 +34087,14 @@ function renderDashboardInner() {
     "click",
     () => movePublishedToDraft([...publishedSelection])
   );
+  const openLabel = xMode ? "\u67E5\u770B" : "\u9884\u89C8";
   $$("[data-published]").forEach((b) => {
     b.onclick = () => openPublishedPreview(b.dataset.published);
     b.oncontextmenu = (e) => {
       e.preventDefault();
       const rel = b.dataset.published;
       showContextMenu(e.clientX, e.clientY, [
-        { label: "\u9884\u89C8", run: () => openPublishedPreview(rel) },
+        { label: openLabel, run: () => openPublishedPreview(rel) },
         { label: "\u8BBE\u7F6E\u5206\u7EC4", run: () => setPublishedGroups([rel]) },
         { label: "\u672C\u5730\u540C\u6B65", run: () => backupPublishedArticle(rel) },
         { label: "\u79FB\u56DE\u8349\u7A3F", run: () => movePublishedToDraft(rel) }
@@ -34952,7 +35064,7 @@ function renderSettings() {
   const accounts = accountList();
   const accountsBody = settingsSection({
     control: `<div class="settings-panel-toolbar"><button type="button" id="register-account">${I.folder()} \u9009\u62E9\u6587\u4EF6\u5939</button><button type="button" class="primary" id="create-account">${I.plus()} \u65B0\u5EFA\u8D26\u53F7</button></div>` + (accounts.length ? `<div class="account-list">${accounts.map(
-      (a) => `<button type="button" class="account-list-item" data-open-account="${esc2(a.id)}"><span class="account-avatar-btn account-avatar-md" aria-hidden="true">${accountAvatarHtml(a)}</span><span class="account-list-main"><strong>${esc2(a.label)}</strong><span class="muted">${a.drafts ?? 0} \u8349\u7A3F \xB7 ${a.archives ?? 0} \u5F52\u6863 \xB7 ${formatBytes(a.bytes)}</span></span><span class="account-list-chevron" aria-hidden="true">\u203A</span></button>`
+      (a) => `<button type="button" class="account-list-item" data-open-account="${esc2(a.id)}"><span class="account-avatar-btn account-avatar-md" aria-hidden="true">${accountAvatarHtml(a)}</span><span class="account-list-main"><strong>${esc2(a.label)} <em class="account-mode-tag">${esc2(accountModeLabel(a.mode))}</em></strong><span class="muted">${a.drafts ?? 0} \u8349\u7A3F \xB7 ${a.archives ?? 0} \u5F52\u6863 \xB7 ${formatBytes(a.bytes)}</span></span><span class="account-list-chevron" aria-hidden="true">\u203A</span></button>`
     ).join("")}</div>` : settingsPanel(
       `<p class="settings-empty">\u5C1A\u672A\u6DFB\u52A0\u8D26\u53F7\u3002\u53EF\u9009\u62E9\u4ED3\u5E93\u5185\u5DF2\u6709\u6587\u4EF6\u5939\uFF0C\u6216\u65B0\u5EFA\u8D26\u53F7\u3002</p>`
     ))
@@ -35026,14 +35138,15 @@ function renderSettings() {
     const registerBtn = $2("#register-account");
     if (createBtn)
       createBtn.onclick = async () => {
-        const name = await askText(
-          "\u65B0\u5EFA\u8D26\u53F7",
-          "\u8F93\u5165\u8D26\u53F7\u540D\u79F0\uFF08\u5C06\u4F5C\u4E3A\u4ED3\u5E93\u5185\u6587\u4EF6\u5939\u540D\uFF09",
-          ""
-        );
-        if (!name?.trim()) return;
+        const created = await askCreateAccount();
+        if (!created?.name?.trim()) return;
         try {
-          applyAccountState(await api("account-create", { name: name.trim() }));
+          applyAccountState(
+            await api("account-create", {
+              name: created.name.trim(),
+              mode: created.mode
+            })
+          );
           toast("\u5DF2\u521B\u5EFA\u8D26\u53F7");
         } catch (e) {
           toast(e.message || "\u521B\u5EFA\u5931\u8D25");
@@ -35190,13 +35303,15 @@ async function pickAndSetAccountAvatar(accountId) {
 }
 async function pickAndRegisterAccountFolder() {
   try {
+    const mode = await askAccountMode();
+    if (!mode) return;
     let result = null;
     if (!isWeb()) {
-      result = await api("pick-account-folder");
+      result = await api("pick-account-folder", { mode });
     } else {
       const folder = await pickAccountFolderOnWeb();
       if (!folder) return;
-      result = await api("account-register", { folder });
+      result = await api("account-register", { folder, mode });
     }
     if (!result) return;
     applyAccountState(result);
@@ -35599,23 +35714,26 @@ async function renderAccountDetail() {
   if (accountDetailTab === "detail") {
     const backup = state.backupPaths?.[a] || "";
     const wx = state.wechatAccounts?.[a] || (state.wechat?.appId || state.wechat?.appSecret ? state.wechat : {}) || {};
-    shell(
-      [
-        settingsSection({
-          title: "\u57FA\u672C\u4FE1\u606F",
-          control: settingsPanel(
-            `<div class="account-overview-top"><button type="button" class="account-avatar-btn account-avatar-lg" id="account-set-avatar" title="${acc.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}" aria-label="\u4E3A ${esc2(acc.label)} ${acc.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}">${accountAvatarHtml(acc, "lg")}</button><div class="account-overview-info"><h2>${esc2(acc.label)}</h2><div class="account-stat-meta"><span>${acc.drafts ?? 0} \u8349\u7A3F</span><span>${acc.archives ?? 0} \u5F52\u6863</span><span>${acc.files ?? 0} \u6587\u4EF6</span><span>${formatBytes(acc.bytes)}</span></div></div></div>`
+    const xMode = normalizeAccountMode(acc.mode) === "x";
+    const sections = [
+      settingsSection({
+        title: "\u57FA\u672C\u4FE1\u606F",
+        control: settingsPanel(
+          `<div class="account-overview-top"><button type="button" class="account-avatar-btn account-avatar-lg" id="account-set-avatar" title="${acc.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}" aria-label="\u4E3A ${esc2(acc.label)} ${acc.avatar ? "\u66F4\u6362\u5934\u50CF" : "\u6DFB\u52A0\u5934\u50CF"}">${accountAvatarHtml(acc, "lg")}</button><div class="account-overview-info"><h2>${esc2(acc.label)}</h2><div class="account-stat-meta"><span class="account-mode-tag">${esc2(accountModeLabel(acc.mode))}</span><span>${acc.drafts ?? 0} \u8349\u7A3F</span><span>${acc.archives ?? 0} \u5F52\u6863</span><span>${acc.files ?? 0} \u6587\u4EF6</span><span>${formatBytes(acc.bytes)}</span></div></div></div>`
+        )
+      }),
+      settingsSection({
+        title: "\u672C\u5730\u5907\u4EFD",
+        control: settingsPanel(
+          settingsField(
+            "\u5907\u4EFD\u8DEF\u5F84",
+            `<span class="settings-path-row"><input type="text" value="${esc2(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9" readonly><button type="button" id="account-pick-backup">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" id="account-clear-backup">\u6E05\u9664</button>` : ""}</span>`
           )
-        }),
-        settingsSection({
-          title: "\u672C\u5730\u5907\u4EFD",
-          control: settingsPanel(
-            settingsField(
-              "\u5907\u4EFD\u8DEF\u5F84",
-              `<span class="settings-path-row"><input type="text" value="${esc2(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9" readonly><button type="button" id="account-pick-backup">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" id="account-clear-backup">\u6E05\u9664</button>` : ""}</span>`
-            )
-          )
-        }),
+        )
+      })
+    ];
+    if (!xMode) {
+      sections.push(
         settingsSection({
           title: "\u5FAE\u4FE1\u516C\u4F17\u53F7",
           control: settingsPanel(
@@ -35631,8 +35749,9 @@ async function renderAccountDetail() {
             ) + `<p class="settings-hint">\u6BCF\u4E2A\u8D26\u53F7\u72EC\u7ACB\u914D\u7F6E\uFF0C\u63A8\u9001\u8349\u7A3F\u65F6\u4F7F\u7528\u5F53\u524D\u6587\u7AE0\u6240\u5C5E\u8D26\u53F7\u7684\u51ED\u8BC1\u3002</p><div class="settings-panel-footer"><button type="button" id="wechat-test">\u6D4B\u8BD5\u8FDE\u63A5</button><button type="button" class="primary" id="save-wechat">\u4FDD\u5B58</button></div>`
           )
         })
-      ].join("")
-    );
+      );
+    }
+    shell(sections.join(""));
     $2("#account-set-avatar").onclick = () => pickAndSetAccountAvatar(a);
     $2("#account-pick-backup").onclick = () => pickAccountBackupPath(a);
     if ($2("#account-clear-backup"))
@@ -35646,31 +35765,33 @@ async function renderAccountDetail() {
           toast(e.message || "\u6E05\u9664\u5931\u8D25");
         }
       };
-    const readWechatForm = () => {
-      const next2 = {
-        appId: $2("#wechat-appid").value.trim(),
-        appSecret: $2("#wechat-secret").value.trim(),
-        author: $2("#wechat-author").value.trim(),
-        coverPath: state.wechatAccounts?.[a]?.coverPath || state.wechat?.coverPath || ""
+    if (!xMode) {
+      const readWechatForm = () => {
+        const next2 = {
+          appId: $2("#wechat-appid").value.trim(),
+          appSecret: $2("#wechat-secret").value.trim(),
+          author: $2("#wechat-author").value.trim(),
+          coverPath: state.wechatAccounts?.[a]?.coverPath || state.wechat?.coverPath || ""
+        };
+        state.wechatAccounts = { ...state.wechatAccounts || {}, [a]: next2 };
+        return next2;
       };
-      state.wechatAccounts = { ...state.wechatAccounts || {}, [a]: next2 };
-      return next2;
-    };
-    $2("#wechat-test").onclick = async () => {
-      readWechatForm();
-      await persist();
-      try {
-        await api("wechat-test-token", { account: a });
-        toast("\u516C\u4F17\u53F7\u51ED\u8BC1\u6709\u6548");
-      } catch (e) {
-        toast(e.message || "\u8FDE\u63A5\u5931\u8D25");
-      }
-    };
-    $2("#save-wechat").onclick = () => {
-      readWechatForm();
-      persist();
-      toast("\u516C\u4F17\u53F7\u8BBE\u7F6E\u5DF2\u4FDD\u5B58");
-    };
+      $2("#wechat-test").onclick = async () => {
+        readWechatForm();
+        await persist();
+        try {
+          await api("wechat-test-token", { account: a });
+          toast("\u516C\u4F17\u53F7\u51ED\u8BC1\u6709\u6548");
+        } catch (e) {
+          toast(e.message || "\u8FDE\u63A5\u5931\u8D25");
+        }
+      };
+      $2("#save-wechat").onclick = () => {
+        readWechatForm();
+        persist();
+        toast("\u516C\u4F17\u53F7\u8BBE\u7F6E\u5DF2\u4FDD\u5B58");
+      };
+    }
     return;
   }
   if (accountDetailTab === "skills") {

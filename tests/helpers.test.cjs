@@ -24,6 +24,24 @@ test("sameAccount 兼容 AI/Dev 后缀", async () => {
   assert.equal(sameAccount(null, "b"), false);
 });
 
+test("accountModeOf / accountModeLabel 缺省与 X", async () => {
+  const { accountModeOf, accountModeLabel, normalizeAccountMode } = await load(
+    "ui/accounts.js",
+    "accounts.test.cjs",
+  );
+  assert.equal(normalizeAccountMode(undefined), "xhs");
+  assert.equal(normalizeAccountMode("x"), "x");
+  assert.equal(accountModeLabel("x"), "X");
+  assert.equal(accountModeLabel("xhs"), "小红书");
+  const list = [
+    { id: "a", mode: "x" },
+    { id: "b" },
+  ];
+  assert.equal(accountModeOf(list, "a"), "x");
+  assert.equal(accountModeOf(list, "b"), "xhs");
+  assert.equal(accountModeOf(list, "missing"), "xhs");
+});
+
 test("accountInitial 取首字（含 emoji 与空值）", async () => {
   const { accountInitial } = await load("ui/accounts.js", "accounts.test.cjs");
   assert.equal(accountInitial("增长"), "增");

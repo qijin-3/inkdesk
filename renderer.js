@@ -21,7 +21,13 @@ import { TableKit } from "@tiptap/extension-table";
 import { gfm } from "turndown-plugin-gfm";
 import TurndownService from "turndown";
 import { calendar, validDate, publishSummary } from "./calendar.cjs";
-import { promptText, askText, askConfirm } from "./ui/dialog.js";
+import {
+  promptText,
+  askText,
+  askConfirm,
+  askCreateAccount,
+  askAccountMode,
+} from "./ui/dialog.js";
 import { showContextMenu } from "./ui/popover.js";
 import {
   groupNames,
@@ -38,6 +44,9 @@ import {
   accountInitial,
   accountLabelOf,
   accountAvatarHtml,
+  accountModeOf,
+  accountModeLabel,
+  normalizeAccountMode,
 } from "./ui/accounts.js";
 import { formatJsonPreview, inferMaterialKind, uint8ToBase64 } from "./ui/materials-meta.js";
 import { formatDelta } from "./ui/metrics.js";
@@ -236,6 +245,16 @@ let unmountAsterRail = null;
  */
 function accountList() {
   return state?.accounts || [];
+}
+
+/** 当前账号模式（缺省小红书）。 */
+function currentAccountMode() {
+  return accountModeOf(accountList(), account);
+}
+
+/** 当前是否为 X 模式账号。 */
+function isXAccount() {
+  return currentAccountMode() === "x";
 }
 
 
@@ -827,6 +846,7 @@ function publishedSourceHTML(md = publishedPreview?.body) {
  * 进入或退出预览模式，并重建写作页。
  */
 function togglePreview() {
+  if (isXAccount()) return;
   sync();
   // 进入预览前再刷一次快照，保证标题软换行 / 图片地址与编辑器一致
   if (editor && current) {
@@ -858,7 +878,7 @@ let closeVersionDropdown = null;
  * 绑定写作页与预览页共用的页眉操作（预览切换、保存、版本历史）。
  */
 function bindArticleHeader() {
-  $("#layout").onclick = togglePreview;
+  if ($("#layout")) $("#layout").onclick = togglePreview;
   $("#save-version").onclick = async () => {
     closeVersionDropdown?.();
     sync();
@@ -1386,6 +1406,7 @@ function renderPreviewInner() {
 
 /**
  * 渲染已发布文章的排版预览（公众号 / 小红书），与草稿预览同结构。
+ * X 模式仅展示正文只读，无排版分栏与公众号推送。
  */
 function renderPublishedPreview(...a) { return time("renderPublishedPreview", renderPublishedPreviewInner, ...a); }
 function renderPublishedPreviewInner() {
@@ -1394,12 +1415,27 @@ function renderPublishedPreviewInner() {
     return renderDashboard();
   }
   removeArticleOutline();
-  if (previewPane !== "social") previewPane = "wechat";
   const doc = {
     title: publishedPreview.title,
     body: publishedPreview.body,
   };
   const html = publishedSourceHTML(doc.body);
+  if (isXAccount()) {
+    $("#main").innerHTML =
+      `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(doc.title || "未命名文章")}</h1><div class="byline">${esc(publishedPreview.path.split("/").pop())} <span>${(doc.body || "").length} 字</span></div></div><div class="header-actions"><button type="button" id="published-backup">${I.folder()} 本地同步</button><button type="button" id="published-to-draft">移回草稿</button><button id="layout" class="primary">返回</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper"><h1 class="preview-title">${esc(doc.title || "未命名文章")}</h1><div id="article-preview">${html}</div></article></section></div>`;
+    $("#layout").onclick = () => {
+      publishedPreview = null;
+      page = "dashboard";
+      render();
+    };
+    $("#published-to-draft").onclick = () =>
+      movePublishedToDraft(publishedPreview.path);
+    $("#published-backup").onclick = () =>
+      backupPublishedArticle(publishedPreview.path);
+    renderAssistantRail();
+    return;
+  }
+  if (previewPane !== "social") previewPane = "wechat";
   $("#main").innerHTML =
     `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(doc.title || "未命名文章")}</h1><div class="byline">${esc(publishedPreview.path.split("/").pop())} <span>${(doc.body || "").length} 字</span></div></div><div class="header-actions"><button type="button" id="published-backup">${I.folder()} 本地同步</button><button type="button" id="published-to-draft">移回草稿</button><button id="layout" class="primary">退出预览</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="预览分栏"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">公众号</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">小红书</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} 导出图片</button><button type="button" id="copy-publish">${I.copy()} 复制排版</button><button type="button" id="push-wechat">${I.send()} 推送到公众号</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc(doc.title || "未命名文章")}</h1><div id="article-preview">${html}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">正在排版…</p><div id="social-pages"></div></div></section></div>`;
   $("#layout").onclick = () => {
@@ -1439,13 +1475,21 @@ function renderWriteInner() {
     previewMode = false;
   tab = "chat";
   if (previewMode) {
-    renderPreview();
-    return;
+    if (isXAccount()) {
+      previewMode = false;
+      previewDocId = null;
+    } else {
+      renderPreview();
+      return;
+    }
   }
   unmountAster?.();
   unmountAster = null;
+  const previewBtn = isXAccount()
+    ? ""
+    : `<button id="layout">预览</button>`;
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout">预览</button><button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(state, current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="审阅" aria-haspopup="true" aria-expanded="false">${I.eye()} 审阅</button><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></div><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">审阅中</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">全部接受</button><button type="button" data-inline="reject-all">全部拒绝</button><button type="button" data-inline="finish" class="primary">完成</button></div></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>添加到 AI 对话</span></button></div></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div>${previewBtn}<button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(state, current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="审阅" aria-haspopup="true" aria-expanded="false">${I.eye()} 审阅</button><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></div><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">审阅中</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">全部接受</button><button type="button" data-inline="reject-all">全部拒绝</button><button type="button" data-inline="finish" class="primary">完成</button></div></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>添加到 AI 对话</span></button></div></div>`;
   unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
   const onSelectionScroll = () => {
@@ -2671,15 +2715,17 @@ async function pushWechatDraft(doc) {
   }
 }
 
-/** 选择笔记列表明细 xlsx */
+/** 选择笔记数据表（小红书 xlsx / X Analytics CSV） */
 async function pickNoteTable() {
+  const xMode = isXAccount();
   if (!isWeb()) {
-    const filePath = await api("pick-note-table");
+    const filePath = await api("pick-note-table", { mode: currentAccountMode() });
     return filePath ? { filePath } : null;
   }
   const files = await pickFiles({
-    accept:
-      ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    accept: xMode
+      ? ".csv,text/csv"
+      : ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
   const f = files[0];
   if (!f) return null;
@@ -2752,6 +2798,7 @@ function renderDashboard(...a) { return time("renderDashboard", renderDashboardI
 function renderDashboardInner() {
   const rows = state.metrics.filter((r) => sameAccount(r["账号"], account));
   const deltas = state.metricDeltas?.[account] || null;
+  const xMode = isXAccount();
   const sum = (k) =>
     rows.some((r) => r[k] !== null)
       ? rows.reduce((s, r) => s + (r[k] || 0), 0).toLocaleString()
@@ -2770,13 +2817,23 @@ function renderDashboardInner() {
     const cls = Number(deltas.articles[path][key]) > 0 ? "up" : "down";
     return ` <em class="delta ${cls}">${text}</em>`;
   };
-  const sortKeys = [
-    ["阅读", "按阅读量"],
-    ["收藏", "按收藏"],
-    ["点赞", "按点赞"],
-    ["涨粉", "按涨粉"],
-    ["日期", "按日期"],
-  ];
+  const sortKeys = xMode
+    ? [
+        ["曝光", "按曝光"],
+        ["点赞", "按点赞"],
+        ["回复", "按回复"],
+        ["转发", "按转发"],
+        ["日期", "按日期"],
+      ]
+    : [
+        ["阅读", "按阅读量"],
+        ["收藏", "按收藏"],
+        ["点赞", "按点赞"],
+        ["涨粉", "按涨粉"],
+        ["日期", "按日期"],
+      ];
+  const allowedSort = new Set(sortKeys.map(([k]) => k));
+  if (!allowedSort.has(metricsSort)) metricsSort = xMode ? "曝光" : "阅读";
   /** 按当前排序字段排列归档文章 */
   const sorted = [...rows].sort((a, b) => {
     if (metricsSort === "日期")
@@ -2789,16 +2846,44 @@ function renderDashboardInner() {
   );
   const selectedCount = publishedSelection.size;
   const allSelected = sorted.length > 0 && selectedCount === sorted.length;
+  const statCards = xMode
+    ? [
+        ["粉丝量", "粉丝量"],
+        ["曝光", "总曝光"],
+        ["互动", "总互动"],
+        ["点赞", "总点赞"],
+        ["回复", "总回复"],
+        ["转发", "总转发"],
+        ["文章", "总帖子数量"],
+      ]
+    : [
+        ["粉丝量", "粉丝量"],
+        ["阅读", "总阅读"],
+        ["点赞", "总点赞"],
+        ["收藏", "总收藏"],
+        ["评论", "总评论"],
+        ["涨粉", "文章涨粉合计"],
+        ["文章", "总文章数量"],
+      ];
+  const tableHead = xMode
+    ? "<th>帖子</th><th>分组</th><th>日期</th><th>曝光</th><th>点赞</th><th>回复</th><th>转发</th>"
+    : "<th>文章</th><th>分组</th><th>日期</th><th>阅读</th><th>点赞</th><th>收藏</th><th>涨粉</th>";
+  const tableRow = (r) => {
+    const on = publishedSelection.has(r.path);
+    const g =
+      typeof r["分组"] === "string" && r["分组"].trim()
+        ? r["分组"].trim()
+        : "";
+    const cells = xMode
+      ? `<td>${r["曝光"] ?? "—"}${cellDelta(r.path, "曝光")}</td><td>${r["点赞"] ?? "—"}${cellDelta(r.path, "点赞")}</td><td>${r["回复"] ?? "—"}${cellDelta(r.path, "回复")}</td><td>${r["转发"] ?? "—"}${cellDelta(r.path, "转发")}</td>`
+      : `<td>${r["阅读"] ?? "—"}${cellDelta(r.path, "阅读")}</td><td>${r["点赞"] ?? "—"}${cellDelta(r.path, "点赞")}</td><td>${r["收藏"] ?? "—"}${cellDelta(r.path, "收藏")}</td><td>${r["涨粉"] ?? "—"}${cellDelta(r.path, "涨粉")}</td>`;
+    return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc(r.path)}" aria-label="选择 ${esc(r["标题"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc(r.path)}">${esc(r["标题"])}</button></td><td class="published-group">${g ? groupChipHtml(g) : "—"}</td><td>${esc(r["日期"])}</td>${cells}</tr>`;
+  };
+  const emptyHint = xMode
+    ? '<div class="empty-data">还没有数据。<p>帖子归档后，导入 X Analytics CSV 或在 YAML 中填写曝光/互动等字段即可查看。</p></div>'
+    : '<div class="empty-data">还没有数据。<p>文章归档后，在 YAML 中填写平台数据即可查看。</p></div>';
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">让每一次表达，都有回响。</h1></div><div class="header-actions"><button type="button" id="refresh-dashboard" class="ghost icon-btn" title="从磁盘同步本地数据" aria-label="刷新">${I.refresh({ size: 18 })}</button><button id="import-notes" class="primary">更新数据</button></div></header><section class="dashboard"><div class="stats">${[
-      ["粉丝量", "粉丝量"],
-      ["阅读", "总阅读"],
-      ["点赞", "总点赞"],
-      ["收藏", "总收藏"],
-      ["评论", "总评论"],
-      ["涨粉", "文章涨粉合计"],
-      ["文章", "总文章数量"],
-    ]
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">让每一次表达，都有回响。</h1></div><div class="header-actions"><button type="button" id="refresh-dashboard" class="ghost icon-btn" title="从磁盘同步本地数据" aria-label="刷新">${I.refresh({ size: 18 })}</button><button id="import-notes" class="primary">更新数据</button></div></header><section class="dashboard"><div class="stats">${statCards
       .map(
         ([k, l]) =>
           `<div><small>${l}</small><strong title="${k === "涨粉" ? "汇总文章 YAML 的涨粉字段，不是账号净增粉丝，也不是工作台估算" : k === "粉丝量" ? "导入数据时填写的当前粉丝量" : ""}">${k === "文章" ? rows.length.toLocaleString() : k === "粉丝量" ? (state.followers?.[account] != null ? Number(state.followers[account]).toLocaleString() : "—") : sum(k)}${deltaMark(k)}</strong></div>`,
@@ -2807,17 +2892,10 @@ function renderDashboardInner() {
         "",
       )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>已发布</h3><div id="published-bulk" class="published-bulk" ${selectedCount ? "" : "hidden"}><span class="published-bulk-count">已选 ${selectedCount}</span><button type="button" id="bulk-group">${I.tags()} 设置分组</button><button type="button" id="bulk-backup">${I.folder()} 本地同步</button><button type="button" id="bulk-to-draft">移回草稿</button><button type="button" class="ghost" id="bulk-clear">取消选择</button></div><select id="metrics-sort" aria-label="文章排序方式">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${
       rows.length
-        ? `<table class="published-table"><thead><tr><th class="published-check"><input type="checkbox" id="published-select-all" aria-label="全选" ${allSelected ? "checked" : ""} ${selectedCount && !allSelected ? 'data-indeterminate="1"' : ""}></th><th>文章</th><th>分组</th><th>日期</th><th>阅读</th><th>点赞</th><th>收藏</th><th>涨粉</th></tr></thead><tbody>${sorted
-            .map((r) => {
-              const on = publishedSelection.has(r.path);
-              const g =
-                typeof r["分组"] === "string" && r["分组"].trim()
-                  ? r["分组"].trim()
-                  : "";
-              return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc(r.path)}" aria-label="选择 ${esc(r["标题"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc(r.path)}">${esc(r["标题"])}</button></td><td class="published-group">${g ? groupChipHtml(g) : "—"}</td><td>${esc(r["日期"])}</td><td>${r["阅读"] ?? "—"}${cellDelta(r.path, "阅读")}</td><td>${r["点赞"] ?? "—"}${cellDelta(r.path, "点赞")}</td><td>${r["收藏"] ?? "—"}${cellDelta(r.path, "收藏")}</td><td>${r["涨粉"] ?? "—"}${cellDelta(r.path, "涨粉")}</td></tr>`;
-            })
+        ? `<table class="published-table"><thead><tr><th class="published-check"><input type="checkbox" id="published-select-all" aria-label="全选" ${allSelected ? "checked" : ""} ${selectedCount && !allSelected ? 'data-indeterminate="1"' : ""}></th>${tableHead}</tr></thead><tbody>${sorted
+            .map(tableRow)
             .join("")}</tbody></table>`
-        : '<div class="empty-data">还没有数据。<p>文章归档后，在 YAML 中填写平台数据即可查看。</p></div>'
+        : emptyHint
     }</div></section>`;
   renderCalendar(rows);
   $("#metrics-sort").onchange = (e) => {
@@ -2855,13 +2933,14 @@ function renderDashboardInner() {
   $("#bulk-to-draft")?.addEventListener("click", () =>
     movePublishedToDraft([...publishedSelection]),
   );
+  const openLabel = xMode ? "查看" : "预览";
   $$("[data-published]").forEach((b) => {
     b.onclick = () => openPublishedPreview(b.dataset.published);
     b.oncontextmenu = (e) => {
       e.preventDefault();
       const rel = b.dataset.published;
       showContextMenu(e.clientX, e.clientY, [
-        { label: "预览", run: () => openPublishedPreview(rel) },
+        { label: openLabel, run: () => openPublishedPreview(rel) },
         { label: "设置分组", run: () => setPublishedGroups([rel]) },
         { label: "本地同步", run: () => backupPublishedArticle(rel) },
         { label: "移回草稿", run: () => movePublishedToDraft(rel) },
@@ -4004,7 +4083,7 @@ function renderSettings() {
         ? `<div class="account-list">${accounts
             .map(
               (a) =>
-                `<button type="button" class="account-list-item" data-open-account="${esc(a.id)}"><span class="account-avatar-btn account-avatar-md" aria-hidden="true">${accountAvatarHtml(a)}</span><span class="account-list-main"><strong>${esc(a.label)}</strong><span class="muted">${a.drafts ?? 0} 草稿 · ${a.archives ?? 0} 归档 · ${formatBytes(a.bytes)}</span></span><span class="account-list-chevron" aria-hidden="true">›</span></button>`,
+                `<button type="button" class="account-list-item" data-open-account="${esc(a.id)}"><span class="account-avatar-btn account-avatar-md" aria-hidden="true">${accountAvatarHtml(a)}</span><span class="account-list-main"><strong>${esc(a.label)} <em class="account-mode-tag">${esc(accountModeLabel(a.mode))}</em></strong><span class="muted">${a.drafts ?? 0} 草稿 · ${a.archives ?? 0} 归档 · ${formatBytes(a.bytes)}</span></span><span class="account-list-chevron" aria-hidden="true">›</span></button>`,
             )
             .join("")}</div>`
         : settingsPanel(
@@ -4104,14 +4183,15 @@ function renderSettings() {
     const registerBtn = $("#register-account");
     if (createBtn)
       createBtn.onclick = async () => {
-        const name = await askText(
-          "新建账号",
-          "输入账号名称（将作为仓库内文件夹名）",
-          "",
-        );
-        if (!name?.trim()) return;
+        const created = await askCreateAccount();
+        if (!created?.name?.trim()) return;
         try {
-          applyAccountState(await api("account-create", { name: name.trim() }));
+          applyAccountState(
+            await api("account-create", {
+              name: created.name.trim(),
+              mode: created.mode,
+            }),
+          );
           toast("已创建账号");
         } catch (e) {
           toast(e.message || "创建失败");
@@ -4306,13 +4386,15 @@ async function pickAndSetAccountAvatar(accountId) {
  */
 async function pickAndRegisterAccountFolder() {
   try {
+    const mode = await askAccountMode();
+    if (!mode) return;
     let result = null;
     if (!isWeb()) {
-      result = await api("pick-account-folder");
+      result = await api("pick-account-folder", { mode });
     } else {
       const folder = await pickAccountFolderOnWeb();
       if (!folder) return;
-      result = await api("account-register", { folder });
+      result = await api("account-register", { folder, mode });
     }
     if (!result) return;
     applyAccountState(result);
@@ -4782,23 +4864,26 @@ async function renderAccountDetail() {
       state.wechatAccounts?.[a] ||
       (state.wechat?.appId || state.wechat?.appSecret ? state.wechat : {}) ||
       {};
-    shell(
-      [
-        settingsSection({
-          title: "基本信息",
-          control: settingsPanel(
-            `<div class="account-overview-top"><button type="button" class="account-avatar-btn account-avatar-lg" id="account-set-avatar" title="${acc.avatar ? "更换头像" : "添加头像"}" aria-label="为 ${esc(acc.label)} ${acc.avatar ? "更换头像" : "添加头像"}">${accountAvatarHtml(acc, "lg")}</button><div class="account-overview-info"><h2>${esc(acc.label)}</h2><div class="account-stat-meta"><span>${acc.drafts ?? 0} 草稿</span><span>${acc.archives ?? 0} 归档</span><span>${acc.files ?? 0} 文件</span><span>${formatBytes(acc.bytes)}</span></div></div></div>`,
+    const xMode = normalizeAccountMode(acc.mode) === "x";
+    const sections = [
+      settingsSection({
+        title: "基本信息",
+        control: settingsPanel(
+          `<div class="account-overview-top"><button type="button" class="account-avatar-btn account-avatar-lg" id="account-set-avatar" title="${acc.avatar ? "更换头像" : "添加头像"}" aria-label="为 ${esc(acc.label)} ${acc.avatar ? "更换头像" : "添加头像"}">${accountAvatarHtml(acc, "lg")}</button><div class="account-overview-info"><h2>${esc(acc.label)}</h2><div class="account-stat-meta"><span class="account-mode-tag">${esc(accountModeLabel(acc.mode))}</span><span>${acc.drafts ?? 0} 草稿</span><span>${acc.archives ?? 0} 归档</span><span>${acc.files ?? 0} 文件</span><span>${formatBytes(acc.bytes)}</span></div></div></div>`,
+        ),
+      }),
+      settingsSection({
+        title: "本地备份",
+        control: settingsPanel(
+          settingsField(
+            "备份路径",
+            `<span class="settings-path-row"><input type="text" value="${esc(backup)}" placeholder="未设置，同步时可选择" readonly><button type="button" id="account-pick-backup">${I.folder()} 选择</button>${backup ? `<button type="button" class="ghost" id="account-clear-backup">清除</button>` : ""}</span>`,
           ),
-        }),
-        settingsSection({
-          title: "本地备份",
-          control: settingsPanel(
-            settingsField(
-              "备份路径",
-              `<span class="settings-path-row"><input type="text" value="${esc(backup)}" placeholder="未设置，同步时可选择" readonly><button type="button" id="account-pick-backup">${I.folder()} 选择</button>${backup ? `<button type="button" class="ghost" id="account-clear-backup">清除</button>` : ""}</span>`,
-            ),
-          ),
-        }),
+        ),
+      }),
+    ];
+    if (!xMode) {
+      sections.push(
         settingsSection({
           title: "微信公众号",
           control: settingsPanel(
@@ -4818,8 +4903,9 @@ async function renderAccountDetail() {
               `<div class="settings-panel-footer"><button type="button" id="wechat-test">测试连接</button><button type="button" class="primary" id="save-wechat">保存</button></div>`,
           ),
         }),
-      ].join(""),
-    );
+      );
+    }
+    shell(sections.join(""));
     $("#account-set-avatar").onclick = () => pickAndSetAccountAvatar(a);
     $("#account-pick-backup").onclick = () => pickAccountBackupPath(a);
     if ($("#account-clear-backup"))
@@ -4833,34 +4919,36 @@ async function renderAccountDetail() {
           toast(e.message || "清除失败");
         }
       };
-    const readWechatForm = () => {
-      const next = {
-        appId: $("#wechat-appid").value.trim(),
-        appSecret: $("#wechat-secret").value.trim(),
-        author: $("#wechat-author").value.trim(),
-        coverPath:
-          state.wechatAccounts?.[a]?.coverPath ||
-          state.wechat?.coverPath ||
-          "",
+    if (!xMode) {
+      const readWechatForm = () => {
+        const next = {
+          appId: $("#wechat-appid").value.trim(),
+          appSecret: $("#wechat-secret").value.trim(),
+          author: $("#wechat-author").value.trim(),
+          coverPath:
+            state.wechatAccounts?.[a]?.coverPath ||
+            state.wechat?.coverPath ||
+            "",
+        };
+        state.wechatAccounts = { ...(state.wechatAccounts || {}), [a]: next };
+        return next;
       };
-      state.wechatAccounts = { ...(state.wechatAccounts || {}), [a]: next };
-      return next;
-    };
-    $("#wechat-test").onclick = async () => {
-      readWechatForm();
-      await persist();
-      try {
-        await api("wechat-test-token", { account: a });
-        toast("公众号凭证有效");
-      } catch (e) {
-        toast(e.message || "连接失败");
-      }
-    };
-    $("#save-wechat").onclick = () => {
-      readWechatForm();
-      persist();
-      toast("公众号设置已保存");
-    };
+      $("#wechat-test").onclick = async () => {
+        readWechatForm();
+        await persist();
+        try {
+          await api("wechat-test-token", { account: a });
+          toast("公众号凭证有效");
+        } catch (e) {
+          toast(e.message || "连接失败");
+        }
+      };
+      $("#save-wechat").onclick = () => {
+        readWechatForm();
+        persist();
+        toast("公众号设置已保存");
+      };
+    }
     return;
   }
   if (accountDetailTab === "skills") {

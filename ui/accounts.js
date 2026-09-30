@@ -1,6 +1,35 @@
 import { esc, assetUrl } from "./dom.js";
 
 /**
+ * 规范化账号模式；缺省小红书。
+ * @param {unknown} mode
+ * @returns {"xhs"|"x"}
+ */
+export function normalizeAccountMode(mode) {
+  const m = String(mode || "").trim().toLowerCase();
+  return m === "x" ? "x" : "xhs";
+}
+
+/**
+ * 账号模式展示文案。
+ * @param {unknown} mode
+ */
+export function accountModeLabel(mode) {
+  return normalizeAccountMode(mode) === "x" ? "X" : "小红书";
+}
+
+/**
+ * 从账号列表取模式。
+ * @param {Array<{ id: string, mode?: string }>} list
+ * @param {string} id
+ * @returns {"xhs"|"x"}
+ */
+export function accountModeOf(list, id) {
+  const acc = (list || []).find((a) => a.id === id);
+  return normalizeAccountMode(acc?.mode);
+}
+
+/**
  * 兼容旧 AI/Dev 与文件夹名的账号比较。
  * @param {string} a
  * @param {string} b

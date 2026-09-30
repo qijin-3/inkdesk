@@ -1,4 +1,8 @@
 const { parseNoteTable, rowToYaml, matchNoteRows } = require("../note-import.cjs");
+const { parseXAnalyticsCsv, xRowToYaml } = require("../x-import.cjs");
+
+const XHS_METRIC_KEYS = ["阅读", "点赞", "收藏", "涨粉", "评论"];
+const X_METRIC_KEYS = ["曝光", "互动", "点赞", "回复", "转发"];
 
 /**
  * 解析表格并匹配本账号归档。
@@ -8,8 +12,10 @@ function importNotesPreview(core, payload) {
   const account = core.vault.resolveAccountId(payload.account);
   const buf = payload.bytes ? Buffer.from(payload.bytes) : payload.filePath;
   if (!buf || (Buffer.isBuffer(buf) && !buf.length))
-    throw Error("请选择笔记数据表");
-  const rows = parseNoteTable(buf);
+    throw Error("请选择数据文件");
+  const mode = core.vault.accountMode(account);
+  const rows =
+    mode === "x" ? parseXAnalyticsCsv(buf) : parseNoteTable(buf);
   const archives = core.vault
     .load()
     .archives.filter((a) => a.account === account)
@@ -24,6 +30,7 @@ function importNotesPreview(core, payload) {
     matched,
     unmatched,
     archives,
+    mode,
   };
 }
 
@@ -47,6 +54,8 @@ function sameAccount(core, a, b) {
  * @param {string} account
  */
 function snapshotAccountMetrics(core, account) {
+  const mode = core.vault.accountMode(account);
+  const keys = mode === "x" ? X_METRIC_KEYS : XHS_METRIC_KEYS;
   const rows = (core.store.metrics || []).filter((r) =>
     core.sameAccount(r["账号"], account),
   );
@@ -54,25 +63,18 @@ function snapshotAccountMetrics(core, account) {
     rows.reduce((s, r) => s + (r[k] != null ? Number(r[k]) || 0 : 0), 0);
   const byPath = {};
   for (const r of rows) {
-    byPath[r.path] = {
-      标题: r["标题"],
-      阅读: r["阅读"],
-      点赞: r["点赞"],
-      收藏: r["收藏"],
-      涨粉: r["涨粉"],
-      评论: r["评论"],
-    };
+    const item = { 标题: r["标题"] };
+    for (const k of keys) item[k] = r[k];
+    byPath[r.path] = item;
   }
-  return {
+  const snap = {
     followers: core.store.followers?.[account] ?? null,
-    阅读: sum("阅读"),
-    点赞: sum("点赞"),
-    收藏: sum("收藏"),
-    评论: sum("评论"),
-    涨粉: sum("涨粉"),
     文章: rows.length,
     byPath,
+    mode,
   };
+  for (const k of keys) snap[k] = sum(k);
+  return snap;
 }
 
 /**
@@ -84,6 +86,9 @@ function importNotesApply(core, payload) {
   const followers = Number(payload.followers);
   if (!Number.isFinite(followers) || followers < 0)
     throw Error("请填写有效的粉丝量");
+  const mode = core.vault.accountMode(account);
+  const keys = mode === "x" ? X_METRIC_KEYS : XHS_METRIC_KEYS;
+  const toYaml = mode === "x" ? xRowToYaml : rowToYaml;
   const before = core.snapshotAccountMetrics(account);
   core.store.followers ||= {};
   core.store.followers[account] = followers;
@@ -95,7 +100,7 @@ function importNotesApply(core, payload) {
     if (!row || !pair.path) continue;
     const rel = core.vault.syncArchiveFromImport(
       pair.path,
-      rowToYaml(row),
+      toYaml(row),
       row.title,
     );
     pathMap[pair.path] = rel;
@@ -111,27 +116,19 @@ function importNotesApply(core, payload) {
   for (const [oldPath, newPath] of Object.entries(pathMap)) {
     const prev = before.byPath[oldPath] || before.byPath[newPath] || {};
     const next = after.byPath[newPath] || {};
-    const d = {
-      阅读: delta(prev["阅读"], next["阅读"]),
-      点赞: delta(prev["点赞"], next["点赞"]),
-      收藏: delta(prev["收藏"], next["收藏"]),
-      涨粉: delta(prev["涨粉"], next["涨粉"]),
-      评论: delta(prev["评论"], next["评论"]),
-    };
+    const d = {};
+    for (const k of keys) d[k] = delta(prev[k], next[k]);
     if (Object.values(d).some((n) => n !== 0)) articles[newPath] = d;
   }
-  core.store.metricDeltas ||= {};
-  core.store.metricDeltas[account] = {
+  const deltas = {
     at: new Date().toISOString(),
     粉丝量: delta(before.followers, after.followers),
-    阅读: delta(before.阅读, after.阅读),
-    点赞: delta(before.点赞, after.点赞),
-    收藏: delta(before.收藏, after.收藏),
-    评论: delta(before.评论, after.评论),
-    涨粉: delta(before.涨粉, after.涨粉),
     文章: delta(before.文章, after.文章),
     articles,
   };
+  for (const k of keys) deltas[k] = delta(before[k], after[k]);
+  core.store.metricDeltas ||= {};
+  core.store.metricDeltas[account] = deltas;
   core.save();
   return { ...core.reload(), dataPath: core.data, updated };
 }
@@ -140,4 +137,6 @@ module.exports = {
   sameAccount,
   snapshotAccountMetrics,
   importNotesApply,
+  XHS_METRIC_KEYS,
+  X_METRIC_KEYS,
 };

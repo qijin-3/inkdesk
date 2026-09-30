@@ -2953,6 +2953,107 @@ th {
   font-size: 14px;
   font-weight: 600;
 }
+.account-mode-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #555;
+  background: #f0f0f0;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+.account-stat-meta .account-mode-tag {
+  margin-left: 0;
+}
+.account-create-dialog {
+  width: min(520px, 92vw);
+}
+.account-create-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 16px;
+  font-size: 13px;
+  color: #555;
+}
+.account-create-field input {
+  font: inherit;
+}
+.account-mode-label {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #555;
+}
+.dialog .account-mode-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.dialog label.account-mode-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 14px 14px 16px;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  color: inherit;
+  font-size: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.dialog label.account-mode-card:hover {
+  border-color: #ccc;
+  background: #fafafa;
+}
+.dialog label.account-mode-card.is-selected {
+  border-color: #111;
+  background: #f7f7f7;
+  box-shadow: inset 0 0 0 1px #111;
+}
+.dialog label.account-mode-card input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+  display: block;
+  clip: rect(0, 0, 0, 0);
+}
+.dialog label.account-mode-card .account-mode-card-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+  user-select: none;
+}
+.dialog label.account-mode-card strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: #111;
+}
+.dialog label.account-mode-card small {
+  display: block;
+  font-size: 12px;
+  color: #888;
+  line-height: 1.45;
+}
 .account-list-chevron {
   color: #bbb;
   font-size: 18px;

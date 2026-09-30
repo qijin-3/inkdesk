@@ -255,14 +255,17 @@ ipcMain.handle("pick-vault", async () => {
 /**
  * 在当前内容仓库内选择文件夹注册为账号。
  */
-ipcMain.handle("pick-account-folder", async () => {
+ipcMain.handle("pick-account-folder", async (_, data = {}) => {
   const result = await dialog.showOpenDialog({
     title: "选择账号文件夹",
     defaultPath: desk.vault?.root || undefined,
     properties: ["openDirectory"],
   });
   if (result.canceled) return null;
-  return desk.invoke("account-register", { folder: result.filePaths[0] });
+  return desk.invoke("account-register", {
+    folder: result.filePaths[0],
+    mode: data?.mode,
+  });
 });
 
 /**
@@ -355,12 +358,19 @@ ipcMain.handle("image", async (_, payload = {}) => {
   return desk.image({ ...payload, filePath: r.filePaths[0] });
 });
 
-ipcMain.handle("pick-note-table", async () => {
+ipcMain.handle("pick-note-table", async (_, data = {}) => {
+  const mode = String(data?.mode || "").toLowerCase() === "x" ? "x" : "xhs";
   const result = await dialog.showOpenDialog({
-    title: "选择笔记列表明细表",
-    defaultPath: path.join(os.homedir(), "Downloads", "笔记列表明细表.xlsx"),
+    title: mode === "x" ? "选择 X Analytics 导出 CSV" : "选择笔记列表明细表",
+    defaultPath:
+      mode === "x"
+        ? path.join(os.homedir(), "Downloads")
+        : path.join(os.homedir(), "Downloads", "笔记列表明细表.xlsx"),
     properties: ["openFile"],
-    filters: [{ name: "Excel", extensions: ["xlsx"] }],
+    filters:
+      mode === "x"
+        ? [{ name: "CSV", extensions: ["csv"] }]
+        : [{ name: "Excel", extensions: ["xlsx"] }],
   });
   if (result.canceled) return null;
   return result.filePaths[0];

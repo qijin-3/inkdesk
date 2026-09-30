@@ -117,12 +117,18 @@ async function invoke(core, name, data) {
     case "accounts-list":
       return core.vault.listAccountsWithStats();
     case "account-create": {
-      core.vault.createAccount(data?.name || data);
+      const name =
+        typeof data === "string" ? data : data?.name || data;
+      const mode = typeof data === "object" && data ? data.mode : undefined;
+      core.vault.createAccount(name, { mode });
       core.reload();
       return core.publicState();
     }
     case "account-register": {
-      core.vault.registerAccount(data?.folder || data);
+      const folder =
+        typeof data === "string" ? data : data?.folder || data;
+      const mode = typeof data === "object" && data ? data.mode : undefined;
+      core.vault.registerAccount(folder, { mode });
       core.reload();
       return core.publicState();
     }
