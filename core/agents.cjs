@@ -2,6 +2,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const { spawn } = require("node:child_process");
+// 拆分理由（AGENTS.md：core/* 超 400 行须说明）：本域内聚于“Agent CLI
+// 提供方生命周期”（找执行体 → 组环境 → 组调用规格 → spawn/采集 →
+// 测连通 → 运行/取消），函数间共享 exe/env/spec 等中间形态，强行按
+// 供应商拆分会造成跨文件互 require 与重复 delegate，得不偿失。对外
+// 仍经 desk-core.cjs 每域一行 delegate 暴露，保持转发层扁平。
 const { AgentOutput } = require("../agent-output.cjs");
 const { parseModelLines: parseLines, codexModels } = require("../agent-models.cjs");
 const { Skills } = require("../skills.cjs");

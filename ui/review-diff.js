@@ -143,6 +143,26 @@ export function reviewEqualHTML(value) {
  * @param {{ doc?: string, hunks?: Array }} plan 审阅计划（显式传参，不读全局）
  * @param {string} docTitle 文章标题
  */
+/** 修改建议小卡片：紧跟在总结气泡下方，只放进度与操作，不放全文 diff
+ * @param {{ doc?: string, conversationId?: string, hunks?: Array }} plan 审阅计划（显式传参，不读全局）
+ * @param {string} docId 当前文章 id
+ * @param {string} conversationId 当前对话 id
+ */
+export function reviewCardHTML(plan, docId, conversationId) {
+  if (!plan || plan.doc !== docId || plan.conversationId !== conversationId) return "";
+  const { done, total } = reviewProgress(plan);
+  return `<div class="review-card review-card-summary review-card-inline"><div class="review-card-head"><h3>修改建议 · ${done}/${total} 已决定</h3><div class="row"><button type="button" id="accept" class="primary">全部接受</button><button type="button" id="reject">全部拒绝</button></div></div><p class="muted">正文保持原文，可逐条对比接受 / 拒绝，改后卡片可直接手动改。</p></div>`;
+}
+
+/** 审阅进度：已决定 / 总数
+ * @param {{ hunks?: Array }} plan 审阅计划（显式传参，不读全局）
+ */
+export function reviewProgress(plan) {
+  const list = (plan?.hunks || []).filter((h) => h.kind === "change");
+  const done = list.filter((h) => h.status !== "pending").length;
+  return { done, total: list.length };
+}
+
 export function reviewPageHTML(plan, docTitle) {
   if (!plan || !plan.doc) return "";
   const list = (plan.hunks || []).filter((h) => h.kind === "change");

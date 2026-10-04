@@ -124,6 +124,8 @@ import {
   reviewOldDiffHTML,
   reviewEqualHTML,
   reviewPageHTML,
+  reviewCardHTML,
+  reviewProgress,
 } from "./ui/review-diff.js";
 import reviewDemoFixture from "./fixtures/review-demo.json";
 let saveProfileEditor = null;
@@ -1938,31 +1940,10 @@ function bindWorkspaceResize() {
   };
 }
 
-/** 修改建议小卡片：紧跟在总结气泡下方，只放进度与操作，不放全文 diff */
-function reviewCardHTML() {
-  if (
-    !pending ||
-    pending.doc !== current?.id ||
-    pending.conversationId !== conversation(current).id
-  )
-    return "";
-  const list = (pending.hunks || []).filter((h) => h.kind === "change");
-  const done = list.filter((h) => h.status !== "pending").length;
-  return `<div class="review-card review-card-summary review-card-inline"><div class="review-card-head"><h3>修改建议 · ${done}/${list.length} 已决定</h3><div class="row"><button type="button" id="accept" class="primary">全部接受</button><button type="button" id="reject">全部拒绝</button></div></div><p class="muted">正文保持原文，可逐条对比接受 / 拒绝，改后卡片可直接手动改。</p></div>`;
-}
-
-/** 审阅中的改动列表（仅 change） */
+/** 审阅中的改动列表（仅 change，保留供有状态调用方使用） */
 function reviewChanges() {
   return (pending?.hunks || []).filter((h) => h.kind === "change");
 }
-
-/** 审阅进度：已决定 / 总数 */
-function reviewProgress() {
-  const list = reviewChanges();
-  const done = list.filter((h) => h.status !== "pending").length;
-  return { done, total: list.length };
-}
-
 
 /** 进入审阅模式：编辑器收起，整页变为审阅界面（类似预览） */
 function enterReviewMode() {
@@ -2009,7 +1990,7 @@ function syncFormatbarReviewMode(on) {
     reviewTools.hidden = !on;
     const tag = reviewTools.querySelector(".formatbar-review-tag");
     if (tag) {
-      const { total } = reviewProgress();
+      const { total } = reviewProgress(pending);
       const cur = Math.min(reviewIndex, Math.max(total - 1, 0));
       tag.textContent = total > 0 ? `审阅中 ${cur + 1}/${total}` : "审阅中";
     }
@@ -2388,7 +2369,10 @@ function renderPanel() {
         )
         .join("") || "";
     if (busy) content += streamBubbleHTML();
-    if (reviewCardHTML()) content += reviewCardHTML();
+    {
+      const card = reviewCardHTML(pending, current?.id, conversation(current).id);
+      if (card) content += card;
+    }
   }
   panel.innerHTML = `<div class="panel-scroll">${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="添加" aria-label="添加" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div></div>`;
   bindConversationHead();

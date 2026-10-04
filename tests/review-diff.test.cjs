@@ -94,6 +94,24 @@ test("reviewEqualHTML 按空行分段", () => {
   assert.match(html, /p2/);
   assert.equal(mod.reviewEqualHTML(""), "");
 });
+test("reviewProgress/reviewCardHTML 显式传参与守卫", () => {
+  assert.deepEqual(mod.reviewProgress(null), { done: 0, total: 0 });
+  assert.deepEqual(
+    mod.reviewProgress({ hunks: [
+      { kind: "change", status: "accepted" },
+      { kind: "change", status: "pending" },
+      { kind: "equal", value: "x" },
+    ] }),
+    { done: 1, total: 2 },
+  );
+  const plan = { doc: "d1", conversationId: "c1", hunks: [{ kind: "change", status: "pending" }] };
+  assert.equal(mod.reviewCardHTML(null, "d1", "c1"), "");
+  assert.equal(mod.reviewCardHTML(plan, "other", "c1"), "");
+  assert.equal(mod.reviewCardHTML(plan, "d1", "other"), "");
+  const card = mod.reviewCardHTML(plan, "d1", "c1");
+  assert.match(card, /修改建议 · 0\/1 已决定/);
+});
+
 test("reviewPageHTML 显式传参与空态", () => {
   assert.equal(mod.reviewPageHTML(null, "T"), "");
   assert.equal(mod.reviewPageHTML({}, "T"), "");

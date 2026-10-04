@@ -32031,6 +32031,16 @@ function reviewOldDiffHTML(h2) {
 function reviewEqualHTML(value) {
   return String(value || "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean).map((p) => `<p class="review-para">${esc2(p).replace(/\n/g, "<br>")}</p>`).join("");
 }
+function reviewCardHTML(plan, docId, conversationId) {
+  if (!plan || plan.doc !== docId || plan.conversationId !== conversationId) return "";
+  const { done, total } = reviewProgress(plan);
+  return `<div class="review-card review-card-summary review-card-inline"><div class="review-card-head"><h3>\u4FEE\u6539\u5EFA\u8BAE \xB7 ${done}/${total} \u5DF2\u51B3\u5B9A</h3><div class="row"><button type="button" id="accept" class="primary">\u5168\u90E8\u63A5\u53D7</button><button type="button" id="reject">\u5168\u90E8\u62D2\u7EDD</button></div></div><p class="muted">\u6B63\u6587\u4FDD\u6301\u539F\u6587\uFF0C\u53EF\u9010\u6761\u5BF9\u6BD4\u63A5\u53D7 / \u62D2\u7EDD\uFF0C\u6539\u540E\u5361\u7247\u53EF\u76F4\u63A5\u624B\u52A8\u6539\u3002</p></div>`;
+}
+function reviewProgress(plan) {
+  const list2 = (plan?.hunks || []).filter((h2) => h2.kind === "change");
+  const done = list2.filter((h2) => h2.status !== "pending").length;
+  return { done, total: list2.length };
+}
 function reviewPageHTML(plan, docTitle) {
   if (!plan || !plan.doc) return "";
   const list2 = (plan.hunks || []).filter((h2) => h2.kind === "change");
@@ -33548,20 +33558,8 @@ function bindWorkspaceResize() {
     window.addEventListener("pointerup", onUp);
   };
 }
-function reviewCardHTML() {
-  if (!pending || pending.doc !== current?.id || pending.conversationId !== conversation(current).id)
-    return "";
-  const list2 = (pending.hunks || []).filter((h2) => h2.kind === "change");
-  const done = list2.filter((h2) => h2.status !== "pending").length;
-  return `<div class="review-card review-card-summary review-card-inline"><div class="review-card-head"><h3>\u4FEE\u6539\u5EFA\u8BAE \xB7 ${done}/${list2.length} \u5DF2\u51B3\u5B9A</h3><div class="row"><button type="button" id="accept" class="primary">\u5168\u90E8\u63A5\u53D7</button><button type="button" id="reject">\u5168\u90E8\u62D2\u7EDD</button></div></div><p class="muted">\u6B63\u6587\u4FDD\u6301\u539F\u6587\uFF0C\u53EF\u9010\u6761\u5BF9\u6BD4\u63A5\u53D7 / \u62D2\u7EDD\uFF0C\u6539\u540E\u5361\u7247\u53EF\u76F4\u63A5\u624B\u52A8\u6539\u3002</p></div>`;
-}
 function reviewChanges() {
   return (pending?.hunks || []).filter((h2) => h2.kind === "change");
-}
-function reviewProgress() {
-  const list2 = reviewChanges();
-  const done = list2.filter((h2) => h2.status !== "pending").length;
-  return { done, total: list2.length };
 }
 function enterReviewMode() {
   reviewMode = true;
@@ -33600,7 +33598,7 @@ function syncFormatbarReviewMode(on) {
     reviewTools.hidden = !on;
     const tag2 = reviewTools.querySelector(".formatbar-review-tag");
     if (tag2) {
-      const { total } = reviewProgress();
+      const { total } = reviewProgress(pending);
       const cur = Math.min(reviewIndex, Math.max(total - 1, 0));
       tag2.textContent = total > 0 ? `\u5BA1\u9605\u4E2D ${cur + 1}/${total}` : "\u5BA1\u9605\u4E2D";
     }
@@ -33939,7 +33937,10 @@ function renderPanel() {
       (m) => `<div class="message ${m.role}"><small class="message-role">${m.role === "user" ? "\u4F60" : "aster"}</small><div>${m.parts ? m.parts.map((p) => p.kind === "tag" ? referenceChipHTML(p.reference?.kind || "file", p.label) : esc2(p.text)).join("") : esc2(m.text)}</div></div>`
     ).join("") || "";
     if (busy) content += streamBubbleHTML();
-    if (reviewCardHTML()) content += reviewCardHTML();
+    {
+      const card = reviewCardHTML(pending, current?.id, conversation(current).id);
+      if (card) content += card;
+    }
   }
   panel.innerHTML = `<div class="panel-scroll">${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0" aria-label="\u6DFB\u52A0" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div></div>`;
   bindConversationHead();
