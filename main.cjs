@@ -391,6 +391,11 @@ ipcMain.handle("copy", async (_, p) => {
 ipcMain.handle("agent", async (event, req) =>
   desk.runAgent(req, (text) => event.sender.send("agent-progress", text)),
 );
+desk.onAgentEvent = (e) => {
+  for (const w of BrowserWindow.getAllWindows()) {
+    try { w.webContents.send("agent-event", e); } catch { /* ignore */ }
+  }
+};
 
 ipcMain.on("save-sync", (event, next) => {
   try {

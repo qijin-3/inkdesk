@@ -28,7 +28,7 @@ const pkg = require("./package.json");
   fs.mkdirSync(path.join(vaultRoot, "Demo_AI/03_Archive"), { recursive: true });
   fs.writeFileSync(
     path.join(dir, "workspace.json"),
-    JSON.stringify({ version: 2, vaultPath: vaultRoot, provider: "cursor" }, null, 2),
+    JSON.stringify({ version: 2, vaultPath: vaultRoot, provider: "codex" }, null, 2),
   );
   const env = { ...process.env, INKDESK_DATA: dir, INKDESK_VAULT: vaultRoot };
   delete env.ELECTRON_RUN_AS_NODE;

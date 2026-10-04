@@ -15,8 +15,8 @@ function parseEnvelope(raw){
   return{ok:false};
 }
 class AgentOutput {
- constructor(provider,onText){this.provider=provider;this.onText=onText;this.buffer='';this.text='';this.finalText=null;this.usage=null;this.error='';this.seen=new Set();}
- emit(text){if(typeof text!=='string')return;this.text+=text;this.onText?.(text);}
+ constructor(provider,onText,onEvent){this.provider=provider;this.onText=onText;this.onEvent=onEvent;this.buffer='';this.text='';this.finalText=null;this.usage=null;this.error='';this.seen=new Set();}
+ emit(text){if(typeof text!=='string'||!text)return;this.text+=text;this.onText?.(text);try{this.onEvent?.({type:'text_delta',text});}catch{}}
  event(e){
   if(this.provider==='codex'){
    if(e.type==='turn.completed')this.usage=normalizeUsage('codex',e.usage);
@@ -31,7 +31,8 @@ class AgentOutput {
     if(u){if(!this.usage)this.usage=u;else for(const k of Object.keys(u))this.usage[k]=this.usage[k]===null||u[k]===null?null:this.usage[k]+u[k];}
    }
   }else if(this.provider==='cursor'){
-   if(e.type==='assistant')for(const b of e.message?.content||[])if(b.type==='text')this.emit(b.text);
+   if(e.type==='assistant'){for(const b of e.message?.content||[])if(b.type==='text')this.emit(b.text);
+     for(const b of e.message?.content||[])if(b.type==='tool_use')try{this.onEvent?.({type:'tool_start',tool:{id:b.id,name:b.name,args:b.input}});}catch{}}
    if(e.type==='result'){if(typeof e.result==='string')this.finalText=e.result;this.usage=normalizeUsage('cursor',e.usage);if(e.is_error)this.error=e.result||'Agent 返回错误';}
   }
  }

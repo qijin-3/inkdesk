@@ -28,6 +28,18 @@ desk.onAgentProgress = (text) => {
   }
 };
 
+// ponytail: single active task → one global handler is enough; events ride the same SSE as objects
+desk.onAgentEvent = (e) => {
+  const line = "data: " + JSON.stringify({ __agentEvent: true, ...e }) + "\n\n";
+  for (const res of agentSse) {
+    try {
+      res.write(line);
+    } catch {
+      agentSse.delete(res);
+    }
+  }
+};
+
 /**
  * 通知浏览器刷新（bundle / css 变更）。
  */

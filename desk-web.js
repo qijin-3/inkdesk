@@ -79,6 +79,14 @@
       agentListeners.add(fn);
       return () => agentListeners.delete(fn);
     },
+    agentEvent(fn) {
+      ensureAgentStream();
+      const wrap = (msg) => {
+        if (msg && typeof msg === "object" && msg.__agentEvent) fn(msg);
+      };
+      agentListeners.add(wrap);
+      return () => agentListeners.delete(wrap);
+    },
   };
 
   if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {

@@ -1,4 +1,5 @@
 import { mountAgentUsage } from "./agent-usage-ui.js";
+import { toolBlockHtml, activityLine } from "./ui/tool-block.js";
 import { $,
   $$,
   api,
@@ -84,7 +85,17 @@ import {
   agentSuggestionIds,
   agentListItemHtml,
   agentModelsPanelHtml,
+  getAgentHttp,
+  setAgentHttp,
+  ensureAgentHttpStore,
+  templateLabel,
+  connectedAgentProviders,
+  providerMeta,
 } from "./ui/agent-store.js";
+import {
+  promptConnectProvider,
+  addProviderFromCatalog,
+} from "./ui/provider-connect.js";
 import {
   WECHAT_BLUE,
   WECHAT_BLUE_SOFT,
@@ -213,6 +224,9 @@ let streamText = "",
   /** 流式消息是否处于思考等待期（未收到首个文本块） */
   streamThinking = false,
   unsubProgress = null,
+  /** 本次任务收到的 tool 事件（按 id 去重，流式展示用，不持久化） */
+  streamTools = [],
+  unsubAgentEvent = null,
   /** 审阅模式：改后稿落正文后，逐条对比审阅 */
   reviewMode = false,
   reviewIndex = 0;
@@ -2511,15 +2525,38 @@ function paintStreamBubble() {
   const bubble = $("#stream-bubble");
   if (!bubble) return;
   if (streamThinking) return;
-  bubble.querySelector(".message-role").textContent = "aster · 输出中";
+  const activity = streamTools.length ? activityLine(streamTools.map((t) => ({ type: "tool_start", tool: t }))) : "aster · 输出中";
+  bubble.querySelector(".message-role").textContent = activity;
   const body = bubble.querySelector(".stream-text");
+  const tools = streamTools.map((t) => toolBlockHtml(t, t.state || "running")).join("");
   if (body) {
     body.childNodes[0]?.remove;
-    body.innerHTML = `${esc(streamText)}<span class="stream-caret"></span>`;
+    body.innerHTML = `${esc(streamText)}<span class="stream-caret"></span>${tools}`;
   } else {
-    bubble.innerHTML = `<small class="message-role">aster · 输出中</small><div class="stream-text">${esc(streamText)}<span class="stream-caret"></span></div>`;
+    bubble.innerHTML = `<small class="message-role">${esc(activity)}</small><div class="stream-text">${esc(streamText)}<span class="stream-caret"></span>${tools}</div>`;
   }
+  bindToolToggles(bubble);
   scrollPanelToBottom();
+}
+
+// ponytail: onclick 赋值天然去重，比委托少一个全局监听
+function bindToolToggles(root) {
+  root?.querySelectorAll("[data-tool-toggle]").forEach((b) => {
+    b.onclick = () => {
+      const out = b.parentElement?.querySelector(".tool-output");
+      if (out) out.hidden = !out.hidden;
+    };
+  });
+}
+
+// ponytail: tool 事件按 id 合并为一张卡；历史消息仍只存文本，升级 paths 再说
+function trackToolEvent(e) {
+  const t = e?.tool || {};
+  const id = t.id || t.name + streamTools.length;
+  const i = streamTools.findIndex((x) => (x.id || x.name) === id);
+  const next = { id, name: t.name, args: t.args ?? t.argsDelta ?? "", output: t.output || "", state: e.type === "tool_end" ? "done" : "running" };
+  if (i >= 0) streamTools[i] = { ...streamTools[i], ...next };
+  else streamTools.push(next);
 }
 async function runTask(task) {
   if (busy) return toast("请等待当前任务，或停止后重试");
@@ -2587,6 +2624,26 @@ async function runTask(task) {
   renderPanel();
   scrollPanelToBottom();
   unsubProgress?.();
+  unsubAgentEvent?.();
+  streamTools = [];
+  unsubAgentEvent =
+    typeof window.desk?.agentEvent === "function"
+      ? window.desk.agentEvent((e) => {
+          if (!e || typeof e !== "object") return;
+          if (current?.id !== doc.id) return;
+          if (e.type === "usage" || e.type === "done") return;
+          if (e.type?.startsWith("tool")) {
+            if (streamThinking) {
+              streamThinking = false;
+              const bubble = $("#stream-bubble");
+              if (bubble)
+                bubble.innerHTML = `<small class="message-role">aster · 输出中</small><div class="stream-text"></div>`;
+            }
+            trackToolEvent(e);
+            paintStreamBubble();
+          }
+        })
+      : null;
   unsubProgress =
     typeof window.desk?.progress === "function"
       ? window.desk.progress((chunk) => {
@@ -2610,6 +2667,7 @@ async function runTask(task) {
     const result = await api("agent", {
       provider: state.provider,
       model: state.model,
+      templateId: state.templateId || undefined,
       account: doc.account,
       task,
       articleId: doc.id,
@@ -2647,7 +2705,10 @@ async function runTask(task) {
       }
       enterReviewMode();
     } else {
-      session.messages.push({ role: "assistant", text: result });
+      const suffix = streamTools.length
+        ? `\n\n（调用工具 ${streamTools.length} 次：${[...new Set(streamTools.map((t) => t.name).filter(Boolean))].join("、")}）`
+        : "";
+      session.messages.push({ role: "assistant", text: result + suffix });
     }
     await persist();
   } catch (e) {
@@ -2663,6 +2724,8 @@ async function runTask(task) {
   } finally {
     unsubProgress?.();
     unsubProgress = null;
+    unsubAgentEvent?.();
+    unsubAgentEvent = null;
     streamThinking = false;
     busy = false;
     syncAsterFace();
@@ -3493,7 +3556,7 @@ async function setAgentEnabled(id, on) {
  */
 function modelPickerHTML() {
   const provider = railProviderId(state);
-  const p = AGENT_PROVIDERS.find((x) => x.id === provider);
+  const p = providerMeta(state, provider);
   const label = railModelLabel(state, provider);
   const agents = selectableAgentProviders(state);
   const agentRows = agents.length
@@ -3522,12 +3585,12 @@ function modelPickerHTML() {
         .join("")
     : `<p class="model-picker-empty">暂无可用的 Agent</p>`;
   return `<div class="model-picker" id="model-picker">
-    <button type="button" id="model-picker-trigger" class="model-picker-trigger" title="${esc(p?.label || "")} · ${esc(label)}" aria-label="选择模型：${esc(label)}" aria-haspopup="menu" aria-expanded="false">
+    <button type="button" id="model-picker-trigger" class="model-picker-trigger" title="${esc(p?.label || "")} · ${esc(label)}${state.templateId ? ` · 模板：${esc(templateLabel(state))}` : ""}" aria-label="选择模型：${esc(label)}" aria-haspopup="menu" aria-expanded="false">
       <span class="model-picker-logo">${agentLogoSvg(provider, 16)}</span>
-      <span class="model-picker-label">${esc(label)}</span>
+      <span class="model-picker-label">${esc(label)}${state.templateId ? ` · ${esc(templateLabel(state))}` : ""}</span>
       ${I.chevronDown({ size: 12 })}
     </button>
-    <div id="model-picker-menu" class="model-picker-menu" hidden role="menu">${agentRows}</div>
+    <div id="model-picker-menu" class="model-picker-menu" hidden role="menu"><div class="model-picker-templates" role="group" aria-label="模板">${AGENT_TEMPLATES.map((t) => `<button type="button" role="menuitemradio" class="model-picker-option" data-template="${esc(t.id)}" aria-checked="${(state.templateId || "") === t.id}">${(state.templateId || "") === t.id ? "✓ " : ""}${esc(t.label)}</button>`).join("")}</div><div class="model-picker-divider"></div>${agentRows}</div>
   </div>`;
 }
 
@@ -3662,13 +3725,23 @@ function bindModelPicker() {
     agentEl.onmouseenter = () => openSubmenu(agentEl);
   });
 
-  root.querySelectorAll(".model-picker-option").forEach((opt) => {
+  root.querySelectorAll(".model-picker-option[data-template]").forEach((opt) => {
+    opt.onclick = async (e) => {
+      e.stopPropagation();
+      state.templateId = opt.getAttribute("data-template") || "";
+      closeAll();
+      await persistAgentModels();
+      render();
+    };
+  });
+
+  root.querySelectorAll(".model-picker-option:not([data-template])").forEach((opt) => {
     opt.onclick = async (e) => {
       e.stopPropagation();
       const provider = opt.getAttribute("data-provider") || "";
       const model = opt.getAttribute("data-model") || "";
       if (!provider || !agentInstalled(state, provider) || !agentEnabled(state, provider)) {
-        toast("未找到该 CLI");
+        toast("该 Agent 不可用");
         return;
       }
       state.provider = provider;
@@ -3680,8 +3753,7 @@ function bindModelPicker() {
       const text = trigger.querySelector(".model-picker-label");
       if (logo) logo.innerHTML = agentLogoSvg(provider, 16);
       if (text) text.textContent = label;
-      const agentLabel =
-        AGENT_PROVIDERS.find((x) => x.id === provider)?.label || "";
+      const agentLabel = providerMeta(state, provider)?.label || "";
       trigger.title = `${agentLabel} · ${label}`;
       trigger.setAttribute("aria-label", `选择模型：${label}`);
       root.querySelectorAll(".model-picker-option").forEach((btn) => {
@@ -3733,7 +3805,8 @@ function setModelRowStatus(provider, model, text, kind = "") {
 
 async function persistAgentModels() {
   ensureAgentModelsStore(state);
-  await persist();
+  ensureAgentHttpStore(state);
+  return persist();
 }
 
 async function fillAgentCard(p, refresh = false) {
@@ -3741,6 +3814,12 @@ async function fillAgentCard(p, refresh = false) {
   if (!body) return;
   if (!agentInstalled(state, p.id)) {
     body.innerHTML = agentModelsPanelHtml(state, p, null);
+    if (p.http) bindAgentModelControls(p);
+    return;
+  }
+  if (p.http) {
+    body.innerHTML = agentModelsPanelHtml(state, p, null);
+    bindAgentModelControls(p);
     return;
   }
   let info = { models: [], selectable: p.id !== "zcode", current: "" };
@@ -3759,6 +3838,68 @@ async function fillAgentCard(p, refresh = false) {
 }
 
 function bindAgentModelControls(p) {
+  if (p.http) {
+    const panel = $(`[data-agent-body="${p.id}"]`) || document;
+    const saveBtn = panel.querySelector(`[data-agent-http-save="${p.id}"]`);
+    const keyInput = panel.querySelector(`[data-agent-http-key="${p.id}"]`);
+    // 已存 Key 用脱敏占位展示；聚焦时清空以便改写
+    if (keyInput?.dataset.keySaved === "1") {
+      keyInput.onfocus = () => {
+        if (keyInput.dataset.keySaved !== "1") return;
+        keyInput.value = "";
+        keyInput.dataset.keySaved = "0";
+        keyInput.placeholder = "输入新 Key，留空则保持已存";
+      };
+    }
+    if (saveBtn)
+      saveBtn.onclick = async () => {
+        const base =
+          panel.querySelector(`[data-agent-http-base="${p.id}"]`)?.value.trim() ||
+          "";
+        const typed = keyInput?.value || "";
+        const prev = getAgentHttp(state, p.id);
+        // 脱敏占位未改时不算新 Key；禁止把 •••• 占位写进仓库
+        const keepingMask =
+          keyInput?.dataset.keySaved === "1" ||
+          /^[•*·]{2,}/.test(typed);
+        const apiKey = (
+          keepingMask || !typed ? prev.apiKey || "" : typed
+        )
+          .trim()
+          .replace(/[\u200b-\u200d\ufeff]/g, "");
+        if (!apiKey) return toast("请先填写 API Key");
+        if (/^[•*·]/.test(apiKey))
+          return toast("请重新粘贴完整 API Key（不要保存脱敏占位）");
+        setAgentHttp(state, p.id, {
+          ...prev,
+          baseURL: base.replace(/\/$/, ""),
+          apiKey,
+        });
+        state.agents = { ...state.agents, [p.id]: true };
+        const ok = await persistAgentModels();
+        if (!ok) return;
+        const mask = "••••" + apiKey.slice(-4);
+        if (keyInput) {
+          keyInput.dataset.keySaved = "1";
+          keyInput.dataset.keyMask = mask;
+          keyInput.value = mask;
+          keyInput.placeholder = "已保存，留空不改动";
+          keyInput.onfocus = () => {
+            if (keyInput.dataset.keySaved !== "1") return;
+            keyInput.value = "";
+            keyInput.dataset.keySaved = "0";
+            keyInput.placeholder = "输入新 Key，留空则保持已存";
+          };
+        }
+        const label = keyInput
+          ?.closest("label")
+          ?.querySelector(".settings-field-label");
+        if (label) label.textContent = `API Key（已存 ${mask}）`;
+        toast("已保存，可点测试连通验证");
+      };
+    const testHttp = panel.querySelector(`[data-agent-test-default="${p.id}"]`);
+    if (testHttp) testHttp.onclick = () => runAgentDefaultTest(p.id);
+  }
   const refresh = $(`[data-agent-refresh="${p.id}"]`);
   if (refresh) refresh.onclick = async () => { refresh.disabled = true; refresh.textContent = "刷新中…"; await fillAgentCard(p, true); };
   const useDefault = $(`[data-agent-cli-default="${p.id}"]`);
@@ -3849,12 +3990,12 @@ function bindAgentModelControls(p) {
 }
 
 async function runAgentDefaultTest(id) {
-  const p = AGENT_PROVIDERS.find((x) => x.id === id);
-  if (!agentInstalled(state, id)) return toast("未找到该 CLI");
+  const p = providerMeta(state, id);
+  if (!p?.http && !agentInstalled(state, id)) return toast("未找到该 CLI");
   const btn =
     $(`[data-agent-test-default="${id}"]`) || $("#agent-test-default");
   if (btn) btn.disabled = true;
-  toast(`${p?.label || id}：测试 CLI 默认…`);
+  toast(`${p?.label || id}：测试${p?.http ? "连通" : " CLI 默认"}…`);
   try {
     const result = await api("agent-test", { provider: id, model: "" });
     if (result.ok) {
@@ -3875,6 +4016,7 @@ async function mountAgentsSettings() {
     const next = await api("load");
     if (next?.agents) state.agents = next.agents;
     if (next?.agentModels) state.agentModels = next.agentModels;
+    if (next?.agentHttp) state.agentHttp = next.agentHttp;
     if (next?.agentsEnabled) state.agentsEnabled = next.agentsEnabled;
   } catch {
     /* keep cached */
@@ -3912,13 +4054,25 @@ async function mountAgentsSettings() {
       }
     };
   });
-  mountAgentUsage($("#agent-usage"), api, AGENT_PROVIDERS, {
+  mountAgentUsage($("#agent-usage"), api, connectedAgentProviders(state), {
     mode: "overview",
   });
+  const addBtn = $("#add-agent-provider");
+  if (addBtn)
+    addBtn.onclick = async () => {
+      const pick = await promptConnectProvider(state);
+      if (!pick) return;
+      const id = await addProviderFromCatalog(state, pick, promptText);
+      if (!id) return;
+      ensureAgentsEnabledStore(state);
+      state.agentsEnabled = { ...state.agentsEnabled, [id]: true };
+      await persistAgentModels();
+      openAgentDetail(id);
+    };
 }
 
 async function renderAgentDetail() {
-  const p = AGENT_PROVIDERS.find((x) => x.id === agentDetailId);
+  const p = providerMeta(state, agentDetailId);
   if (!p) {
     page = "settings";
     settingsTab = "agents";
@@ -3930,11 +4084,13 @@ async function renderAgentDetail() {
     const next = await api("load");
     if (next?.agents) state.agents = next.agents;
     if (next?.agentModels) state.agentModels = next.agentModels;
+    if (next?.agentHttp) state.agentHttp = next.agentHttp;
     if (next?.agentsEnabled) state.agentsEnabled = next.agentsEnabled;
   } catch {
     /* keep cached */
   }
   ensureAgentModelsStore(state);
+  ensureAgentHttpStore(state);
   ensureAgentsEnabledStore(state);
   if (!["connection", "usage"].includes(agentDetailTab))
     agentDetailTab = "connection";
@@ -3999,7 +4155,7 @@ async function renderAgentDetail() {
         control: `<section id="agent-usage" class="agent-usage"></section>`,
       }),
     );
-    mountAgentUsage($("#agent-usage"), api, AGENT_PROVIDERS, {
+    mountAgentUsage($("#agent-usage"), api, connectedAgentProviders(state), {
       mode: "detail",
       provider: p.id,
     });
@@ -4071,7 +4227,8 @@ function renderSettings() {
     settingsSection({
       title: "模型连接",
       className: "settings-section-agents",
-      control: `<div class="agent-card-list">${AGENT_PROVIDERS.map(agentListItemHtml).join("")}</div>`,
+      action: `<button type="button" class="primary" id="add-agent-provider">${I.plus()} 添加</button>`,
+      control: `<div class="agent-card-list">${connectedAgentProviders(state).map((p) => agentListItemHtml(state, p)).join("")}</div>`,
     }),
   ].join("");
 

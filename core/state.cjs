@@ -46,6 +46,13 @@ function init(core, options) {
         ...defaults.agentModels,
         ...(loaded.agentModels || {}),
       },
+      agentHttp: (() => {
+        const { migrateAgentHttp } = require("./providers.cjs");
+        return migrateAgentHttp({
+          ...defaults.agentHttp,
+          ...(loaded.agentHttp || {}),
+        });
+      })(),
       agentsEnabled: {
         ...defaults.agentsEnabled,
         ...(loaded.agentsEnabled || {}),
@@ -151,6 +158,19 @@ function setVault(core, root) {
 /**
  * 返回前端可用的完整状态快照。
  */
+// ponytail: HTTP provider 算“已安装”当且仅当配了 Key；无 Key 时面板提示填写而非报错
+function httpInstalled(core) {
+  const out = {};
+  try {
+    const { getProvider } = require("./providers.cjs");
+    for (const id of Object.keys(core.store?.agentHttp || {})) {
+      const cfg = core.store.agentHttp[id] || {};
+      const preset = getProvider(core, id) || {};
+      if (cfg.apiKey || process.env[preset.keyEnv || cfg.keyEnv || ""]) out[id] = true;
+    }
+  } catch { /* ignore */ }
+  return out;
+}
 function publicState(core) {
   const accounts = core.vault?.listAccountsWithStats?.() || [];
   return {
@@ -178,6 +198,7 @@ function publicState(core) {
       zcode: !!core.executable("zcode"),
       opencode: !!core.executable("opencode"),
       antigravity: !!core.executable("antigravity"),
+      ...httpInstalled(core),
     },
   };
 }
@@ -192,6 +213,7 @@ function save(core) {
     model: core.store.model,
     agentModels: core.store.agentModels || {},
     agentsEnabled: core.store.agentsEnabled || {},
+    agentHttp: core.store.agentHttp || {},
     followers: core.store.followers || {},
     metricDeltas: core.store.metricDeltas || {},
     backupPaths: core.store.backupPaths || {},

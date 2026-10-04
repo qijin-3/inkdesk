@@ -9,12 +9,12 @@ const {_electron:electron}=require('@playwright/test'),assert=require('node:asse
  await w.locator('[data-page="settings"]').click();await w.locator('[data-settings-tab="agents"]').click();
  assert.equal(await w.locator('[data-open-agent="codex"] .agent-card-title strong').textContent(),'ChatGPT');
  assert.equal(await w.locator('[data-open-agent="claude"] .agent-card-title strong').textContent(),'Claude Code');
- assert.equal(await w.locator('[data-agent-enable]').count(),6);
+ assert.equal(await w.locator('[data-agent-enable]').count(),4);
  assert(await w.locator('[data-agent-enable="codex"]').isChecked());
  await w.locator('[data-agent-enable="claude"]').click();
  await w.locator('[data-open-agent="claude"].is-off').waitFor();
  const storedOff=JSON.parse(fs.readFileSync(path.join(dir,'workspace.json'),'utf8'));assert.equal(storedOff.agentsEnabled.claude,false);
- const images=await w.locator('.agent-card-logo img').evaluateAll(async imgs=>{await Promise.all(imgs.map(i=>i.decode()));return imgs.map(i=>i.naturalWidth)});assert.equal(images.length,6);assert(images.every(n=>n>0));
+ const images=await w.locator('.agent-card-logo img').evaluateAll(async imgs=>{await Promise.all(imgs.map(i=>i.decode()));return imgs.map(i=>i.naturalWidth)});assert.equal(images.length,4);assert(images.every(n=>n>0));
  await w.locator('[data-open-agent="codex"]').click();
  await w.locator('[data-agent-refresh="codex"]').waitFor();
  assert.equal(await w.locator('.dashboard-tagline').textContent(),'ChatGPT');
@@ -24,5 +24,5 @@ const {_electron:electron}=require('@playwright/test'),assert=require('node:asse
  await w.locator('[data-open-agent="claude"]').click();
  await w.locator('#agent-set-default').click();
  const stored=JSON.parse(fs.readFileSync(path.join(dir,'workspace.json'),'utf8'));assert.equal(stored.provider,'claude');assert.equal(stored.model,'');
- await w.screenshot({path:'/tmp/aside-agents.png',fullPage:true});console.log('PASS Agent names, six real logos, refresh/add/select and provider isolation');
+ await w.screenshot({path:'/tmp/aside-agents.png',fullPage:true});console.log('PASS Agent names, four real logos, refresh/add/select and provider isolation');
  }finally{if(app)await app.close();fs.rmSync(dir,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -103,6 +103,11 @@ contextBridge.exposeInMainWorld("desk", {
     ipcRenderer.on("agent-progress", listener);
     return () => ipcRenderer.removeListener("agent-progress", listener);
   },
+  agentEvent: (fn) => {
+    const listener = (_, e) => fn(e);
+    ipcRenderer.on("agent-event", listener);
+    return () => ipcRenderer.removeListener("agent-event", listener);
+  },
   updateProgress: (fn) => {
     const listener = (_, text) => fn(text);
     ipcRenderer.on("update-progress", listener);

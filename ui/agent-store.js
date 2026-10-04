@@ -1,19 +1,41 @@
 import { esc } from "./dom.js";
+import providersCatalog from "../assets/agents/providers-catalog.json";
 
+/** CLI 卡片（设置页常驻；不含已下线的 cursor/zcode） */
 export const AGENT_PROVIDERS = [
-  { id: "cursor", label: "Cursor", blurb: "Cursor Agent CLI" },
   { id: "codex", label: "ChatGPT", blurb: "OpenAI Codex CLI" },
   { id: "claude", label: "Claude Code", blurb: "Anthropic Claude Code" },
-  { id: "zcode", label: "ZCode", blurb: "Z.ai ZCode（沿用 CLI 默认模型）" },
   { id: "opencode", label: "OpenCode", blurb: "OpenCode CLI" },
   { id: "antigravity", label: "Antigravity", blurb: "Google Antigravity（agy）" },
 ];
 
-export function settingsSection({ title, control, className = "" }) {
-  const titleHtml = title
-    ? `<h3 class="settings-section-title">${esc(title)}</h3>`
-    : "";
-  return `<section class="settings-section ${className}">${titleHtml}<div class="settings-section-control">${control}</div></section>`;
+export const AGENT_TEMPLATES = [
+  { id: "", label: "默认" },
+  { id: "polish", label: "润色" },
+  { id: "review", label: "审阅" },
+  { id: "qa", label: "素材问答" },
+  { id: "plan", label: "计划（只读）" },
+];
+
+/** models.dev 精简目录（自 OpenCode / models.dev） */
+export function providerCatalog() {
+  return providersCatalog;
+}
+
+export function catalogProvider(id) {
+  return providersCatalog.providers.find((p) => p.id === id) || null;
+}
+
+export function templateLabel(st) {
+  return AGENT_TEMPLATES.find((t) => t.id === (st.templateId || ""))?.label || "默认";
+}
+
+export function settingsSection({ title, control, className = "", action = "" }) {
+  const head =
+    title || action
+      ? `<div class="settings-section-head">${title ? `<h3 class="settings-section-title">${esc(title)}</h3>` : ""}${action}</div>`
+      : "";
+  return `<section class="settings-section ${className}">${head}<div class="settings-section-control">${control}</div></section>`;
 }
 
 /** 右侧白底面板 */
@@ -28,10 +50,8 @@ export function settingsField(label, controlHtml) {
 
 export function agentLogoSvg(id, size = 28) {
   const extensions = {
-    cursor: "png",
     codex: "png",
     claude: "ico",
-    zcode: "png",
     opencode: "svg",
     antigravity: "ico",
   };
@@ -55,9 +75,53 @@ export function agentEnabled(st, id) {
   return st.agentsEnabled[id] !== false;
 }
 
+export function ensureAgentHttpStore(st) {
+  if (!st.agentHttp || typeof st.agentHttp !== "object") st.agentHttp = {};
+}
+
+export function getAgentHttp(st, provider) {
+  ensureAgentHttpStore(st);
+  return st.agentHttp[provider] || { baseURL: "", apiKey: "" };
+}
+
+export function setAgentHttp(st, provider, cfg) {
+  ensureAgentHttpStore(st);
+  st.agentHttp = { ...st.agentHttp, [provider]: { baseURL: "", apiKey: "", ...cfg } };
+}
+
+/** 已连接的 HTTP 供应商（出现在 agentHttp 里） */
+export function connectedHttpProviders(st) {
+  ensureAgentHttpStore(st);
+  return Object.keys(st.agentHttp)
+    .map((id) => providerMeta(st, id))
+    .filter((p) => p?.http);
+}
+
+/** 模型连接列表：CLI 常驻 + 已添加的 HTTP */
+export function connectedAgentProviders(st) {
+  return [...AGENT_PROVIDERS, ...connectedHttpProviders(st)];
+}
+
+/** 查找任意 provider 元数据（CLI / catalog / agentHttp） */
+export function providerMeta(st, id) {
+  const cli = AGENT_PROVIDERS.find((x) => x.id === id);
+  if (cli) return cli;
+  ensureAgentHttpStore(st);
+  const cfg = st.agentHttp?.[id];
+  const cat = catalogProvider(id);
+  if (!cfg && !cat) return null;
+  return {
+    id,
+    label: cfg?.label || cat?.name || id,
+    blurb: "HTTP 直调（需 API Key）",
+    http: true,
+    family: cfg?.family || cat?.family || "openai",
+  };
+}
+
 /** 已安装的 Agent 列表 */
 export function installedAgentProviders(st) {
-  return AGENT_PROVIDERS.filter((p) => agentInstalled(st, p.id));
+  return connectedAgentProviders(st).filter((p) => agentInstalled(st, p.id));
 }
 
 /** 对话中可选的 Agent（已安装且已启用） */
@@ -76,7 +140,7 @@ export function railProviderId(st) {
 export function railModelLabel(st, provider = railProviderId(st)) {
   if (provider === st.provider && st.model) return st.model;
   if (provider === st.provider) return "默认";
-  const p = AGENT_PROVIDERS.find((x) => x.id === provider);
+  const p = providerMeta(st, provider);
   return p?.label || "选择模型";
 }
 
@@ -127,9 +191,30 @@ export function agentListItemHtml(st, p) {
 </div>`;
 }
 
+// ponytail: Key 只存本地 workspace.json，输入框用脱敏占位，不回填明文
+export function agentHttpPanelHtml(st, p) {
+  const cfg = getAgentHttp(st, p.id);
+  const cat = catalogProvider(p.id);
+  const masked = cfg.apiKey ? "••••" + String(cfg.apiKey).slice(-4) : "";
+  const base = cfg.baseURL || cat?.api || "";
+  const codingHint =
+    /zai-coding-plan|zhipuai-coding-plan/.test(p.id) || /coding\/paas/i.test(base)
+      ? `<p class="settings-hint">智谱 / Z.AI Coding Plan：国内用 <code>https://open.bigmodel.cn/api/coding/paas/v4</code>，国际用 <code>https://api.z.ai/api/coding/paas/v4</code>；须用编程套餐专用 Key。</p>`
+      : "";
+  return `<div class="agent-model-panel">
+    <p class="settings-hint">HTTP 直调，无需 CLI。Key 仅存本地，不上传。</p>
+    ${codingHint}
+    <label class="settings-field"><span class="settings-field-label">Base URL</span><input class="agent-model-input" data-agent-http-base="${p.id}" value="${esc(base)}" placeholder="${esc(cat?.api || "https://api.example.com/v1")}" autocomplete="off"></label>
+    <label class="settings-field"><span class="settings-field-label">API Key${masked ? `（已存 ${esc(masked)}）` : ""}</span><input class="agent-model-input" type="password" data-agent-http-key="${p.id}" ${masked ? `value="${esc(masked)}" data-key-saved="1" data-key-mask="${esc(masked)}"` : ""} placeholder="${masked ? "已保存，留空不改动" : "粘贴 API Key"}" autocomplete="off"></label>
+    <div class="agent-card-actions"><button type="button" class="primary" data-agent-http-save="${p.id}">保存</button><button type="button" class="ghost" data-agent-test-default="${p.id}">测试连通</button></div>
+    <span class="agent-model-row-status" data-model-status="__http__" role="status"></span>
+  </div>`;
+}
+
 /** 模型目录面板含回填副作用，保留在 renderer.js，本模块不导出 */
 
 export function agentModelsPanelHtml(st, p, info) {
+  if (p.http) return agentHttpPanelHtml(st, p);
   const installed = agentInstalled(st, p.id);
   if (!installed) {
     return `<p class="settings-hint">安装并登录对应 CLI 后，可添加模型并逐一测试连通。</p>`;

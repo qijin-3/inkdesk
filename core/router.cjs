@@ -307,11 +307,7 @@ async function invoke(core, name, data) {
       return result.metrics;
     }
     case "cancel":
-      if (core.active) {
-        core.active.asideCancelled = true;
-        core.active.kill("SIGTERM");
-        core.active = null;
-      }
+      core.cancelAgent(data?.conversationId || data?.conversation_id || "default");
       return true;
     case "agent":
       return core.runAgent(data);

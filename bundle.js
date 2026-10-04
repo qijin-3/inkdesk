@@ -179,6 +179,31 @@ function assetUrl(src) {
   return src;
 }
 
+// ui/tool-block.js
+function summarizeArgs(args, max = 120) {
+  try {
+    const s = typeof args === "string" ? args : JSON.stringify(args || {});
+    return s.length > max ? s.slice(0, max) + "\u2026" : s;
+  } catch {
+    return "";
+  }
+}
+function toolDisplayName(name) {
+  const map2 = { read: "\u8BFB\u53D6\u6587\u4EF6", write: "\u5199\u5165\u6587\u4EF6", edit: "\u7F16\u8F91\u6587\u4EF6", bash: "\u6267\u884C\u547D\u4EE4", search: "\u641C\u7D22", webfetch: "\u8054\u7F51\u68C0\u7D22" };
+  return map2[String(name || "").toLowerCase()] || String(name || "\u5DE5\u5177");
+}
+function toolBlockHtml(tool, state2 = "running") {
+  const name = toolDisplayName(tool?.name);
+  const icon2 = state2 === "done" ? "\u2713" : state2 === "error" ? "\u2715" : "\u25CC";
+  return `<div class="tool-block is-${state2}" data-tool-id="${esc2(tool?.id || "")}"><button type="button" class="tool-head" data-tool-toggle><span class="tool-icon">${icon2}</span><strong>${esc2(name)}</strong><code>${esc2(tool?.name || "")}</code><span class="tool-args">${esc2(summarizeArgs(tool?.args))}</span><span class="tool-state">${esc2(state2)}</span></button><pre class="tool-output" hidden>${esc2(tool?.output || "")}</pre></div>`;
+}
+function activityLine(events) {
+  const last = [...events].reverse().find((e) => e.type?.startsWith("tool"));
+  if (last) return toolDisplayName(last.tool?.name) + " " + summarizeArgs(last.tool?.args, 60);
+  const t = events.filter((e) => e.type === "text_delta").length;
+  return t ? "\u6B63\u5728\u64B0\u5199\u2026" : "\u51C6\u5907\u4E2D\u2026";
+}
+
 // node_modules/lucide/dist/esm/icons/at-sign.mjs
 var AtSign = [
   ["circle", { cx: "12", cy: "12", r: "4" }],
@@ -30971,18 +30996,35 @@ function conversation(doc3) {
   return c;
 }
 
+// assets/agents/providers-catalog.json
+var providers_catalog_default = { source: "https://models.dev/api.json", popular: ["opencode-go", "anthropic", "openai", "openrouter", "deepseek", "zhipuai-coding-plan"], custom: { id: "_custom", name: "\u81EA\u5B9A\u4E49 OpenAI \u517C\u5BB9\u63D0\u4F9B\u5546" }, providers: [{ id: "302ai", name: "302.AI", api: "https://api.302.ai/v1", family: "openai", env: ["302AI_API_KEY"], models: ["grok-4-1-fast-reasoning", "glm-4.6v", "gpt-5.4", "glm-4.5", "claude-haiku-4-5", "qwen3.7-max", "gemini-3.1-flash-image-preview", "grok-4.7"], popular: false }, { id: "abacus", name: "Abacus", api: "https://routellm.abacus.ai/v1", family: "openai", env: ["ABACUS_API_KEY"], models: ["gpt-5.4", "grok-4-1-fast-non-reasoning", "qwen3.7-max", "gemini-3.1-flash-image-preview", "gpt-5.4-nano", "gpt-5.2-codex", "gpt-5.1-codex", "gemini-2.5-flash-image"], popular: false }, { id: "abliteration-ai", name: "abliteration.ai", api: "https://api.abliteration.ai/v1", family: "openai", env: ["ABLIT_KEY"], models: ["abliterated-model-large-v2", "abliterated-model", "abliterated-model-large"], popular: false }, { id: "above", name: "above.dev", api: "https://api.above.dev/v1", family: "openai", env: ["ABOVE_API_KEY"], models: ["mimo-v2.6-pro", "glm-5.3-flash", "glm-5.2-fast", "qwen3.8-max", "deepseek-v4.1-flash", "mimo-v2.6-pro-ultraspeed", "mimo-v2.6-flash", "glm-5.2"], popular: false }, { id: "agentrouter", name: "AgentRouter", api: "https://agentrouter.org/v1", family: "openai", env: ["AGENTROUTER_API_KEY"], models: ["claude-opus-5", "claude-opus-4-8", "glm-5.3", "gpt-5.6-sol", "deepseek-v4-flash"], popular: false }, { id: "agnes", name: "Agnes AI", api: "https://apihub.agnes-ai.com/v1", family: "openai", env: ["AGNES_API_KEY"], models: ["agnes-2.5-pro-alpha", "agnes-2.0-flash", "agnes-2.5-flash"], popular: false }, { id: "ai-router", name: "AI-ROUTER", api: "https://api.ai-router.dev/v1", family: "openai", env: ["AI_ROUTER_API_KEY"], models: ["gpt-5.4", "gpt-5.6-luna", "gpt-5.5", "gpt-5.6-terra", "gpt-5.6-sol"], popular: false }, { id: "aiand", name: "ai&", api: "https://api.aiand.com/v1", family: "openai", env: ["AIAND_API_KEY"], models: ["motif-technologies/motif-3", "google/gemma-4-31b-it", "deepseek-ai/deepseek-v4.1-flash", "deepseek-ai/deepseek-v4-pro", "deepseek-ai/deepseek-v4-flash", "moonshotai/kimi-k3", "moonshotai/kimi-k2.7-code", "zai-org/glm-5.3-flash"], popular: false }, { id: "ai21", name: "AI21 Labs", api: "https://api.ai21.com/studio/v1", family: "openai", env: ["AI21_API_KEY"], models: ["jamba-large", "jamba-mini"], popular: false }, { id: "ainetcafe", name: "ainetcafe", api: "https://microquickjs.com/v1", family: "openai", env: ["AINETCAFE_API_KEY"], models: ["Kimi-K3"], popular: false }, { id: "aixy", name: "Aixy", api: "https://api.aixy-gateway.com/v1", family: "openai", env: ["AIXY_API_KEY"], models: ["openai/gpt-4.1-mini"], popular: false }, { id: "aki-io", name: "AKI.IO", api: "https://aki.io/v1", family: "openai", env: ["AKI_IO_API_KEY"], models: ["qwen3.8-27b", "deepseek-v4-flash-0731-284b", "qwen3.6-35b", "glm5.3-754b", "mistral4-119b", "gpt-oss-120b", "gemma4-26b"], popular: false }, { id: "alibaba", name: "Alibaba", api: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", family: "openai", env: ["DASHSCOPE_API_KEY"], models: ["qwen-flash", "qwen3.5-flash", "qwen3.7-max", "qwen2-5-32b-instruct", "qwq-plus", "qwen2-5-vl-72b-instruct", "qwen3-vl-plus", "qwen3.5-27b"], popular: false }, { id: "alibaba-cn", name: "Alibaba (China)", api: "https://dashscope.aliyuncs.com/compatible-mode/v1", family: "openai", env: ["DASHSCOPE_API_KEY"], models: ["qwen-flash", "qwen3.5-flash", "qwen2-5-coder-32b-instruct", "deepseek-v3-2-exp", "deepseek-r1-distill-qwen-14b", "qwen-math-plus", "qwen-deep-research", "qwen3.7-max"], popular: false }, { id: "alibaba-coding-plan", name: "Alibaba Coding Plan", api: "https://coding-intl.dashscope.aliyuncs.com/v1", family: "openai", env: ["ALIBABA_CODING_PLAN_API_KEY"], models: ["qwen3-coder-next", "qwen3.5-plus", "glm-5", "kimi-k2.5", "qwen3-max-2026-01-23", "qwen3-coder-plus", "MiniMax-M2.5", "glm-4.7"], popular: false }, { id: "alibaba-coding-plan-cn", name: "Alibaba Coding Plan (China)", api: "https://coding.dashscope.aliyuncs.com/v1", family: "openai", env: ["ALIBABA_CODING_PLAN_API_KEY"], models: ["qwen3-coder-next", "qwen3.5-plus", "glm-5", "kimi-k2.5", "qwen3-max-2026-01-23", "qwen3-coder-plus", "MiniMax-M2.5", "glm-4.7"], popular: false }, { id: "alibaba-token-plan", name: "Alibaba Token Plan", api: "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1", family: "openai", env: ["ALIBABA_TOKEN_PLAN_API_KEY"], models: ["happyhorse-1.1-r2v", "qwen3.7-max", "deepseek-v4-flash-0731", "qwen3.8-max", "happyhorse-1.1-t2v", "qwen-image-2.0", "glm-5", "deepseek-v4.1-flash"], popular: false }, { id: "alibaba-token-plan-cn", name: "Alibaba Token Plan (China)", api: "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1", family: "openai", env: ["ALIBABA_TOKEN_PLAN_API_KEY"], models: ["happyhorse-1.1-r2v", "qwen3.7-max", "deepseek-v4-flash-0731", "qwen3.8-max", "happyhorse-1.1-t2v", "qwen-image-2.0", "glm-5", "deepseek-v4.1-flash"], popular: false }, { id: "ambient", name: "Ambient", api: "https://api.ambient.xyz/v1", family: "openai", env: ["AMBIENT_API_KEY"], models: ["deepseek/deepseek-v4-flash-0731", "deepseek/deepseek-v4-flash", "z-ai/glm-5.2", "ambient/large", "moonshotai/kimi-k2.6", "moonshotai/kimi-k2.7-code", "zai-org/GLM-5.2-FP8", "zai-org/GLM-5.1-FP8"], popular: false }, { id: "amd", name: "AMD", api: "https://developer.amd.com.cn/radeon/api/v1", family: "openai", env: ["AMD_API_KEY"], models: ["Qwen3.8-27B", "DeepSeek-V4.1-Flash", "DeepSeek-V4-Flash", "Qwen3.8-Flash-Next", "MiniCPM5-2B", "DeepSeek-V4-Flash-Vision-Exp"], popular: false }, { id: "anthropic", name: "Anthropic", api: "https://api.anthropic.com", family: "anthropic", env: ["ANTHROPIC_API_KEY"], models: ["claude-haiku-4-5", "claude-opus-4-5", "claude-sonnet-4-5", "claude-opus-5-5", "claude-fable-5-1", "claude-opus-4-5-20251101", "claude-opus-5", "claude-fable-5"], popular: true }, { id: "anyapi", name: "AnyAPI", api: "https://api.anyapi.ai/v1", family: "openai", env: ["ANYAPI_API_KEY"], models: ["anthropic/claude-haiku-4-5", "anthropic/claude-sonnet-4-5", "anthropic/claude-opus-4-6", "anthropic/claude-sonnet-4-6", "anthropic/claude-opus-4-7", "cohere/command-r-plus-08-2024", "deepseek/deepseek-chat", "deepseek/deepseek-r1"], popular: false }, { id: "arcee", name: "Arcee", api: "https://api.arcee.ai/api/v1", family: "openai", env: ["ARCEE_API_KEY"], models: ["trinity-large-thinking", "deepseek/deepseek-v4-pro-0813", "deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-flash-latest", "thinkingmachines/inkling-small", "moonshotai/kimi-k3", "zai-org/glm-5.2"], popular: false }, { id: "atomic-chat", name: "Atomic Chat", api: "http://127.0.0.1:1337/v1", family: "openai", env: ["ATOMIC_CHAT_API_KEY"], models: ["gemma-4-E4B-it-MLX-4bit", "Meta-Llama-3_1-8B-Instruct-GGUF", "Qwen3_5-9B-Q4_K_M", "gemma-4-E4B-it-IQ4_XS", "Qwen3_5-9B-MLX-4bit"], popular: false }, { id: "auriko", name: "Auriko", api: "https://api.auriko.ai/v1", family: "openai", env: ["AURIKO_API_KEY"], models: ["qwen-3.6-plus", "minimax-m2-7-highspeed", "kimi-k2.6", "grok-4.3", "gemini-3.1-pro-preview", "kimi-k2.5", "gemini-2.5-pro", "gemini-2.5-flash"], popular: false }, { id: "bailing", name: "Bailing", api: "https://api.tbox.cn/api/llm/v1", family: "openai", env: ["BAILING_API_TOKEN"], models: ["Ring-1T", "Ling-1T"], popular: false }, { id: "baseten", name: "Baseten", api: "https://inference.baseten.co/v1", family: "openai", env: ["BASETEN_API_KEY"], models: ["thinkingmachines/inkling-small", "thinkingmachines/inkling", "deepseek-ai/DeepSeek-V3.1", "deepseek-ai/DeepSeek-V4-Flash-0731", "deepseek-ai/DeepSeek-V4-Pro-0813", "deepseek-ai/DeepSeek-V4.1-Flash", "deepseek-ai/DeepSeek-V4.1-Flash-Fast", "deepseek-ai/DeepSeek-V4-Pro"], popular: false }, { id: "bee", name: "Bee by HEOSSI", api: "https://api.bee.heossi.com/bee", family: "openai", env: ["BEE_API_KEY"], models: ["bee-buzz", "bee-swarm", "bee-comb", "bee-hive", "bee-brood", "bee-cell"], popular: false }, { id: "berget", name: "Berget.AI", api: "https://api.berget.ai/v1", family: "openai", env: ["BERGET_API_KEY"], models: ["google/gemma-4-31B-it", "Qwen/Qwen3.8-27B-FP8", "mistralai/Mistral-Small-3.2-24B-Instruct-2506", "moonshotai/Kimi-K3", "zai-org/GLM-5.2", "zai-org/GLM-5.3-Flash"], popular: false }, { id: "blueclaw", name: "Blue Claw", api: "https://openai.blueclaw.network/v1", family: "openai", env: ["BLUECLAW_API_KEY"], models: ["Qwen3.6-27B", "Qwen/Qwen3.6-35B-A3B-FP8"], popular: false }, { id: "bothub", name: "Bothub", api: "https://openai.bothub.ru/v1", family: "openai", env: ["BOTHUB_API_KEY"], models: ["gemma-4-31b-it:free", "glm-5.3-flash", "deepseek-v4-flash-0731", "nemotron-3-ultra-550b-a55b:free", "deepseek-v4-pro-0813", "gpt-5.6-luna", "muse-spark-1.3-contributor", "glm-5.3"], popular: false }, { id: "hyper", name: "Charm Hyper", api: "https://hyper.charm.land/v1", family: "openai", env: ["HYPER_API_KEY"], models: ["qwen3.7-max", "qwen3.8-27b", "qwen3.8-2.4t-a95b", "glm-5.3-flash", "deepseek-v4-flash-0731", "qwen3.8-max", "kimi-k3", "deepseek-v4.1-flash"], popular: false }, { id: "chutes", name: "Chutes", api: "https://llm.chutes.ai/v1", family: "openai", env: ["CHUTES_API_KEY"], models: ["Nemotron-3-Nano-Omni-30B-TEE", "unsloth/Mistral-Nemo-Instruct-2407-TEE", "google/gemma-4-31B-turbo-TEE", "Qwen/Qwen3-32B-TEE", "Qwen/Qwen3.6-27B-TEE", "Qwen/Qwen3-235B-A22B-Thinking-2507-TEE", "Qwen/Qwen3.8-27B-TEE", "Qwen/Qwen3.5-397B-A17B-TEE"], popular: false }, { id: "clarifai", name: "Clarifai", api: "https://api.clarifai.com/v2/ext/openai/v1", family: "openai", env: ["CLARIFAI_PAT"], models: ["minimaxai/chat-completion/models/MiniMax-M2_5-high-throughput", "clarifai/main/models/mm-poly-8b", "deepseek-ai/deepseek-ocr/models/DeepSeek-OCR", "mistralai/completion/models/Ministral-3-3B-Reasoning-2512", "mistralai/completion/models/Ministral-3-14B-Reasoning-2512", "moonshotai/chat-completion/models/Kimi-K2_6", "arcee_ai/AFM/models/trinity-mini", "qwen/qwenCoder/models/Qwen3-Coder-30B-A3B-Instruct"], popular: false }, { id: "claudinio", name: "Claudinio", api: "https://api.claudin.io/v1", family: "openai", env: ["CLAUDINIO_API_KEY"], models: ["claudinio", "claudius"], popular: false }, { id: "cline-pass", name: "ClinePass", api: "https://api.cline.bot/api/v1", family: "openai", env: ["CLINE_API_KEY"], models: ["cline-pass/mimo-v2.6-pro", "cline-pass/qwen3.7-max", "cline-pass/mimo-v2.5", "cline-pass/glm-5.3-flash", "cline-pass/qwen3.8-max", "cline-pass/kimi-k3", "cline-pass/deepseek-v4.1-flash", "cline-pass/kimi-k2.6"], popular: false }, { id: "cloudferro-sherlock", name: "CloudFerro Sherlock", api: "https://api-sherlock.cloudferro.com/openai/v1/", family: "openai", env: ["CLOUDFERRO_SHERLOCK_API_KEY"], models: ["meta-llama/Llama-3.3-70B-Instruct", "MiniMaxAI/MiniMax-M2.5", "openai/gpt-oss-120b", "speakleash/Bielik-11B-v2.6-Instruct", "speakleash/Bielik-11B-v3.0-Instruct"], popular: false }, { id: "coralbricks", name: "CoralBricks", api: "https://inference.coralbricks.ai/v1", family: "openai", env: ["CORAL_API_KEY"], models: ["glm-5.3-fp4", "glm-5.3-flash-fp4", "deepseek-v4.1-flash-fast-fp4"], popular: false }, { id: "wandb", name: "CoreWeave", api: "https://api.inference.wandb.ai/v1", family: "openai", env: ["WANDB_API_KEY"], models: ["JetBrains/Mellum2-12B-A2.5B-Instruct", "meta-llama/Llama-3.1-70B-Instruct", "meta-llama/Llama-3.1-8B-Instruct", "meta-llama/Llama-3.3-70B-Instruct", "google/gemma-4-31B-it", "google/gemma-4-26B-A4B-it", "Qwen/Qwen3.8-27B", "Qwen/Qwen3-30B-A3B-Instruct-2507"], popular: false }, { id: "cortecs", name: "Cortecs", api: "https://api.cortecs.ai/v1", family: "openai", env: ["CORTECS_API_KEY"], models: ["gpt-5.4", "claude-haiku-4-5", "gpt-oss-safeguard-120b", "gemma-4-31b-it", "qwen3.8-27b", "gemma-3-27b-it", "qwen3.8-2.4t-a95b", "mistral-large-2402"], popular: false }, { id: "crof", name: "CrofAI", api: "https://crof.ai/v1", family: "openai", env: ["CROF_API_KEY"], models: ["gemma-4-31b-it", "qwen3.8-27b", "kimi-k3-eco", "glm-5.3-flash", "deepseek-v4-flash-0731", "kimi-k3", "deepseek-v4-flash-vision-exp", "kimi-k2.6"], popular: false }, { id: "crossmodel", name: "CrossModel", api: "https://api.crossmodel.ai/v1", family: "openai", env: ["CROSSMODEL_API_KEY"], models: ["anthropic/claude-haiku-4-5", "anthropic/claude-opus-5-5", "anthropic/claude-fable-5-1", "anthropic/claude-opus-5", "anthropic/claude-fable-5", "anthropic/claude-opus-4-8", "anthropic/claude-sonnet-5", "anthropic/claude-sonnet-4-6"], popular: false }, { id: "crusoe", name: "Crusoe", api: "https://api.inference.crusoecloud.com/v1", family: "openai", env: ["CRUSOE_API_KEY"], models: ["zai/GLM-5.1", "zai/GLM-5.2", "meta-llama/Llama-3.3-70B-Instruct", "google/gemma-4-31b-it", "Qwen/Qwen3-235B-A22B-Instruct-2507", "deepseek-ai/DeepSeek-V3-0324", "moonshotai/Kimi-K2.6", "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"], popular: false }, { id: "drun", name: "D.Run (China)", api: "https://chat.d.run/v1", family: "openai", env: ["DRUN_API_KEY"], models: ["public/deepseek-v3", "public/minimax-m25", "public/deepseek-r1"], popular: false }, { id: "daoxe", name: "DaoXE", api: "https://daoxe.com/v1", family: "openai", env: ["DAOXE_API_KEY"], models: ["gpt-5.4", "grok-4.3", "gemini-3.1-pro-preview", "grok-4.5", "kimi-k2.5", "claude-opus-4-8", "gpt-5.5", "claude-haiku-4-5-20251001"], popular: false }, { id: "deepseek", name: "DeepSeek", api: "https://api.deepseek.com", family: "openai", env: ["DEEPSEEK_API_KEY"], models: ["deepseek-v4-flash-vision-exp", "deepseek-flash", "deepseek-v4-pro", "deepseek-v4-flash"], popular: true }, { id: "llmgateway", name: "DevPass (LLM Gateway)", api: "https://api.llmgateway.io/v1", family: "openai", env: ["LLMGATEWAY_API_KEY"], models: ["grok-4-1-fast-reasoning", "glm-4.6v", "qwen-flash", "gpt-5.4", "glm-4.5", "claude-haiku-4-5", "gpt-5.4-pro", "mimo-v2.6-pro"], popular: false }, { id: "digitalocean", name: "DigitalOcean", api: "https://inference.do-ai.run/v1", family: "openai", env: ["DIGITALOCEAN_ACCESS_TOKEN"], models: ["deepseek-3.2", "openai-gpt-5.5", "openai-gpt-5.2-pro", "all-mini-lm-l6-v2", "multi-qa-mpnet-base-dot-v1", "openai-gpt-image-1", "anthropic-claude-3-opus", "anthropic-claude-4.6-sonnet"], popular: false }, { id: "dinference", name: "DInference", api: "https://api.dinference.com/v1", family: "openai", env: ["DINFERENCE_API_KEY"], models: ["glm-5", "minimax-m2.5", "glm-4.7", "glm-5.2", "glm-5.1", "gpt-oss-120b"], popular: false }, { id: "ebcloud", name: "EBCloud", api: "https://maas-api.ebcloud.com/v1", family: "openai", env: ["EBCLOUD_API_KEY"], models: ["Kimi-K2.6", "GLM-5.1", "DeepSeek-V4-Flash", "DeepSeek-V4-Pro"], popular: false }, { id: "echo", name: "Echo", api: "https://echo.tracerml.ai/v1", family: "openai", env: ["ECHO_API_KEY"], models: ["echo"], popular: false }, { id: "edenai", name: "Eden AI", api: "https://api.edenai.run/v3", family: "openai", env: ["EDENAI_API_KEY"], models: ["deepinfra/nemotron-3-ultra-550b-a55b", "deepinfra/meta-models/Muse-Glimmer-30B", "deepinfra/tencent/Hy3", "deepinfra/tencent/Hy4-preview", "deepinfra/meta-llama/Llama-Guard-3-8B", "deepinfra/meta-llama/Llama-3.2-11B-Vision-Instruct", "deepinfra/meta-llama/Llama-3.3-70B-Instruct", "deepinfra/thinkingmachines/Inkling-Small"], popular: false }, { id: "empiriolabs", name: "EmpirioLabs AI", api: "https://api.empiriolabs.ai/v1", family: "openai", env: ["EMPIRIOLABS_API_KEY"], models: ["qwen3-8-max-0902", "qwen3-6-plus", "qwen3-6-27b", "glm-5-3-flash", "kimi-k2-7-code", "seed-2-0-lite", "deepseek-v4-flash-0731", "mimo-v2-5"], popular: false }, { id: "engy", name: "engy", api: "https://api.engy.ai/v1", family: "openai", env: ["ENGY_API_KEY"], models: ["qwen3.8-27b", "glm-5.3-flash", "deepseek-v4-flash-0731", "kimi-k3", "deepseek-v4.1-flash", "qwen3.6-35b-a3b", "glm-5.2", "glm-5.3"], popular: false }, { id: "evroc", name: "evroc", api: "https://models.think.evroc.com/v1", family: "openai", env: ["EVROC_API_KEY"], models: ["google/gemma-4-26B-A4B-it", "intfloat/multilingual-e5-large-instruct", "Qwen/Qwen3.8-27B", "Qwen/Qwen3-Reranker-4B", "Qwen/Qwen3.6-35B-A3B", "Qwen/Qwen3-Embedding-8B", "mistralai/Mistral-Medium-3.5-128B", "mistralai/Voxtral-Small-24B-2507"], popular: false }, { id: "fastrouter", name: "FastRouter", api: "https://go.fastrouter.ai/api/v1", family: "openai", env: ["FASTROUTER_API_KEY"], models: ["anthropic/claude-opus-4.1", "anthropic/claude-opus-4.8", "anthropic/claude-sonnet-4", "anthropic/claude-sonnet-4.6", "deepseek/deepseek-v4-pro", "z-ai/glm-5", "z-ai/glm-5.1", "sarvam/sarvam-30b"], popular: false }, { id: "fireworks-ai", name: "Fireworks AI", api: "https://api.fireworks.ai/inference/v1/", family: "openai", env: ["FIREWORKS_API_KEY"], models: ["accounts/fireworks/models/nemotron-3-ultra-nvfp4", "accounts/fireworks/models/kimi-k3", "accounts/fireworks/models/qwen3p8-2p4t-a95b", "accounts/fireworks/models/ember-1", "accounts/fireworks/models/deepseek-v4p1-flash", "accounts/fireworks/models/glm-5p3", "accounts/fireworks/models/nemotron-lightning-3p5-30b-a3b", "accounts/fireworks/models/inkling"], popular: false }, { id: "freemodel", name: "FreeModel", api: "https://cc.freemodel.dev/v1", family: "anthropic", env: ["FREEMODEL_API_KEY"], models: ["gpt-5.4", "gpt-5.3-codex", "claude-fable-5", "gpt-5.4-mini", "claude-opus-4-8", "gpt-5.5", "claude-opus-4-6", "claude-haiku-4-5-20251001"], popular: false }, { id: "friendli", name: "Friendli", api: "https://api.friendli.ai/serverless/v1", family: "openai", env: ["FRIENDLI_TOKEN"], models: ["google/gemma-4-31B-it", "deepseek-ai/DeepSeek-V3.2", "MiniMaxAI/MiniMax-M2.5", "zai-org/GLM-5.1", "zai-org/GLM-5.2", "zai-org/GLM-5.3-Flash", "zai-org/GLM-5.3"], popular: false }, { id: "frogbot", name: "FrogBot", api: "https://app.frogbot.ai/api/v1", family: "openai", env: ["FROGBOT_API_KEY"], models: ["grok-4-1-fast-reasoning", "gpt-5-4-mini", "claude-haiku-4-5", "grok-4-1-fast-non-reasoning", "gpt-4o", "minimax-m2-5", "gpt-5-4-nano", "kimi-k2.5"], popular: false }, { id: "github-copilot", name: "GitHub Copilot", api: "https://api.githubcopilot.com", family: "openai", env: ["GITHUB_TOKEN"], models: ["gpt-5.4", "grok-4.7", "gpt-5.4-nano", "claude-opus-4.7", "kimi-k3", "gpt-5-mini", "claude-opus-4.8", "gpt-5.3-codex"], popular: false }, { id: "gmicloud", name: "GMI Cloud", api: "https://api.gmi-serving.com/v1", family: "openai", env: ["GMICLOUD_API_KEY"], models: ["anthropic/claude-opus-4.6", "anthropic/claude-opus-4.7", "anthropic/claude-opus-4.8", "anthropic/claude-sonnet-4.6", "Qwen/Qwen3.7-Max", "Qwen/Qwen3.8-Max", "Qwen/Qwen3.8-Flash", "deepseek-ai/DeepSeek-V4-Flash"], popular: false }, { id: "greenpt", name: "GreenPT", api: "https://api.greenpt.ai/v1", family: "openai", env: ["GREENPT_API_KEY"], models: ["glm-5.2-honey-ultra", "glm-5.2-ponytail-lite", "gemma-3-27b-it", "glm-5.3-flash", "deepseek-v4-flash-0731", "qwen3-235b-a22b-instruct-2507", "kimi-k3", "deepseek-v4.1-flash"], popular: false }, { id: "helicone", name: "Helicone", api: "https://ai-gateway.helicone.ai/v1", family: "openai", env: ["HELICONE_API_KEY"], models: ["grok-4-1-fast-reasoning", "grok-3", "llama-4-scout", "llama-guard-4", "mistral-large-2411", "grok-4-1-fast-non-reasoning", "qwen3-vl-235b-a22b-instruct", "mistral-nemo"], popular: false }, { id: "hetzner", name: "Hetzner", api: "https://inference.hetzner.com/api/v1", family: "openai", env: ["HETZNER_API_KEY"], models: ["Qwen3.8-27B", "Qwen/Qwen3.6-35B-A3B-FP8"], popular: false }, { id: "hpc-ai", name: "HPC-AI", api: "https://api.hpc-ai.com/inference/v1", family: "openai", env: ["HPC_AI_API_KEY"], models: ["anthropic/claude-opus-4.7", "deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-flash", "moonshotai/kimi-k2.5", "moonshotai/kimi-k2.7-code", "zai-org/glm-5.2", "zai-org/glm-5.1", "minimax/minimax-m2.5"], popular: false }, { id: "huggingface", name: "Hugging Face", api: "https://router.huggingface.co/v1", family: "openai", env: ["HF_TOKEN"], models: ["tencent/Hy3", "tencent/Hy4-preview", "meta-llama/Llama-3.1-8B-Instruct", "meta-llama/Llama-3.3-70B-Instruct", "XiaomiMiMo/MiMo-V2-Flash", "XiaomiMiMo/MiMo-V2.5-Pro", "XiaomiMiMo/MiMo-V2.5", "thinkingmachines/Inkling-Small"], popular: false }, { id: "iflowcn", name: "iFlow", api: "https://apis.iflow.cn/v1", family: "openai", env: ["IFLOW_API_KEY"], models: ["qwen3-vl-plus", "glm-4.6", "qwen3-32b", "qwen3-max", "deepseek-v3", "qwen3-235b-a22b-thinking-2507", "qwen3-max-preview", "qwen3-coder-plus"], popular: false }, { id: "impossibl", name: "Impossibl", api: "https://api.impossibl.com/v1", family: "openai", env: ["IMPOSSIBL_API_KEY"], models: ["cerebras/gpt-oss-120b", "groq/gpt-oss-20b", "groq/gpt-oss-120b", "zai/glm-4.5", "zai/glm-4.6", "zai/glm-5", "zai/glm-4.7", "zai/glm-5.2"], popular: false }, { id: "inception", name: "Inception", api: "https://api.inceptionlabs.ai/v1/", family: "openai", env: ["INCEPTION_API_KEY"], models: ["mercury-edit-2", "mercury-2.5", "mercury-2"], popular: false }, { id: "inceptron", name: "Inceptron", api: "https://api.inceptron.io/v1", family: "openai", env: ["INCEPTRON_API_KEY"], models: ["deepseek-ai/DeepSeek-V4-Flash-0731", "moonshotai/Kimi-K2.6", "moonshotai/Kimi-K2.7-Code", "zai-org/GLM-5.2"], popular: false }, { id: "inco", name: "Inco", api: "https://api.inco.ai/v1", family: "openai", env: ["INCO_API_KEY"], models: ["kimi-k3:fast", "glm-5.3:fast", "glm-5.3-flash:fast", "minimax-m3", "deepseek-v4.1-flash:fast", "minimax-m3:fast", "glm-5.3"], popular: false }, { id: "infer", name: "Infer by Flow7", api: "https://infer.flow7.org/v1", family: "openai", env: ["INFER_API_KEY"], models: ["infer/gpt-6-astra:official", "infer/gpt-5.6-sol:official"], popular: false }, { id: "inference", name: "Inference", api: "https://inference.net/v1", family: "openai", env: ["INFERENCE_API_KEY"], models: ["meta/llama-3.1-8b-instruct", "meta/llama-3.2-11b-vision-instruct", "meta/llama-3.2-1b-instruct", "meta/llama-3.2-3b-instruct", "google/gemma-3", "osmosis/osmosis-structure-0.6b", "mistral/mistral-nemo-12b-instruct", "qwen/qwen3-embedding-4b"], popular: false }, { id: "inferx", name: "InferX", api: "https://model.inferx.net/endpoints/v1", family: "openai", env: ["INFERX_API_KEY"], models: ["gemma-4-31B-it-fp8", "Qwen3.6-35B-A3B-fp8-no-thinking", "Devstral-2-123B-Instruct-2512-int4-AutoRound", "Qwen3.6-27B-FP8", "Qwen3-Coder-Next-FP8", "Qwen3-Coder-Next-FP8-no-thinking", "mimo-v25", "Qwen3-Embedding-8B"], popular: false }, { id: "io-net", name: "IO.NET", api: "https://api.intelligence.io.solutions/api/v1", family: "openai", env: ["IOINTELLIGENCE_API_KEY"], models: ["meta-llama/Llama-3.2-90B-Vision-Instruct", "meta-llama/Llama-3.3-70B-Instruct", "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8", "Qwen/Qwen3-Next-80B-A3B-Instruct", "Qwen/Qwen3-235B-A22B-Thinking-2507", "Qwen/Qwen2.5-VL-32B-Instruct", "deepseek-ai/DeepSeek-R1-0528", "mistralai/Mistral-Nemo-Instruct-2407"], popular: false }, { id: "iteracompute", name: "IteraCompute", api: "https://api.iteracompute.com/v1", family: "openai", env: ["ITERACOMPUTE_API_KEY"], models: ["deepseek/deepseek-v4-flash-0731", "deepseek/deepseek-v4-pro-0813", "z-ai/glm-5.3-flash", "z-ai/glm-5.3", "moonshotai/kimi-k3", "minimax/minimax-m3", "ornith-ai/ornith-1.5-35b-a3b", "qwen/qwen3.8-27b"], popular: false }, { id: "jalapeno", name: "Jalapeno Cloud", api: "https://api.jalapeno-cloud.ai/v1", family: "openai", env: ["JALAPENO_API_KEY"], models: ["Qwen3-VL-235B-A22B-Instruct", "MiniMax-M3", "Qwen3-Next-80B-A3B-Instruct", "GLM-5.1", "Hy3", "GLM-5.2", "Qwen3-VL-235B-A22B-Thinking", "Qwen3.5-27B"], popular: false }, { id: "jiekou", name: "Jiekou.AI", api: "https://api.jiekou.ai/openai", family: "openai", env: ["JIEKOU_API_KEY"], models: ["grok-4-1-fast-reasoning", "grok-4-1-fast-non-reasoning", "gpt-5.2-codex", "gpt-5.1-codex", "gemini-3-pro-preview", "gpt-5-codex", "gpt-5-mini", "gpt-5.2-pro"], popular: false }, { id: "kenari", name: "Kenari", api: "https://kenari.id/v1", family: "openai", env: ["KENARI_API_KEY"], models: ["gpt-5-4-mini", "gpt-5-6-luna", "gemma-4-31b-it", "grok-4-5", "gemini-2-5-flash", "nemotron-3-nano-30b-a3b", "glm-5-3-flash", "kimi-k2-7-code"], popular: false }, { id: "kilo", name: "Kilo Gateway", api: "https://api.kilo.ai/api/gateway", family: "openai", env: ["KILO_API_KEY"], models: ["sao10k/l3-lunaris-8b", "sao10k/l3.3-euryale-70b", "sao10k/l3.1-euryale-70b", "kwaipilot/kat-coder-pro-v2.5", "stealth/claude-opus-4.6", "stealth/claude-opus-4.7", "stealth/claude-opus-4.8", "stealth/space-bunny-alpha"], popular: false }, { id: "kimi-code-plan-global", name: "Kimi For Coding (kimi.ai)", api: "https://api.kimi.ai/coding/v1", family: "openai", env: ["KIMI_API_KEY"], models: ["kimi-for-coding-highspeed", "kimi-for-coding", "k3-256k", "k3"], popular: false }, { id: "kimi-code-plan-cn", name: "Kimi For Coding (kimi.com)", api: "https://api.kimi.com/coding/v1", family: "openai", env: ["KIMI_API_KEY"], models: ["kimi-for-coding-highspeed", "kimi-for-coding", "k3-256k", "k3"], popular: false }, { id: "klokintegration", name: "klokintegration.se", api: "https://api-gw.klok.ipaas.se/proxy/kloker-key/v1", family: "openai", env: ["KLOKINTEGRATION_API_KEY"], models: ["Kloker-Integration-Developer", "Kloker", "Kloker-Integration-Architect"], popular: false }, { id: "kosmik", name: "Kosmik Compute", api: "https://api.koscompute.com/v1", family: "openai", env: ["KOSMIK_API_KEY"], models: ["qwen/qwen3.8-27b"], popular: false }, { id: "kuae-cloud-coding-plan", name: "KUAE Cloud Coding Plan", api: "https://coding-plan-endpoint.kuaecloud.net/v1", family: "openai", env: ["KUAE_API_KEY"], models: ["GLM-4.7"], popular: false }, { id: "lilac", name: "Lilac", api: "https://api.getlilac.com/v1", family: "openai", env: ["LILAC_API_KEY"], models: ["google/gemma-4-31b-it", "minimaxai/minimax-m3", "moonshotai/kimi-k2.6", "zai-org/glm-5.2"], popular: false }, { id: "llama", name: "Llama", api: "https://api.llama.com/compat/v1/", family: "openai", env: ["LLAMA_API_KEY"], models: ["llama-4-maverick-17b-128e-instruct-fp8", "groq-llama-4-maverick-17b-128e-instruct", "llama-4-scout-17b-16e-instruct-fp8", "cerebras-llama-4-maverick-17b-128e-instruct", "llama-3.3-70b-instruct", "llama-3.3-8b-instruct", "cerebras-llama-4-scout-17b-16e-instruct"], popular: false }, { id: "llmgateway-providers", name: "LLM Gateway", api: "https://api.llmgateway.io/v1", family: "openai", env: ["LLMGATEWAY_API_KEY"], models: ["consensusprotocol/gemma-4-31b-it", "consensusprotocol/Qwen3.8-27B", "consensusprotocol/glm-5.3-flash", "consensusprotocol/deepseek-v4.1-flash", "consensusprotocol/gpt-oss-20b", "consensusprotocol/deepseek-v4-flash", "deepinfra/mimo-v2.6-pro", "deepinfra/gemma-4-31b-it"], popular: false }, { id: "llmtech", name: "LLM Tech", api: "https://api.llmtech.eu/v1", family: "openai", env: ["LLMTECH_API_KEY"], models: ["nvidia/Qwen3.8-27B-NVFP4"], popular: false }, { id: "llmtr", name: "LLMTR", api: "https://llmtr.com/v1", family: "openai", env: ["LLMTR_API_KEY"], models: ["muse-glimmer-30b-tr", "magibu-11b-v8", "gemma-4", "trendyol-asure-12b", "medgemma-4b", "qwen3-6-35b", "poolside/laguna-xs-2.1", "publicai/apertus-70b-instruct"], popular: false }, { id: "lmstudio", name: "LMStudio", api: "http://127.0.0.1:1234/v1", family: "openai", env: ["LMSTUDIO_API_KEY"], models: ["qwen/qwen3-30b-a3b-2507", "qwen/qwen3-coder-30b", "openai/gpt-oss-20b"], popular: false }, { id: "longcat", name: "LongCat", api: "https://api.longcat.chat/openai", family: "openai", env: ["LONGCAT_API_KEY"], models: ["LongCat-2.0"], popular: false }, { id: "lucidquery", name: "LucidQuery", api: "https://api.lucidquery.com/v1", family: "openai", env: ["LUCIDQUERY_API_KEY"], models: ["lucidquery-agi-01-frontier", "lucidquery-nexus-coder", "lucidnova-rf1-100b", "lucidquery-agi-01-swift"], popular: false }, { id: "lynkr", name: "Lynkr", api: "http://127.0.0.1:8081/v1", family: "openai", env: ["LYNKR_API_KEY"], models: ["lynkr-auto"], popular: false }, { id: "meganova", name: "Meganova", api: "https://api.meganova.ai/v1", family: "openai", env: ["MEGANOVA_API_KEY"], models: ["meta-llama/Llama-3.3-70B-Instruct", "XiaomiMiMo/MiMo-V2-Flash", "Qwen/Qwen3.5-Plus", "Qwen/Qwen3-235B-A22B-Instruct-2507", "Qwen/Qwen2.5-VL-32B-Instruct", "deepseek-ai/DeepSeek-V3.1", "deepseek-ai/DeepSeek-V3.2", "deepseek-ai/DeepSeek-R1-0528"], popular: false }, { id: "melious", name: "Melious", api: "https://api.melious.ai/v1", family: "openai", env: ["MELIOUS_API_KEY"], models: ["glm-5.3-flash", "deepseek-v4-flash-0731", "kimi-k3", "glm-5", "deepseek-v4.1-flash", "kimi-k2.6", "kimi-k2.5", "glm-5.1"], popular: false }, { id: "merge-gateway", name: "Merge Gateway", api: "https://api-gateway.merge.dev/v1/ai-sdk", family: "openai", env: ["MERGE_GATEWAY_API_KEY"], models: ["zai/glm-4.5", "zai/glm-5.3-flash", "zai/glm-4.6", "zai/glm-5", "zai/glm-4.5v", "zai/glm-4.7-flash", "zai/glm-4.7", "zai/glm-5.2"], popular: false }, { id: "meta", name: "Meta", api: "https://api.meta.ai/v1", family: "openai", env: ["META_MODEL_API_KEY"], models: ["muse-spark-1.3", "muse-spark-1.1", "muse-spark-1.2", "muse-spark-1.2-contributor", "muse-spark-1.3-contributor"], popular: false }, { id: "minimax-cn", name: "MiniMax (minimax.cn)", api: "https://api.minimax.cn/anthropic/v1", family: "anthropic", env: ["MINIMAX_API_KEY"], models: ["MiniMax-M3", "MiniMax-M2.1", "MiniMax-M2.5", "MiniMax-M2.7", "MiniMax-M2.7-highspeed", "MiniMax-M2", "MiniMax-M2.5-highspeed"], popular: false }, { id: "minimax", name: "MiniMax (minimax.io)", api: "https://api.minimax.io/anthropic/v1", family: "anthropic", env: ["MINIMAX_API_KEY"], models: ["MiniMax-M3", "MiniMax-M2.1", "MiniMax-M2.5", "MiniMax-M2.7", "MiniMax-M2.7-highspeed", "MiniMax-M2", "MiniMax-M2.5-highspeed"], popular: false }, { id: "minimax-cn-coding-plan", name: "MiniMax Token Plan (minimax.cn)", api: "https://api.minimax.cn/anthropic/v1", family: "anthropic", env: ["MINIMAX_API_KEY"], models: ["MiniMax-M3", "MiniMax-M2.1", "MiniMax-M3.1-Flash-Preview", "MiniMax-M2.5", "MiniMax-M2.7", "MiniMax-M2.7-highspeed", "MiniMax-M2", "MiniMax-M2.5-highspeed"], popular: false }, { id: "minimax-coding-plan", name: "MiniMax Token Plan (minimax.io)", api: "https://api.minimax.io/anthropic/v1", family: "anthropic", env: ["MINIMAX_API_KEY"], models: ["MiniMax-M3", "MiniMax-M2.1", "MiniMax-M3.1-Flash-Preview", "MiniMax-M2.5", "MiniMax-M2.7", "MiniMax-M2.7-highspeed", "MiniMax-M2", "MiniMax-M2.5-highspeed"], popular: false }, { id: "mixlayer", name: "Mixlayer", api: "https://models.mixlayer.ai/v1", family: "openai", env: ["MIXLAYER_API_KEY"], models: ["qwen/qwen3.5-27b", "qwen/qwen3.5-122b-a10b", "qwen/qwen3.5-9b", "qwen/qwen3.5-35b-a3b", "qwen/qwen3.5-397b-a17b"], popular: false }, { id: "moark", name: "Moark", api: "https://moark.com/v1", family: "openai", env: ["MOARK_API_KEY"], models: ["GLM-4.7", "MiniMax-M2.1"], popular: false }, { id: "modal", name: "Modal", api: "https://inference.us-west.modal.direct/v1", family: "openai", env: ["MODAL_PROXY_TOKEN"], models: ["thinkingmachines/Inkling-NVFP4", "Qwen/Qwen3.8-2.4T-A95B", "moonshotai/Kimi-K3", "zai-org/GLM-5.3-Flash"], popular: false }, { id: "model-oracle-ai", name: "Model Oracle AI", api: "https://api.modeloracle.com/api/v1", family: "openai", env: ["MODEL_ORACLE_API_KEY"], models: ["gpt-5.4", "gpt-5.4-nano", "o4-mini", "claude-opus-4.8", "claude-haiku-4.5", "claude-fable-5", "gpt-5.4-mini", "gpt-5.5"], popular: false }, { id: "modelis", name: "Modelis", api: "https://modelishub.com/v1", family: "openai", env: ["MODELIS_API_KEY"], models: ["gemini-2.5-pro", "gemini-2.5-flash", "claude-fable-5", "claude-opus-4-8", "deepseek-v4-pro", "claude-sonnet-4-6", "deepseek-v4-flash", "qwen/qwen3.7-max"], popular: false }, { id: "modelscope", name: "ModelScope", api: "https://api-inference.modelscope.cn/v1", family: "openai", env: ["MODELSCOPE_API_KEY"], models: ["ZhipuAI/GLM-4.6", "ZhipuAI/GLM-4.5", "Qwen/Qwen3-30B-A3B-Instruct-2507", "Qwen/Qwen3-235B-A22B-Thinking-2507", "Qwen/Qwen3-235B-A22B-Instruct-2507", "Qwen/Qwen3-30B-A3B-Thinking-2507", "Qwen/Qwen3-Coder-30B-A3B-Instruct"], popular: false }, { id: "moonshotai", name: "Moonshot AI", api: "https://api.moonshot.ai/v1", family: "openai", env: ["MOONSHOT_API_KEY"], models: ["kimi-k3", "kimi-k2.7-code-highspeed", "kimi-k2.6", "kimi-k2.7-code"], popular: false }, { id: "moonshotai-cn", name: "Moonshot AI (China)", api: "https://api.moonshot.cn/v1", family: "openai", env: ["MOONSHOT_API_KEY"], models: ["kimi-k2.7-code", "kimi-k2.6", "kimi-k2.7-code-highspeed", "kimi-k3"], popular: false }, { id: "morph", name: "Morph", api: "https://api.morphllm.com/v1", family: "openai", env: ["MORPH_API_KEY"], models: ["morph-v3-large", "morph-v3-fast", "auto"], popular: false }, { id: "nan", name: "NaN", api: "https://api.nan.builders/v1", family: "openai", env: ["NAN_API_KEY"], models: ["qwen-image-2.1", "glm5.3-flash", "gemma4", "qwen3.6", "mimo-v2.6-flash", "qwen3.8-flash", "glm5.3", "deepseek-v4-flash"], popular: false }, { id: "nano-gpt", name: "NanoGPT", api: "https://nano-gpt.com/api/v1", family: "openai", env: ["NANO_GPT_API_KEY"], models: ["deepseek-reasoner-cheaper", "nano-gpt-help", "doubao-seed-2-0-lite-260215", "doubao-seed-2-0-mini-260215", "fastgpt", "doubao-seed-2-0-pro-260215", "ernie-5.0-thinking-preview", "gemini-2.5-flash-lite-preview-09-2025-thinking"], popular: false }, { id: "nearai", name: "NEAR AI Cloud", api: "https://cloud-api.near.ai/v1", family: "openai", env: ["NEARAI_API_KEY"], models: ["anthropic/claude-haiku-4-5", "anthropic/claude-sonnet-4-5", "anthropic/claude-opus-4-6", "anthropic/claude-sonnet-4-6", "anthropic/claude-opus-4-7", "black-forest-labs/FLUX.2-klein-4B", "google/gemini-3.5-flash", "google/gemini-2.5-pro"], popular: false }, { id: "nebius", name: "Nebius Token Factory", api: "https://api.tokenfactory.nebius.com/v1", family: "openai", env: ["NEBIUS_API_KEY"], models: ["google/gemma-3-27b-it", "Qwen/Qwen3.8-27B", "Qwen/Qwen3-30B-A3B-Instruct-2507", "Qwen/Qwen3-235B-A22B-Instruct-2507", "Qwen/Qwen3-Embedding-8B", "Qwen/Qwen3.5-397B-A17B", "deepseek-ai/DeepSeek-V4-Flash-0731", "deepseek-ai/DeepSeek-V4-Pro-0813"], popular: false }, { id: "neosmith", name: "NeoSmith", api: "https://router.neosmith.ai/v1", family: "openai", env: ["NEOSMITH_API_KEY"], models: ["neosmith.neolite", "neosmith.intelligent-maestro", "neosmith.intelligent-pro", "neosmith.intelligent-basic"], popular: false }, { id: "neuralwatt", name: "Neuralwatt", api: "https://api.neuralwatt.com/v1", family: "openai", env: ["NEURALWATT_API_KEY"], models: ["glm-5.2-short-fast", "kimi-k3-flex", "deepseek-v4-flash-flex", "glm-5.3-flash", "glm-5.2-short-flex", "qwen3.6-35b", "glm-5.2-fast", "kimi-k3"], popular: false }, { id: "nova", name: "Nova", api: "https://api.nova.amazon.com/v1", family: "openai", env: ["NOVA_API_KEY"], models: ["nova-2-pro-v1", "nova-2-lite-v1"], popular: false }, { id: "novita-ai", name: "NovitaAI", api: "https://api.novita.ai/openai", family: "openai", env: ["NOVITA_API_KEY"], models: ["kwaipilot/kat-coder-pro", "deepseek/deepseek-prover-v2-671b", "deepseek/deepseek-r1-distill-qwen-14b", "deepseek/deepseek-v3-0324", "deepseek/deepseek-r1-distill-llama-70b", "deepseek/deepseek-v3-turbo", "deepseek/deepseek-r1-0528-qwen3-8b", "deepseek/deepseek-v3.1-terminus"], popular: false }, { id: "nvidia", name: "Nvidia", api: "https://integrate.api.nvidia.com/v1", family: "openai", env: ["NVIDIA_API_KEY"], models: ["baai/bge-m3", "poolside/laguna-xs-2.1", "abacusai/dracarys-llama-3.1-70b-instruct", "z-ai/glm-5.3-flash", "z-ai/glm-5.2", "z-ai/glm-5.3", "thinkingmachines/inkling", "black-forest-labs/flux_1-schnell"], popular: false }, { id: "oci", name: "OCI Generative AI", api: "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/openai/v1", family: "openai", env: ["OCI_GENAI_API_KEY"], models: ["xai.grok-4.3", "xai.grok-4.20-non-reasoning", "meta.llama-3.3-70b-instruct", "meta.llama-4-scout-17b-16e-instruct", "xai.grok-4.6", "meta.llama-4-maverick-17b-128e-instruct-fp8", "openai.gpt-oss-120b", "openai.gpt-oss-20b"], popular: false }, { id: "ofox", name: "Ofox", api: "https://api.ofox.ai/v1", family: "openai", env: ["OFOX_API_KEY"], models: ["bailian/qwen-flash", "bailian/qwen3.5-flash", "bailian/qwen3.7-max", "bailian/qwen3.8-27b", "bailian/qwen3.5-27b", "bailian/qwen-max", "bailian/qwen3.8-max", "bailian/qwen3-coder-next"], popular: false }, { id: "ollama-cloud", name: "Ollama Cloud", api: "https://ollama.com/v1", family: "openai", env: ["OLLAMA_API_KEY"], models: ["glm-5.3-flash", "nemotron-3-ultra", "kimi-k3", "deepseek-v4.1-flash", "minimax-m2.5", "kimi-k2.6", "qwen3.5:397b", "gpt-oss:20b"], popular: false }, { id: "openai", name: "OpenAI", api: "https://api.openai.com/v1", family: "openai", env: ["OPENAI_API_KEY"], models: ["chatgpt-image-latest", "gpt-5.4", "gpt-5.4-pro", "gpt-3.5-turbo", "gpt-5.5-pro", "text-embedding-3-small", "gpt-5.4-nano", "gpt-realtime-2.1"], popular: true }, { id: "opencode-go", name: "OpenCode Go", api: "https://opencode.ai/zen/go/v1", family: "openai", env: ["OPENCODE_API_KEY"], models: ["mimo-v2.6-pro", "qwen3.7-max", "mimo-v2.5", "grok-4.7", "longcat-2.5-preview-free", "glm-5.3-flash", "qwen3.8-max", "kimi-k3"], popular: true }, { id: "openreason", name: "OpenReason", api: "https://api.openreason.app/v1", family: "openai", env: ["OPENREASON_API_KEY"], models: ["deepseek-ai/deepseek-v4-flash-0731", "moonshotai/kimi-k2.7-code", "openai/gpt-oss-120b"], popular: false }, { id: "openrouter", name: "OpenRouter", api: "https://openrouter.ai/api/v1", family: "openai", env: ["OPENROUTER_API_KEY"], models: ["sao10k/l3-lunaris-8b", "sao10k/l3.3-euryale-70b", "sao10k/l3.1-euryale-70b", "kwaipilot/kat-coder-pro-v2.5", "stealth/space-bunny-alpha", "bytedance-seed/seed-1.6-flash", "bytedance-seed/seed-2.0-lite", "bytedance-seed/seed-2-1-turbo"], popular: true }, { id: "opper", name: "Opper", api: "https://api.opper.ai/v3/compat", family: "openai", env: ["OPPER_API_KEY"], models: ["gpt-5.4", "claude-haiku-4-5", "gpt-5.4-pro", "gemma-4-31b-it", "muse-spark-1.3", "qwen3.8-27b", "gpt-5.5-pro", "gpt-5.4-nano"], popular: false }, { id: "orcarouter", name: "OrcaRouter", api: "https://api.orcarouter.ai/v1", family: "openai", env: ["ORCAROUTER_API_KEY"], models: ["grok/grok-4.3", "grok/grok-4.5", "grok/grok-4.6", "anthropic/claude-opus-4.5", "anthropic/claude-opus-4.6", "anthropic/claude-opus-4.7", "anthropic/claude-opus-4.8", "anthropic/claude-haiku-4.5"], popular: false }, { id: "ovhcloud", name: "OVHcloud AI Endpoints", api: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1", family: "openai", env: ["OVHCLOUD_API_KEY"], models: ["qwen3.8-27b", "qwen3guard-gen-8b", "mistral-7b-instruct-v0.3", "qwen3-coder-30b-a3b-instruct", "qwen3guard-gen-0.6b", "gpt-oss-20b", "qwen3.5-9b", "meta-llama-3_3-70b-instruct"], popular: false }, { id: "pareto", name: "Pareto Inference", api: "https://api.paretoinference.com/v1", family: "openai", env: ["PARETO_API_KEY"], models: ["z-ai/glm-5.3-flash"], popular: false }, { id: "pendra", name: "Pendra", api: "https://api.pendra.ai/api/v1", family: "openai", env: ["PENDRA_API_KEY"], models: ["llama3.3:70b", "qwen3-coder:30b", "gpt-oss:120b", "qwen3.6:27b", "glm-4.7-flash", "deepseek-v4-flash"], popular: false }, { id: "perplexity-agent", name: "Perplexity Agent", api: "https://api.perplexity.ai/v1", family: "openai", env: ["PERPLEXITY_API_KEY"], models: ["anthropic/claude-haiku-4-5", "anthropic/claude-opus-4-5", "anthropic/claude-sonnet-4-5", "anthropic/claude-opus-4-6", "anthropic/claude-sonnet-4-6", "anthropic/claude-opus-4-7", "deepseek/deepseek-v4-flash-0731", "perplexity/sonar"], popular: false }, { id: "pioneer", name: "Pioneer", api: "https://api.fastino.ai/v1", family: "openai", env: ["PIONEER_API_KEY"], models: ["gpt-5.4", "claude-haiku-4-5", "qwen3.7-max", "gpt-5.4-nano", "gpt-4o", "ministral-3b", "magistral-medium", "gpt-5-mini"], popular: false }, { id: "poe", name: "Poe", api: "https://api.poe.com/v1", family: "openai", env: ["POE_API_KEY"], models: ["cerebras/qwen3-32b-cs", "cerebras/llama-3.1-8b-cs", "cerebras/llama-3.3-70b-cs", "cerebras/gpt-oss-120b-cs", "cerebras/qwen3-235b-2507-cs", "empiriolabs/deepseek-v4-pro-el", "empiriolabs/deepseek-v4-flash-el", "anthropic/claude-haiku-3.5"], popular: false }, { id: "poolside", name: "Poolside", api: "https://inference.poolside.ai/v1", family: "openai", env: ["POOLSIDE_API_KEY"], models: ["poolside/laguna-s-2.1", "poolside/laguna-xs-2.1", "poolside/laguna-m.1"], popular: false }, { id: "privatemode-ai", name: "Privatemode AI", api: "http://localhost:8080/v1", family: "openai", env: ["PRIVATEMODE_API_KEY", "PRIVATEMODE_ENDPOINT"], models: ["glm-flash-latest", "glm-5.3-flash", "whisper-large-v3", "kimi-k2.6", "deepseek-ocr-2", "qwen3-embedding-4b", "voxtral-mini-3b", "kimi-latest"], popular: false }, { id: "qihang-ai", name: "QiHang", api: "https://api.qhaigc.net/v1", family: "openai", env: ["QIHANG_API_KEY"], models: ["gpt-5.2-codex", "gemini-3-pro-preview", "gpt-5-mini", "claude-opus-4-5-20251101", "gemini-2.5-flash", "gpt-5.2", "claude-sonnet-4-5-20250929", "gemini-3-flash-preview"], popular: false }, { id: "qiniu-ai", name: "Qiniu", api: "https://api.qnaigc.com/v1", family: "openai", env: ["QINIU_API_KEY"], models: ["glm-4.5", "gemini-3.0-flash-preview", "doubao-seed-2.0-mini", "mimo-v2-flash", "doubao-seed-2.0-lite", "doubao-seed-1.6-thinking", "gemini-2.5-flash-image", "gemini-3.0-pro-image-preview"], popular: false }, { id: "regolo-ai", name: "Regolo AI", api: "https://api.regolo.ai/v1", family: "openai", env: ["REGOLO_API_KEY"], models: ["qwen3.8-27b", "brick-v1-beta", "qwen3.5-122b", "qwen3-coder-next", "apertus-70b", "glm5.2", "qwen3-reranker-4b", "deepseek-ocr-2"], popular: false }, { id: "requesty", name: "Requesty", api: "https://router.requesty.ai/v1", family: "openai", env: ["REQUESTY_API_KEY"], models: ["ring-2.6-1t", "gpt-5.4", "nemotron-3-ultra-nvfp4", "gpt-6.1-sol@eu", "claude-haiku-4-5", "gpt-5.4-pro", "claude-opus-5@eu", "mimo-v2.6-pro"], popular: false }, { id: "routing-run", name: "routing.run", api: "https://api.routing.run/v1", family: "openai", env: ["ROUTING_RUN_API_KEY"], models: ["nemotron-3-ultra", "kimi-k2.6", "qwen3.5-9b", "gpt-5.6-luna", "claude-opus-4-8", "glm-5.2-nitro", "glm-5.2", "kimi-k2.6-nitro"], popular: false }, { id: "runinfra", name: "RunInfra", api: "https://api.runinfra.ai/v1", family: "openai", env: ["RUNINFRA_GATEWAY_KEY"], models: ["Inferact/Qwen3.8-2.4T-A95B-NVFP4", "Qwen/Qwen3.8-27B", "deepseek-ai/DeepSeek-V4-Flash-0731", "deepseek-ai/DeepSeek-V4-Pro-0813", "zai-org/GLM-5.3-Flash", "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16", "ornith-ai/Ornith-1.5-35B-A3B"], popular: false }, { id: "sakana", name: "Sakana AI", api: "https://api.sakana.ai/v1", family: "openai", env: ["SAKANA_API_KEY"], models: ["fugu-ultra", "fugu-ultra-20260615", "sakana-namazu", "fugu"], popular: false }, { id: "sarvam", name: "Sarvam AI", api: "https://api.sarvam.ai/v1", family: "openai", env: ["SARVAM_API_KEY"], models: ["sarvam-30b", "sarvam-105b"], popular: false }, { id: "scaleway", name: "Scaleway", api: "https://api.scaleway.ai/v1", family: "openai", env: ["SCALEWAY_API_KEY"], models: ["qwen3.8-27b", "deepseek-v4-flash-0731", "qwen3-235b-a22b-instruct-2507", "whisper-large-v3", "bge-multilingual-gemma2", "qwen3-coder-30b-a3b-instruct", "gemma-4-26b-a4b-it", "llama-3.3-70b-instruct"], popular: false }, { id: "scnet-token-plan", name: "SCNet Token Plan", api: "https://api.scnet.cn/api/llm/v1", family: "openai", env: ["SCNET_API_KEY"], models: ["DeepSeek-V4-Flash-0731", "Kimi-K2.6", "MiniMax-M3", "GLM-5.1", "GLM-5.2", "Qwen3.8-Max", "Kimi-K3", "DeepSeek-V4-Pro-0813"], popular: false }, { id: "scx-ai", name: "SCX.ai", api: "https://api.scx.ai/v1", family: "openai", env: ["SCX_API_KEY"], models: ["GLM-5.2", "Qwen3.8-Max", "MiniMax-M2.7", "gpt-oss-120b"], popular: false }, { id: "sensenova", name: "SenseNova (China)", api: "https://token.sensenova.cn/v1", family: "openai", env: ["SENSENOVA_API_KEY"], models: ["kimi-k3", "sensenova-6.8-flash-lite", "glm-5.2", "deepseek-v4-pro", "deepseek-v4-flash"], popular: false }, { id: "siliconflow", name: "SiliconFlow", api: "https://api.siliconflow.com/v1", family: "openai", env: ["SILICONFLOW_API_KEY"], models: ["ByteDance-Seed/Seed-OSS-36B-Instruct", "nex-agi/Nex-N2-Pro", "tencent/Hunyuan-A13B-Instruct", "tencent/Hy3", "meituan-longcat/LongCat-2.0", "google/gemma-4-12B-it", "google/gemma-4-31B-it", "google/gemma-4-26B-A4B-it"], popular: false }, { id: "siliconflow-cn", name: "SiliconFlow (China)", api: "https://api.siliconflow.cn/v1", family: "openai", env: ["SILICONFLOW_CN_API_KEY"], models: ["ByteDance-Seed/Seed-OSS-36B-Instruct", "tencent/Hunyuan-A13B-Instruct", "Qwen/Qwen3.5-4B", "Qwen/Qwen3.5-27B", "Qwen/Qwen3.6-35B-A3B", "Qwen/Qwen3-235B-A22B-Thinking-2507", "Qwen/Qwen3-14B", "Qwen/Qwen3-8B"], popular: false }, { id: "stackit", name: "STACKIT", api: "https://api.openai-compat.model-serving.eu01.onstackit.cloud/v1", family: "openai", env: ["STACKIT_API_KEY"], models: ["google/gemma-3-27b-it", "intfloat/e5-mistral-7b-instruct", "Qwen/Qwen3-VL-235B-A22B-Instruct-FP8", "Qwen/Qwen3-VL-Embedding-8B", "Qwen/Qwen3.6-27B", "cortecs/Llama-3.3-70B-Instruct-FP8-Dynamic", "openai/gpt-oss-20b", "openai/gpt-oss-120b"], popular: false }, { id: "standardcompute", name: "Standard Compute", api: "https://api.stdcmpt.com/v1", family: "openai", env: ["STANDARDCOMPUTE_API_KEY"], models: ["standardcompute"], popular: false }, { id: "stepfun", name: "StepFun (China)", api: "https://api.stepfun.com/v1", family: "openai", env: ["STEPFUN_API_KEY"], models: ["step-1-32k", "step-tts-2", "step-5-preview", "step-3.5-flash-2603", "step-2-16k", "stepaudio-2.5-tts", "stepaudio-2.5-asr", "step-3.5-flash"], popular: false }, { id: "stepfun-ai", name: "StepFun (Global)", api: "https://api.stepfun.ai/v1", family: "openai", env: ["STEPFUN_API_KEY"], models: ["step-5-preview", "step-3.7-flash", "step-3.5-flash", "stepaudio-2.5-asr", "stepaudio-2.5-tts", "step-2-16k", "step-3.5-flash-2603", "step-tts-2"], popular: false }, { id: "stepfun-step-plan", name: "StepFun Step Plan (China)", api: "https://api.stepfun.com/step_plan/v1", family: "openai", env: ["STEPFUN_API_KEY"], models: ["step-5-preview", "step-router-v1", "step-3.5-flash-2603", "step-3.5-flash", "step-3.7-flash"], popular: false }, { id: "stepfun-ai-step-plan", name: "StepFun Step Plan (Global)", api: "https://api.stepfun.ai/step_plan/v1", family: "openai", env: ["STEPFUN_API_KEY"], models: ["step-5-preview", "step-3.5-flash-2603", "step-3.5-flash", "step-3.7-flash"], popular: false }, { id: "subconscious", name: "Subconscious", api: "https://api.subconscious.dev/v1", family: "anthropic", env: ["SUBCONSCIOUS_API_KEY"], models: ["subconscious/tim-qwen3.6-27b", "subconscious/glm-5.2"], popular: false }, { id: "submodel", name: "submodel", api: "https://llm.submodel.ai/v1", family: "openai", env: ["SUBMODEL_INSTAGEN_ACCESS_KEY"], models: ["Qwen/Qwen3-235B-A22B-Thinking-2507", "Qwen/Qwen3-235B-A22B-Instruct-2507", "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8", "deepseek-ai/DeepSeek-V3.1", "deepseek-ai/DeepSeek-R1-0528", "deepseek-ai/DeepSeek-V3-0324", "zai-org/GLM-4.5-FP8", "zai-org/GLM-4.5-Air"], popular: false }, { id: "synthetic", name: "Synthetic", api: "https://api.synthetic.new/openai/v1", family: "openai", env: ["SYNTHETIC_API_KEY"], models: ["hf:moonshotai/Kimi-K3", "hf:moonshotai/Kimi-K2.7-Code", "hf:nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4", "hf:zai-org/GLM-5.2", "hf:zai-org/GLM-5.3-Flash", "hf:zai-org/GLM-4.7-Flash", "hf:zai-org/GLM-5.3", "hf:deepseek-ai/DeepSeek-V4.1-Flash"], popular: false }, { id: "tempr", name: "Tempr Gateway", api: "https://api.temprhq.io/v1", family: "openai", env: ["TEMPR_API_KEY"], models: ["xiaomi-mimo/mimo-v2.6-pro", "xiaomi-mimo/mimo-v2.6-pro-ultraspeed", "xiaomi-mimo/mimo-v2.6-flash", "cerebras/qwen-3.8-27b", "cerebras/gpt-oss-120b", "groq/allam-2-7b", "groq/qwen/qwen3.8-27b", "groq/openai/gpt-oss-20b"], popular: false }, { id: "tencent-coding-plan", name: "Tencent Coding Plan (China)", api: "https://api.lkeap.cloud.tencent.com/coding/v3", family: "openai", env: ["TENCENT_CODING_PLAN_API_KEY"], models: ["hunyuan-2.0-thinking", "glm-5", "minimax-m2.5", "hunyuan-2.0-instruct", "kimi-k2.5", "tc-code-latest", "hunyuan-turbos", "hunyuan-t1"], popular: false }, { id: "tencent-token-plan", name: "Tencent Token Plan", api: "https://api.lkeap.cloud.tencent.com/plan/v3", family: "openai", env: ["TENCENT_TOKEN_PLAN_API_KEY"], models: ["hy3", "hy4-preview"], popular: false }, { id: "tencent-tokenhub", name: "Tencent TokenHub", api: "https://tokenhub.tencentmaas.com/v1", family: "openai", env: ["TENCENT_TOKENHUB_API_KEY"], models: ["hy3-preview", "hy3", "hy4-preview"], popular: false }, { id: "tensorx", name: "TensorX", api: "https://api.tensorx.ai/v1", family: "openai", env: ["TENSORX_API_KEY"], models: ["deepseek/deepseek-v4-flash-0731", "deepseek/deepseek-v4.1-flash", "deepseek/deepseek-v4-pro-0813", "deepseek/deepseek-v4-pro", "deepseek/deepseek-r1-0528", "deepseek/deepseek-v3.2", "z-ai/glm-5v-turbo", "z-ai/glm-5.3-flash"], popular: false }, { id: "the-grid-ai", name: "The Grid AI", api: "https://api.thegrid.ai/v1", family: "openai", env: ["THEGRID_API_KEY"], models: ["agent-prime", "code-max", "agent-max", "text-max", "code-prime", "text-prime", "code-standard", "text-standard"], popular: false }, { id: "thinkingmachines", name: "Thinking Machines", api: "https://tinker.thinkingmachines.dev/services/tinker-prod/anthropic/api/v1", family: "anthropic", env: ["TINKER_API_KEY"], models: ["thinkingmachines/Inkling:peft:262144", "thinkingmachines/Inkling"], popular: false }, { id: "tinfoil", name: "Tinfoil", api: "https://inference.tinfoil.sh/v1", family: "openai", env: ["TINFOIL_API_KEY"], models: ["gpt-oss-safeguard-120b", "glm-5-3-flash", "kimi-k3", "llama3-3-70b", "gemma4-31b", "glm-5-3", "deepseek-v4-1-flash", "nomic-embed-text"], popular: false }, { id: "tokengo", name: "TokenGo", api: "https://api.tokengo.com/v1", family: "openai", env: ["TOKENGO_API_KEY"], models: ["deepseek/deepseek-v3.1", "deepseek/deepseek-v4-pro", "deepseek/deepseek-v3.2", "deepseek/deepseek-v4-flash", "z-ai/glm-5.3-flash", "z-ai/glm-5", "z-ai/glm-5.2", "z-ai/glm-5.1"], popular: false }, { id: "tokenrouter", name: "TokenRouter", api: "https://api.tokenrouter.com/v1", family: "openai", env: ["TOKENROUTER_API_KEY"], models: ["z-ai/glm-5.3-free"], popular: false }, { id: "trustedrouter", name: "TrustedRouter", api: "https://api.trustedrouter.com/v1", family: "openai", env: ["TRUSTEDROUTER_API_KEY"], models: ["trustedrouter/cheap", "trustedrouter/synth-code", "trustedrouter/e2e", "trustedrouter/zdr", "trustedrouter/fast", "trustedrouter/synth", "trustedrouter/auto"], popular: false }, { id: "umans-ai", name: "Umans AI", api: "https://api.code.umans.ai/v1", family: "openai", env: ["UMANS_AI_API_KEY"], models: ["umans-deepseek-v4.1-flash", "umans-glm-5.3-flash", "umans-flash", "umans-deepseek-v4-flash-0731", "umans-kimi-k3", "umans-glm-5.3", "umans-coder"], popular: false }, { id: "umans-ai-coding-plan", name: "Umans AI Coding Plan", api: "https://api.code.umans.ai/v1", family: "openai", env: ["UMANS_AI_CODING_PLAN_API_KEY"], models: ["umans-deepseek-v4.1-flash", "umans-glm-5.3-flash", "umans-flash", "umans-deepseek-v4-flash-0731", "umans-kimi-k3", "umans-glm-5.3", "umans-qwen3.6-35b-a3b", "umans-coder"], popular: false }, { id: "unorouter", name: "UnoRouter", api: "https://api.unorouter.com/v1", family: "openai", env: ["UNOROUTER_API_KEY"], models: ["gpt-5.5:free", "gpt-5.4", "glm-4.5-flash:free", "gemma-4-31b-it:free", "kimi-k2.6", "nemotron-3-ultra-550b-a55b:free", "gpt-5.4:free", "minimax-m2.7"], popular: false }, { id: "upstage", name: "Upstage", api: "https://api.upstage.ai/v1/solar", family: "openai", env: ["UPSTAGE_API_KEY"], models: ["solar-pro4", "solar-pro3", "solar-mini", "solar-pro2"], popular: false }, { id: "vancine", name: "Vancine", api: "https://vancine.com/v1", family: "openai", env: ["VANCINE_API_KEY"], models: ["MiniMax-M3", "glm-5.3-flash", "qwen3.8-max", "kimi-k3", "deepseek-v4.1-flash", "qwen3.8-flash", "hy4-preview", "glm-5.3"], popular: false }, { id: "vispark", name: "Vispark", api: "https://api.lab.vispark.in/v1", family: "openai", env: ["VISPARK_LAB_API_KEY"], models: ["vispark/vision-large", "vispark/vision-small", "vispark/vision-medium"], popular: false }, { id: "vivgrid", name: "Vivgrid", api: "https://api.vivgrid.com/v1", family: "openai", env: ["VIVGRID_API_KEY"], models: ["viv-fast", "gpt-5.4", "gpt-5.4-nano", "gpt-5.2-codex", "gpt-5.1-codex", "glm-5.3-flash", "kimi-k3", "gpt-5-mini"], popular: false }, { id: "volcengine", name: "Volcengine Ark", api: "https://ark.cn-beijing.volces.com/api/v3", family: "openai", env: ["ARK_API_KEY"], models: ["glm-5-3-flash-260828", "doubao-seed-1-6-251015", "doubao-seed-2-0-pro-260215", "doubao-seed-2-0-lite-260428", "doubao-seed-2-1-pro-260628", "doubao-seed-1-6-vision-250815", "doubao-seed-2-0-mini-260428", "doubao-seed-2-0-code-preview-260215"], popular: false }, { id: "volcengine-coding-plan", name: "Volcengine Ark Coding Plan", api: "https://ark.cn-beijing.volces.com/api/coding/v3", family: "openai", env: ["ARK_CODING_PLAN_API_KEY"], models: ["doubao-seed-2.0-lite", "glm-5.3-flash", "kimi-k3", "doubao-seed-2.1-turbo", "minimax-m3", "doubao-seed-evolving", "deepseek-v4-pro", "glm-5.3"], popular: false }, { id: "vultr", name: "Vultr", api: "https://api.vultrinference.com/v1", family: "openai", env: ["VULTR_API_KEY"], models: ["mimo-v2.6-pro-rl", "qwen3.8-27b", "glm-5.3-flash", "deepseek-v4-flash-0731", "muse-glimmer-30b", "deepseek-v4.1-flash", "laguna-s-2.1", "glm-5.x-menthol"], popular: false }, { id: "wafer.ai", name: "Wafer", api: "https://pass.wafer.ai/v1", family: "openai", env: ["WAFER_API_KEY"], models: ["Kimi-K2.6", "MiniMax-M3", "GLM-5.1", "GLM-5.2", "glm5.2-fast"], popular: false }, { id: "wallaby", name: "Wallaby", api: "https://api.wallabytoken.com/v1", family: "openai", env: ["WALLABY_API_KEY"], models: ["moonshotai/kimi-k3"], popular: false }, { id: "xiaomi", name: "Xiaomi", api: "https://api.xiaomimimo.com/v1", family: "openai", env: ["XIAOMI_API_KEY"], models: ["mimo-v2.6-pro", "mimo-v2-flash", "mimo-v2.5", "mimo-v2-omni", "mimo-v2.6-pro-ultraspeed", "mimo-v2-pro", "mimo-v2.5-pro", "mimo-v2.6-flash"], popular: false }, { id: "xiaomi-token-plan-cn", name: "Xiaomi Token Plan (China)", api: "https://token-plan-cn.xiaomimimo.com/v1", family: "openai", env: ["XIAOMI_API_KEY"], models: ["mimo-v2.6-pro", "mimo-v2.5", "mimo-v2.5-tts-voicedesign", "mimo-v2.5-tts", "mimo-v2-pro", "mimo-v2-tts", "mimo-v2.5-pro", "mimo-v2.6-flash"], popular: false }, { id: "xiaomi-token-plan-ams", name: "Xiaomi Token Plan (Europe)", api: "https://token-plan-ams.xiaomimimo.com/v1", family: "openai", env: ["XIAOMI_API_KEY"], models: ["mimo-v2.6-pro", "mimo-v2.6-flash", "mimo-v2.5-tts-voiceclone", "mimo-v2.5-pro", "mimo-v2-tts", "mimo-v2-pro", "mimo-v2.5-tts", "mimo-v2.5-tts-voicedesign"], popular: false }, { id: "xiaomi-token-plan-sgp", name: "Xiaomi Token Plan (Singapore)", api: "https://token-plan-sgp.xiaomimimo.com/v1", family: "openai", env: ["XIAOMI_API_KEY"], models: ["mimo-v2.6-pro", "mimo-v2.6-flash", "mimo-v2.5-tts-voiceclone", "mimo-v2.5-pro", "mimo-v2-tts", "mimo-v2-pro", "mimo-v2.5-tts", "mimo-v2.5-tts-voicedesign"], popular: false }, { id: "xpersona", name: "Xpersona", api: "https://www.xpersona.co/v1", family: "openai", env: ["XPERSONA_API_KEY"], models: ["gpt-5.4", "claude-haiku-4-5", "xpersona-frieren-coder", "gpt-5.6", "xpersona-gpt-5.5", "gemini-3.5-flash", "claude-fable-5", "gpt-5.4-mini"], popular: false }, { id: "zai", name: "Z.AI", api: "https://api.z.ai/api/paas/v4", family: "openai", env: ["ZHIPU_API_KEY"], models: ["glm-4.6v", "glm-4.5", "glm-5v-turbo", "glm-5.3-flash", "glm-4.6", "glm-5", "glm-4.6v-flash", "glm-4.5v"], popular: false }, { id: "zai-coding-plan", name: "Z.AI Coding Plan", api: "https://api.z.ai/api/coding/paas/v4", family: "openai", env: ["ZHIPU_API_KEY"], models: ["glm-5.3-flash", "glm-5.3-highspeed", "glm-5.2-highspeed", "glm-4.7", "glm-5.2", "glm-5-turbo", "glm-5.3"], popular: false }, { id: "zeldoc", name: "Zeldoc", api: "https://api.zeldoc.ai/v1", family: "openai", env: ["ZELDOC_API_KEY"], models: ["zdev"], popular: false }, { id: "zenifra", name: "Zenifra", api: "https://ai.zenifra.com/v1", family: "openai", env: ["ZENIFRA_AI_KEY"], models: ["alibaba/qwen3.6-35b-a3b"], popular: false }, { id: "zenmux", name: "ZenMux", api: "https://zenmux.ai/api/v1", family: "openai", env: ["ZENMUX_API_KEY"], models: ["anthropic/claude-opus-4.1", "anthropic/claude-opus-4.5", "anthropic/claude-opus-4.6", "anthropic/claude-3.5-haiku", "anthropic/claude-opus-4.7", "anthropic/claude-opus-4.8", "anthropic/claude-sonnet-5-free", "anthropic/claude-haiku-4.5"], popular: false }, { id: "zhipuai", name: "Zhipu AI", api: "https://open.bigmodel.cn/api/paas/v4", family: "openai", env: ["ZHIPU_API_KEY"], models: ["glm-5v-turbo", "glm-5.3-flash", "glm-5", "glm-5.3-flashx", "glm-5.2", "glm-5.1", "glm-5.3", "glm-4.5-air"], popular: false }, { id: "zhipuai-coding-plan", name: "Zhipu AI Coding Plan", api: "https://open.bigmodel.cn/api/coding/paas/v4", family: "openai", env: ["ZHIPU_API_KEY"], models: ["glm-5.3-flash", "glm-5.3-highspeed", "glm-5.3", "glm-4.6v"], popular: true }] };
+
 // ui/agent-store.js
 var AGENT_PROVIDERS = [
-  { id: "cursor", label: "Cursor", blurb: "Cursor Agent CLI" },
   { id: "codex", label: "ChatGPT", blurb: "OpenAI Codex CLI" },
   { id: "claude", label: "Claude Code", blurb: "Anthropic Claude Code" },
-  { id: "zcode", label: "ZCode", blurb: "Z.ai ZCode\uFF08\u6CBF\u7528 CLI \u9ED8\u8BA4\u6A21\u578B\uFF09" },
   { id: "opencode", label: "OpenCode", blurb: "OpenCode CLI" },
   { id: "antigravity", label: "Antigravity", blurb: "Google Antigravity\uFF08agy\uFF09" }
 ];
-function settingsSection({ title, control, className = "" }) {
-  const titleHtml = title ? `<h3 class="settings-section-title">${esc2(title)}</h3>` : "";
-  return `<section class="settings-section ${className}">${titleHtml}<div class="settings-section-control">${control}</div></section>`;
+var AGENT_TEMPLATES2 = [
+  { id: "", label: "\u9ED8\u8BA4" },
+  { id: "polish", label: "\u6DA6\u8272" },
+  { id: "review", label: "\u5BA1\u9605" },
+  { id: "qa", label: "\u7D20\u6750\u95EE\u7B54" },
+  { id: "plan", label: "\u8BA1\u5212\uFF08\u53EA\u8BFB\uFF09" }
+];
+function providerCatalog() {
+  return providers_catalog_default;
+}
+function catalogProvider(id) {
+  return providers_catalog_default.providers.find((p) => p.id === id) || null;
+}
+function templateLabel(st) {
+  return AGENT_TEMPLATES2.find((t) => t.id === (st.templateId || ""))?.label || "\u9ED8\u8BA4";
+}
+function settingsSection({ title, control, className = "", action = "" }) {
+  const head = title || action ? `<div class="settings-section-head">${title ? `<h3 class="settings-section-title">${esc2(title)}</h3>` : ""}${action}</div>` : "";
+  return `<section class="settings-section ${className}">${head}<div class="settings-section-control">${control}</div></section>`;
 }
 function settingsPanel(inner, className = "") {
   return `<div class="settings-panel ${className}">${inner}</div>`;
@@ -30992,10 +31034,8 @@ function settingsField(label, controlHtml) {
 }
 function agentLogoSvg(id, size = 28) {
   const extensions = {
-    cursor: "png",
     codex: "png",
     claude: "ico",
-    zcode: "png",
     opencode: "svg",
     antigravity: "ico"
   };
@@ -31012,8 +31052,41 @@ function agentEnabled(st, id) {
   ensureAgentsEnabledStore(st);
   return st.agentsEnabled[id] !== false;
 }
+function ensureAgentHttpStore(st) {
+  if (!st.agentHttp || typeof st.agentHttp !== "object") st.agentHttp = {};
+}
+function getAgentHttp(st, provider) {
+  ensureAgentHttpStore(st);
+  return st.agentHttp[provider] || { baseURL: "", apiKey: "" };
+}
+function setAgentHttp(st, provider, cfg) {
+  ensureAgentHttpStore(st);
+  st.agentHttp = { ...st.agentHttp, [provider]: { baseURL: "", apiKey: "", ...cfg } };
+}
+function connectedHttpProviders(st) {
+  ensureAgentHttpStore(st);
+  return Object.keys(st.agentHttp).map((id) => providerMeta(st, id)).filter((p) => p?.http);
+}
+function connectedAgentProviders(st) {
+  return [...AGENT_PROVIDERS, ...connectedHttpProviders(st)];
+}
+function providerMeta(st, id) {
+  const cli = AGENT_PROVIDERS.find((x) => x.id === id);
+  if (cli) return cli;
+  ensureAgentHttpStore(st);
+  const cfg = st.agentHttp?.[id];
+  const cat = catalogProvider(id);
+  if (!cfg && !cat) return null;
+  return {
+    id,
+    label: cfg?.label || cat?.name || id,
+    blurb: "HTTP \u76F4\u8C03\uFF08\u9700 API Key\uFF09",
+    http: true,
+    family: cfg?.family || cat?.family || "openai"
+  };
+}
 function installedAgentProviders(st) {
-  return AGENT_PROVIDERS.filter((p) => agentInstalled(st, p.id));
+  return connectedAgentProviders(st).filter((p) => agentInstalled(st, p.id));
 }
 function selectableAgentProviders(st) {
   return installedAgentProviders(st).filter((p) => agentEnabled(st, p.id));
@@ -31026,7 +31099,7 @@ function railProviderId(st) {
 function railModelLabel(st, provider = railProviderId(st)) {
   if (provider === st.provider && st.model) return st.model;
   if (provider === st.provider) return "\u9ED8\u8BA4";
-  const p = AGENT_PROVIDERS.find((x) => x.id === provider);
+  const p = providerMeta(st, provider);
   return p?.label || "\u9009\u62E9\u6A21\u578B";
 }
 function ensureAgentModelsStore(st) {
@@ -31071,7 +31144,23 @@ function agentListItemHtml(st, p) {
   <span class="account-list-chevron" aria-hidden="true">\u203A</span>
 </div>`;
 }
+function agentHttpPanelHtml(st, p) {
+  const cfg = getAgentHttp(st, p.id);
+  const cat = catalogProvider(p.id);
+  const masked = cfg.apiKey ? "\u2022\u2022\u2022\u2022" + String(cfg.apiKey).slice(-4) : "";
+  const base2 = cfg.baseURL || cat?.api || "";
+  const codingHint = /zai-coding-plan|zhipuai-coding-plan/.test(p.id) || /coding\/paas/i.test(base2) ? `<p class="settings-hint">\u667A\u8C31 / Z.AI Coding Plan\uFF1A\u56FD\u5185\u7528 <code>https://open.bigmodel.cn/api/coding/paas/v4</code>\uFF0C\u56FD\u9645\u7528 <code>https://api.z.ai/api/coding/paas/v4</code>\uFF1B\u987B\u7528\u7F16\u7A0B\u5957\u9910\u4E13\u7528 Key\u3002</p>` : "";
+  return `<div class="agent-model-panel">
+    <p class="settings-hint">HTTP \u76F4\u8C03\uFF0C\u65E0\u9700 CLI\u3002Key \u4EC5\u5B58\u672C\u5730\uFF0C\u4E0D\u4E0A\u4F20\u3002</p>
+    ${codingHint}
+    <label class="settings-field"><span class="settings-field-label">Base URL</span><input class="agent-model-input" data-agent-http-base="${p.id}" value="${esc2(base2)}" placeholder="${esc2(cat?.api || "https://api.example.com/v1")}" autocomplete="off"></label>
+    <label class="settings-field"><span class="settings-field-label">API Key${masked ? `\uFF08\u5DF2\u5B58 ${esc2(masked)}\uFF09` : ""}</span><input class="agent-model-input" type="password" data-agent-http-key="${p.id}" ${masked ? `value="${esc2(masked)}" data-key-saved="1" data-key-mask="${esc2(masked)}"` : ""} placeholder="${masked ? "\u5DF2\u4FDD\u5B58\uFF0C\u7559\u7A7A\u4E0D\u6539\u52A8" : "\u7C98\u8D34 API Key"}" autocomplete="off"></label>
+    <div class="agent-card-actions"><button type="button" class="primary" data-agent-http-save="${p.id}">\u4FDD\u5B58</button><button type="button" class="ghost" data-agent-test-default="${p.id}">\u6D4B\u8BD5\u8FDE\u901A</button></div>
+    <span class="agent-model-row-status" data-model-status="__http__" role="status"></span>
+  </div>`;
+}
 function agentModelsPanelHtml(st, p, info) {
+  if (p.http) return agentHttpPanelHtml(st, p);
   const installed = agentInstalled(st, p.id);
   if (!installed) {
     return `<p class="settings-hint">\u5B89\u88C5\u5E76\u767B\u5F55\u5BF9\u5E94 CLI \u540E\uFF0C\u53EF\u6DFB\u52A0\u6A21\u578B\u5E76\u9010\u4E00\u6D4B\u8BD5\u8FDE\u901A\u3002</p>`;
@@ -31113,6 +31202,112 @@ function agentModelsPanelHtml(st, p, info) {
     </div>
     <ul class="agent-model-list">${rows}</ul>
   </div>`;
+}
+
+// ui/provider-connect.js
+function promptConnectProvider(st) {
+  return new Promise((resolve) => {
+    $2("#provider-connect-modal")?.remove();
+    ensureAgentHttpStore(st);
+    const connected = new Set(connectedHttpProviders(st).map((p) => p.id));
+    const catalog = providerCatalog();
+    const m = document.createElement("div");
+    m.id = "provider-connect-modal";
+    m.className = "modal";
+    m.innerHTML = `<div class="dialog provider-connect-dialog" role="dialog" aria-labelledby="provider-connect-title">
+  <div class="provider-connect-head">
+    <h2 id="provider-connect-title">\u8FDE\u63A5\u63D0\u4F9B\u5546</h2>
+    <button type="button" class="ghost provider-connect-close" id="provider-connect-close" aria-label="\u5173\u95ED">\xD7</button>
+  </div>
+  <div class="provider-connect-search">
+    <span class="provider-connect-search-icon" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    </span>
+    <input id="provider-connect-filter" type="search" placeholder="\u641C\u7D22\u63D0\u4F9B\u5546" autocomplete="off" aria-label="\u641C\u7D22\u63D0\u4F9B\u5546">
+  </div>
+  <div class="provider-connect-list" id="provider-connect-list"></div>
+</div>`;
+    document.body.append(m);
+    const listEl = $2("#provider-connect-list");
+    const filterEl = $2("#provider-connect-filter");
+    const done = (value) => {
+      m.remove();
+      resolve(value);
+    };
+    const render3 = () => {
+      const q = filterEl.value.trim().toLowerCase();
+      const available = catalog.providers.filter((p) => !connected.has(p.id));
+      const match = (p) => !q || `${p.id} ${p.name}`.toLowerCase().includes(q);
+      const popularIds = catalog.popular || [];
+      const popular = popularIds.map((id) => available.find((p) => p.id === id)).filter((p) => p && match(p));
+      const other2 = available.filter((p) => !popularIds.includes(p.id) && match(p)).sort((a, b) => a.name.localeCompare(b.name));
+      const custom = catalog.custom || { id: "_custom", name: "\u81EA\u5B9A\u4E49 OpenAI \u517C\u5BB9\u63D0\u4F9B\u5546" };
+      const showCustom = !q || `${custom.id} ${custom.name}`.toLowerCase().includes(q);
+      const row = (p, badge = "") => `<button type="button" class="provider-connect-row" data-provider-id="${esc2(p.id)}">
+          <span class="provider-connect-row-main">
+            <strong>${esc2(p.name)}</strong>
+            ${p.blurb ? `<span class="provider-connect-blurb">${esc2(p.blurb)}</span>` : ""}
+          </span>
+          ${badge}
+        </button>`;
+      const section = (title, items, badgeFn) => items.length ? `<div class="provider-connect-section"><div class="provider-connect-section-title">${esc2(title)}</div>${items.map((p) => row(p, badgeFn?.(p) || "")).join("")}</div>` : "";
+      const recommended = `<span class="agent-badge agent-badge-ok">\u63A8\u8350</span>`;
+      const customBadge = `<span class="agent-badge">\u81EA\u5B9A\u4E49</span>`;
+      listEl.innerHTML = section("\u70ED\u95E8", popular, () => recommended) + section("\u5176\u4ED6", [
+        ...showCustom ? [{ id: custom.id, name: custom.name, blurb: "" }] : [],
+        ...other2
+      ], (p) => p.id === custom.id ? customBadge : "") || `<p class="settings-hint provider-connect-empty">\u6CA1\u6709\u5339\u914D\u7684\u63D0\u4F9B\u5546</p>`;
+      listEl.querySelectorAll("[data-provider-id]").forEach((btn) => {
+        btn.onclick = () => done(btn.getAttribute("data-provider-id"));
+      });
+    };
+    $2("#provider-connect-close").onclick = () => done(null);
+    m.addEventListener("click", (e) => {
+      if (e.target === m) done(null);
+    });
+    filterEl.addEventListener("input", render3);
+    filterEl.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        done(null);
+      }
+    });
+    render3();
+    requestAnimationFrame(() => filterEl.focus());
+  });
+}
+async function addProviderFromCatalog(st, pickId, promptText2) {
+  if (!pickId) return null;
+  if (pickId === "_custom") {
+    const name = await promptText2("\u81EA\u5B9A\u4E49\u63D0\u4F9B\u5546\u540D\u79F0", {
+      placeholder: "\u4F8B\u5982 my-llm",
+      okLabel: "\u4E0B\u4E00\u6B65"
+    });
+    if (!name) return null;
+    const id = name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "custom";
+    const baseURL = await promptText2("Base URL", {
+      placeholder: "https://api.example.com/v1",
+      okLabel: "\u6DFB\u52A0"
+    });
+    if (!baseURL) return null;
+    setAgentHttp(st, id, {
+      label: name.trim(),
+      baseURL: baseURL.trim(),
+      apiKey: "",
+      family: "openai"
+    });
+    return id;
+  }
+  const cat = catalogProvider(pickId);
+  if (!cat) return null;
+  setAgentHttp(st, cat.id, {
+    label: cat.name,
+    baseURL: cat.api || "",
+    apiKey: "",
+    family: cat.family || "openai",
+    models: cat.models || []
+  });
+  return cat.id;
 }
 
 // node_modules/diff/libesm/diff/base.js
@@ -31839,6 +32034,8 @@ var agentMode = "chat";
 var streamText = "";
 var streamThinking = false;
 var unsubProgress = null;
+var streamTools = [];
+var unsubAgentEvent = null;
 var reviewMode = false;
 var reviewIndex = 0;
 var reviewDemoActive = false;
@@ -33722,15 +33919,34 @@ function paintStreamBubble() {
   const bubble = $2("#stream-bubble");
   if (!bubble) return;
   if (streamThinking) return;
-  bubble.querySelector(".message-role").textContent = "aster \xB7 \u8F93\u51FA\u4E2D";
+  const activity = streamTools.length ? activityLine(streamTools.map((t) => ({ type: "tool_start", tool: t }))) : "aster \xB7 \u8F93\u51FA\u4E2D";
+  bubble.querySelector(".message-role").textContent = activity;
   const body = bubble.querySelector(".stream-text");
+  const tools = streamTools.map((t) => toolBlockHtml(t, t.state || "running")).join("");
   if (body) {
     body.childNodes[0]?.remove;
-    body.innerHTML = `${esc2(streamText)}<span class="stream-caret"></span>`;
+    body.innerHTML = `${esc2(streamText)}<span class="stream-caret"></span>${tools}`;
   } else {
-    bubble.innerHTML = `<small class="message-role">aster \xB7 \u8F93\u51FA\u4E2D</small><div class="stream-text">${esc2(streamText)}<span class="stream-caret"></span></div>`;
+    bubble.innerHTML = `<small class="message-role">${esc2(activity)}</small><div class="stream-text">${esc2(streamText)}<span class="stream-caret"></span>${tools}</div>`;
   }
+  bindToolToggles(bubble);
   scrollPanelToBottom();
+}
+function bindToolToggles(root2) {
+  root2?.querySelectorAll("[data-tool-toggle]").forEach((b) => {
+    b.onclick = () => {
+      const out = b.parentElement?.querySelector(".tool-output");
+      if (out) out.hidden = !out.hidden;
+    };
+  });
+}
+function trackToolEvent(e) {
+  const t = e?.tool || {};
+  const id = t.id || t.name + streamTools.length;
+  const i = streamTools.findIndex((x) => (x.id || x.name) === id);
+  const next2 = { id, name: t.name, args: t.args ?? t.argsDelta ?? "", output: t.output || "", state: e.type === "tool_end" ? "done" : "running" };
+  if (i >= 0) streamTools[i] = { ...streamTools[i], ...next2 };
+  else streamTools.push(next2);
 }
 async function runTask(task) {
   if (busy) return toast("\u8BF7\u7B49\u5F85\u5F53\u524D\u4EFB\u52A1\uFF0C\u6216\u505C\u6B62\u540E\u91CD\u8BD5");
@@ -33791,6 +34007,23 @@ async function runTask(task) {
   renderPanel();
   scrollPanelToBottom();
   unsubProgress?.();
+  unsubAgentEvent?.();
+  streamTools = [];
+  unsubAgentEvent = typeof window.desk?.agentEvent === "function" ? window.desk.agentEvent((e) => {
+    if (!e || typeof e !== "object") return;
+    if (current?.id !== doc3.id) return;
+    if (e.type === "usage" || e.type === "done") return;
+    if (e.type?.startsWith("tool")) {
+      if (streamThinking) {
+        streamThinking = false;
+        const bubble = $2("#stream-bubble");
+        if (bubble)
+          bubble.innerHTML = `<small class="message-role">aster \xB7 \u8F93\u51FA\u4E2D</small><div class="stream-text"></div>`;
+      }
+      trackToolEvent(e);
+      paintStreamBubble();
+    }
+  }) : null;
   unsubProgress = typeof window.desk?.progress === "function" ? window.desk.progress((chunk) => {
     if (typeof chunk !== "string" || !chunk) return;
     if (current?.id !== doc3.id) return;
@@ -33808,6 +34041,7 @@ async function runTask(task) {
     const result = await api("agent", {
       provider: state.provider,
       model: state.model,
+      templateId: state.templateId || void 0,
       account: doc3.account,
       task,
       articleId: doc3.id,
@@ -33844,7 +34078,10 @@ async function runTask(task) {
       }
       enterReviewMode();
     } else {
-      session.messages.push({ role: "assistant", text: result });
+      const suffix = streamTools.length ? `
+
+\uFF08\u8C03\u7528\u5DE5\u5177 ${streamTools.length} \u6B21\uFF1A${[...new Set(streamTools.map((t) => t.name).filter(Boolean))].join("\u3001")}\uFF09` : "";
+      session.messages.push({ role: "assistant", text: result + suffix });
     }
     await persist();
   } catch (e) {
@@ -33860,6 +34097,8 @@ async function runTask(task) {
   } finally {
     unsubProgress?.();
     unsubProgress = null;
+    unsubAgentEvent?.();
+    unsubAgentEvent = null;
     streamThinking = false;
     busy = false;
     syncAsterFace();
@@ -34549,7 +34788,7 @@ async function setAgentEnabled(id, on) {
 }
 function modelPickerHTML() {
   const provider = railProviderId(state);
-  const p = AGENT_PROVIDERS.find((x) => x.id === provider);
+  const p = providerMeta(state, provider);
   const label = railModelLabel(state, provider);
   const agents = selectableAgentProviders(state);
   const agentRows = agents.length ? agents.map((agent2) => {
@@ -34572,12 +34811,12 @@ function modelPickerHTML() {
           </div>`;
   }).join("") : `<p class="model-picker-empty">\u6682\u65E0\u53EF\u7528\u7684 Agent</p>`;
   return `<div class="model-picker" id="model-picker">
-    <button type="button" id="model-picker-trigger" class="model-picker-trigger" title="${esc2(p?.label || "")} \xB7 ${esc2(label)}" aria-label="\u9009\u62E9\u6A21\u578B\uFF1A${esc2(label)}" aria-haspopup="menu" aria-expanded="false">
+    <button type="button" id="model-picker-trigger" class="model-picker-trigger" title="${esc2(p?.label || "")} \xB7 ${esc2(label)}${state.templateId ? ` \xB7 \u6A21\u677F\uFF1A${esc2(templateLabel(state))}` : ""}" aria-label="\u9009\u62E9\u6A21\u578B\uFF1A${esc2(label)}" aria-haspopup="menu" aria-expanded="false">
       <span class="model-picker-logo">${agentLogoSvg(provider, 16)}</span>
-      <span class="model-picker-label">${esc2(label)}</span>
+      <span class="model-picker-label">${esc2(label)}${state.templateId ? ` \xB7 ${esc2(templateLabel(state))}` : ""}</span>
       ${I.chevronDown({ size: 12 })}
     </button>
-    <div id="model-picker-menu" class="model-picker-menu" hidden role="menu">${agentRows}</div>
+    <div id="model-picker-menu" class="model-picker-menu" hidden role="menu"><div class="model-picker-templates" role="group" aria-label="\u6A21\u677F">${AGENT_TEMPLATES.map((t) => `<button type="button" role="menuitemradio" class="model-picker-option" data-template="${esc2(t.id)}" aria-checked="${(state.templateId || "") === t.id}">${(state.templateId || "") === t.id ? "\u2713 " : ""}${esc2(t.label)}</button>`).join("")}</div><div class="model-picker-divider"></div>${agentRows}</div>
   </div>`;
 }
 function bindModelPicker() {
@@ -34698,13 +34937,22 @@ function bindModelPicker() {
     };
     agentEl.onmouseenter = () => openSubmenu(agentEl);
   });
-  root2.querySelectorAll(".model-picker-option").forEach((opt) => {
+  root2.querySelectorAll(".model-picker-option[data-template]").forEach((opt) => {
+    opt.onclick = async (e) => {
+      e.stopPropagation();
+      state.templateId = opt.getAttribute("data-template") || "";
+      closeAll();
+      await persistAgentModels();
+      render2();
+    };
+  });
+  root2.querySelectorAll(".model-picker-option:not([data-template])").forEach((opt) => {
     opt.onclick = async (e) => {
       e.stopPropagation();
       const provider = opt.getAttribute("data-provider") || "";
       const model = opt.getAttribute("data-model") || "";
       if (!provider || !agentInstalled(state, provider) || !agentEnabled(state, provider)) {
-        toast("\u672A\u627E\u5230\u8BE5 CLI");
+        toast("\u8BE5 Agent \u4E0D\u53EF\u7528");
         return;
       }
       state.provider = provider;
@@ -34716,7 +34964,7 @@ function bindModelPicker() {
       const text = trigger.querySelector(".model-picker-label");
       if (logo) logo.innerHTML = agentLogoSvg(provider, 16);
       if (text) text.textContent = label;
-      const agentLabel = AGENT_PROVIDERS.find((x) => x.id === provider)?.label || "";
+      const agentLabel = providerMeta(state, provider)?.label || "";
       trigger.title = `${agentLabel} \xB7 ${label}`;
       trigger.setAttribute("aria-label", `\u9009\u62E9\u6A21\u578B\uFF1A${label}`);
       root2.querySelectorAll(".model-picker-option").forEach((btn) => {
@@ -34757,13 +35005,20 @@ function setModelRowStatus(provider, model, text, kind = "") {
 }
 async function persistAgentModels() {
   ensureAgentModelsStore(state);
-  await persist();
+  ensureAgentHttpStore(state);
+  return persist();
 }
 async function fillAgentCard(p, refresh = false) {
   const body = $2(`[data-agent-body="${p.id}"]`);
   if (!body) return;
   if (!agentInstalled(state, p.id)) {
     body.innerHTML = agentModelsPanelHtml(state, p, null);
+    if (p.http) bindAgentModelControls(p);
+    return;
+  }
+  if (p.http) {
+    body.innerHTML = agentModelsPanelHtml(state, p, null);
+    bindAgentModelControls(p);
     return;
   }
   let info = { models: [], selectable: p.id !== "zcode", current: "" };
@@ -34781,6 +35036,56 @@ async function fillAgentCard(p, refresh = false) {
   bindAgentModelControls(p);
 }
 function bindAgentModelControls(p) {
+  if (p.http) {
+    const panel = $2(`[data-agent-body="${p.id}"]`) || document;
+    const saveBtn = panel.querySelector(`[data-agent-http-save="${p.id}"]`);
+    const keyInput = panel.querySelector(`[data-agent-http-key="${p.id}"]`);
+    if (keyInput?.dataset.keySaved === "1") {
+      keyInput.onfocus = () => {
+        if (keyInput.dataset.keySaved !== "1") return;
+        keyInput.value = "";
+        keyInput.dataset.keySaved = "0";
+        keyInput.placeholder = "\u8F93\u5165\u65B0 Key\uFF0C\u7559\u7A7A\u5219\u4FDD\u6301\u5DF2\u5B58";
+      };
+    }
+    if (saveBtn)
+      saveBtn.onclick = async () => {
+        const base2 = panel.querySelector(`[data-agent-http-base="${p.id}"]`)?.value.trim() || "";
+        const typed = keyInput?.value || "";
+        const prev = getAgentHttp(state, p.id);
+        const keepingMask = keyInput?.dataset.keySaved === "1" || /^[•*·]{2,}/.test(typed);
+        const apiKey = (keepingMask || !typed ? prev.apiKey || "" : typed).trim().replace(/[\u200b-\u200d\ufeff]/g, "");
+        if (!apiKey) return toast("\u8BF7\u5148\u586B\u5199 API Key");
+        if (/^[•*·]/.test(apiKey))
+          return toast("\u8BF7\u91CD\u65B0\u7C98\u8D34\u5B8C\u6574 API Key\uFF08\u4E0D\u8981\u4FDD\u5B58\u8131\u654F\u5360\u4F4D\uFF09");
+        setAgentHttp(state, p.id, {
+          ...prev,
+          baseURL: base2.replace(/\/$/, ""),
+          apiKey
+        });
+        state.agents = { ...state.agents, [p.id]: true };
+        const ok = await persistAgentModels();
+        if (!ok) return;
+        const mask = "\u2022\u2022\u2022\u2022" + apiKey.slice(-4);
+        if (keyInput) {
+          keyInput.dataset.keySaved = "1";
+          keyInput.dataset.keyMask = mask;
+          keyInput.value = mask;
+          keyInput.placeholder = "\u5DF2\u4FDD\u5B58\uFF0C\u7559\u7A7A\u4E0D\u6539\u52A8";
+          keyInput.onfocus = () => {
+            if (keyInput.dataset.keySaved !== "1") return;
+            keyInput.value = "";
+            keyInput.dataset.keySaved = "0";
+            keyInput.placeholder = "\u8F93\u5165\u65B0 Key\uFF0C\u7559\u7A7A\u5219\u4FDD\u6301\u5DF2\u5B58";
+          };
+        }
+        const label = keyInput?.closest("label")?.querySelector(".settings-field-label");
+        if (label) label.textContent = `API Key\uFF08\u5DF2\u5B58 ${mask}\uFF09`;
+        toast("\u5DF2\u4FDD\u5B58\uFF0C\u53EF\u70B9\u6D4B\u8BD5\u8FDE\u901A\u9A8C\u8BC1");
+      };
+    const testHttp = panel.querySelector(`[data-agent-test-default="${p.id}"]`);
+    if (testHttp) testHttp.onclick = () => runAgentDefaultTest(p.id);
+  }
   const refresh = $2(`[data-agent-refresh="${p.id}"]`);
   if (refresh) refresh.onclick = async () => {
     refresh.disabled = true;
@@ -34871,11 +35176,11 @@ function bindAgentModelControls(p) {
   });
 }
 async function runAgentDefaultTest(id) {
-  const p = AGENT_PROVIDERS.find((x) => x.id === id);
-  if (!agentInstalled(state, id)) return toast("\u672A\u627E\u5230\u8BE5 CLI");
+  const p = providerMeta(state, id);
+  if (!p?.http && !agentInstalled(state, id)) return toast("\u672A\u627E\u5230\u8BE5 CLI");
   const btn = $2(`[data-agent-test-default="${id}"]`) || $2("#agent-test-default");
   if (btn) btn.disabled = true;
-  toast(`${p?.label || id}\uFF1A\u6D4B\u8BD5 CLI \u9ED8\u8BA4\u2026`);
+  toast(`${p?.label || id}\uFF1A\u6D4B\u8BD5${p?.http ? "\u8FDE\u901A" : " CLI \u9ED8\u8BA4"}\u2026`);
   try {
     const result = await api("agent-test", { provider: id, model: "" });
     if (result.ok) {
@@ -34894,6 +35199,7 @@ async function mountAgentsSettings() {
     const next2 = await api("load");
     if (next2?.agents) state.agents = next2.agents;
     if (next2?.agentModels) state.agentModels = next2.agentModels;
+    if (next2?.agentHttp) state.agentHttp = next2.agentHttp;
     if (next2?.agentsEnabled) state.agentsEnabled = next2.agentsEnabled;
   } catch {
   }
@@ -34929,12 +35235,24 @@ async function mountAgentsSettings() {
       }
     };
   });
-  mountAgentUsage($2("#agent-usage"), api, AGENT_PROVIDERS, {
+  mountAgentUsage($2("#agent-usage"), api, connectedAgentProviders(state), {
     mode: "overview"
   });
+  const addBtn = $2("#add-agent-provider");
+  if (addBtn)
+    addBtn.onclick = async () => {
+      const pick = await promptConnectProvider(state);
+      if (!pick) return;
+      const id = await addProviderFromCatalog(state, pick, promptText);
+      if (!id) return;
+      ensureAgentsEnabledStore(state);
+      state.agentsEnabled = { ...state.agentsEnabled, [id]: true };
+      await persistAgentModels();
+      openAgentDetail(id);
+    };
 }
 async function renderAgentDetail() {
-  const p = AGENT_PROVIDERS.find((x) => x.id === agentDetailId);
+  const p = providerMeta(state, agentDetailId);
   if (!p) {
     page = "settings";
     settingsTab = "agents";
@@ -34946,10 +35264,12 @@ async function renderAgentDetail() {
     const next2 = await api("load");
     if (next2?.agents) state.agents = next2.agents;
     if (next2?.agentModels) state.agentModels = next2.agentModels;
+    if (next2?.agentHttp) state.agentHttp = next2.agentHttp;
     if (next2?.agentsEnabled) state.agentsEnabled = next2.agentsEnabled;
   } catch {
   }
   ensureAgentModelsStore(state);
+  ensureAgentHttpStore(state);
   ensureAgentsEnabledStore(state);
   if (!["connection", "usage"].includes(agentDetailTab))
     agentDetailTab = "connection";
@@ -35003,7 +35323,7 @@ async function renderAgentDetail() {
         control: `<section id="agent-usage" class="agent-usage"></section>`
       })
     );
-    mountAgentUsage($2("#agent-usage"), api, AGENT_PROVIDERS, {
+    mountAgentUsage($2("#agent-usage"), api, connectedAgentProviders(state), {
       mode: "detail",
       provider: p.id
     });
@@ -35058,7 +35378,8 @@ function renderSettings() {
     settingsSection({
       title: "\u6A21\u578B\u8FDE\u63A5",
       className: "settings-section-agents",
-      control: `<div class="agent-card-list">${AGENT_PROVIDERS.map(agentListItemHtml).join("")}</div>`
+      action: `<button type="button" class="primary" id="add-agent-provider">${I.plus()} \u6DFB\u52A0</button>`,
+      control: `<div class="agent-card-list">${connectedAgentProviders(state).map((p) => agentListItemHtml(state, p)).join("")}</div>`
     })
   ].join("");
   const accounts = accountList();

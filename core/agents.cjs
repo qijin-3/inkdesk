@@ -235,6 +235,15 @@ async function listAgentModels(core, data = {}) {
   const query = (async () => {
     const base = { provider, models: [], current: "", selectable: provider !== "zcode", source: "", checkedAt: Date.now(), error: "" };
     try {
+      try {
+        const { isHttp, getProvider } = require("./providers.cjs");
+        if (isHttp(core, provider)) {
+          const preset = getProvider(core, provider) || {};
+          const saved = core.store?.agentHttp?.[provider] || {};
+          const models = [...new Set([...(preset.models || []), ...((saved.models) || [])])];
+          return { ...base, models, source: "HTTP 预置" + (saved.baseURL ? " · 已自定义地址" : ""), notice: saved.apiKey ? "" : "未配置 API Key，先在下方填写后测试。" };
+        }
+      } catch {}
       const exe = core.executable(provider);
       if (!exe) throw new Error("未找到 CLI，请先安装并登录");
       if (provider === "zcode") return { ...base, current: core.zcodeCurrentModel(), source: "CLI 默认配置" };
@@ -272,12 +281,14 @@ function normalizeProvider(core, raw) {
   const value = String(raw || "").toLowerCase();
   const p = value === "chatgpt" ? "codex" : value;
   if (
-    ["cursor", "codex", "claude", "zcode", "opencode", "antigravity"].includes(
-      p,
-    )
+    ["cursor", "codex", "claude", "zcode", "opencode", "antigravity"].includes(p)
   )
     return p;
-  return "cursor";
+  try {
+    const { getProvider } = require("./providers.cjs");
+    if (getProvider(core, p)) return p;
+  } catch {}
+  return "codex";
 }
 
 /** Agent 工作目录：绝对路径，避免 dataDir 已含 agent-work 时重复拼接。 */
@@ -390,14 +401,16 @@ function agentInvokeSpec(core, provider, exe, prompt, model, cwd) {
  * @param {{ cwd: string, prompt: string, timeoutMs?: number, onProgress?: Function, streamProgress?: boolean }} opts
  */
 function spawnAgent(core, spec, opts) {
-  const { cwd, prompt, timeoutMs = 180000, onProgress, streamProgress } = opts;
+  const { cwd, prompt, timeoutMs = 180000, onProgress, streamProgress, onEvent } = opts;
+  const emit = (e) => { try { onEvent?.(e); } catch {} };
   const usageId = opts.usageMeta && core.agentUsage?.begin(opts.usageMeta);
   return new Promise((resolve, reject) => {
     let output = "", error = "", timeout = false, settled = false, timer;
-    const decoder = new AgentOutput(spec.provider, streamProgress ? onProgress : null);
+    const decoder = new AgentOutput(spec.provider, streamProgress ? onProgress : null, emit);
     const finish = (status, failure, result) => {
       if (settled) return;
       settled = true; clearTimeout(timer);
+      emit({ type: "done", status });
       if (usageId) core.agentUsage.end(usageId, status, decoder.usage);
       failure ? reject(failure) : resolve(String(result || "").trim());
     };
@@ -433,6 +446,38 @@ function spawnAgent(core, spec, opts) {
  */
 async function testAgentConnection(core, data = {}) {
   const provider = core.normalizeProvider(data.provider);
+  try {
+    const { isHttp, getProvider } = require("./providers.cjs");
+    if (isHttp(core, provider)) {
+      const saved = core.store?.agentHttp?.[provider] || {};
+      const cfg = { ...(getProvider(core, provider) || {}), ...saved };
+      // ponytail: 界面已存 Key 优先；避免 shell 里过期的 ZHIPU_API_KEY 盖掉编程套餐 Key
+      const apiKey = String(cfg.apiKey || process.env[cfg.keyEnv || ""] || "").trim();
+      if (!apiKey) return { ok: false, provider, installed: true, error: "未配置 API Key" };
+      if (/^[•*]+/.test(apiKey) || apiKey.length < 8)
+        return { ok: false, provider, installed: true, error: "API Key 无效（疑似未正确保存，请重新粘贴后保存）" };
+      const model = String(data.model || cfg.models?.[0] || "").trim();
+      if (!model) return { ok: false, provider, installed: true, error: "未指定模型 ID" };
+      const started = Date.now();
+      const { runOpenAI, runAnthropic } = require("./http-client.cjs");
+      const r = await (cfg.family === "anthropic" ? runAnthropic : runOpenAI)({
+        baseURL: cfg.baseURL, apiKey, model,
+        messages: [{ role: "user", content: "请只回复一个词：ok。" }], timeoutMs: 30000,
+      });
+      return { ok: !!String(r.text || "").trim(), provider, installed: true, preview: String(r.text || "").slice(0, 120), latencyMs: Date.now() - started };
+    }
+  } catch (e) {
+    let error = e.message || String(e);
+    const base = String(core.store?.agentHttp?.[provider]?.baseURL || "");
+    if (/401/.test(error) && /api\.z\.ai/i.test(base)) {
+      error += " · 国内智谱 Coding Plan 请改用 Base URL：https://open.bigmodel.cn/api/coding/paas/v4";
+    } else if (/401/.test(error) && /bigmodel\.cn/i.test(base)) {
+      const keyLen = String(core.store?.agentHttp?.[provider]?.apiKey || "").trim().length;
+      error +=
+        ` · 智谱已拒绝该令牌（当前 Key 长度 ${keyLen}）。请到「个人编程套餐 › 套餐概览」新建专用 Key 并完整复制（常见为 id.secret，中间有点）；通用平台 Key 或截断 Key 都会 401`;
+    }
+    return { ok: false, provider, installed: true, error };
+  }
   const exe = core.executable(provider);
   if (!exe)
     return {
@@ -488,8 +533,37 @@ async function testAgentConnection(core, data = {}) {
  */
 function runAgent(core, req, onProgress) {
   const progress = onProgress || core.onAgentProgress;
-  if (core.active) throw Error("已有任务运行中");
+  const onEvent = req.onEvent || core.onAgentEvent;
+  core.sessions ||= new Map();
+  const convId = req.conversationId || "default";
+  if ([...core.sessions.values()].some((s) => s && !s.settled)) throw Error("已有任务运行中");
   const provider = core.normalizeProvider(req.provider);
+  let template = null;
+  if (req.templateId) {
+    try {
+      const fs0 = require("node:fs"), path0 = require("node:path");
+      const t = JSON.parse(fs0.readFileSync(path0.join(__dirname, "..", "assets", "agents", "templates.json"), "utf8"));
+      template = (t.templates || []).find((x) => x.id === req.templateId) || null;
+    } catch {}
+  }
+  try {
+    const { isHttp, getProvider } = require("./providers.cjs");
+    if (isHttp(core, provider)) {
+      const preset = getProvider(core, provider) || {};
+      const saved = core.store?.agentHttp?.[provider] || {};
+      const cfg = { ...preset, ...saved };
+      const apiKey = String(cfg.apiKey || process.env[cfg.keyEnv || ""] || "").trim();
+      if (!apiKey) throw Error("未配置 API Key，请在设置中填写后重试。");
+      if (/^[•*]+/.test(apiKey)) throw Error("API Key 无效，请重新粘贴后保存。");
+      const { runOpenAI, runAnthropic } = require("./http-client.cjs");
+      const messages = [{ role: "user", content: promptBase(req, core, template) }];
+      const runner = cfg.family === "anthropic" ? runAnthropic : runOpenAI;
+      const p = runner({ baseURL: cfg.baseURL, apiKey, model: req.model || cfg.models?.[0], messages, system: template?.system || undefined, onEvent });
+      const tracked = { settled: false };
+      core.sessions.set(convId, tracked);
+      return p.then((r) => { tracked.settled = true; core.sessions.delete(convId); onEvent?.({ type: "done", status: "success" }); return String(r.text || "").trim(); });
+    }
+  } catch (e) { if (String(e?.message || "").includes("API Key")) throw e; }
   const exe = core.executable(provider);
   if (!exe) throw Error("未找到 " + provider + " CLI，请安装并登录后重试。");
   const cwd = core.agentWorkDir();
@@ -544,13 +618,29 @@ function runAgent(core, req, onProgress) {
 
   const model = provider === "zcode" ? "" : String(req.model || "").trim();
   const spec = core.agentInvokeSpec(provider, exe, prompt, model, cwd);
-  return core.spawnAgent(spec, {
+  if (template?.system) prompt = template.system + "\n" + prompt;
+  const tracked = { settled: false, child: null };
+  core.sessions.set(convId, tracked);
+  const r = core.spawnAgent(spec, {
     cwd,
     prompt,
     usageMeta: { provider, model, kind: "writing", account: req.account, articleId: req.articleId, conversationId: req.conversationId },
     onProgress: progress,
+    onEvent,
     streamProgress: spec.streamProgress,
   });
+  return Promise.resolve(r).finally(() => { tracked.settled = true; core.sessions.delete(convId); });
+}
+
+function promptBase(req, core, template) {
+  return (template?.system ? template.system + "\n" : "") + "任务：" + (req.task || "") + "\n要求：" + (req.instruction || "") + "\n" + (req.body || "");
+}
+
+function cancelAgent(core, conversationId) {
+  const s = core.sessions?.get(conversationId || "default");
+  if (s?.child) { try { s.child.asideCancelled = true; s.child.kill("SIGTERM"); } catch {} return true; }
+  if (core.active) { try { core.active.asideCancelled = true; core.active.kill("SIGTERM"); } catch {} return true; }
+  return false;
 }
 
 module.exports = {
@@ -567,6 +657,8 @@ module.exports = {
   agentWorkDir,
   agentInvokeSpec,
   spawnAgent,
+  cancelAgent,
+  promptBase,
   testAgentConnection,
   runAgent,
 };

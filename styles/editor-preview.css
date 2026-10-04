@@ -1142,6 +1142,16 @@ th {
   font-weight: 600;
   color: #111;
 }
+.settings-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.settings-section-head .settings-section-title {
+  margin: 0;
+}
 .settings-panel > .settings-section-title {
   margin-bottom: 14px;
 }
@@ -1243,12 +1253,21 @@ th {
 .settings-section-agents {
   max-width: none;
 }
+.settings-section-agents .settings-section-head,
 .settings-section-agents .settings-section-control {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
   max-width: 920px;
   width: 100%;
+}
+.settings-section-agents .settings-section-head {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.settings-section-agents .settings-section-control {
+  flex-direction: column;
+  gap: 12px;
 }
 .agents-intro {
   margin: 0 0 12px;
@@ -1258,6 +1277,152 @@ th {
   flex-direction: column;
   gap: 12px;
   width: 100%;
+}
+.provider-connect-dialog {
+  width: min(520px, 92vw);
+  max-height: min(720px, 88vh);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  background: #fff;
+}
+.provider-connect-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 20px 0;
+  flex: 0 0 auto;
+}
+.provider-connect-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.provider-connect-close {
+  font-size: 22px;
+  line-height: 1;
+  padding: 4px 8px;
+  color: #888;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.provider-connect-close:hover {
+  color: #111;
+}
+.provider-connect-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  margin: 14px 20px 10px;
+  padding: 0 12px;
+  height: 40px;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  background: #f7f7f7;
+  box-sizing: border-box;
+}
+.provider-connect-search:focus-within {
+  border-color: #cfcfcf;
+  background: #fff;
+  box-shadow: 0 0 0 3px #0000000a;
+}
+.provider-connect-search-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  flex: 0 0 auto;
+}
+.provider-connect-dialog .provider-connect-search input,
+.provider-connect-search input {
+  display: block;
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: #111;
+  outline: none;
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.provider-connect-search input::placeholder {
+  color: #aaa;
+}
+.provider-connect-search input::-webkit-search-decoration,
+.provider-connect-search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+.provider-connect-list {
+  overflow: auto;
+  padding: 4px 16px 16px;
+  min-height: 200px;
+  flex: 1 1 auto;
+}
+.provider-connect-section {
+  margin-top: 10px;
+}
+.provider-connect-section:first-child {
+  margin-top: 0;
+}
+.provider-connect-section-title {
+  padding: 6px 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+}
+.provider-connect-section .provider-connect-row + .provider-connect-row {
+  margin-top: 8px;
+}
+.provider-connect-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.provider-connect-row:hover,
+.provider-connect-row:focus-visible {
+  border-color: #ccc;
+  background: #fafafa;
+  outline: none;
+}
+.provider-connect-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.provider-connect-row-main strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.provider-connect-blurb {
+  font-size: 12px;
+  color: #888;
+}
+.provider-connect-empty {
+  padding: 24px 12px;
+  text-align: center;
 }
 .agent-list-item {
   display: flex;

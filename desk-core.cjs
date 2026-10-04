@@ -22,6 +22,7 @@ class DeskCore {
     this.knowledge = null;
     this.accountModel = null;
     this.onAgentProgress = null;
+    this.onAgentEvent = null;
     /** @type {Record<string, { token?: string, expiresAt?: number }>} appId → token cache */
     this.wechatTokenCache = {};
   }
@@ -51,6 +52,7 @@ class DeskCore {
   agentWorkDir() { return Agents.agentWorkDir(this); }
   agentInvokeSpec(provider, exe, prompt, model, cwd) { return Agents.agentInvokeSpec(this, provider, exe, prompt, model, cwd); }
   spawnAgent(spec, opts) { return Agents.spawnAgent(this, spec, opts); }
+  cancelAgent(conversationId) { return Agents.cancelAgent(this, conversationId); }
   async testAgentConnection(data = {}) { return Agents.testAgentConnection(this, data); }
 
 
