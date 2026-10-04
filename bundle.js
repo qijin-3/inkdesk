@@ -31006,21 +31006,11 @@ var AGENT_PROVIDERS = [
   { id: "opencode", label: "OpenCode", blurb: "OpenCode CLI" },
   { id: "antigravity", label: "Antigravity", blurb: "Google Antigravity\uFF08agy\uFF09" }
 ];
-var AGENT_TEMPLATES = [
-  { id: "", label: "\u9ED8\u8BA4" },
-  { id: "polish", label: "\u6DA6\u8272" },
-  { id: "review", label: "\u5BA1\u9605" },
-  { id: "qa", label: "\u7D20\u6750\u95EE\u7B54" },
-  { id: "plan", label: "\u8BA1\u5212\uFF08\u53EA\u8BFB\uFF09" }
-];
 function providerCatalog() {
   return providers_catalog_default;
 }
 function catalogProvider(id) {
   return providers_catalog_default.providers.find((p) => p.id === id) || null;
-}
-function templateLabel(st) {
-  return AGENT_TEMPLATES.find((t) => t.id === (st.templateId || ""))?.label || "\u9ED8\u8BA4";
 }
 function settingsSection({ title, control, className = "", action = "" }) {
   const head = title || action ? `<div class="settings-section-head">${title ? `<h3 class="settings-section-title">${esc2(title)}</h3>` : ""}${action}</div>` : "";
@@ -33754,14 +33744,6 @@ function agentModeHTML() {
   const modeIcon = edit2 ? I.pen({ size: 14 }) : I.chat({ size: 14 });
   return `<div class="agent-mode"><button type="button" id="agent-output" class="agent-mode-trigger" title="${label}" aria-label="\u8F93\u51FA\u6A21\u5F0F\uFF1A${label}" aria-haspopup="listbox" aria-expanded="false" data-mode="${agentMode}">${modeIcon}${I.chevronDown({ size: 12 })}</button><div id="agent-mode-menu" class="agent-mode-menu" hidden role="listbox"><button type="button" role="option" data-value="chat" aria-selected="${!edit2}">${I.chat({ size: 14 })}<span>\u5BF9\u8BDD</span></button><button type="button" role="option" data-value="edit" aria-selected="${edit2}">${I.pen({ size: 14 })}<span>\u7F16\u8F91</span></button></div></div>`;
 }
-function templatePickerHTML() {
-  const label = templateLabel(state);
-  const opts = AGENT_TEMPLATES.map((t) => {
-    const on = (state.templateId || "") === t.id;
-    return `<button type="button" role="option" data-template="${esc2(t.id)}" aria-selected="${on}">${on ? "\u2713 " : ""}${esc2(t.label)}</button>`;
-  }).join("");
-  return `<div class="template-picker" id="template-picker"><button type="button" id="template-picker-trigger" class="template-picker-trigger" title="\u6A21\u677F\uFF1A${esc2(label)}" aria-label="\u9009\u62E9\u6A21\u677F\uFF1A${esc2(label)}" aria-haspopup="listbox" aria-expanded="false"><span class="template-picker-label">${esc2(label)}</span>${I.chevronDown({ size: 12 })}</button><div id="template-picker-menu" class="template-picker-menu" hidden role="listbox">${opts}</div></div>`;
-}
 var activeComposerMenuDismiss = null;
 function dismissActiveComposerMenu() {
   const fn = activeComposerMenuDismiss;
@@ -33805,48 +33787,6 @@ function bindAgentModeMenu() {
       e.stopPropagation();
       agentMode = opt.dataset.value === "edit" ? "edit" : "chat";
       closeMode();
-      renderPanel();
-    };
-  });
-}
-function bindTemplatePicker() {
-  const root2 = $2("#template-picker");
-  const trigger = $2("#template-picker-trigger");
-  const menu = $2("#template-picker-menu");
-  if (!root2 || !trigger || !menu) return;
-  let onDocPointer = null;
-  const closeMenu = () => {
-    menu.setAttribute("hidden", "");
-    trigger.setAttribute("aria-expanded", "false");
-    if (onDocPointer) {
-      document.removeEventListener("pointerdown", onDocPointer, true);
-      onDocPointer = null;
-    }
-    if (activeComposerMenuDismiss === closeMenu) activeComposerMenuDismiss = null;
-  };
-  trigger.onclick = (e) => {
-    e.stopPropagation();
-    const willOpen = menu.hasAttribute("hidden");
-    dismissActiveComposerMenu();
-    if (!willOpen) return;
-    menu.removeAttribute("hidden");
-    trigger.setAttribute("aria-expanded", "true");
-    activeComposerMenuDismiss = closeMenu;
-    onDocPointer = (ev) => {
-      if (root2.contains(
-        /** @type {Node} */
-        ev.target
-      )) return;
-      closeMenu();
-    };
-    document.addEventListener("pointerdown", onDocPointer, true);
-  };
-  menu.querySelectorAll("[data-template]").forEach((opt) => {
-    opt.onclick = async (e) => {
-      e.stopPropagation();
-      state.templateId = opt.getAttribute("data-template") || "";
-      closeMenu();
-      await persistAgentModels();
       renderPanel();
     };
   });
@@ -33945,11 +33885,10 @@ function renderPanel() {
     if (busy) content += streamBubbleHTML();
     if (reviewCardHTML()) content += reviewCardHTML();
   }
-  panel.innerHTML = `<div class="panel-scroll">${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0" aria-label="\u6DFB\u52A0" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${templatePickerHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div></div>`;
+  panel.innerHTML = `<div class="panel-scroll">${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0" aria-label="\u6DFB\u52A0" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div></div>`;
   bindConversationHead();
   $2("#send").onclick = () => busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
   bindAgentModeMenu();
-  bindTemplatePicker();
   bindModelPicker();
   composer = new Composer($2("#composer-input"), conversation(current), {
     changed: () => {
@@ -34141,7 +34080,6 @@ async function runTask(task) {
     const result = await api("agent", {
       provider: state.provider,
       model: state.model,
-      templateId: state.templateId || void 0,
       account: doc3.account,
       task,
       articleId: doc3.id,

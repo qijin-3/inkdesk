@@ -68,7 +68,6 @@ import {
 import { conversation } from "./ui/conversation.js";
 import {
   AGENT_PROVIDERS,
-  AGENT_TEMPLATES,
   settingsSection,
   settingsPanel,
   settingsField,
@@ -90,7 +89,6 @@ import {
   setAgentHttp,
   removeAgentHttp,
   ensureAgentHttpStore,
-  templateLabel,
   connectedAgentProviders,
   providerMeta,
 } from "./ui/agent-store.js";
@@ -2281,16 +2279,6 @@ function agentModeHTML() {
   return `<div class="agent-mode"><button type="button" id="agent-output" class="agent-mode-trigger" title="${label}" aria-label="输出模式：${label}" aria-haspopup="listbox" aria-expanded="false" data-mode="${agentMode}">${modeIcon}${I.chevronDown({ size: 12 })}</button><div id="agent-mode-menu" class="agent-mode-menu" hidden role="listbox"><button type="button" role="option" data-value="chat" aria-selected="${!edit}">${I.chat({ size: 14 })}<span>对话</span></button><button type="button" role="option" data-value="edit" aria-selected="${edit}">${I.pen({ size: 14 })}<span>编辑</span></button></div></div>`;
 }
 
-/** Agent 模板（润色/审阅等）独立选择器，勿塞进模型菜单 */
-function templatePickerHTML() {
-  const label = templateLabel(state);
-  const opts = AGENT_TEMPLATES.map((t) => {
-    const on = (state.templateId || "") === t.id;
-    return `<button type="button" role="option" data-template="${esc(t.id)}" aria-selected="${on}">${on ? "✓ " : ""}${esc(t.label)}</button>`;
-  }).join("");
-  return `<div class="template-picker" id="template-picker"><button type="button" id="template-picker-trigger" class="template-picker-trigger" title="模板：${esc(label)}" aria-label="选择模板：${esc(label)}" aria-haspopup="listbox" aria-expanded="false"><span class="template-picker-label">${esc(label)}</span>${I.chevronDown({ size: 12 })}</button><div id="template-picker-menu" class="template-picker-menu" hidden role="listbox">${opts}</div></div>`;
-}
-
 /** @type {null | (() => void)} */
 let activeComposerMenuDismiss = null;
 
@@ -2343,52 +2331,6 @@ function bindAgentModeMenu() {
       e.stopPropagation();
       agentMode = opt.dataset.value === "edit" ? "edit" : "chat";
       closeMode();
-      renderPanel();
-    };
-  });
-}
-
-/** 绑定模板菜单：与模式/模型互斥关闭 */
-function bindTemplatePicker() {
-  const root = $("#template-picker");
-  const trigger = $("#template-picker-trigger");
-  const menu = $("#template-picker-menu");
-  if (!root || !trigger || !menu) return;
-
-  /** @type {((e: Event) => void) | null} */
-  let onDocPointer = null;
-
-  const closeMenu = () => {
-    menu.setAttribute("hidden", "");
-    trigger.setAttribute("aria-expanded", "false");
-    if (onDocPointer) {
-      document.removeEventListener("pointerdown", onDocPointer, true);
-      onDocPointer = null;
-    }
-    if (activeComposerMenuDismiss === closeMenu) activeComposerMenuDismiss = null;
-  };
-
-  trigger.onclick = (e) => {
-    e.stopPropagation();
-    const willOpen = menu.hasAttribute("hidden");
-    dismissActiveComposerMenu();
-    if (!willOpen) return;
-    menu.removeAttribute("hidden");
-    trigger.setAttribute("aria-expanded", "true");
-    activeComposerMenuDismiss = closeMenu;
-    onDocPointer = (ev) => {
-      if (root.contains(/** @type {Node} */ (ev.target))) return;
-      closeMenu();
-    };
-    document.addEventListener("pointerdown", onDocPointer, true);
-  };
-
-  menu.querySelectorAll("[data-template]").forEach((opt) => {
-    opt.onclick = async (e) => {
-      e.stopPropagation();
-      state.templateId = opt.getAttribute("data-template") || "";
-      closeMenu();
-      await persistAgentModels();
       renderPanel();
     };
   });
@@ -2498,12 +2440,11 @@ function renderPanel() {
     if (busy) content += streamBubbleHTML();
     if (reviewCardHTML()) content += reviewCardHTML();
   }
-  panel.innerHTML = `<div class="panel-scroll">${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="添加" aria-label="添加" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${templatePickerHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div></div>`;
+  panel.innerHTML = `<div class="panel-scroll">${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="添加" aria-label="添加" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div></div>`;
   bindConversationHead();
   $("#send").onclick = () =>
     busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
   bindAgentModeMenu();
-  bindTemplatePicker();
   bindModelPicker();
   composer = new Composer($("#composer-input"), conversation(current), {
     changed: () => {
@@ -2726,7 +2667,6 @@ async function runTask(task) {
     const result = await api("agent", {
       provider: state.provider,
       model: state.model,
-      templateId: state.templateId || undefined,
       account: doc.account,
       task,
       articleId: doc.id,

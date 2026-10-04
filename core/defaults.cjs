@@ -4,8 +4,6 @@ const defaults = {
   source: "",
   provider: "codex",
   model: "",
-  /** 对话模板（assets/agents/templates.json），空为默认 */
-  templateId: "",
   /** 各 Agent 用户收藏的模型 ID 列表 */
   agentModels: {},
   /** HTTP 直调配置：providerId → { baseURL, apiKey, models? }（Key 脱敏显示，不进日志） */

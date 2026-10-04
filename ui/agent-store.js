@@ -9,14 +9,6 @@ export const AGENT_PROVIDERS = [
   { id: "antigravity", label: "Antigravity", blurb: "Google Antigravity（agy）" },
 ];
 
-export const AGENT_TEMPLATES = [
-  { id: "", label: "默认" },
-  { id: "polish", label: "润色" },
-  { id: "review", label: "审阅" },
-  { id: "qa", label: "素材问答" },
-  { id: "plan", label: "计划（只读）" },
-];
-
 /** models.dev 精简目录（自 OpenCode / models.dev） */
 export function providerCatalog() {
   return providersCatalog;
@@ -24,10 +16,6 @@ export function providerCatalog() {
 
 export function catalogProvider(id) {
   return providersCatalog.providers.find((p) => p.id === id) || null;
-}
-
-export function templateLabel(st) {
-  return AGENT_TEMPLATES.find((t) => t.id === (st.templateId || ""))?.label || "默认";
 }
 
 export function settingsSection({ title, control, className = "", action = "" }) {

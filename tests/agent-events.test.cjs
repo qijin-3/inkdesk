@@ -20,10 +20,6 @@ test("AgentOutput emits text_delta + tool_start", () => {
   assert.ok(evts.some((e) => e.type === "text_delta" && e.text === "hello"));
   assert.ok(evts.some((e) => e.type === "tool_start"));
 });
-test("templates valid", () => {
-  const t = require("../assets/agents/templates.json");
-  assert.ok(t.templates.length >= 3);
-});
 test("http registry reads store.agentHttp extras", () => {
   const { registry, migrateAgentHttp } = require("../core/providers.cjs");
   const m = registry({ store: { agentHttp: { "my-llm": { baseURL: "http://x/v1" } } } });
@@ -59,9 +55,4 @@ test("cancelAgent kills active child", () => {
   const core = { sessions: new Map(), active: { kill: (s) => { killed = s; } } };
   assert.equal(Agents.cancelAgent(core, "x"), true);
   assert.equal(killed, "SIGTERM");
-});
-test("template ids match templates.json", () => {
-  const t = require("../assets/agents/templates.json");
-  const ids = new Set(t.templates.map((x) => x.id));
-  for (const id of ["polish", "review", "qa", "plan"]) assert.ok(ids.has(id));
 });

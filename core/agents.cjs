@@ -538,14 +538,6 @@ function runAgent(core, req, onProgress) {
   const convId = req.conversationId || "default";
   if ([...core.sessions.values()].some((s) => s && !s.settled)) throw Error("已有任务运行中");
   const provider = core.normalizeProvider(req.provider);
-  let template = null;
-  if (req.templateId) {
-    try {
-      const fs0 = require("node:fs"), path0 = require("node:path");
-      const t = JSON.parse(fs0.readFileSync(path0.join(__dirname, "..", "assets", "agents", "templates.json"), "utf8"));
-      template = (t.templates || []).find((x) => x.id === req.templateId) || null;
-    } catch {}
-  }
   try {
     const { isHttp, getProvider } = require("./providers.cjs");
     if (isHttp(core, provider)) {
@@ -556,9 +548,9 @@ function runAgent(core, req, onProgress) {
       if (!apiKey) throw Error("未配置 API Key，请在设置中填写后重试。");
       if (/^[•*]+/.test(apiKey)) throw Error("API Key 无效，请重新粘贴后保存。");
       const { runOpenAI, runAnthropic } = require("./http-client.cjs");
-      const messages = [{ role: "user", content: promptBase(req, core, template) }];
+      const messages = [{ role: "user", content: promptBase(req) }];
       const runner = cfg.family === "anthropic" ? runAnthropic : runOpenAI;
-      const p = runner({ baseURL: cfg.baseURL, apiKey, model: req.model || cfg.models?.[0], messages, system: template?.system || undefined, onEvent });
+      const p = runner({ baseURL: cfg.baseURL, apiKey, model: req.model || cfg.models?.[0], messages, onEvent });
       const tracked = { settled: false };
       core.sessions.set(convId, tracked);
       return p.then((r) => { tracked.settled = true; core.sessions.delete(convId); onEvent?.({ type: "done", status: "success" }); return String(r.text || "").trim(); });
@@ -618,7 +610,6 @@ function runAgent(core, req, onProgress) {
 
   const model = provider === "zcode" ? "" : String(req.model || "").trim();
   const spec = core.agentInvokeSpec(provider, exe, prompt, model, cwd);
-  if (template?.system) prompt = template.system + "\n" + prompt;
   const tracked = { settled: false, child: null };
   core.sessions.set(convId, tracked);
   const r = core.spawnAgent(spec, {
@@ -632,8 +623,8 @@ function runAgent(core, req, onProgress) {
   return Promise.resolve(r).finally(() => { tracked.settled = true; core.sessions.delete(convId); });
 }
 
-function promptBase(req, core, template) {
-  return (template?.system ? template.system + "\n" : "") + "任务：" + (req.task || "") + "\n要求：" + (req.instruction || "") + "\n" + (req.body || "");
+function promptBase(req) {
+  return "任务：" + (req.task || "") + "\n要求：" + (req.instruction || "") + "\n" + (req.body || "");
 }
 
 function cancelAgent(core, conversationId) {
