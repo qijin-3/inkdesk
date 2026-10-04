@@ -139,6 +139,29 @@ export function reviewEqualHTML(value) {
     .join("");
 }
 
+/** 审阅整页：待决定显示改后+原文；接受/拒绝后只保留最终正文
+ * @param {{ doc?: string, hunks?: Array }} plan 审阅计划（显式传参，不读全局）
+ * @param {string} docTitle 文章标题
+ */
+export function reviewPageHTML(plan, docTitle) {
+  if (!plan || !plan.doc) return "";
+  const list = (plan.hunks || []).filter((h) => h.kind === "change");
+  const idOf = (h) => list.findIndex((x) => x.id === h.id);
+  const body = (plan.hunks || [])
+    .map((h) => {
+      if (h.kind === "equal") return reviewEqualHTML(h.value);
+      const i = idOf(h);
+      if (h.status !== "pending") {
+        const finalText = h.status === "accepted" ? h.next : h.old;
+        const empty = h.status === "accepted" ? "（已删除）" : "（空段落）";
+        return `<section class="review-block is-decided is-${h.status}" data-review-hunk="${esc(h.id)}"><div class="review-resolved-wrap"><p class="review-para review-resolved">${reviewPlainHTML(finalText, empty)}</p><div class="review-float" role="group" aria-label="撤销本处决定"><button type="button" class="review-undo" data-review-undo="${esc(h.id)}" title="撤销${h.status === "accepted" ? "接受" : "拒绝"}">↩</button></div></div></section>`;
+      }
+      return `<section class="review-block" data-review-hunk="${esc(h.id)}"><div class="review-new"><div class="review-new-body" contenteditable="true" role="textbox" aria-label="改后正文，可直接编辑" data-placeholder="（已删除）" data-review-edit="${esc(h.id)}" title="点击直接编辑">${reviewNewHTML(h)}</div><div class="review-float" role="group" aria-label="第 ${i + 1} 处修改操作"><button type="button" class="review-ok" data-review-accept="${esc(h.id)}" title="接受本处（A）">✓</button><button type="button" class="review-no" data-review-reject="${esc(h.id)}" title="拒绝本处（X）">×</button></div></div><div class="review-old"><span class="review-old-plain">${reviewPlainHTML(h.old)}</span><span class="review-old-diff">${reviewOldDiffHTML(h)}</span></div></section>`;
+    })
+    .join("");
+  return `<div id="inline-review-list" class="review-page"><h1 class="review-title">${esc(docTitle || "未命名文章")}</h1><div class="review-article">${body}</div></div>`;
+}
+
 /** 用一句话总结本次改写，供侧栏展示（不重复全文） */
 export function summarizeRewrite(plan) {
   const hunks = (plan?.hunks || []).filter((h) => h.kind === "change");

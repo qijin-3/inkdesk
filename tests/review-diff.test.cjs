@@ -94,6 +94,27 @@ test("reviewEqualHTML 按空行分段", () => {
   assert.match(html, /p2/);
   assert.equal(mod.reviewEqualHTML(""), "");
 });
+test("reviewPageHTML 显式传参与空态", () => {
+  assert.equal(mod.reviewPageHTML(null, "T"), "");
+  assert.equal(mod.reviewPageHTML({}, "T"), "");
+  const html = mod.reviewPageHTML(
+    {
+      doc: "d1",
+      hunks: [
+        { kind: "equal", value: "首段" },
+        { kind: "change", id: "h1", old: "ab", next: "ac", status: "pending" },
+        { kind: "change", id: "h2", old: "x", next: "", status: "accepted" },
+      ],
+    },
+    "我的标题",
+  );
+  assert.match(html, /我的标题/);
+  assert.match(html, /首段/);
+  assert.match(html, /data-review-hunk="h1"/);
+  assert.match(html, /is-decided is-accepted/);
+  assert.match(html, /（已删除）/);
+});
+
 test("summarizeRewrite 统计润色与标点", () => {
   const plan = { hunks: [
     { kind: "change", old: "你好，世界", next: "你好世界" },

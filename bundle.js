@@ -32031,6 +32031,22 @@ function reviewOldDiffHTML(h2) {
 function reviewEqualHTML(value) {
   return String(value || "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean).map((p) => `<p class="review-para">${esc2(p).replace(/\n/g, "<br>")}</p>`).join("");
 }
+function reviewPageHTML(plan, docTitle) {
+  if (!plan || !plan.doc) return "";
+  const list2 = (plan.hunks || []).filter((h2) => h2.kind === "change");
+  const idOf = (h2) => list2.findIndex((x) => x.id === h2.id);
+  const body = (plan.hunks || []).map((h2) => {
+    if (h2.kind === "equal") return reviewEqualHTML(h2.value);
+    const i = idOf(h2);
+    if (h2.status !== "pending") {
+      const finalText = h2.status === "accepted" ? h2.next : h2.old;
+      const empty2 = h2.status === "accepted" ? "\uFF08\u5DF2\u5220\u9664\uFF09" : "\uFF08\u7A7A\u6BB5\u843D\uFF09";
+      return `<section class="review-block is-decided is-${h2.status}" data-review-hunk="${esc2(h2.id)}"><div class="review-resolved-wrap"><p class="review-para review-resolved">${reviewPlainHTML(finalText, empty2)}</p><div class="review-float" role="group" aria-label="\u64A4\u9500\u672C\u5904\u51B3\u5B9A"><button type="button" class="review-undo" data-review-undo="${esc2(h2.id)}" title="\u64A4\u9500${h2.status === "accepted" ? "\u63A5\u53D7" : "\u62D2\u7EDD"}">\u21A9</button></div></div></section>`;
+    }
+    return `<section class="review-block" data-review-hunk="${esc2(h2.id)}"><div class="review-new"><div class="review-new-body" contenteditable="true" role="textbox" aria-label="\u6539\u540E\u6B63\u6587\uFF0C\u53EF\u76F4\u63A5\u7F16\u8F91" data-placeholder="\uFF08\u5DF2\u5220\u9664\uFF09" data-review-edit="${esc2(h2.id)}" title="\u70B9\u51FB\u76F4\u63A5\u7F16\u8F91">${reviewNewHTML(h2)}</div><div class="review-float" role="group" aria-label="\u7B2C ${i + 1} \u5904\u4FEE\u6539\u64CD\u4F5C"><button type="button" class="review-ok" data-review-accept="${esc2(h2.id)}" title="\u63A5\u53D7\u672C\u5904\uFF08A\uFF09">\u2713</button><button type="button" class="review-no" data-review-reject="${esc2(h2.id)}" title="\u62D2\u7EDD\u672C\u5904\uFF08X\uFF09">\xD7</button></div></div><div class="review-old"><span class="review-old-plain">${reviewPlainHTML(h2.old)}</span><span class="review-old-diff">${reviewOldDiffHTML(h2)}</span></div></section>`;
+  }).join("");
+  return `<div id="inline-review-list" class="review-page"><h1 class="review-title">${esc2(docTitle || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="review-article">${body}</div></div>`;
+}
 function summarizeRewrite(plan) {
   const hunks = (plan?.hunks || []).filter((h2) => h2.kind === "change");
   const n = hunks.length;
@@ -33547,25 +33563,6 @@ function reviewProgress() {
   const done = list2.filter((h2) => h2.status !== "pending").length;
   return { done, total: list2.length };
 }
-function reviewPageHTML() {
-  if (!pending || pending.doc !== current?.id) return "";
-  const list2 = reviewChanges();
-  const idOf = (h2) => list2.findIndex((x) => x.id === h2.id);
-  let n = 0;
-  const body = (pending.hunks || []).map((h2) => {
-    if (h2.kind === "equal") return reviewEqualHTML(h2.value);
-    const i = idOf(h2);
-    n = i;
-    if (h2.status !== "pending") {
-      const finalText = h2.status === "accepted" ? h2.next : h2.old;
-      const empty2 = h2.status === "accepted" ? "\uFF08\u5DF2\u5220\u9664\uFF09" : "\uFF08\u7A7A\u6BB5\u843D\uFF09";
-      return `<section class="review-block is-decided is-${h2.status}" data-review-hunk="${esc2(h2.id)}"><div class="review-resolved-wrap"><p class="review-para review-resolved">${reviewPlainHTML(finalText, empty2)}</p><div class="review-float" role="group" aria-label="\u64A4\u9500\u672C\u5904\u51B3\u5B9A"><button type="button" class="review-undo" data-review-undo="${esc2(h2.id)}" title="\u64A4\u9500${h2.status === "accepted" ? "\u63A5\u53D7" : "\u62D2\u7EDD"}">\u21A9</button></div></div></section>`;
-    }
-    return `<section class="review-block" data-review-hunk="${esc2(h2.id)}"><div class="review-new"><div class="review-new-body" contenteditable="true" role="textbox" aria-label="\u6539\u540E\u6B63\u6587\uFF0C\u53EF\u76F4\u63A5\u7F16\u8F91" data-placeholder="\uFF08\u5DF2\u5220\u9664\uFF09" data-review-edit="${esc2(h2.id)}" title="\u70B9\u51FB\u76F4\u63A5\u7F16\u8F91">${reviewNewHTML(h2)}</div><div class="review-float" role="group" aria-label="\u7B2C ${i + 1} \u5904\u4FEE\u6539\u64CD\u4F5C"><button type="button" class="review-ok" data-review-accept="${esc2(h2.id)}" title="\u63A5\u53D7\u672C\u5904\uFF08A\uFF09">\u2713</button><button type="button" class="review-no" data-review-reject="${esc2(h2.id)}" title="\u62D2\u7EDD\u672C\u5904\uFF08X\uFF09">\xD7</button></div></div><div class="review-old"><span class="review-old-plain">${reviewPlainHTML(h2.old)}</span><span class="review-old-diff">${reviewOldDiffHTML(h2)}</span></div></section>`;
-  }).join("");
-  void n;
-  return `<div id="inline-review-list" class="review-page"><h1 class="review-title">${esc2(current?.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="review-article">${body}</div></div>`;
-}
 function enterReviewMode() {
   reviewMode = true;
   const list2 = reviewChanges();
@@ -33621,7 +33618,7 @@ function refreshReviewUI() {
   if (!paper || !pending || pending.doc !== current?.id || !reviewMode) return;
   const listEl = $2("#inline-review-list");
   const tmp = document.createElement("div");
-  tmp.innerHTML = reviewPageHTML();
+  tmp.innerHTML = reviewPageHTML(pending, current?.title);
   const newList = tmp.querySelector("#inline-review-list");
   if (listEl && newList) listEl.replaceWith(newList);
   else if (newList) paper.insertAdjacentElement("afterbegin", newList);
@@ -33794,7 +33791,7 @@ function mountInlineReviewBar() {
   if (ed) ed.hidden = true;
   const title = $2("#title");
   if (title) title.hidden = true;
-  paper.insertAdjacentHTML("afterbegin", reviewPageHTML());
+  paper.insertAdjacentHTML("afterbegin", reviewPageHTML(pending, current?.title));
   bindInlineReviewBar();
 }
 function agentModeHTML() {

@@ -123,6 +123,7 @@ import {
   reviewNewHTML,
   reviewOldDiffHTML,
   reviewEqualHTML,
+  reviewPageHTML,
 } from "./ui/review-diff.js";
 import reviewDemoFixture from "./fixtures/review-demo.json";
 let saveProfileEditor = null;
@@ -1963,29 +1964,6 @@ function reviewProgress() {
 }
 
 
-/** 审阅整页：待决定显示改后+原文；接受/拒绝后只保留最终正文 */
-function reviewPageHTML() {
-  if (!pending || pending.doc !== current?.id) return "";
-  const list = reviewChanges();
-  const idOf = (h) => list.findIndex((x) => x.id === h.id);
-  let n = 0;
-  const body = (pending.hunks || [])
-    .map((h) => {
-      if (h.kind === "equal") return reviewEqualHTML(h.value);
-      const i = idOf(h);
-      n = i;
-      if (h.status !== "pending") {
-        const finalText = h.status === "accepted" ? h.next : h.old;
-        const empty = h.status === "accepted" ? "（已删除）" : "（空段落）";
-        return `<section class="review-block is-decided is-${h.status}" data-review-hunk="${esc(h.id)}"><div class="review-resolved-wrap"><p class="review-para review-resolved">${reviewPlainHTML(finalText, empty)}</p><div class="review-float" role="group" aria-label="撤销本处决定"><button type="button" class="review-undo" data-review-undo="${esc(h.id)}" title="撤销${h.status === "accepted" ? "接受" : "拒绝"}">↩</button></div></div></section>`;
-      }
-      return `<section class="review-block" data-review-hunk="${esc(h.id)}"><div class="review-new"><div class="review-new-body" contenteditable="true" role="textbox" aria-label="改后正文，可直接编辑" data-placeholder="（已删除）" data-review-edit="${esc(h.id)}" title="点击直接编辑">${reviewNewHTML(h)}</div><div class="review-float" role="group" aria-label="第 ${i + 1} 处修改操作"><button type="button" class="review-ok" data-review-accept="${esc(h.id)}" title="接受本处（A）">✓</button><button type="button" class="review-no" data-review-reject="${esc(h.id)}" title="拒绝本处（X）">×</button></div></div><div class="review-old"><span class="review-old-plain">${reviewPlainHTML(h.old)}</span><span class="review-old-diff">${reviewOldDiffHTML(h)}</span></div></section>`;
-    })
-    .join("");
-  void n;
-  return `<div id="inline-review-list" class="review-page"><h1 class="review-title">${esc(current?.title || "未命名文章")}</h1><div class="review-article">${body}</div></div>`;
-}
-
 /** 进入审阅模式：编辑器收起，整页变为审阅界面（类似预览） */
 function enterReviewMode() {
   reviewMode = true;
@@ -2055,7 +2033,7 @@ function refreshReviewUI() {
   if (!paper || !pending || pending.doc !== current?.id || !reviewMode) return;
   const listEl = $("#inline-review-list");
   const tmp = document.createElement("div");
-  tmp.innerHTML = reviewPageHTML();
+  tmp.innerHTML = reviewPageHTML(pending, current?.title);
   const newList = tmp.querySelector("#inline-review-list");
   if (listEl && newList) listEl.replaceWith(newList);
   else if (newList) paper.insertAdjacentElement("afterbegin", newList);
@@ -2238,7 +2216,7 @@ function mountInlineReviewBar() {
   if (ed) ed.hidden = true;
   const title = $("#title");
   if (title) title.hidden = true;
-  paper.insertAdjacentHTML("afterbegin", reviewPageHTML());
+  paper.insertAdjacentHTML("afterbegin", reviewPageHTML(pending, current?.title));
   bindInlineReviewBar();
 }
 
