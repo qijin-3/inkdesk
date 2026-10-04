@@ -161,14 +161,20 @@ function setVault(core, root) {
 // ponytail: HTTP provider 算“已安装”当且仅当配了 Key；无 Key 时面板提示填写而非报错
 function httpInstalled(core) {
   const out = {};
-  try {
-    const { getProvider } = require("./providers.cjs");
-    for (const id of Object.keys(core.store?.agentHttp || {})) {
-      const cfg = core.store.agentHttp[id] || {};
-      const preset = getProvider(core, id) || {};
-      if (cfg.apiKey || process.env[preset.keyEnv || cfg.keyEnv || ""]) out[id] = true;
+  for (const id of Object.keys(core.store?.agentHttp || {})) {
+    const cfg = core.store.agentHttp[id] || {};
+    if (String(cfg.apiKey || "").trim()) {
+      out[id] = true;
+      continue;
     }
-  } catch { /* ignore */ }
+    try {
+      const { getProvider } = require("./providers.cjs");
+      const preset = getProvider(core, id) || {};
+      if (process.env[preset.keyEnv || cfg.keyEnv || ""]) out[id] = true;
+    } catch {
+      /* env 查找失败不影响已配 Key 的判定 */
+    }
+  }
   return out;
 }
 function publicState(core) {

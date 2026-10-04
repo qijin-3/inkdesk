@@ -68,6 +68,7 @@ import {
 import { conversation } from "./ui/conversation.js";
 import {
   AGENT_PROVIDERS,
+  AGENT_TEMPLATES,
   settingsSection,
   settingsPanel,
   settingsField,
@@ -87,6 +88,7 @@ import {
   agentModelsPanelHtml,
   getAgentHttp,
   setAgentHttp,
+  removeAgentHttp,
   ensureAgentHttpStore,
   templateLabel,
   connectedAgentProviders,
@@ -2279,6 +2281,16 @@ function agentModeHTML() {
   return `<div class="agent-mode"><button type="button" id="agent-output" class="agent-mode-trigger" title="${label}" aria-label="输出模式：${label}" aria-haspopup="listbox" aria-expanded="false" data-mode="${agentMode}">${modeIcon}${I.chevronDown({ size: 12 })}</button><div id="agent-mode-menu" class="agent-mode-menu" hidden role="listbox"><button type="button" role="option" data-value="chat" aria-selected="${!edit}">${I.chat({ size: 14 })}<span>对话</span></button><button type="button" role="option" data-value="edit" aria-selected="${edit}">${I.pen({ size: 14 })}<span>编辑</span></button></div></div>`;
 }
 
+/** Agent 模板（润色/审阅等）独立选择器，勿塞进模型菜单 */
+function templatePickerHTML() {
+  const label = templateLabel(state);
+  const opts = AGENT_TEMPLATES.map((t) => {
+    const on = (state.templateId || "") === t.id;
+    return `<button type="button" role="option" data-template="${esc(t.id)}" aria-selected="${on}">${on ? "✓ " : ""}${esc(t.label)}</button>`;
+  }).join("");
+  return `<div class="template-picker" id="template-picker"><button type="button" id="template-picker-trigger" class="template-picker-trigger" title="模板：${esc(label)}" aria-label="选择模板：${esc(label)}" aria-haspopup="listbox" aria-expanded="false"><span class="template-picker-label">${esc(label)}</span>${I.chevronDown({ size: 12 })}</button><div id="template-picker-menu" class="template-picker-menu" hidden role="listbox">${opts}</div></div>`;
+}
+
 /** @type {null | (() => void)} */
 let activeComposerMenuDismiss = null;
 
@@ -2331,6 +2343,52 @@ function bindAgentModeMenu() {
       e.stopPropagation();
       agentMode = opt.dataset.value === "edit" ? "edit" : "chat";
       closeMode();
+      renderPanel();
+    };
+  });
+}
+
+/** 绑定模板菜单：与模式/模型互斥关闭 */
+function bindTemplatePicker() {
+  const root = $("#template-picker");
+  const trigger = $("#template-picker-trigger");
+  const menu = $("#template-picker-menu");
+  if (!root || !trigger || !menu) return;
+
+  /** @type {((e: Event) => void) | null} */
+  let onDocPointer = null;
+
+  const closeMenu = () => {
+    menu.setAttribute("hidden", "");
+    trigger.setAttribute("aria-expanded", "false");
+    if (onDocPointer) {
+      document.removeEventListener("pointerdown", onDocPointer, true);
+      onDocPointer = null;
+    }
+    if (activeComposerMenuDismiss === closeMenu) activeComposerMenuDismiss = null;
+  };
+
+  trigger.onclick = (e) => {
+    e.stopPropagation();
+    const willOpen = menu.hasAttribute("hidden");
+    dismissActiveComposerMenu();
+    if (!willOpen) return;
+    menu.removeAttribute("hidden");
+    trigger.setAttribute("aria-expanded", "true");
+    activeComposerMenuDismiss = closeMenu;
+    onDocPointer = (ev) => {
+      if (root.contains(/** @type {Node} */ (ev.target))) return;
+      closeMenu();
+    };
+    document.addEventListener("pointerdown", onDocPointer, true);
+  };
+
+  menu.querySelectorAll("[data-template]").forEach((opt) => {
+    opt.onclick = async (e) => {
+      e.stopPropagation();
+      state.templateId = opt.getAttribute("data-template") || "";
+      closeMenu();
+      await persistAgentModels();
       renderPanel();
     };
   });
@@ -2440,11 +2498,12 @@ function renderPanel() {
     if (busy) content += streamBubbleHTML();
     if (reviewCardHTML()) content += reviewCardHTML();
   }
-  panel.innerHTML = `<div class="panel-scroll">${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="添加" aria-label="添加" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div></div>`;
+  panel.innerHTML = `<div class="panel-scroll">${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="添加" aria-label="添加" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${templatePickerHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "停止生成" : "发送（⌘Enter）"}" aria-label="${busy ? "停止生成" : "发送"}">${busy ? "■" : I.send()}</button></div></div></div>`;
   bindConversationHead();
   $("#send").onclick = () =>
     busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
   bindAgentModeMenu();
+  bindTemplatePicker();
   bindModelPicker();
   composer = new Composer($("#composer-input"), conversation(current), {
     changed: () => {
@@ -3585,12 +3644,12 @@ function modelPickerHTML() {
         .join("")
     : `<p class="model-picker-empty">暂无可用的 Agent</p>`;
   return `<div class="model-picker" id="model-picker">
-    <button type="button" id="model-picker-trigger" class="model-picker-trigger" title="${esc(p?.label || "")} · ${esc(label)}${state.templateId ? ` · 模板：${esc(templateLabel(state))}` : ""}" aria-label="选择模型：${esc(label)}" aria-haspopup="menu" aria-expanded="false">
+    <button type="button" id="model-picker-trigger" class="model-picker-trigger" title="${esc(p?.label || "")} · ${esc(label)}" aria-label="选择模型：${esc(label)}" aria-haspopup="menu" aria-expanded="false">
       <span class="model-picker-logo">${agentLogoSvg(provider, 16)}</span>
-      <span class="model-picker-label">${esc(label)}${state.templateId ? ` · ${esc(templateLabel(state))}` : ""}</span>
+      <span class="model-picker-label">${esc(label)}</span>
       ${I.chevronDown({ size: 12 })}
     </button>
-    <div id="model-picker-menu" class="model-picker-menu" hidden role="menu"><div class="model-picker-templates" role="group" aria-label="模板">${AGENT_TEMPLATES.map((t) => `<button type="button" role="menuitemradio" class="model-picker-option" data-template="${esc(t.id)}" aria-checked="${(state.templateId || "") === t.id}">${(state.templateId || "") === t.id ? "✓ " : ""}${esc(t.label)}</button>`).join("")}</div><div class="model-picker-divider"></div>${agentRows}</div>
+    <div id="model-picker-menu" class="model-picker-menu" hidden role="menu">${agentRows}</div>
   </div>`;
 }
 
@@ -3725,17 +3784,7 @@ function bindModelPicker() {
     agentEl.onmouseenter = () => openSubmenu(agentEl);
   });
 
-  root.querySelectorAll(".model-picker-option[data-template]").forEach((opt) => {
-    opt.onclick = async (e) => {
-      e.stopPropagation();
-      state.templateId = opt.getAttribute("data-template") || "";
-      closeAll();
-      await persistAgentModels();
-      render();
-    };
-  });
-
-  root.querySelectorAll(".model-picker-option:not([data-template])").forEach((opt) => {
+  root.querySelectorAll(".model-picker-option[data-provider]").forEach((opt) => {
     opt.onclick = async (e) => {
       e.stopPropagation();
       const provider = opt.getAttribute("data-provider") || "";
@@ -3756,7 +3805,7 @@ function bindModelPicker() {
       const agentLabel = providerMeta(state, provider)?.label || "";
       trigger.title = `${agentLabel} · ${label}`;
       trigger.setAttribute("aria-label", `选择模型：${label}`);
-      root.querySelectorAll(".model-picker-option").forEach((btn) => {
+      root.querySelectorAll(".model-picker-option[data-provider]").forEach((btn) => {
         const on =
           btn.getAttribute("data-provider") === provider &&
           (btn.getAttribute("data-model") || "") === model;
@@ -3812,13 +3861,14 @@ async function persistAgentModels() {
 async function fillAgentCard(p, refresh = false) {
   const body = $(`[data-agent-body="${p.id}"]`);
   if (!body) return;
-  if (!agentInstalled(state, p.id)) {
-    body.innerHTML = agentModelsPanelHtml(state, p, null);
-    if (p.http) bindAgentModelControls(p);
-    return;
-  }
   if (p.http) {
-    body.innerHTML = agentModelsPanelHtml(state, p, null);
+    let info = null;
+    try {
+      info = await api("agent-models", { provider: p.id, refresh });
+    } catch (e) {
+      info = { models: [], source: "", error: e.message || "读取失败" };
+    }
+    body.innerHTML = agentModelsPanelHtml(state, p, info);
     bindAgentModelControls(p);
     return;
   }
@@ -3896,9 +3946,22 @@ function bindAgentModelControls(p) {
           ?.querySelector(".settings-field-label");
         if (label) label.textContent = `API Key（已存 ${mask}）`;
         toast("已保存，可点测试连通验证");
+        fillAgentCard(p);
       };
     const testHttp = panel.querySelector(`[data-agent-test-default="${p.id}"]`);
     if (testHttp) testHttp.onclick = () => runAgentDefaultTest(p.id);
+    panel.querySelectorAll(`[data-agent-remove="${p.id}"]`).forEach((btn) => {
+      btn.onclick = async () => {
+        if (!confirm(`移除供应商 ${p.label}？将同时清除本地 Key 与模型。`)) return;
+        removeAgentHttp(state, p.id);
+        await persistAgentModels();
+        toast("已移除供应商");
+        agentDetailId = null;
+        page = "settings";
+        settingsTab = "agents";
+        render();
+      };
+    });
   }
   const refresh = $(`[data-agent-refresh="${p.id}"]`);
   if (refresh) refresh.onclick = async () => { refresh.disabled = true; refresh.textContent = "刷新中…"; await fillAgentCard(p, true); };
@@ -4027,15 +4090,28 @@ async function mountAgentsSettings() {
   $$("[data-open-agent]").forEach((item) => {
     const open = () => openAgentDetail(item.dataset.openAgent);
     item.onclick = (e) => {
-      if (e.target.closest("[data-agent-enable], .agent-switch")) return;
+      if (e.target.closest("[data-agent-enable], [data-agent-remove], .agent-switch, .agent-remove-btn")) return;
       open();
     };
     item.onkeydown = (e) => {
-      if (e.target.closest("[data-agent-enable], .agent-switch")) return;
+      if (e.target.closest("[data-agent-enable], [data-agent-remove], .agent-switch")) return;
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         open();
       }
+    };
+  });
+  $$("[data-agent-remove]").forEach((btn) => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute("data-agent-remove") || "";
+      if (!id) return;
+      const meta = providerMeta(state, id);
+      if (!confirm(`移除供应商 ${meta?.label || id}？将同时清除本地 Key 与模型。`)) return;
+      removeAgentHttp(state, id);
+      await persistAgentModels();
+      toast("已移除供应商");
+      render();
     };
   });
   $$("[data-agent-enable]").forEach((input) => {

@@ -31006,7 +31006,7 @@ var AGENT_PROVIDERS = [
   { id: "opencode", label: "OpenCode", blurb: "OpenCode CLI" },
   { id: "antigravity", label: "Antigravity", blurb: "Google Antigravity\uFF08agy\uFF09" }
 ];
-var AGENT_TEMPLATES2 = [
+var AGENT_TEMPLATES = [
   { id: "", label: "\u9ED8\u8BA4" },
   { id: "polish", label: "\u6DA6\u8272" },
   { id: "review", label: "\u5BA1\u9605" },
@@ -31020,7 +31020,7 @@ function catalogProvider(id) {
   return providers_catalog_default.providers.find((p) => p.id === id) || null;
 }
 function templateLabel(st) {
-  return AGENT_TEMPLATES2.find((t) => t.id === (st.templateId || ""))?.label || "\u9ED8\u8BA4";
+  return AGENT_TEMPLATES.find((t) => t.id === (st.templateId || ""))?.label || "\u9ED8\u8BA4";
 }
 function settingsSection({ title, control, className = "", action = "" }) {
   const head = title || action ? `<div class="settings-section-head">${title ? `<h3 class="settings-section-title">${esc2(title)}</h3>` : ""}${action}</div>` : "";
@@ -31042,7 +31042,10 @@ function agentLogoSvg(id, size = 28) {
   return extensions[id] ? `<img src="assets/agents/${id}.${extensions[id]}" width="${size}" height="${size}" style="object-fit:contain" alt="">` : "";
 }
 function agentInstalled(st, id) {
-  return !!st.agents?.[id];
+  if (st.agents?.[id]) return true;
+  ensureAgentHttpStore(st);
+  const cfg = st.agentHttp?.[id];
+  return !!(cfg && String(cfg.apiKey || "").trim());
 }
 function ensureAgentsEnabledStore(st) {
   if (!st.agentsEnabled || typeof st.agentsEnabled !== "object")
@@ -31062,6 +31065,22 @@ function getAgentHttp(st, provider) {
 function setAgentHttp(st, provider, cfg) {
   ensureAgentHttpStore(st);
   st.agentHttp = { ...st.agentHttp, [provider]: { baseURL: "", apiKey: "", ...cfg } };
+}
+function removeAgentHttp(st, provider) {
+  ensureAgentHttpStore(st);
+  ensureAgentModelsStore(st);
+  ensureAgentsEnabledStore(st);
+  delete st.agentHttp[provider];
+  if (st.agentModels) delete st.agentModels[provider];
+  if (st.agents) delete st.agents[provider];
+  if (st.agentsEnabled) delete st.agentsEnabled[provider];
+  if (st.provider === provider) {
+    const fallback = [...AGENT_PROVIDERS, ...connectedHttpProviders(st)].find(
+      (p) => agentInstalled(st, p.id) && agentEnabled(st, p.id)
+    ) || AGENT_PROVIDERS[0];
+    st.provider = fallback?.id || "codex";
+    st.model = "";
+  }
 }
 function connectedHttpProviders(st) {
   ensureAgentHttpStore(st);
@@ -31126,41 +31145,71 @@ function agentListItemHtml(st, p) {
   const installed = agentInstalled(st, p.id);
   const enabled2 = agentEnabled(st, p.id);
   const isDefault = st.provider === p.id;
+  const status = installed ? "\u5DF2\u5B89\u88C5" : p.http ? "\u672A\u914D\u7F6E" : "\u672A\u5B89\u88C5";
   return `<div class="agent-list-item ${isDefault ? "is-default" : ""} ${installed ? "" : "is-missing"} ${enabled2 ? "" : "is-off"}" data-open-agent="${p.id}" role="button" tabindex="0">
   <div class="agent-card-logo">${agentLogoSvg(p.id)}</div>
   <span class="agent-list-main">
     <span class="agent-card-title">
       <strong>${esc2(p.label)}</strong>
       ${isDefault ? `<span class="agent-badge agent-badge-default">\u9ED8\u8BA4</span>` : ""}
-      <span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${installed ? "\u5DF2\u5B89\u88C5" : "\u672A\u5B89\u88C5"}</span>
+      <span class="agent-badge ${installed ? "agent-badge-ok" : "agent-badge-miss"}">${status}</span>
       ${enabled2 ? "" : `<span class="agent-badge agent-badge-off">\u5DF2\u5173\u95ED</span>`}
     </span>
-    <span class="agent-card-blurb">${esc2(p.blurb)}</span>
+    <span class="agent-card-blurb">${esc2(installed ? p.blurb : p.http ? `${p.blurb}\uFF1A\u586B\u5199 API Key \u540E\u9009\u62E9\u6A21\u578B` : p.blurb)}</span>
   </span>
   <label class="agent-switch" title="${enabled2 ? "\u5173\u95ED\u540E\u5BF9\u8BDD\u4E2D\u4E0D\u53EF\u9009" : "\u542F\u7528\u4EE5\u5728\u5BF9\u8BDD\u4E2D\u9009\u62E9"}">
     <input type="checkbox" role="switch" data-agent-enable="${p.id}" ${enabled2 ? "checked" : ""} aria-label="${enabled2 ? "\u5173\u95ED" : "\u542F\u7528"} ${esc2(p.label)}">
     <span class="agent-switch-track" aria-hidden="true"></span>
   </label>
+  ${p.http ? `<button type="button" class="ghost agent-remove-btn" data-agent-remove="${p.id}" title="\u79FB\u9664\u8BE5\u4F9B\u5E94\u5546">\u79FB\u9664</button>` : ""}
   <span class="account-list-chevron" aria-hidden="true">\u203A</span>
 </div>`;
 }
-function agentHttpPanelHtml(st, p) {
+function agentHttpPanelHtml(st, p, info = null) {
   const cfg = getAgentHttp(st, p.id);
   const cat = catalogProvider(p.id);
   const masked = cfg.apiKey ? "\u2022\u2022\u2022\u2022" + String(cfg.apiKey).slice(-4) : "";
   const base2 = cfg.baseURL || cat?.api || "";
+  const hasKey = !!String(cfg.apiKey || "").trim();
   const codingHint = /zai-coding-plan|zhipuai-coding-plan/.test(p.id) || /coding\/paas/i.test(base2) ? `<p class="settings-hint">\u667A\u8C31 / Z.AI Coding Plan\uFF1A\u56FD\u5185\u7528 <code>https://open.bigmodel.cn/api/coding/paas/v4</code>\uFF0C\u56FD\u9645\u7528 <code>https://api.z.ai/api/coding/paas/v4</code>\uFF1B\u987B\u7528\u7F16\u7A0B\u5957\u9910\u4E13\u7528 Key\u3002</p>` : "";
+  const catalogModels = [.../* @__PURE__ */ new Set([...cat?.models || [], ...info?.models || [], ...cfg.models || []])];
+  if (st.provider === p.id && st.model) setAgentModelList(st, p.id, [.../* @__PURE__ */ new Set([st.model, ...getAgentModelList(st, p.id)])]);
+  const saved = getAgentModelList(st, p.id);
+  const suggestions = [.../* @__PURE__ */ new Set([...catalogModels, ...saved])];
+  const list2 = saved.length ? saved : hasKey ? catalogModels.slice(0, 8) : [];
+  const rows = list2.length ? list2.map((m) => {
+    const active = st.provider === p.id && st.model === m;
+    const verified = catalogModels.includes(m);
+    return `<li class="agent-model-item ${active ? "is-active" : ""}" data-model-row="${esc2(m)}">
+            <code class="agent-model-id">${esc2(m)}</code>${verified ? "" : `<span class="agent-badge">\u81EA\u5B9A\u4E49 \xB7 \u672A\u6838\u9A8C</span>`}
+            ${active ? `<span class="agent-badge agent-badge-default">\u4F7F\u7528\u4E2D</span>` : `<button type="button" class="ghost" data-agent-use="${p.id}" data-model="${esc2(m)}" ${hasKey ? "" : "disabled"}>\u4F7F\u7528</button>`}
+            <button type="button" class="ghost" data-agent-test-model="${p.id}" data-model="${esc2(m)}" ${hasKey ? "" : "disabled"}>\u6D4B\u8BD5</button>
+            <button type="button" class="ghost" data-agent-remove-model="${p.id}" data-model="${esc2(m)}">\u79FB\u9664</button>
+            <span class="agent-model-row-status" data-model-status="${esc2(m)}" role="status"></span>
+          </li>`;
+  }).join("") : `<li class="agent-model-empty settings-hint">${hasKey ? "\u5C1A\u672A\u6DFB\u52A0\u6A21\u578B\u3002\u4ECE\u4E0B\u65B9\u9009\u62E9\u6A21\u578B ID\uFF0C\u6216\u624B\u586B\u540E\u70B9\u300C\u6DFB\u52A0\u300D\u3002" : "\u5148\u5728\u4E0A\u65B9\u586B\u5199 API Key \u5E76\u4FDD\u5B58\uFF0C\u518D\u6DFB\u52A0\u6216\u9009\u62E9\u6A21\u578B\u3002"}</li>`;
   return `<div class="agent-model-panel">
     <p class="settings-hint">HTTP \u76F4\u8C03\uFF0C\u65E0\u9700 CLI\u3002Key \u4EC5\u5B58\u672C\u5730\uFF0C\u4E0D\u4E0A\u4F20\u3002</p>
     ${codingHint}
     <label class="settings-field"><span class="settings-field-label">Base URL</span><input class="agent-model-input" data-agent-http-base="${p.id}" value="${esc2(base2)}" placeholder="${esc2(cat?.api || "https://api.example.com/v1")}" autocomplete="off"></label>
     <label class="settings-field"><span class="settings-field-label">API Key${masked ? `\uFF08\u5DF2\u5B58 ${esc2(masked)}\uFF09` : ""}</span><input class="agent-model-input" type="password" data-agent-http-key="${p.id}" ${masked ? `value="${esc2(masked)}" data-key-saved="1" data-key-mask="${esc2(masked)}"` : ""} placeholder="${masked ? "\u5DF2\u4FDD\u5B58\uFF0C\u7559\u7A7A\u4E0D\u6539\u52A8" : "\u7C98\u8D34 API Key"}" autocomplete="off"></label>
-    <div class="agent-card-actions"><button type="button" class="primary" data-agent-http-save="${p.id}">\u4FDD\u5B58</button><button type="button" class="ghost" data-agent-test-default="${p.id}">\u6D4B\u8BD5\u8FDE\u901A</button></div>
+    <div class="agent-card-actions"><button type="button" class="primary" data-agent-http-save="${p.id}">\u4FDD\u5B58</button><button type="button" class="ghost" data-agent-test-default="${p.id}" ${hasKey ? "" : "disabled"}>\u6D4B\u8BD5\u8FDE\u901A</button><button type="button" class="ghost agent-danger" data-agent-remove="${p.id}">\u79FB\u9664\u4F9B\u5E94\u5546</button></div>
     <span class="agent-model-row-status" data-model-status="__http__" role="status"></span>
+    <p class="settings-hint" role="status">${esc2(info?.source || (catalogModels.length ? `\u9884\u7F6E\u6A21\u578B ${catalogModels.length} \u4E2A` : "\u5C1A\u672A\u8BFB\u53D6\u6A21\u578B\u76EE\u5F55"))}${info?.checkedAt ? ` \xB7 ${new Date(info.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}</p>
+    ${info?.error || info?.notice ? `<p class="settings-hint">${esc2(info.error || info.notice)}</p>` : ""}
+    <div class="agent-model-add">
+      <select class="agent-model-select" data-agent-preset="${p.id}" aria-label="\u5E38\u7528\u6A21\u578B">
+        <option value="">\u9009\u62E9\u6A21\u578B ID</option>
+        ${suggestions.map((m) => `<option value="${esc2(m)}">${esc2(m)}${catalogModels.includes(m) ? "" : " \xB7 \u5DF2\u4FDD\u5B58\uFF0C\u672A\u6838\u9A8C"}</option>`).join("")}
+      </select>
+      <input class="agent-model-input" data-agent-pick="${p.id}" placeholder="\u6216\u624B\u52A8\u8F93\u5165\u6A21\u578B ID" autocomplete="off">
+      <button type="button" class="primary" data-agent-add-model="${p.id}">\u6DFB\u52A0</button>
+    </div>
+    <ul class="agent-model-list">${rows}</ul>
   </div>`;
 }
 function agentModelsPanelHtml(st, p, info) {
-  if (p.http) return agentHttpPanelHtml(st, p);
+  if (p.http) return agentHttpPanelHtml(st, p, info);
   const installed = agentInstalled(st, p.id);
   if (!installed) {
     return `<p class="settings-hint">\u5B89\u88C5\u5E76\u767B\u5F55\u5BF9\u5E94 CLI \u540E\uFF0C\u53EF\u6DFB\u52A0\u6A21\u578B\u5E76\u9010\u4E00\u6D4B\u8BD5\u8FDE\u901A\u3002</p>`;
@@ -33705,6 +33754,14 @@ function agentModeHTML() {
   const modeIcon = edit2 ? I.pen({ size: 14 }) : I.chat({ size: 14 });
   return `<div class="agent-mode"><button type="button" id="agent-output" class="agent-mode-trigger" title="${label}" aria-label="\u8F93\u51FA\u6A21\u5F0F\uFF1A${label}" aria-haspopup="listbox" aria-expanded="false" data-mode="${agentMode}">${modeIcon}${I.chevronDown({ size: 12 })}</button><div id="agent-mode-menu" class="agent-mode-menu" hidden role="listbox"><button type="button" role="option" data-value="chat" aria-selected="${!edit2}">${I.chat({ size: 14 })}<span>\u5BF9\u8BDD</span></button><button type="button" role="option" data-value="edit" aria-selected="${edit2}">${I.pen({ size: 14 })}<span>\u7F16\u8F91</span></button></div></div>`;
 }
+function templatePickerHTML() {
+  const label = templateLabel(state);
+  const opts = AGENT_TEMPLATES.map((t) => {
+    const on = (state.templateId || "") === t.id;
+    return `<button type="button" role="option" data-template="${esc2(t.id)}" aria-selected="${on}">${on ? "\u2713 " : ""}${esc2(t.label)}</button>`;
+  }).join("");
+  return `<div class="template-picker" id="template-picker"><button type="button" id="template-picker-trigger" class="template-picker-trigger" title="\u6A21\u677F\uFF1A${esc2(label)}" aria-label="\u9009\u62E9\u6A21\u677F\uFF1A${esc2(label)}" aria-haspopup="listbox" aria-expanded="false"><span class="template-picker-label">${esc2(label)}</span>${I.chevronDown({ size: 12 })}</button><div id="template-picker-menu" class="template-picker-menu" hidden role="listbox">${opts}</div></div>`;
+}
 var activeComposerMenuDismiss = null;
 function dismissActiveComposerMenu() {
   const fn = activeComposerMenuDismiss;
@@ -33748,6 +33805,48 @@ function bindAgentModeMenu() {
       e.stopPropagation();
       agentMode = opt.dataset.value === "edit" ? "edit" : "chat";
       closeMode();
+      renderPanel();
+    };
+  });
+}
+function bindTemplatePicker() {
+  const root2 = $2("#template-picker");
+  const trigger = $2("#template-picker-trigger");
+  const menu = $2("#template-picker-menu");
+  if (!root2 || !trigger || !menu) return;
+  let onDocPointer = null;
+  const closeMenu = () => {
+    menu.setAttribute("hidden", "");
+    trigger.setAttribute("aria-expanded", "false");
+    if (onDocPointer) {
+      document.removeEventListener("pointerdown", onDocPointer, true);
+      onDocPointer = null;
+    }
+    if (activeComposerMenuDismiss === closeMenu) activeComposerMenuDismiss = null;
+  };
+  trigger.onclick = (e) => {
+    e.stopPropagation();
+    const willOpen = menu.hasAttribute("hidden");
+    dismissActiveComposerMenu();
+    if (!willOpen) return;
+    menu.removeAttribute("hidden");
+    trigger.setAttribute("aria-expanded", "true");
+    activeComposerMenuDismiss = closeMenu;
+    onDocPointer = (ev) => {
+      if (root2.contains(
+        /** @type {Node} */
+        ev.target
+      )) return;
+      closeMenu();
+    };
+    document.addEventListener("pointerdown", onDocPointer, true);
+  };
+  menu.querySelectorAll("[data-template]").forEach((opt) => {
+    opt.onclick = async (e) => {
+      e.stopPropagation();
+      state.templateId = opt.getAttribute("data-template") || "";
+      closeMenu();
+      await persistAgentModels();
       renderPanel();
     };
   });
@@ -33846,10 +33945,11 @@ function renderPanel() {
     if (busy) content += streamBubbleHTML();
     if (reviewCardHTML()) content += reviewCardHTML();
   }
-  panel.innerHTML = `<div class="panel-scroll">${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0" aria-label="\u6DFB\u52A0" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div></div>`;
+  panel.innerHTML = `<div class="panel-scroll">${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0" aria-label="\u6DFB\u52A0" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${templatePickerHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div></div>`;
   bindConversationHead();
   $2("#send").onclick = () => busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
   bindAgentModeMenu();
+  bindTemplatePicker();
   bindModelPicker();
   composer = new Composer($2("#composer-input"), conversation(current), {
     changed: () => {
@@ -34811,12 +34911,12 @@ function modelPickerHTML() {
           </div>`;
   }).join("") : `<p class="model-picker-empty">\u6682\u65E0\u53EF\u7528\u7684 Agent</p>`;
   return `<div class="model-picker" id="model-picker">
-    <button type="button" id="model-picker-trigger" class="model-picker-trigger" title="${esc2(p?.label || "")} \xB7 ${esc2(label)}${state.templateId ? ` \xB7 \u6A21\u677F\uFF1A${esc2(templateLabel(state))}` : ""}" aria-label="\u9009\u62E9\u6A21\u578B\uFF1A${esc2(label)}" aria-haspopup="menu" aria-expanded="false">
+    <button type="button" id="model-picker-trigger" class="model-picker-trigger" title="${esc2(p?.label || "")} \xB7 ${esc2(label)}" aria-label="\u9009\u62E9\u6A21\u578B\uFF1A${esc2(label)}" aria-haspopup="menu" aria-expanded="false">
       <span class="model-picker-logo">${agentLogoSvg(provider, 16)}</span>
-      <span class="model-picker-label">${esc2(label)}${state.templateId ? ` \xB7 ${esc2(templateLabel(state))}` : ""}</span>
+      <span class="model-picker-label">${esc2(label)}</span>
       ${I.chevronDown({ size: 12 })}
     </button>
-    <div id="model-picker-menu" class="model-picker-menu" hidden role="menu"><div class="model-picker-templates" role="group" aria-label="\u6A21\u677F">${AGENT_TEMPLATES.map((t) => `<button type="button" role="menuitemradio" class="model-picker-option" data-template="${esc2(t.id)}" aria-checked="${(state.templateId || "") === t.id}">${(state.templateId || "") === t.id ? "\u2713 " : ""}${esc2(t.label)}</button>`).join("")}</div><div class="model-picker-divider"></div>${agentRows}</div>
+    <div id="model-picker-menu" class="model-picker-menu" hidden role="menu">${agentRows}</div>
   </div>`;
 }
 function bindModelPicker() {
@@ -34937,16 +35037,7 @@ function bindModelPicker() {
     };
     agentEl.onmouseenter = () => openSubmenu(agentEl);
   });
-  root2.querySelectorAll(".model-picker-option[data-template]").forEach((opt) => {
-    opt.onclick = async (e) => {
-      e.stopPropagation();
-      state.templateId = opt.getAttribute("data-template") || "";
-      closeAll();
-      await persistAgentModels();
-      render2();
-    };
-  });
-  root2.querySelectorAll(".model-picker-option:not([data-template])").forEach((opt) => {
+  root2.querySelectorAll(".model-picker-option[data-provider]").forEach((opt) => {
     opt.onclick = async (e) => {
       e.stopPropagation();
       const provider = opt.getAttribute("data-provider") || "";
@@ -34967,7 +35058,7 @@ function bindModelPicker() {
       const agentLabel = providerMeta(state, provider)?.label || "";
       trigger.title = `${agentLabel} \xB7 ${label}`;
       trigger.setAttribute("aria-label", `\u9009\u62E9\u6A21\u578B\uFF1A${label}`);
-      root2.querySelectorAll(".model-picker-option").forEach((btn) => {
+      root2.querySelectorAll(".model-picker-option[data-provider]").forEach((btn) => {
         const on = btn.getAttribute("data-provider") === provider && (btn.getAttribute("data-model") || "") === model;
         btn.setAttribute("aria-checked", on ? "true" : "false");
         const raw = btn.getAttribute("data-model") || "" || "\u9ED8\u8BA4";
@@ -35011,13 +35102,14 @@ async function persistAgentModels() {
 async function fillAgentCard(p, refresh = false) {
   const body = $2(`[data-agent-body="${p.id}"]`);
   if (!body) return;
-  if (!agentInstalled(state, p.id)) {
-    body.innerHTML = agentModelsPanelHtml(state, p, null);
-    if (p.http) bindAgentModelControls(p);
-    return;
-  }
   if (p.http) {
-    body.innerHTML = agentModelsPanelHtml(state, p, null);
+    let info2 = null;
+    try {
+      info2 = await api("agent-models", { provider: p.id, refresh });
+    } catch (e) {
+      info2 = { models: [], source: "", error: e.message || "\u8BFB\u53D6\u5931\u8D25" };
+    }
+    body.innerHTML = agentModelsPanelHtml(state, p, info2);
     bindAgentModelControls(p);
     return;
   }
@@ -35082,9 +35174,22 @@ function bindAgentModelControls(p) {
         const label = keyInput?.closest("label")?.querySelector(".settings-field-label");
         if (label) label.textContent = `API Key\uFF08\u5DF2\u5B58 ${mask}\uFF09`;
         toast("\u5DF2\u4FDD\u5B58\uFF0C\u53EF\u70B9\u6D4B\u8BD5\u8FDE\u901A\u9A8C\u8BC1");
+        fillAgentCard(p);
       };
     const testHttp = panel.querySelector(`[data-agent-test-default="${p.id}"]`);
     if (testHttp) testHttp.onclick = () => runAgentDefaultTest(p.id);
+    panel.querySelectorAll(`[data-agent-remove="${p.id}"]`).forEach((btn) => {
+      btn.onclick = async () => {
+        if (!confirm(`\u79FB\u9664\u4F9B\u5E94\u5546 ${p.label}\uFF1F\u5C06\u540C\u65F6\u6E05\u9664\u672C\u5730 Key \u4E0E\u6A21\u578B\u3002`)) return;
+        removeAgentHttp(state, p.id);
+        await persistAgentModels();
+        toast("\u5DF2\u79FB\u9664\u4F9B\u5E94\u5546");
+        agentDetailId = null;
+        page = "settings";
+        settingsTab = "agents";
+        render2();
+      };
+    });
   }
   const refresh = $2(`[data-agent-refresh="${p.id}"]`);
   if (refresh) refresh.onclick = async () => {
@@ -35208,15 +35313,28 @@ async function mountAgentsSettings() {
   $$("[data-open-agent]").forEach((item) => {
     const open = () => openAgentDetail(item.dataset.openAgent);
     item.onclick = (e) => {
-      if (e.target.closest("[data-agent-enable], .agent-switch")) return;
+      if (e.target.closest("[data-agent-enable], [data-agent-remove], .agent-switch, .agent-remove-btn")) return;
       open();
     };
     item.onkeydown = (e) => {
-      if (e.target.closest("[data-agent-enable], .agent-switch")) return;
+      if (e.target.closest("[data-agent-enable], [data-agent-remove], .agent-switch")) return;
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         open();
       }
+    };
+  });
+  $$("[data-agent-remove]").forEach((btn) => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute("data-agent-remove") || "";
+      if (!id) return;
+      const meta = providerMeta(state, id);
+      if (!confirm(`\u79FB\u9664\u4F9B\u5E94\u5546 ${meta?.label || id}\uFF1F\u5C06\u540C\u65F6\u6E05\u9664\u672C\u5730 Key \u4E0E\u6A21\u578B\u3002`)) return;
+      removeAgentHttp(state, id);
+      await persistAgentModels();
+      toast("\u5DF2\u79FB\u9664\u4F9B\u5E94\u5546");
+      render2();
     };
   });
   $$("[data-agent-enable]").forEach((input) => {

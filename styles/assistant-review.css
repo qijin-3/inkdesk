@@ -369,12 +369,14 @@ button:disabled {
 .agent-composer .composer-tools .icon-btn:not(.primary):hover {
   background: #f0f0f0;
 }
-.agent-composer .agent-mode {
+.agent-composer .agent-mode,
+.agent-composer .template-picker {
   position: relative;
   flex-shrink: 0;
 }
 .agent-composer #agent-output,
-.agent-composer .agent-mode-trigger {
+.agent-composer .agent-mode-trigger,
+.agent-composer .template-picker-trigger {
   appearance: none;
   -webkit-appearance: none;
   display: inline-flex;
@@ -390,17 +392,31 @@ button:disabled {
   color: #111;
   cursor: pointer;
   flex-shrink: 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
 }
 .agent-composer #agent-output:hover,
-.agent-composer .agent-mode-trigger:hover {
+.agent-composer .agent-mode-trigger:hover,
+.agent-composer .template-picker-trigger:hover {
   background-color: #e2e2e2;
   color: #000;
 }
 .agent-composer #agent-output .lucide,
-.agent-composer .agent-mode-trigger .lucide {
+.agent-composer .agent-mode-trigger .lucide,
+.agent-composer .template-picker-trigger .lucide {
   display: block;
+  color: #888;
 }
-.agent-composer .agent-mode-menu {
+.agent-composer .template-picker-label {
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-composer .agent-mode-menu,
+.agent-composer .template-picker-menu {
   position: absolute;
   bottom: calc(100% + 8px);
   left: 0;
@@ -413,7 +429,8 @@ button:disabled {
   border-radius: 10px;
   box-shadow: 0 10px 28px #00000014;
 }
-.agent-composer .agent-mode-menu button {
+.agent-composer .agent-mode-menu button,
+.agent-composer .template-picker-menu button {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -439,11 +456,13 @@ button:disabled {
   font-weight: 500;
   color: #000000;
 }
-.agent-composer .agent-mode-menu button:hover {
+.agent-composer .agent-mode-menu button:hover,
+.agent-composer .template-picker-menu button:hover {
   background: #ececec;
   color: #000000;
 }
-.agent-composer .agent-mode-menu button[aria-selected="true"] {
+.agent-composer .agent-mode-menu button[aria-selected="true"],
+.agent-composer .template-picker-menu button[aria-selected="true"] {
   background: #e8e8e8;
   color: #000000;
 }

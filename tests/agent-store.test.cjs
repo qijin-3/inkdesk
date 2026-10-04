@@ -125,6 +125,28 @@ test("connectedAgentProviders 含 HTTP 已添加项，不含 cursor/zcode", () =
   assert.equal(m.providerMeta(s, "openai")?.label, "OpenAI");
 });
 
+// 回归：后端 agents 快照漏了 HTTP 项时，有 Key 仍应进入模型选择器
+test("HTTP 有 Key 即可选，不依赖 agents 快照", () => {
+  const s = st();
+  s.agents = { codex: true }; // 故意不含 zhipu
+  s.agentsEnabled = { "zhipuai-coding-plan": true };
+  s.agentHttp = {
+    "zhipuai-coding-plan": {
+      label: "Zhipu AI Coding Plan",
+      baseURL: "https://open.bigmodel.cn/api/coding/paas/v4",
+      apiKey: "sk-test",
+    },
+  };
+  assert.equal(m.agentInstalled(s, "zhipuai-coding-plan"), true);
+  assert.deepEqual(m.selectableAgentProviders(s).map((p) => p.id), [
+    "codex",
+    "zhipuai-coding-plan",
+  ]);
+  s.agentHttp["zhipuai-coding-plan"].apiKey = "";
+  assert.equal(m.agentInstalled(s, "zhipuai-coding-plan"), false);
+  assert.deepEqual(m.selectableAgentProviders(s).map((p) => p.id), ["codex"]);
+});
+
 test("agentModelsPanelHtml 三态与回填", async () => {
   const st = () => ({ agents: { codex: {}, opencode: {} }, agentsEnabled: {}, provider: "codex", model: "", agentModels: {}, agentHttp: {} });
   let html = m.agentModelsPanelHtml(st(), { id: "claude", label: "Claude Code", blurb: "" }, null);

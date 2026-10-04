@@ -1538,6 +1538,10 @@ th {
 .agent-detail .settings-section {
   max-width: none;
 }
+.agent-detail .settings-section-agents .settings-section-head,
+.agent-detail .settings-section-agents .settings-section-control {
+  max-width: none;
+}
 .agent-model-panel {
   border-top: 0;
   padding-top: 0;
@@ -1632,6 +1636,13 @@ th {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+  flex: 0 0 auto;
+}
+.agent-card-actions .agent-danger,
+.agent-remove-btn {
+  color: #b3261e;
+}
+.agent-remove-btn {
   flex: 0 0 auto;
 }
 .agent-model-panel {
