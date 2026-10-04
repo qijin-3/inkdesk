@@ -288,6 +288,16 @@ var FolderOpen = [
   ]
 ];
 
+// node_modules/lucide/dist/esm/icons/folder.mjs
+var Folder = [
+  [
+    "path",
+    {
+      d: "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
+    }
+  ]
+];
+
 // node_modules/lucide/dist/esm/icons/heading-1.mjs
 var Heading1 = [
   ["path", { d: "M4 12h8" }],
@@ -612,6 +622,8 @@ var I = {
   focus: (o) => icon(Focus, o),
   refresh: (o) => icon(RefreshCw, o),
   folder: (o) => icon(FolderOpen, o),
+  /** 侧栏项目分组：闭合文件夹轮廓（对齐参考样式） */
+  folderClosed: (o) => icon(Folder, o),
   external: (o) => icon(ExternalLink, o),
   close: (o) => icon(X, o),
   panelOpen: (o) => icon(PanelRightOpen, o),
@@ -28068,6 +28080,51 @@ function groupOptionsHtml(st, selected, opts = {}) {
   ).join("")}`;
 }
 
+// ui/draft-projects.js
+function draftProjectOf(docOrPath) {
+  const raw = typeof docOrPath === "string" ? docOrPath : docOrPath?.path;
+  const parts = String(raw || "").replace(/\\/g, "/").split("/").filter(Boolean);
+  const i = parts.indexOf("02_Drafts");
+  if (i < 0) return null;
+  if (parts.length <= i + 2) return null;
+  const name = parts[i + 1];
+  return name || null;
+}
+function groupDraftsByProject(docs) {
+  const ungrouped = [];
+  const map2 = /* @__PURE__ */ new Map();
+  for (const d of docs || []) {
+    const name = draftProjectOf(d);
+    if (!name) {
+      ungrouped.push(d);
+      continue;
+    }
+    if (!map2.has(name)) map2.set(name, []);
+    map2.get(name).push(d);
+  }
+  const projects = [...map2.entries()].sort((a, b) => a[0].localeCompare(b[0], "zh")).map(([name, list2]) => ({ name, docs: list2 }));
+  return { ungrouped, projects };
+}
+function draftDocButtonHtml(d, selectedId) {
+  const updated = d.updated ? new Date(d.updated).toLocaleDateString("zh-CN") : "";
+  const words = (d.body || "").length;
+  const meta = updated ? `${updated} \xB7 ${words} \u5B57` : `${words} \u5B57`;
+  return `<button type="button" class="doc ${selectedId === d.id ? "selected" : ""}" data-id="${esc2(d.id)}"><span>${esc2(d.title || "\u672A\u547D\u540D\u6587\u7AE0")}</span><small>${esc2(meta)}</small></button>`;
+}
+function draftsSidebarHtml(docs, selectedId, folderIcon) {
+  const { ungrouped, projects } = groupDraftsByProject(docs);
+  if (!ungrouped.length && !projects.length)
+    return '<p class="muted">\u4ECE\u4E00\u4E2A\u60F3\u6CD5\u5F00\u59CB\u3002</p>';
+  const parts = [];
+  for (const d of ungrouped) parts.push(draftDocButtonHtml(d, selectedId));
+  for (const p of projects) {
+    parts.push(
+      `<div class="docs-project"><div class="docs-project-head" aria-hidden="false">${folderIcon}<span>${esc2(p.name)}</span></div>${p.docs.map((d) => draftDocButtonHtml(d, selectedId)).join("")}</div>`
+    );
+  }
+  return parts.join("");
+}
+
 // store/doc-store.js
 function createDocStore(deps) {
   let saveTimer = 0;
@@ -32289,11 +32346,13 @@ function render2() {
   if (page !== "published-preview") publishedPreview = null;
   $2("#app").innerHTML = `<aside class="sidebar"><div class="account">${accountList().map(
     (a) => `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc2(a.id)}" title="${esc2(a.label)}" aria-label="${esc2(a.label)}">${accountAvatarHtml(a)}</button>`
-  ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>\u7075\u611F\u5E93</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>\u8BBE\u7F6E</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></div><div class="docs">${state.documents.filter(
-    (d) => sameAccount(d.account, account) && d.status !== "final" && d.status !== "archive"
-  ).map(
-    (d) => `<button class="doc ${current?.id === d.id ? "selected" : ""}" data-id="${d.id}"><span>${esc2(d.title)}</span><small>${new Date(d.updated).toLocaleDateString("zh-CN")} \xB7 ${d.body.length} \u5B57</small></button>`
-  ).join("") || '<p class="muted">\u4ECE\u4E00\u4E2A\u60F3\u6CD5\u5F00\u59CB\u3002</p>'}</div></aside><main id="main"></main><div class="workspace-resizer hidden" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant hidden" id="rail"></aside>`;
+  ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>\u7075\u611F\u5E93</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>\u8BBE\u7F6E</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></div><div class="docs">${draftsSidebarHtml(
+    state.documents.filter(
+      (d) => sameAccount(d.account, account) && d.status !== "final" && d.status !== "archive"
+    ),
+    current?.id,
+    I.folderClosed({ size: 14, stroke: 1.75, className: "docs-project-icon" })
+  )}</div></aside><main id="main"></main><div class="workspace-resizer hidden" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant hidden" id="rail"></aside>`;
   unmountAster?.();
   unmountAster = null;
   clearAsterRail();
@@ -36422,6 +36481,7 @@ lucide/dist/esm/icons/eye.mjs:
 lucide/dist/esm/icons/file-text.mjs:
 lucide/dist/esm/icons/focus.mjs:
 lucide/dist/esm/icons/folder-open.mjs:
+lucide/dist/esm/icons/folder.mjs:
 lucide/dist/esm/icons/heading-1.mjs:
 lucide/dist/esm/icons/heading-2.mjs:
 lucide/dist/esm/icons/image-down.mjs:

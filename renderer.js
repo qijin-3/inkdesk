@@ -38,6 +38,7 @@ import {
   backupPathFor,
   groupOptionsHtml,
 } from "./ui/groups.js";
+import { draftsSidebarHtml } from "./ui/draft-projects.js";
 import { createDocStore } from "./store/doc-store.js";
 import { time } from "./ui/perf.js";
 import {
@@ -520,20 +521,16 @@ function render() {
             `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc(a.id)}" title="${esc(a.label)}" aria-label="${esc(a.label)}">${accountAvatarHtml(a)}</button>`,
         )
         .join("") || `<p class="account-empty">请在设置中添加账号</p>`
-    }</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>灵感库</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>设置</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></div><div class="docs">${
-      state.documents
-        .filter(
-          (d) =>
-            sameAccount(d.account, account) &&
-            d.status !== "final" &&
-            d.status !== "archive",
-        )
-        .map(
-          (d) =>
-            `<button class="doc ${current?.id === d.id ? "selected" : ""}" data-id="${d.id}"><span>${esc(d.title)}</span><small>${new Date(d.updated).toLocaleDateString("zh-CN")} · ${d.body.length} 字</small></button>`,
-        )
-        .join("") || '<p class="muted">从一个想法开始。</p>'
-    }</div></aside><main id="main"></main><div class="workspace-resizer hidden" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant hidden" id="rail"></aside>`;
+    }</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>灵感库</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>设置</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></div><div class="docs">${draftsSidebarHtml(
+      state.documents.filter(
+        (d) =>
+          sameAccount(d.account, account) &&
+          d.status !== "final" &&
+          d.status !== "archive",
+      ),
+      current?.id,
+      I.folderClosed({ size: 14, stroke: 1.75, className: "docs-project-icon" }),
+    )}</div></aside><main id="main"></main><div class="workspace-resizer hidden" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant hidden" id="rail"></aside>`;
   unmountAster?.();
   unmountAster = null;
   clearAsterRail();

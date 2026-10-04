@@ -19,6 +19,7 @@ import {
   ListTree,
   Focus,
   RefreshCw,
+  Folder,
   FolderOpen,
   ExternalLink,
   X,
@@ -89,6 +90,8 @@ export const I = {
   focus: (o) => icon(Focus, o),
   refresh: (o) => icon(RefreshCw, o),
   folder: (o) => icon(FolderOpen, o),
+  /** 侧栏项目分组：闭合文件夹轮廓（对齐参考样式） */
+  folderClosed: (o) => icon(Folder, o),
   external: (o) => icon(ExternalLink, o),
   close: (o) => icon(X, o),
   panelOpen: (o) => icon(PanelRightOpen, o),
