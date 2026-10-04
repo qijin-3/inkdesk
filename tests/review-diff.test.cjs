@@ -74,6 +74,26 @@ test("protectStructure 补回配图标题并提示", () => {
   assert.deepEqual(clean.notes, []);
 });
 
+test("reviewPlainHTML/reviewNewHTML 转义与换行", () => {
+  assert.equal(mod.reviewPlainHTML("", "（空段落）"), "（空段落）");
+  assert.equal(mod.reviewPlainHTML("a<b\nc"), "a&lt;b<br>c");
+  assert.equal(mod.reviewNewHTML({ next: "x\ny" }), "x<br>y");
+  assert.equal(mod.reviewNewHTML({ next: "  " }), "");
+});
+
+test("reviewOldDiffHTML 有 diff 用高亮、无 diff 回退纯文本", () => {
+  const html = mod.reviewOldDiffHTML({ old: "ab", next: "ac" });
+  assert.match(html, /<ins>|<del>/);
+  assert.equal(mod.reviewOldDiffHTML({ old: "", next: "" }), "（空段落）");
+});
+
+test("reviewEqualHTML 按空行分段", () => {
+  const html = mod.reviewEqualHTML("p1\nline2\n\np2");
+  assert.match(html, /review-para/);
+  assert.match(html, /p1<br>line2/);
+  assert.match(html, /p2/);
+  assert.equal(mod.reviewEqualHTML(""), "");
+});
 test("summarizeRewrite 统计润色与标点", () => {
   const plan = { hunks: [
     { kind: "change", old: "你好，世界", next: "你好世界" },

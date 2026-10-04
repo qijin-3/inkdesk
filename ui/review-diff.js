@@ -110,6 +110,35 @@ export function protectStructure(oldText, nextText) {
   return { next, notes: dropped };
 }
 
+/** 审阅纯文本（无 diff 高亮） */
+export function reviewPlainHTML(text, empty = "（空段落）") {
+  const t = String(text ?? "").trim();
+  if (!t) return esc(empty);
+  return esc(t).replace(/\n/g, "<br>");
+}
+
+/** 改后行：默认可编辑纯文本 */
+export function reviewNewHTML(h) {
+  const t = String(h.next ?? "").trim();
+  if (!t) return "";
+  return esc(t).replace(/\n/g, "<br>");
+}
+
+/** 原文行：hover 时展示的词级 diff 细节 */
+export function reviewOldDiffHTML(h) {
+  return diffHTML(h.old, h.next) || reviewPlainHTML(h.old);
+}
+
+/** 未改动段落：按空行分段，保持文章阅读节奏 */
+export function reviewEqualHTML(value) {
+  return String(value || "")
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `<p class="review-para">${esc(p).replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
 /** 用一句话总结本次改写，供侧栏展示（不重复全文） */
 export function summarizeRewrite(plan) {
   const hunks = (plan?.hunks || []).filter((h) => h.kind === "change");

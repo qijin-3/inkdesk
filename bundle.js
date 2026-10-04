@@ -32015,6 +32015,22 @@ function protectStructure(oldText, nextText) {
   }
   return { next: next2, notes: dropped };
 }
+function reviewPlainHTML(text, empty2 = "\uFF08\u7A7A\u6BB5\u843D\uFF09") {
+  const t = String(text ?? "").trim();
+  if (!t) return esc2(empty2);
+  return esc2(t).replace(/\n/g, "<br>");
+}
+function reviewNewHTML(h2) {
+  const t = String(h2.next ?? "").trim();
+  if (!t) return "";
+  return esc2(t).replace(/\n/g, "<br>");
+}
+function reviewOldDiffHTML(h2) {
+  return diffHTML(h2.old, h2.next) || reviewPlainHTML(h2.old);
+}
+function reviewEqualHTML(value) {
+  return String(value || "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean).map((p) => `<p class="review-para">${esc2(p).replace(/\n/g, "<br>")}</p>`).join("");
+}
 function summarizeRewrite(plan) {
   const hunks = (plan?.hunks || []).filter((h2) => h2.kind === "change");
   const n = hunks.length;
@@ -33530,22 +33546,6 @@ function reviewProgress() {
   const list2 = reviewChanges();
   const done = list2.filter((h2) => h2.status !== "pending").length;
   return { done, total: list2.length };
-}
-function reviewPlainHTML(text, empty2 = "\uFF08\u7A7A\u6BB5\u843D\uFF09") {
-  const t = String(text ?? "").trim();
-  if (!t) return esc2(empty2);
-  return esc2(t).replace(/\n/g, "<br>");
-}
-function reviewNewHTML(h2) {
-  const t = String(h2.next ?? "").trim();
-  if (!t) return "";
-  return esc2(t).replace(/\n/g, "<br>");
-}
-function reviewOldDiffHTML(h2) {
-  return diffHTML(h2.old, h2.next) || reviewPlainHTML(h2.old);
-}
-function reviewEqualHTML(value) {
-  return String(value || "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean).map((p) => `<p class="review-para">${esc2(p).replace(/\n/g, "<br>")}</p>`).join("");
 }
 function reviewPageHTML() {
   if (!pending || pending.doc !== current?.id) return "";
