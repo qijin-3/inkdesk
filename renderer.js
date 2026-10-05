@@ -38,7 +38,14 @@ import {
   backupPathFor,
   groupOptionsHtml,
 } from "./ui/groups.js";
-import { draftsSidebarHtml, draftProjectOf } from "./ui/draft-projects.js";
+import {
+  draftsSidebarHtml,
+  draftProjectOf,
+  firstLineTitle,
+  fillTitleFromBody,
+  PLACEHOLDER_TITLE,
+  X_TITLE_MAX,
+} from "./ui/draft-projects.js";
 import { createDocStore } from "./store/doc-store.js";
 import { time } from "./ui/perf.js";
 import {
@@ -412,7 +419,22 @@ async function hydrateMaterialPreview(r) {
  * 保存当前仓库快照（防抖由 docStore 拥有，见 store/doc-store.js）。
  * @returns {Promise<boolean>}
  */
+/**
+ * X 模式：标题为空/占位时用正文首句作本地备忘名，并同步输入框与顶栏。
+ * @returns {boolean} 是否已改写标题
+ */
+function ensureXDocTitle() {
+  if (!isXAccount() || !current) return false;
+  if (!fillTitleFromBody(current, X_TITLE_MAX)) return false;
+  const input = $("#title");
+  if (input) input.value = current.title;
+  const lead = $("#main .dashboard-tagline");
+  if (lead) lead.textContent = current.title || PLACEHOLDER_TITLE;
+  return true;
+}
+
 async function persist() {
+  ensureXDocTitle();
   return docStore.persist();
 }
 
@@ -457,13 +479,15 @@ function showSaveConflictDialog(msg) {
   };
 }
 function changed() {
+  ensureXDocTitle();
   docStore.markChanged();
 }
 function newDoc() {
   if (!account) return toast("请先在设置中添加账号");
   const d = {
     id: crypto.randomUUID(),
-    title: "未命名文章",
+    // X 模式无发表标题：空着显示本地备忘名 placeholder，保存时用正文首句填充
+    title: isXAccount() ? "" : PLACEHOLDER_TITLE,
     body: "",
     account,
     updated: new Date().toISOString(),
@@ -1263,6 +1287,7 @@ function bindFinalize() {
     if (!current) return toast("请先打开一篇草稿");
     if (busy) return toast("请等待 AI 完成后再发布");
     sync();
+    ensureXDocTitle();
     if (!(await persist())) return;
     try {
       let result = await api("finalize", current.id);
@@ -1762,8 +1787,11 @@ function renderWriteInner() {
   const previewBtn = isXAccount()
     ? ""
     : `<button id="layout">预览</button>`;
+  const titlePlaceholder = isXAccount()
+    ? "帖文首句，方便检索"
+    : "给这个想法起个名字";
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || "未命名文章")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div>${previewBtn}<button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(state, current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="审阅" aria-haspopup="true" aria-expanded="false">${I.eye()} 审阅</button><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></div><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">审阅中</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">全部接受</button><button type="button" data-inline="reject-all">全部拒绝</button><button type="button" data-inline="finish" class="primary">完成</button></div></div><article class="paper"><input id="title" placeholder="给这个想法起个名字" value="${esc(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>添加到 AI 对话</span></button></div></div>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc(current.title || PLACEHOLDER_TITLE)}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">保存</button><button type="button" id="version-menu" aria-label="版本历史" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div>${previewBtn}<button id="finalize" class="primary">已发布</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="文章信息">${new Date().toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} 字</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="加粗">${I.bold()}</button><button data-fmt="italic" title="斜体">${I.italic()}</button><button data-fmt="heading1" title="一级标题">${I.h1()}</button><button data-fmt="heading" title="二级标题">${I.h2()}</button><button data-fmt="bulletList" title="列表">${I.list()}</button><button data-fmt="blockquote" title="引用">${I.quote()}</button><button id="image" title="插入图片">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="文章分组" title="分组影响本地同步默认路径">${groupOptionsHtml(state, current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="审阅" aria-haspopup="true" aria-expanded="false">${I.eye()} 审阅</button><div class="selection-bar" hidden><span id="selection-label">选中正文，让 AI 帮你推敲</span><button id="tag-selection">${I.tags()} 引用选段</button></div></div><button id="focus" title="专注">${I.focus()} 专注</button><button id="article-materials" title="本文素材">${I.library()} 素材</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">审阅中</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">全部接受</button><button type="button" data-inline="reject-all">全部拒绝</button><button type="button" data-inline="finish" class="primary">完成</button></div></div><article class="paper"><input id="title" placeholder="${esc(titlePlaceholder)}" value="${esc(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>添加到 AI 对话</span></button></div></div>`;
   unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
   const onSelectionScroll = () => {
@@ -3118,7 +3146,7 @@ function renderDashboardInner() {
         ["文章", "总文章数量"],
       ];
   const tableHead = xMode
-    ? "<th>帖子</th><th>分组</th><th>日期</th><th>曝光</th><th>点赞</th><th>回复</th><th>转发</th>"
+    ? "<th>帖文</th><th>分组</th><th>日期</th><th>曝光</th><th>点赞</th><th>回复</th><th>转发</th>"
     : "<th>文章</th><th>分组</th><th>日期</th><th>阅读</th><th>点赞</th><th>收藏</th><th>涨粉</th>";
   const tableRow = (r) => {
     const on = publishedSelection.has(r.path);
@@ -3441,14 +3469,12 @@ async function renderTopics() {
   /** 从灵感写成草稿并进入写作页 */
   const writeFromTopic = async (rel) => {
     const topic = await api("topics-read", { path: rel });
-    const firstLine =
-      String(topic.body || "")
-        .split(/\r?\n/)
-        .map((l) => l.replace(/^#+\s*/, "").trim())
-        .find(Boolean) || "未命名文章";
+    const max = isXAccount() ? X_TITLE_MAX : 80;
+    const label =
+      firstLineTitle(topic.body || "", max) || PLACEHOLDER_TITLE;
     const d = {
       id: crypto.randomUUID(),
-      title: firstLine.slice(0, 80),
+      title: label,
       body: topic.body || "",
       account,
       updated: new Date().toISOString(),
@@ -3457,7 +3483,7 @@ async function renderTopics() {
       prompts: [],
       topics: [
         {
-          text: firstLine.slice(0, 80),
+          text: label,
           at: new Date().toISOString(),
         },
       ],

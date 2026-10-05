@@ -1,5 +1,51 @@
 import { esc } from "./dom.js";
 
+/** 占位标题：空或「未命名文章」视为未命名，可被正文首句覆盖 */
+export const PLACEHOLDER_TITLE = "未命名文章";
+
+/** X 模式本地备忘名默认截断长度（帖文首句） */
+export const X_TITLE_MAX = 40;
+
+/**
+ * 从正文取首行非空文本作本地备忘名（去掉 Markdown 标题标记）。
+ * @param {string} [body]
+ * @param {number} [max]
+ * @returns {string}
+ */
+export function firstLineTitle(body, max = X_TITLE_MAX) {
+  const line = String(body || "")
+    .split(/\r?\n/)
+    .map((l) => l.replace(/^#+\s*/, "").trim())
+    .find(Boolean);
+  if (!line) return "";
+  const n = Number(max);
+  const limit = Number.isFinite(n) && n > 0 ? n : X_TITLE_MAX;
+  return line.slice(0, limit);
+}
+
+/**
+ * 是否为占位/空标题（可自动用正文首句填充）。
+ * @param {unknown} title
+ */
+export function isPlaceholderTitle(title) {
+  const t = String(title || "").trim();
+  return !t || t === PLACEHOLDER_TITLE;
+}
+
+/**
+ * 标题为空或占位时，用正文首句写入 doc.title。
+ * @param {{ title?: string, body?: string }|null|undefined} doc
+ * @param {number} [max]
+ * @returns {boolean} 是否已改写
+ */
+export function fillTitleFromBody(doc, max = X_TITLE_MAX) {
+  if (!doc || !isPlaceholderTitle(doc.title)) return false;
+  const next = firstLineTitle(doc.body, max);
+  if (!next) return false;
+  doc.title = next;
+  return true;
+}
+
 /**
  * 从草稿相对路径取出项目名：02_Drafts 下一级子文件夹。
  * 根目录草稿（无子文件夹）返回 null。
@@ -60,7 +106,7 @@ export function draftDocButtonHtml(d, selectedId) {
     : "";
   const words = (d.body || "").length;
   const meta = updated ? `${updated} · ${words} 字` : `${words} 字`;
-  return `<button type="button" class="doc ${selectedId === d.id ? "selected" : ""}" draggable="true" data-id="${esc(d.id)}"><span>${esc(d.title || "未命名文章")}</span><small>${esc(meta)}</small></button>`;
+  return `<button type="button" class="doc ${selectedId === d.id ? "selected" : ""}" draggable="true" data-id="${esc(d.id)}"><span>${esc(d.title || PLACEHOLDER_TITLE)}</span><small>${esc(meta)}</small></button>`;
 }
 
 /**

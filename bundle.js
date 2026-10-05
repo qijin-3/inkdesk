@@ -28081,6 +28081,26 @@ function groupOptionsHtml(st, selected, opts = {}) {
 }
 
 // ui/draft-projects.js
+var PLACEHOLDER_TITLE = "\u672A\u547D\u540D\u6587\u7AE0";
+var X_TITLE_MAX = 40;
+function firstLineTitle(body, max = X_TITLE_MAX) {
+  const line = String(body || "").split(/\r?\n/).map((l) => l.replace(/^#+\s*/, "").trim()).find(Boolean);
+  if (!line) return "";
+  const n = Number(max);
+  const limit = Number.isFinite(n) && n > 0 ? n : X_TITLE_MAX;
+  return line.slice(0, limit);
+}
+function isPlaceholderTitle(title) {
+  const t = String(title || "").trim();
+  return !t || t === PLACEHOLDER_TITLE;
+}
+function fillTitleFromBody(doc3, max = X_TITLE_MAX) {
+  if (!doc3 || !isPlaceholderTitle(doc3.title)) return false;
+  const next2 = firstLineTitle(doc3.body, max);
+  if (!next2) return false;
+  doc3.title = next2;
+  return true;
+}
 function draftProjectOf(docOrPath) {
   const raw = typeof docOrPath === "string" ? docOrPath : docOrPath?.path;
   const parts = String(raw || "").replace(/\\/g, "/").split("/").filter(Boolean);
@@ -28112,7 +28132,7 @@ function draftDocButtonHtml(d, selectedId) {
   const updated = d.updated ? new Date(d.updated).toLocaleDateString("zh-CN") : "";
   const words = (d.body || "").length;
   const meta = updated ? `${updated} \xB7 ${words} \u5B57` : `${words} \u5B57`;
-  return `<button type="button" class="doc ${selectedId === d.id ? "selected" : ""}" draggable="true" data-id="${esc2(d.id)}"><span>${esc2(d.title || "\u672A\u547D\u540D\u6587\u7AE0")}</span><small>${esc2(meta)}</small></button>`;
+  return `<button type="button" class="doc ${selectedId === d.id ? "selected" : ""}" draggable="true" data-id="${esc2(d.id)}"><span>${esc2(d.title || PLACEHOLDER_TITLE)}</span><small>${esc2(meta)}</small></button>`;
 }
 function draftsSidebarHtml(docs, selectedId, folderIcons, opts = {}) {
   const collapsed = new Set(opts.collapsed || []);
@@ -32303,7 +32323,17 @@ async function hydrateMaterialPreview(r) {
     return { ...r, kind, asset };
   }
 }
+function ensureXDocTitle() {
+  if (!isXAccount() || !current) return false;
+  if (!fillTitleFromBody(current, X_TITLE_MAX)) return false;
+  const input = $("#title");
+  if (input) input.value = current.title;
+  const lead = $("#main .dashboard-tagline");
+  if (lead) lead.textContent = current.title || PLACEHOLDER_TITLE;
+  return true;
+}
 async function persist() {
+  ensureXDocTitle();
   return docStore.persist();
 }
 function setSavedStatus(text) {
@@ -32337,13 +32367,15 @@ function showSaveConflictDialog(msg) {
   };
 }
 function changed() {
+  ensureXDocTitle();
   docStore.markChanged();
 }
 function newDoc() {
   if (!account) return toast("\u8BF7\u5148\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7");
   const d = {
     id: crypto.randomUUID(),
-    title: "\u672A\u547D\u540D\u6587\u7AE0",
+    // X 模式无发表标题：空着显示本地备忘名 placeholder，保存时用正文首句填充
+    title: isXAccount() ? "" : PLACEHOLDER_TITLE,
     body: "",
     account,
     updated: (/* @__PURE__ */ new Date()).toISOString(),
@@ -32994,6 +33026,7 @@ function bindFinalize() {
     if (!current) return toast("\u8BF7\u5148\u6253\u5F00\u4E00\u7BC7\u8349\u7A3F");
     if (busy) return toast("\u8BF7\u7B49\u5F85 AI \u5B8C\u6210\u540E\u518D\u53D1\u5E03");
     sync();
+    ensureXDocTitle();
     if (!await persist()) return;
     try {
       let result = await api("finalize", current.id);
@@ -33406,7 +33439,8 @@ function renderWriteInner() {
   unmountAster?.();
   unmountAster = null;
   const previewBtn = isXAccount() ? "" : `<button id="layout">\u9884\u89C8</button>`;
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div>${previewBtn}<button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(state, current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="\u5BA1\u9605" aria-haspopup="true" aria-expanded="false">${I.eye()} \u5BA1\u9605</button><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></div><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">\u5BA1\u9605\u4E2D</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">\u5168\u90E8\u63A5\u53D7</button><button type="button" data-inline="reject-all">\u5168\u90E8\u62D2\u7EDD</button><button type="button" data-inline="finish" class="primary">\u5B8C\u6210</button></div></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc2(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD</span></button></div></div>`;
+  const titlePlaceholder = isXAccount() ? "\u5E16\u6587\u9996\u53E5\uFF0C\u65B9\u4FBF\u68C0\u7D22" : "\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57";
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(current.title || PLACEHOLDER_TITLE)}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div>${previewBtn}<button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(state, current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="\u5BA1\u9605" aria-haspopup="true" aria-expanded="false">${I.eye()} \u5BA1\u9605</button><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></div><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">\u5BA1\u9605\u4E2D</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">\u5168\u90E8\u63A5\u53D7</button><button type="button" data-inline="reject-all">\u5168\u90E8\u62D2\u7EDD</button><button type="button" data-inline="finish" class="primary">\u5B8C\u6210</button></div></div><article class="paper"><input id="title" placeholder="${esc2(titlePlaceholder)}" value="${esc2(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD</span></button></div></div>`;
   unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
   const onSelectionScroll = () => {
@@ -34596,7 +34630,7 @@ function renderDashboardInner() {
     ["\u6DA8\u7C89", "\u6587\u7AE0\u6DA8\u7C89\u5408\u8BA1"],
     ["\u6587\u7AE0", "\u603B\u6587\u7AE0\u6570\u91CF"]
   ];
-  const tableHead = xMode ? "<th>\u5E16\u5B50</th><th>\u5206\u7EC4</th><th>\u65E5\u671F</th><th>\u66DD\u5149</th><th>\u70B9\u8D5E</th><th>\u56DE\u590D</th><th>\u8F6C\u53D1</th>" : "<th>\u6587\u7AE0</th><th>\u5206\u7EC4</th><th>\u65E5\u671F</th><th>\u9605\u8BFB</th><th>\u70B9\u8D5E</th><th>\u6536\u85CF</th><th>\u6DA8\u7C89</th>";
+  const tableHead = xMode ? "<th>\u5E16\u6587</th><th>\u5206\u7EC4</th><th>\u65E5\u671F</th><th>\u66DD\u5149</th><th>\u70B9\u8D5E</th><th>\u56DE\u590D</th><th>\u8F6C\u53D1</th>" : "<th>\u6587\u7AE0</th><th>\u5206\u7EC4</th><th>\u65E5\u671F</th><th>\u9605\u8BFB</th><th>\u70B9\u8D5E</th><th>\u6536\u85CF</th><th>\u6DA8\u7C89</th>";
   const tableRow = (r) => {
     const on = publishedSelection.has(r.path);
     const g = typeof r["\u5206\u7EC4"] === "string" && r["\u5206\u7EC4"].trim() ? r["\u5206\u7EC4"].trim() : "";
@@ -34860,10 +34894,11 @@ async function renderTopics() {
   $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7075\u611F\u5E93</h1></div></header><section class="dashboard topic-dashboard"><div class="topic-composer"><textarea id="topic-input" rows="5" placeholder="\u8BB0\u4E0B\u7075\u611F\u2026 \u652F\u6301 Markdown"></textarea><div class="topic-composer-bar"><span class="muted">Markdown \xB7 \u2318/Ctrl + Enter \u4FDD\u5B58</span><button type="button" id="topic-save" class="primary">\u8BB0\u4E0B</button></div></div><div class="topic-grid" id="topic-grid"><p class="muted">\u52A0\u8F7D\u4E2D\u2026</p></div></section>`;
   const writeFromTopic = async (rel) => {
     const topic = await api("topics-read", { path: rel });
-    const firstLine = String(topic.body || "").split(/\r?\n/).map((l) => l.replace(/^#+\s*/, "").trim()).find(Boolean) || "\u672A\u547D\u540D\u6587\u7AE0";
+    const max = isXAccount() ? X_TITLE_MAX : 80;
+    const label = firstLineTitle(topic.body || "", max) || PLACEHOLDER_TITLE;
     const d = {
       id: crypto.randomUUID(),
-      title: firstLine.slice(0, 80),
+      title: label,
       body: topic.body || "",
       account,
       updated: (/* @__PURE__ */ new Date()).toISOString(),
@@ -34872,7 +34907,7 @@ async function renderTopics() {
       prompts: [],
       topics: [
         {
-          text: firstLine.slice(0, 80),
+          text: label,
           at: (/* @__PURE__ */ new Date()).toISOString()
         }
       ],
