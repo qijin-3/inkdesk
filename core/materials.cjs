@@ -1,3 +1,6 @@
+const fs = require("node:fs");
+const path = require("node:path");
+
 /**
  * 列出素材库，并用当前草稿标题补全引用信息。
  * @param {string|{ account?: string }} [data]

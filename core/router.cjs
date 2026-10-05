@@ -1,4 +1,8 @@
+const fs = require("node:fs");
+const path = require("node:path");
 const { Skills } = require("../skills.cjs");
+const { within, scan } = require("../core.cjs");
+const { split } = require("../vault.cjs");
 
 const API_CHANNELS = [
   "skills-list",

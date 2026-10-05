@@ -1,3 +1,8 @@
+const fs = require("node:fs");
+const path = require("node:path");
+const { split } = require("../vault.cjs");
+const { within } = require("../core.cjs");
+
 /**
  * 读取已发布（03_Archive）文章正文，供仪表盘预览。
  * @param {string} rel vault 相对路径
