@@ -72,6 +72,30 @@ function accountLabel(folder) {
 const ACCOUNT_MODES = new Set(["xhs", "x"]);
 
 /**
+ * 规范化发布日为 YYYY-MM-DD；空值或不合法返回 null。
+ * @param {unknown} raw
+ * @returns {string|null}
+ */
+function normalizePublishAt(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const y = Number(m[1]),
+    mo = Number(m[2]),
+    d = Number(m[3]);
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (
+    dt.getUTCFullYear() !== y ||
+    dt.getUTCMonth() !== mo - 1 ||
+    dt.getUTCDate() !== d
+  )
+    return null;
+  return `${m[1]}-${m[2]}-${m[3]}`;
+}
+
+/**
  * 规范化账号模式；缺省或非法值回退为小红书。
  * @param {unknown} mode
  * @returns {"xhs"|"x"}
@@ -599,6 +623,10 @@ class Vault {
               typeof groupField === "string" && groupField.trim()
                 ? groupField.trim()
                 : meta.group || null;
+            doc.publishAt =
+              normalizePublishAt(fields["发布时间"]) ||
+              normalizePublishAt(meta.publishAt) ||
+              null;
             if (!meta.titles && Array.isArray(fields["标题候选"]))
               doc.titles = fields["标题候选"]
                 .map((x) => ({
@@ -706,6 +734,16 @@ class Vault {
       }
     })();
     if (nextGroup !== prevGroup) yaml.set("分组", nextGroup);
+    const nextPublishAt = normalizePublishAt(doc.publishAt);
+    doc.publishAt = nextPublishAt;
+    const prevPublishAt = (() => {
+      try {
+        return normalizePublishAt(JSON.parse(cached?.doc || "{}").publishAt);
+      } catch {
+        return null;
+      }
+    })();
+    if (nextPublishAt !== prevPublishAt) yaml.set("发布时间", nextPublishAt);
     const dir = old ? path.posix.dirname(old) : `${account}/02_Drafts`;
     let dest = dir + "/" + clean(doc.title) + ".md";
     if (dest !== old && fs.existsSync(this.p(dest)))
@@ -1346,4 +1384,5 @@ module.exports = {
   compact,
   normalizeAccountMode,
   normalizeAccountEntry,
+  normalizePublishAt,
 };

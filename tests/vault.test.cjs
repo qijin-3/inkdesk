@@ -223,6 +223,32 @@ test("archive YAML parses X metrics fields", (t) => {
   assert.equal(row["转发"], 5);
 });
 
+test("normalizePublishAt 校验 YYYY-MM-DD", () => {
+  const { normalizePublishAt } = require("../vault.cjs");
+  assert.equal(normalizePublishAt("2026-10-05"), "2026-10-05");
+  assert.equal(normalizePublishAt("2026-10-05T12:00:00Z"), "2026-10-05");
+  assert.equal(normalizePublishAt("  "), null);
+  assert.equal(normalizePublishAt("2026-13-01"), null);
+  assert.equal(normalizePublishAt("10/05/2026"), null);
+});
+
+test("draft publishAt 写入 YAML 并在 load 读回", (t) => {
+  const v = fixture(t);
+  v.load();
+  const d = draft();
+  d.publishAt = "2026-10-05";
+  v.saveDoc(d);
+  const raw = fs.readFileSync(v.p("Demo_AI/02_Drafts/文章一.md"), "utf8");
+  assert.equal(split(raw).yaml.toJS()["发布时间"], "2026-10-05");
+  const v2 = new Vault(v.root);
+  const again = v2.load();
+  assert.equal(again.documents[0].publishAt, "2026-10-05");
+  again.documents[0].publishAt = null;
+  v2.saveDoc(again.documents[0]);
+  const cleared = fs.readFileSync(v2.p("Demo_AI/02_Drafts/文章一.md"), "utf8");
+  assert.equal(split(cleared).yaml.toJS()["发布时间"], null);
+});
+
 test("draft project create / move / delete", (t) => {
   const v = fixture(t);
   v.load();
