@@ -347,14 +347,20 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   padding: 24px 30px 12px;
   -webkit-app-region: drag;
+  user-select: none;
+  -webkit-user-select: none;
   border-bottom: 1px solid #e5e5e5;
 }
 .header-lead {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1;
+  min-width: 0;
+  -webkit-app-region: drag;
 }
 header .dashboard-tagline {
   font-family: "Songti SC", Georgia, serif;
@@ -363,6 +369,9 @@ header .dashboard-tagline {
   margin: 0;
   line-height: 1.25;
   -webkit-app-region: drag;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
 }
 button.title-preview {
   font: inherit;
@@ -468,13 +477,20 @@ button.title-preview:hover {
   height: auto;
 }
 header button,
-header select {
+header select,
+header input,
+header textarea,
+header a,
+header label,
+header .save-split {
   -webkit-app-region: no-drag;
 }
 .header-actions {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
 }
 .save-split {
   display: inline-flex;

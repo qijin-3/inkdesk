@@ -35703,10 +35703,13 @@ function renderSettings() {
     { id: "groups", title: "\u5206\u7EC4" },
     { id: "skills", title: "\u6280\u80FD" }
   ];
+  const update = state._update;
+  const updateNotes = String(update?.notes || "").trim();
+  const updateNotesHtml = updateNotes ? `<div class="settings-update-notes"><div class="settings-status-row"><div><span class="settings-field-label">${update.available ? `\u65B0\u7248\u672C ${esc2(update.latest)} \u66F4\u65B0\u5185\u5BB9` : `\u6700\u65B0\u7248\u672C ${esc2(update.latest || state._appVersion || "")} \u66F4\u65B0\u5185\u5BB9`}</span></div></div><div class="settings-update-body is-md">${safeHTML(updateNotes)}</div></div>` : "";
   const configBody = [
     settingsSection({
       control: settingsPanel(
-        `<h3 class="settings-section-title">\u5173\u4E8E</h3><div class="settings-app-identity"><img src="assets/logo.png" alt="" class="settings-app-logo" width="48" height="48"><div class="settings-app-meta"><strong class="settings-app-name">Aster*</strong><div class="settings-status-row"><div><span class="settings-field-label">\u5F53\u524D\u7248\u672C</span><strong class="settings-version">${esc2(state._appVersion || "\u2026")}</strong></div></div></div></div><div class="settings-panel-footer"><button type="button" id="open-releases">${I.external()} \u53D1\u5E03\u9875</button><button type="button" id="check-update">${I.refresh()} \u68C0\u6D4B\u66F4\u65B0</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">\u4E0B\u8F7D\u5E76\u5B89\u88C5</button>` : ""}</div>`
+        `<h3 class="settings-section-title">\u5173\u4E8E</h3><div class="settings-app-identity"><img src="assets/logo.png" alt="" class="settings-app-logo" width="48" height="48"><div class="settings-app-meta"><strong class="settings-app-name">Aster*</strong><div class="settings-status-row"><div><span class="settings-field-label">\u5F53\u524D\u7248\u672C</span><strong class="settings-version">${esc2(state._appVersion || "\u2026")}</strong></div>${update?.available ? `<div><span class="settings-field-label">\u6700\u65B0\u7248\u672C</span><strong class="settings-version settings-version-latest">${esc2(update.latest)}</strong></div>` : ""}</div></div></div>` + updateNotesHtml + `<div class="settings-panel-footer"><button type="button" id="open-releases">${I.external()} \u53D1\u5E03\u9875</button><button type="button" id="check-update">${I.refresh()} \u68C0\u6D4B\u66F4\u65B0</button>${update?.available ? `<button type="button" class="primary" id="install-update">\u4E0B\u8F7D\u5E76\u5B89\u88C5</button>` : ""}</div>`
       )
     }),
     settingsSection({
@@ -36651,7 +36654,7 @@ async function checkForAppUpdate(opts = {}) {
     const info = await api("update-check");
     state._update = info;
     state._appVersion = info.current;
-    if (opts.manual && page === "settings") render2();
+    if (page === "settings" && (settingsTab === "config" || opts.manual)) render2();
     if (info.available) {
       toast(`\u53D1\u73B0\u65B0\u7248\u672C ${info.latest}\uFF0C\u53EF\u5728\u8BBE\u7F6E\u4E2D\u66F4\u65B0`);
     } else if (opts.manual) {

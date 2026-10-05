@@ -31,6 +31,16 @@ button {
   border-radius: 7px;
   padding: 8px 12px;
   transition: background 0.15s;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+button *,
+[role="button"],
+[role="button"] * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
 }
 button:hover {
   background: #ebebeb;
@@ -119,6 +129,7 @@ p {
   overflow: hidden;
 }
 .sidebar {
+  position: relative;
   width: 280px;
   flex-shrink: 0;
   background: #efefef;
@@ -126,6 +137,16 @@ p {
   padding: 52px 18px 20px;
   display: flex;
   flex-direction: column;
+}
+/* Traffic-light inset: empty top strip is a window drag region */
+.sidebar::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 52px;
+  -webkit-app-region: drag;
 }
 
 /* ===== /styles/sidebar-accounts.css ===== */
@@ -1059,14 +1080,20 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   padding: 24px 30px 12px;
   -webkit-app-region: drag;
+  user-select: none;
+  -webkit-user-select: none;
   border-bottom: 1px solid #e5e5e5;
 }
 .header-lead {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1;
+  min-width: 0;
+  -webkit-app-region: drag;
 }
 header .dashboard-tagline {
   font-family: "Songti SC", Georgia, serif;
@@ -1075,6 +1102,9 @@ header .dashboard-tagline {
   margin: 0;
   line-height: 1.25;
   -webkit-app-region: drag;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
 }
 button.title-preview {
   font: inherit;
@@ -1180,13 +1210,20 @@ button.title-preview:hover {
   height: auto;
 }
 header button,
-header select {
+header select,
+header input,
+header textarea,
+header a,
+header label,
+header .save-split {
   -webkit-app-region: no-drag;
 }
 .header-actions {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
 }
 .save-split {
   display: inline-flex;
@@ -1477,6 +1514,7 @@ button.secondary {
 .assistant-head > .aster {
   flex-shrink: 0;
   cursor: default;
+  -webkit-app-region: drag;
 }
 .welcome-icon {
   display: inline-flex;
@@ -1686,9 +1724,17 @@ header .byline {
   font-weight: 500;
   flex-shrink: 0;
   min-width: 0;
+  -webkit-app-region: drag;
+  user-select: none;
+  -webkit-user-select: none;
 }
-.assistant-head > .aster {
-  flex-shrink: 0;
+.assistant-head button,
+.assistant-head select,
+.assistant-head input,
+.assistant-head textarea,
+.assistant-head a,
+.assistant-head label {
+  -webkit-app-region: no-drag;
 }
 .assistant-conversation {
   appearance: none;
@@ -1721,6 +1767,7 @@ header .byline {
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+  -webkit-app-region: no-drag;
 }
 .assistant-head select {
   font-size: 11px;
@@ -2124,6 +2171,8 @@ header .byline {
   grid-template-columns: repeat(4, 1fr);
   gap: 18px;
   margin-bottom: 30px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .stats > div {
   border: 1px solid #e5e5e5;
@@ -2148,6 +2197,8 @@ header .byline {
   border-radius: 12px;
   padding: 26px;
   margin-bottom: 22px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .dashboard-card h3 {
   font-size: 15px;
@@ -2162,6 +2213,11 @@ header .byline {
 #publishing-calendar > p {
   margin: 4px 0 6px;
   color: #666666;
+}
+/* 已发布列表：仅文章标题可复制 */
+.dashboard .published-table button.title-preview {
+  user-select: text;
+  -webkit-user-select: text;
 }
 #heatmap-year,
 #metrics-sort {
@@ -3162,6 +3218,55 @@ th {
   font-size: 18px;
   font-weight: 600;
   color: #111;
+}
+.settings-version-latest {
+  color: #0b6bcb;
+}
+.settings-update-notes {
+  margin: 16px 0 4px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+.settings-update-body {
+  margin-top: 8px;
+  max-height: 220px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #444;
+}
+.settings-update-body.is-md > *:first-child {
+  margin-top: 0;
+}
+.settings-update-body.is-md > *:last-child {
+  margin-bottom: 0;
+}
+.settings-update-body.is-md :is(h1, h2, h3, h4) {
+  margin: 0.85em 0 0.35em;
+  font-size: 13px;
+  font-weight: 600;
+  color: #222;
+}
+.settings-update-body.is-md h1 {
+  font-size: 15px;
+}
+.settings-update-body.is-md h2 {
+  font-size: 14px;
+}
+.settings-update-body.is-md p,
+.settings-update-body.is-md ul,
+.settings-update-body.is-md ol {
+  margin: 0.4em 0;
+}
+.settings-update-body.is-md ul,
+.settings-update-body.is-md ol {
+  padding-left: 1.25em;
+}
+.settings-update-body.is-md li + li {
+  margin-top: 0.2em;
+}
+.settings-update-body.is-md a {
+  color: #0b6bcb;
 }
 .account-list {
   display: flex;

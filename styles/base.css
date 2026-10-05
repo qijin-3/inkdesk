@@ -30,6 +30,16 @@ button {
   border-radius: 7px;
   padding: 8px 12px;
   transition: background 0.15s;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+button *,
+[role="button"],
+[role="button"] * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
 }
 button:hover {
   background: #ebebeb;
@@ -118,6 +128,7 @@ p {
   overflow: hidden;
 }
 .sidebar {
+  position: relative;
   width: 280px;
   flex-shrink: 0;
   background: #efefef;
@@ -125,4 +136,14 @@ p {
   padding: 52px 18px 20px;
   display: flex;
   flex-direction: column;
+}
+/* Traffic-light inset: empty top strip is a window drag region */
+.sidebar::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 52px;
+  -webkit-app-region: drag;
 }

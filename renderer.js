@@ -4413,12 +4413,18 @@ function renderSettings() {
     { id: "skills", title: "技能" },
   ];
 
+  const update = state._update;
+  const updateNotes = String(update?.notes || "").trim();
+  const updateNotesHtml = updateNotes
+    ? `<div class="settings-update-notes"><div class="settings-status-row"><div><span class="settings-field-label">${update.available ? `新版本 ${esc(update.latest)} 更新内容` : `最新版本 ${esc(update.latest || state._appVersion || "")} 更新内容`}</span></div></div><div class="settings-update-body is-md">${safeHTML(updateNotes)}</div></div>`
+    : "";
   const configBody = [
     settingsSection({
       control: settingsPanel(
         `<h3 class="settings-section-title">关于</h3>` +
-          `<div class="settings-app-identity"><img src="assets/logo.png" alt="" class="settings-app-logo" width="48" height="48"><div class="settings-app-meta"><strong class="settings-app-name">Aster*</strong><div class="settings-status-row"><div><span class="settings-field-label">当前版本</span><strong class="settings-version">${esc(state._appVersion || "…")}</strong></div></div></div></div>` +
-          `<div class="settings-panel-footer"><button type="button" id="open-releases">${I.external()} 发布页</button><button type="button" id="check-update">${I.refresh()} 检测更新</button>${state._update?.available ? `<button type="button" class="primary" id="install-update">下载并安装</button>` : ""}</div>`,
+          `<div class="settings-app-identity"><img src="assets/logo.png" alt="" class="settings-app-logo" width="48" height="48"><div class="settings-app-meta"><strong class="settings-app-name">Aster*</strong><div class="settings-status-row"><div><span class="settings-field-label">当前版本</span><strong class="settings-version">${esc(state._appVersion || "…")}</strong></div>${update?.available ? `<div><span class="settings-field-label">最新版本</span><strong class="settings-version settings-version-latest">${esc(update.latest)}</strong></div>` : ""}</div></div></div>` +
+          updateNotesHtml +
+          `<div class="settings-panel-footer"><button type="button" id="open-releases">${I.external()} 发布页</button><button type="button" id="check-update">${I.refresh()} 检测更新</button>${update?.available ? `<button type="button" class="primary" id="install-update">下载并安装</button>` : ""}</div>`,
       ),
     }),
     settingsSection({
@@ -5545,7 +5551,7 @@ async function checkForAppUpdate(opts = {}) {
     const info = await api("update-check");
     state._update = info;
     state._appVersion = info.current;
-    if (opts.manual && page === "settings") render();
+    if (page === "settings" && (settingsTab === "config" || opts.manual)) render();
     if (info.available) {
       toast(`发现新版本 ${info.latest}，可在设置中更新`);
     } else if (opts.manual) {

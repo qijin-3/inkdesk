@@ -99,6 +99,7 @@ button.secondary {
 .assistant-head > .aster {
   flex-shrink: 0;
   cursor: default;
+  -webkit-app-region: drag;
 }
 .welcome-icon {
   display: inline-flex;
@@ -308,9 +309,17 @@ header .byline {
   font-weight: 500;
   flex-shrink: 0;
   min-width: 0;
+  -webkit-app-region: drag;
+  user-select: none;
+  -webkit-user-select: none;
 }
-.assistant-head > .aster {
-  flex-shrink: 0;
+.assistant-head button,
+.assistant-head select,
+.assistant-head input,
+.assistant-head textarea,
+.assistant-head a,
+.assistant-head label {
+  -webkit-app-region: no-drag;
 }
 .assistant-conversation {
   appearance: none;
@@ -343,6 +352,7 @@ header .byline {
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+  -webkit-app-region: no-drag;
 }
 .assistant-head select {
   font-size: 11px;
@@ -746,6 +756,8 @@ header .byline {
   grid-template-columns: repeat(4, 1fr);
   gap: 18px;
   margin-bottom: 30px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .stats > div {
   border: 1px solid #e5e5e5;
@@ -770,6 +782,8 @@ header .byline {
   border-radius: 12px;
   padding: 26px;
   margin-bottom: 22px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .dashboard-card h3 {
   font-size: 15px;
@@ -784,6 +798,11 @@ header .byline {
 #publishing-calendar > p {
   margin: 4px 0 6px;
   color: #666666;
+}
+/* 已发布列表：仅文章标题可复制 */
+.dashboard .published-table button.title-preview {
+  user-select: text;
+  -webkit-user-select: text;
 }
 #heatmap-year,
 #metrics-sort {
@@ -1784,6 +1803,55 @@ th {
   font-size: 18px;
   font-weight: 600;
   color: #111;
+}
+.settings-version-latest {
+  color: #0b6bcb;
+}
+.settings-update-notes {
+  margin: 16px 0 4px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+.settings-update-body {
+  margin-top: 8px;
+  max-height: 220px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #444;
+}
+.settings-update-body.is-md > *:first-child {
+  margin-top: 0;
+}
+.settings-update-body.is-md > *:last-child {
+  margin-bottom: 0;
+}
+.settings-update-body.is-md :is(h1, h2, h3, h4) {
+  margin: 0.85em 0 0.35em;
+  font-size: 13px;
+  font-weight: 600;
+  color: #222;
+}
+.settings-update-body.is-md h1 {
+  font-size: 15px;
+}
+.settings-update-body.is-md h2 {
+  font-size: 14px;
+}
+.settings-update-body.is-md p,
+.settings-update-body.is-md ul,
+.settings-update-body.is-md ol {
+  margin: 0.4em 0;
+}
+.settings-update-body.is-md ul,
+.settings-update-body.is-md ol {
+  padding-left: 1.25em;
+}
+.settings-update-body.is-md li + li {
+  margin-top: 0.2em;
+}
+.settings-update-body.is-md a {
+  color: #0b6bcb;
 }
 .account-list {
   display: flex;
