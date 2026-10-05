@@ -50,6 +50,10 @@ const API_CHANNELS = [
   "vault-reveal",
   "vault-open",
   "draft-delete",
+  "draft-projects",
+  "draft-project-create",
+  "draft-project-delete",
+  "draft-move",
   "materials-list",
   "materials-read",
   "materials-delete",
@@ -274,6 +278,14 @@ async function invoke(core, name, data) {
       return core.projectUpload(data);
     case "draft-delete":
       return core.deleteDraft(data);
+    case "draft-projects":
+      return core.listDraftProjects(data);
+    case "draft-project-create":
+      return core.createDraftProject(data);
+    case "draft-project-delete":
+      return core.deleteDraftProject(data);
+    case "draft-move":
+      return core.moveDraft(data);
     case "materials-list":
       return core.listMaterials(data);
     case "materials-read":

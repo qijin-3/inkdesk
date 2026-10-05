@@ -1222,6 +1222,117 @@ class Vault {
     }
     this.cache.clear();
   }
+
+  /**
+   * 规范草稿项目文件夹名（02_Drafts 下一级）。
+   * @param {string} name
+   */
+  cleanProjectName(name) {
+    const n = clean(name);
+    if (!n || n === "." || n === "..") throw Error("文件夹名称无效");
+    if (n.includes("/") || n.includes("\\")) throw Error("文件夹名称无效");
+    return n;
+  }
+
+  /**
+   * 列出账号 02_Drafts 下的一级项目文件夹（含空目录）。
+   * @param {string} account
+   * @returns {string[]}
+   */
+  listDraftProjects(account) {
+    const folder = this.resolveAccountId(account);
+    const dir = this.p(`${folder}/02_Drafts`);
+    if (!fs.existsSync(dir)) return [];
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter(
+        (e) =>
+          e.isDirectory() &&
+          !e.isSymbolicLink() &&
+          !e.name.startsWith("."),
+      )
+      .map((e) => e.name)
+      .sort((a, b) => a.localeCompare(b, "zh"));
+  }
+
+  /**
+   * 在 02_Drafts 下新建项目文件夹。
+   * @param {string} account
+   * @param {string} name
+   */
+  createDraftProject(account, name) {
+    const folder = this.resolveAccountId(account);
+    const project = this.cleanProjectName(name);
+    const abs = this.p(`${folder}/02_Drafts/${project}`);
+    if (fs.existsSync(abs)) throw Error("文件夹已存在");
+    fs.mkdirSync(abs, { recursive: true });
+    return project;
+  }
+
+  /**
+   * 删除项目文件夹及其内全部草稿（含元数据）。
+   * @param {string} account
+   * @param {string} name
+   */
+  deleteDraftProject(account, name) {
+    const folder = this.resolveAccountId(account);
+    const project = this.cleanProjectName(name);
+    const prefix = `${folder}/02_Drafts/${project}/`;
+    const ids = Object.entries(this.index)
+      .filter(
+        ([, item]) =>
+          item?.status === "draft" &&
+          String(item.path || "").replace(/\\/g, "/").startsWith(prefix),
+      )
+      .map(([id]) => id);
+    for (const id of ids) this.deleteDoc(id);
+    const abs = this.p(`${folder}/02_Drafts/${project}`);
+    if (fs.existsSync(abs)) fs.rmSync(abs, { recursive: true, force: true });
+    return { project, deleted: ids.length };
+  }
+
+  /**
+   * 将草稿移到指定项目文件夹；project 为空则移回 02_Drafts 根目录。
+   * @param {string} id
+   * @param {string|null|undefined} project
+   */
+  moveDraft(id, project) {
+    const item = this.index[id];
+    if (!item || item.status !== "draft") throw Error("只能移动草稿");
+    const old = String(item.path || "").replace(/\\/g, "/");
+    if (!old.includes("/02_Drafts/")) throw Error("不是草稿路径");
+    if (!fs.existsSync(this.p(old))) throw Error("草稿文件不存在，请先刷新");
+    const parts = old.split("/").filter(Boolean);
+    const i = parts.indexOf("02_Drafts");
+    if (i < 0) throw Error("不是草稿路径");
+    const draftsRoot = parts.slice(0, i + 1).join("/");
+    const base = path.posix.basename(old);
+    const target =
+      project == null || String(project).trim() === ""
+        ? null
+        : this.cleanProjectName(project);
+    if (target) {
+      fs.mkdirSync(this.p(`${draftsRoot}/${target}`), { recursive: true });
+    }
+    let dest = target ? `${draftsRoot}/${target}/${base}` : `${draftsRoot}/${base}`;
+    if (dest === old) return { id, path: dest };
+    if (fs.existsSync(this.p(dest))) {
+      const stem = path.posix.basename(base, ".md");
+      dest =
+        path.posix.dirname(dest) +
+        "/" +
+        stem +
+        " " +
+        id.slice(0, 8) +
+        ".md";
+    }
+    fs.mkdirSync(path.dirname(this.p(dest)), { recursive: true });
+    fs.renameSync(this.p(old), this.p(dest));
+    this.index[id] = { ...item, path: dest };
+    this.writeJSON(this.meta + "/index.json", this.index);
+    this.cache.delete(id);
+    return { id, path: dest };
+  }
 }
 function number(v) {
   if (v === null || v === undefined || String(v).trim() === "") return null;

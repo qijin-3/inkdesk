@@ -222,3 +222,25 @@ test("archive YAML parses X metrics fields", (t) => {
   assert.equal(row["回复"], 10);
   assert.equal(row["转发"], 5);
 });
+
+test("draft project create / move / delete", (t) => {
+  const v = fixture(t);
+  v.load();
+  const d = draft();
+  v.saveDoc(d);
+  assert.equal(v.index[d.id].path, "Demo_AI/02_Drafts/文章一.md");
+  assert.deepEqual(v.listDraftProjects("Demo_AI"), []);
+  v.createDraftProject("Demo_AI", "虾皮猫");
+  assert.deepEqual(v.listDraftProjects("Demo_AI"), ["虾皮猫"]);
+  const moved = v.moveDraft(d.id, "虾皮猫");
+  assert.equal(moved.path, "Demo_AI/02_Drafts/虾皮猫/文章一.md");
+  assert.ok(fs.existsSync(v.p(moved.path)));
+  assert.equal(fs.existsSync(v.p("Demo_AI/02_Drafts/文章一.md")), false);
+  v.moveDraft(d.id, null);
+  assert.equal(v.index[d.id].path, "Demo_AI/02_Drafts/文章一.md");
+  v.moveDraft(d.id, "虾皮猫");
+  const result = v.deleteDraftProject("Demo_AI", "虾皮猫");
+  assert.equal(result.deleted, 1);
+  assert.equal(v.index[d.id], undefined);
+  assert.deepEqual(v.listDraftProjects("Demo_AI"), []);
+});

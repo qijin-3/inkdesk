@@ -932,6 +932,11 @@ nav span {
   color: #888888;
   font-size: 11px;
 }
+.list-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .list-head button {
   border: 0;
   background: none;
@@ -940,6 +945,11 @@ nav span {
   justify-content: center;
   padding: 0;
   font-size: 22px;
+  color: #888888;
+  cursor: pointer;
+}
+.list-head button:hover {
+  color: #111111;
 }
 .docs {
   overflow: auto;
@@ -951,18 +961,37 @@ nav span {
   width: 0;
   height: 0;
 }
+.docs.is-drop-target {
+  outline: 1px dashed #111111;
+  outline-offset: -4px;
+  border-radius: 8px;
+}
 .docs-project {
   margin: 2px 0 10px;
+  border-radius: 8px;
+}
+.docs-project.is-drop-target {
+  outline: 1px dashed #111111;
+  outline-offset: -2px;
+  background: rgba(0, 0, 0, 0.03);
 }
 .docs-project-head {
   display: flex;
   align-items: center;
   gap: 7px;
+  width: 100%;
+  border: 0;
+  background: none;
   padding: 10px 10px 4px;
   color: #222222;
   font-size: 13px;
   line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
   user-select: none;
+}
+.docs-project-head:hover {
+  color: #111111;
 }
 .docs-project-head span {
   min-width: 0;
@@ -974,6 +1003,12 @@ nav span {
   flex-shrink: 0;
   color: #111111;
 }
+.docs-project-body {
+  min-height: 4px;
+}
+.docs-project.is-collapsed .docs-project-body {
+  display: none;
+}
 .docs-project .doc {
   padding-left: 31px;
 }
@@ -984,6 +1019,13 @@ nav span {
   border: 0;
   background: none;
   padding: 13px 10px;
+  cursor: grab;
+}
+.doc:active {
+  cursor: grabbing;
+}
+.doc.dragging {
+  opacity: 0.45;
 }
 .doc span {
   display: block;

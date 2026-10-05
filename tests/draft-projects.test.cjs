@@ -31,49 +31,59 @@ test("draftProjectOf 取 02_Drafts 下一级子文件夹", () => {
   assert.equal(mod.draftProjectOf(null), null);
 });
 
-test("groupDraftsByProject 未分组在前，项目中文排序", () => {
+test("groupDraftsByProject 未分组在前，项目中文排序，并入空文件夹", () => {
   const docs = [
     { id: "1", path: "A/02_Drafts/根.md", updated: "2026-01-02" },
     { id: "2", path: "A/02_Drafts/虾皮猫/a.md", updated: "2026-01-03" },
     { id: "3", path: "A/02_Drafts/clay_game/b.md", updated: "2026-01-01" },
     { id: "4", path: "A/02_Drafts/虾皮猫/c.md", updated: "2026-01-04" },
   ];
-  const g = mod.groupDraftsByProject(docs);
+  const g = mod.groupDraftsByProject(docs, ["空文件夹", "虾皮猫"]);
   assert.deepEqual(
     g.ungrouped.map((d) => d.id),
     ["1"],
   );
   assert.deepEqual(
     g.projects.map((p) => p.name),
-    ["clay_game", "虾皮猫"].sort((a, b) => a.localeCompare(b, "zh")),
+    ["clay_game", "虾皮猫", "空文件夹"].sort((a, b) =>
+      a.localeCompare(b, "zh"),
+    ),
   );
   assert.deepEqual(
     g.projects.find((p) => p.name === "虾皮猫").docs.map((d) => d.id),
     ["2", "4"],
   );
+  assert.deepEqual(g.projects.find((p) => p.name === "空文件夹").docs, []);
 });
 
-test("draftsSidebarHtml 空态与项目头转义", () => {
+test("draftsSidebarHtml 空态、收起态与项目头转义", () => {
   assert.equal(
-    mod.draftsSidebarHtml([], null, "<i/>"),
+    mod.draftsSidebarHtml([], null, { closed: "<i/>", open: "<o/>" }),
     '<p class="muted">从一个想法开始。</p>',
   );
   const html = mod.draftsSidebarHtml(
     [
       {
         id: "x",
-        path: 'A/02_Drafts/<b>/t.md',
+        path: "A/02_Drafts/<b>/t.md",
         title: "<script>",
         updated: "2026-09-29T00:00:00.000Z",
         body: "abcd",
       },
     ],
     "x",
-    '<svg class="ico"></svg>',
+    { closed: '<svg class="closed"></svg>', open: '<svg class="open"></svg>' },
+    { collapsed: ["<b>"], projects: ["空的"] },
   );
   assert.match(html, /docs-project-head/);
-  assert.match(html, /&lt;b&gt;/);
+  assert.match(html, /data-toggle-project="&lt;b&gt;"/);
+  assert.match(html, /is-collapsed/);
+  assert.match(html, /aria-expanded="false"/);
+  assert.match(html, /class="closed"/);
+  assert.match(html, /data-drop-project="&lt;b&gt;"/);
+  assert.match(html, /draggable="true"/);
   assert.match(html, /&lt;script&gt;/);
   assert.match(html, /class="doc selected"/);
   assert.match(html, /4 字/);
+  assert.match(html, /data-toggle-project="空的"/);
 });

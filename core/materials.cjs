@@ -131,6 +131,58 @@ function image(core, payload = {}) {
     ext,
   );
 }
+/**
+ * 列出账号草稿项目文件夹。
+ * @param {string|{ account?: string }} data
+ */
+function listDraftProjects(core, data) {
+  const account =
+    typeof data === "string" ? data : data?.account || undefined;
+  if (!account) throw Error("请先选择账号");
+  return core.vault.listDraftProjects(account);
+}
+
+/**
+ * 新建草稿项目文件夹。
+ * @param {{ account: string, name: string }} data
+ */
+function createDraftProject(core, data) {
+  if (core.active) throw Error("请等待 AI 完成后再操作");
+  const account = data?.account;
+  const name = data?.name;
+  if (!account) throw Error("请先选择账号");
+  core.save();
+  const project = core.vault.createDraftProject(account, name);
+  return { ...core.reload(), dataPath: core.data, project };
+}
+
+/**
+ * 删除草稿项目文件夹（含其中全部草稿）。
+ * @param {{ account: string, name: string }} data
+ */
+function deleteDraftProject(core, data) {
+  if (core.active) throw Error("请等待 AI 完成后再操作");
+  const account = data?.account;
+  const name = data?.name;
+  if (!account) throw Error("请先选择账号");
+  core.save();
+  const result = core.vault.deleteDraftProject(account, name);
+  return { ...core.reload(), dataPath: core.data, ...result };
+}
+
+/**
+ * 移动草稿到项目文件夹（project 为空则移到根目录）。
+ * @param {{ id: string, project?: string|null }} data
+ */
+function moveDraft(core, data) {
+  if (core.active) throw Error("请等待 AI 完成后再操作");
+  const id = data?.id;
+  if (!id) throw Error("缺少文章");
+  core.save();
+  const moved = core.vault.moveDraft(id, data?.project ?? null);
+  return { ...core.reload(), dataPath: core.data, moved };
+}
+
 module.exports = {
   listMaterials,
   deleteDraft,
@@ -138,4 +190,8 @@ module.exports = {
   finalize,
   toDraft,
   image,
+  listDraftProjects,
+  createDraftProject,
+  deleteDraftProject,
+  moveDraft,
 };

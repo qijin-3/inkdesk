@@ -38,7 +38,7 @@ import {
   backupPathFor,
   groupOptionsHtml,
 } from "./ui/groups.js";
-import { draftsSidebarHtml } from "./ui/draft-projects.js";
+import { draftsSidebarHtml, draftProjectOf } from "./ui/draft-projects.js";
 import { createDocStore } from "./store/doc-store.js";
 import { time } from "./ui/perf.js";
 import {
@@ -227,6 +227,10 @@ let state,
   dirty = false,
   /** Agent 输出模式：对话 | 编辑全文 */
   agentMode = "chat";
+/** 侧栏草稿项目文件夹（含空目录），按当前账号缓存 */
+let draftProjects = [];
+/** 侧栏已收起的项目名 */
+let collapsedProjects = new Set();
 /** 流式输出：当前累积文本与订阅卸载函数 */
 let streamText = "",
   /** 流式消息是否处于思考等待期（未收到首个文本块） */
@@ -528,7 +532,7 @@ function render() {
             `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc(a.id)}" title="${esc(a.label)}" aria-label="${esc(a.label)}">${accountAvatarHtml(a)}</button>`,
         )
         .join("") || `<p class="account-empty">请在设置中添加账号</p>`
-    }</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>灵感库</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>设置</span></button></nav><div class="list-head">我的草稿 <button id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></div><div class="docs">${draftsSidebarHtml(
+    }</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>灵感库</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>设置</span></button></nav><div class="list-head">我的草稿 <span class="list-head-actions"><button type="button" id="new-folder" title="新建文件夹" aria-label="新建文件夹">${I.folderClosed({ size: 16 })}</button><button type="button" id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></span></div><div class="docs" data-drop-project="">${draftsSidebarHtml(
       state.documents.filter(
         (d) =>
           sameAccount(d.account, account) &&
@@ -536,7 +540,19 @@ function render() {
           d.status !== "archive",
       ),
       current?.id,
-      I.folderClosed({ size: 14, stroke: 1.75, className: "docs-project-icon" }),
+      {
+        closed: I.folderClosed({
+          size: 14,
+          stroke: 1.75,
+          className: "docs-project-icon",
+        }),
+        open: I.folder({
+          size: 14,
+          stroke: 1.75,
+          className: "docs-project-icon",
+        }),
+      },
+      { collapsed: collapsedProjects, projects: draftProjects },
     )}</div></aside><main id="main"></main><div class="workspace-resizer hidden" id="workspace-resizer" title="拖动调整宽度"></div><aside class="assistant hidden" id="rail"></aside>`;
   unmountAster?.();
   unmountAster = null;
@@ -581,6 +597,8 @@ function render() {
       publishedSelection = new Set();
       current = state.documents.find((d) => sameAccount(d.account, account));
       pending = null;
+      loadCollapsedProjects();
+      await refreshDraftProjects();
       render();
     };
     b.oncontextmenu = (e) => {
@@ -620,6 +638,8 @@ function render() {
       }),
   );
   $("#new").onclick = newDoc;
+  $("#new-folder")?.addEventListener("click", () => createDraftFolder());
+  bindDraftProjectUi();
   $$(".doc").forEach((b) => {
     b.oncontextmenu = (e) => {
       e.preventDefault();
@@ -635,11 +655,254 @@ function render() {
 }
 
 /**
- * 在屏幕坐标处显示简易右键菜单。
- * @param {number} x
- * @param {number} y
- * @param {{ label: string, danger?: boolean, run: () => void }[]} items
+ * 读取当前账号侧栏文件夹收起状态。
  */
+function loadCollapsedProjects() {
+  try {
+    const raw = localStorage.getItem(
+      "inkdesk-draft-collapsed:" + (account || ""),
+    );
+    collapsedProjects = new Set(JSON.parse(raw || "[]"));
+  } catch {
+    collapsedProjects = new Set();
+  }
+}
+
+/**
+ * 持久化侧栏文件夹收起状态。
+ */
+function saveCollapsedProjects() {
+  try {
+    localStorage.setItem(
+      "inkdesk-draft-collapsed:" + (account || ""),
+      JSON.stringify([...collapsedProjects]),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * 刷新当前账号的草稿项目文件夹列表。
+ */
+async function refreshDraftProjects() {
+  if (!account) {
+    draftProjects = [];
+    return;
+  }
+  try {
+    draftProjects = (await api("draft-projects", { account })) || [];
+  } catch {
+    draftProjects = [];
+  }
+}
+
+/**
+ * 绑定侧栏项目展开/收起、右键删除、拖拽移动。
+ */
+function bindDraftProjectUi() {
+  $$("[data-toggle-project]").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const name = btn.dataset.toggleProject;
+      if (!name) return;
+      if (collapsedProjects.has(name)) collapsedProjects.delete(name);
+      else collapsedProjects.add(name);
+      saveCollapsedProjects();
+      const project = btn.closest(".docs-project");
+      const collapsed = collapsedProjects.has(name);
+      project?.classList.toggle("is-collapsed", collapsed);
+      btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      btn.title = collapsed ? "展开" : "收起";
+      btn.querySelector(".lucide")?.remove();
+      btn.insertAdjacentHTML(
+        "afterbegin",
+        collapsed
+          ? I.folderClosed({
+              size: 14,
+              stroke: 1.75,
+              className: "docs-project-icon",
+            })
+          : I.folder({
+              size: 14,
+              stroke: 1.75,
+              className: "docs-project-icon",
+            }),
+      );
+    };
+    btn.oncontextmenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const name = btn.dataset.toggleProject;
+      showContextMenu(e.clientX, e.clientY, [
+        {
+          label: "删除文件夹",
+          danger: true,
+          run: () => deleteDraftFolder(name),
+        },
+      ]);
+    };
+  });
+
+  $$(".doc[draggable]").forEach((b) => {
+    b.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/inkdesk-doc", b.dataset.id);
+      e.dataTransfer.setData("text/plain", "inkdesk-doc:" + b.dataset.id);
+      e.dataTransfer.effectAllowed = "move";
+      b.classList.add("dragging");
+    });
+    b.addEventListener("dragend", () => {
+      b.classList.remove("dragging");
+      $$(".is-drop-target").forEach((el) =>
+        el.classList.remove("is-drop-target"),
+      );
+    });
+  });
+
+  const dropTargets = [
+    $(".docs"),
+    ...$$(".docs-project[data-drop-project]"),
+  ].filter(Boolean);
+  for (const el of dropTargets) {
+    el.addEventListener("dragenter", (e) => {
+      if (!isDraftDocDrag(e)) return;
+      e.preventDefault();
+      el.classList.add("is-drop-target");
+    });
+    el.addEventListener("dragover", (e) => {
+      if (!isDraftDocDrag(e)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      el.classList.add("is-drop-target");
+    });
+    el.addEventListener("dragleave", (e) => {
+      if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+      el.classList.remove("is-drop-target");
+    });
+    el.addEventListener("drop", async (e) => {
+      if (!isDraftDocDrag(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      el.classList.remove("is-drop-target");
+      const id =
+        e.dataTransfer.getData("text/inkdesk-doc") ||
+        String(e.dataTransfer.getData("text/plain") || "").replace(
+          /^inkdesk-doc:/,
+          "",
+        );
+      if (!id) return;
+      const project =
+        el.dataset.dropProject === undefined ? "" : el.dataset.dropProject;
+      await moveDraftToProject(id, project || null);
+    });
+  }
+}
+
+function isDraftDocDrag(e) {
+  const types = [...(e.dataTransfer?.types || [])];
+  return types.includes("text/inkdesk-doc") || types.includes("text/plain");
+}
+
+/**
+ * 新建草稿项目文件夹。
+ */
+async function createDraftFolder() {
+  if (!account) return toast("请先在设置中添加账号");
+  const name = await promptText("新建文件夹", {
+    placeholder: "例如：AI游戏系列",
+    okLabel: "创建",
+  });
+  if (!name) return;
+  sync();
+  try {
+    await persist();
+    const result = await api("draft-project-create", { account, name });
+    Object.assign(state, result);
+    await refreshDraftProjects();
+    collapsedProjects.delete(result.project || name);
+    saveCollapsedProjects();
+    render();
+    toast("已创建文件夹");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+/**
+ * 删除草稿项目文件夹（先确认是否清除其中文件）。
+ * @param {string} name
+ */
+async function deleteDraftFolder(name) {
+  if (!account || !name) return;
+  const count = state.documents.filter(
+    (d) =>
+      sameAccount(d.account, account) &&
+      d.status !== "final" &&
+      d.status !== "archive" &&
+      draftProjectOf(d) === name,
+  ).length;
+  const ok = count
+    ? await askConfirm(
+        "删除文件夹",
+        `「${name}」内有 ${count} 篇草稿。删除文件夹将同时清除其中全部文件，且不可恢复。确定继续？`,
+      )
+    : await askConfirm("删除文件夹", `确定删除空文件夹「${name}」？`);
+  if (!ok) return;
+  sync();
+  try {
+    await persist();
+    const result = await api("draft-project-delete", { account, name });
+    Object.assign(state, result);
+    if (current && draftProjectOf(current) === name) {
+      current =
+        state.documents.find((d) => sameAccount(d.account, account)) ||
+        state.documents[0] ||
+        null;
+      page = current ? "write" : "dashboard";
+    }
+    collapsedProjects.delete(name);
+    saveCollapsedProjects();
+    await refreshDraftProjects();
+    dirty = false;
+    pending = null;
+    render();
+    toast(count ? `已删除文件夹及 ${count} 篇草稿` : "已删除文件夹");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+/**
+ * 拖拽移动草稿到项目（null/空 = 根目录）。
+ * @param {string} id
+ * @param {string|null} project
+ */
+async function moveDraftToProject(id, project) {
+  const doc = state.documents.find((d) => d.id === id);
+  if (!doc) return;
+  const currentProject = draftProjectOf(doc);
+  const next = project || null;
+  if ((currentProject || null) === next) return;
+  sync();
+  try {
+    await persist();
+    const result = await api("draft-move", { id, project: next });
+    Object.assign(state, result);
+    current = state.documents.find((d) => d.id === id) || current;
+    await refreshDraftProjects();
+    if (next) {
+      collapsedProjects.delete(next);
+      saveCollapsedProjects();
+    }
+    dirty = false;
+    render();
+    toast(next ? `已移到「${next}」` : "已移到根目录");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
 /**
  * Composer「+」菜单：添加文件 / 素材，以及本次技能开关（GPT 风格分区）。
  * @param {HTMLElement} anchor
@@ -5314,6 +5577,8 @@ async function installAppUpdate() {
 state = await api("load");
 ensureAccount();
 current = state.documents.find((d) => sameAccount(d.account, account));
+loadCollapsedProjects();
+await refreshDraftProjects();
 if (!isWeb()) {
   try {
     const info = await api("app-info");

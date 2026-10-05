@@ -76,6 +76,10 @@ class DeskCore {
 
   listMaterials(data) { return Materials.listMaterials(this, data); }
   deleteDraft(id) { return Materials.deleteDraft(this, id); }
+  listDraftProjects(data) { return Materials.listDraftProjects(this, data); }
+  createDraftProject(data) { return Materials.createDraftProject(this, data); }
+  deleteDraftProject(data) { return Materials.deleteDraftProject(this, data); }
+  moveDraft(data) { return Materials.moveDraft(this, data); }
   projectUpload(payload) { return Materials.projectUpload(this, payload); }
   finalize(payload) { return Materials.finalize(this, payload); }
   toDraft(rel) { return Materials.toDraft(this, rel); }

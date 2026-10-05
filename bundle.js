@@ -28090,7 +28090,7 @@ function draftProjectOf(docOrPath) {
   const name = parts[i + 1];
   return name || null;
 }
-function groupDraftsByProject(docs) {
+function groupDraftsByProject(docs, emptyProjects = []) {
   const ungrouped = [];
   const map2 = /* @__PURE__ */ new Map();
   for (const d of docs || []) {
@@ -28102,6 +28102,9 @@ function groupDraftsByProject(docs) {
     if (!map2.has(name)) map2.set(name, []);
     map2.get(name).push(d);
   }
+  for (const name of emptyProjects || []) {
+    if (name && !map2.has(name)) map2.set(name, []);
+  }
   const projects = [...map2.entries()].sort((a, b) => a[0].localeCompare(b[0], "zh")).map(([name, list2]) => ({ name, docs: list2 }));
   return { ungrouped, projects };
 }
@@ -28109,17 +28112,23 @@ function draftDocButtonHtml(d, selectedId) {
   const updated = d.updated ? new Date(d.updated).toLocaleDateString("zh-CN") : "";
   const words = (d.body || "").length;
   const meta = updated ? `${updated} \xB7 ${words} \u5B57` : `${words} \u5B57`;
-  return `<button type="button" class="doc ${selectedId === d.id ? "selected" : ""}" data-id="${esc2(d.id)}"><span>${esc2(d.title || "\u672A\u547D\u540D\u6587\u7AE0")}</span><small>${esc2(meta)}</small></button>`;
+  return `<button type="button" class="doc ${selectedId === d.id ? "selected" : ""}" draggable="true" data-id="${esc2(d.id)}"><span>${esc2(d.title || "\u672A\u547D\u540D\u6587\u7AE0")}</span><small>${esc2(meta)}</small></button>`;
 }
-function draftsSidebarHtml(docs, selectedId, folderIcon) {
-  const { ungrouped, projects } = groupDraftsByProject(docs);
+function draftsSidebarHtml(docs, selectedId, folderIcons, opts = {}) {
+  const collapsed = new Set(opts.collapsed || []);
+  const { ungrouped, projects } = groupDraftsByProject(
+    docs,
+    opts.projects || []
+  );
   if (!ungrouped.length && !projects.length)
     return '<p class="muted">\u4ECE\u4E00\u4E2A\u60F3\u6CD5\u5F00\u59CB\u3002</p>';
   const parts = [];
   for (const d of ungrouped) parts.push(draftDocButtonHtml(d, selectedId));
   for (const p of projects) {
+    const isCollapsed = collapsed.has(p.name);
+    const icon2 = isCollapsed ? folderIcons.closed || folderIcons.open || "" : folderIcons.open || folderIcons.closed || "";
     parts.push(
-      `<div class="docs-project"><div class="docs-project-head" aria-hidden="false">${folderIcon}<span>${esc2(p.name)}</span></div>${p.docs.map((d) => draftDocButtonHtml(d, selectedId)).join("")}</div>`
+      `<div class="docs-project${isCollapsed ? " is-collapsed" : ""}" data-project="${esc2(p.name)}" data-drop-project="${esc2(p.name)}"><button type="button" class="docs-project-head" data-toggle-project="${esc2(p.name)}" aria-expanded="${isCollapsed ? "false" : "true"}" title="${isCollapsed ? "\u5C55\u5F00" : "\u6536\u8D77"}">${icon2}<span>${esc2(p.name)}</span></button><div class="docs-project-body">${p.docs.map((d) => draftDocButtonHtml(d, selectedId)).join("")}</div></div>`
     );
   }
   return parts.join("");
@@ -32169,6 +32178,8 @@ var selectionContext = null;
 var selectionDragging = false;
 var dirty = false;
 var agentMode = "chat";
+var draftProjects = [];
+var collapsedProjects = /* @__PURE__ */ new Set();
 var streamText = "";
 var streamThinking = false;
 var unsubProgress = null;
@@ -32388,12 +32399,24 @@ function render2() {
   if (page !== "published-preview") publishedPreview = null;
   $2("#app").innerHTML = `<aside class="sidebar"><div class="account">${accountList().map(
     (a) => `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc2(a.id)}" title="${esc2(a.label)}" aria-label="${esc2(a.label)}">${accountAvatarHtml(a)}</button>`
-  ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>\u7075\u611F\u5E93</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>\u8BBE\u7F6E</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <button id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></div><div class="docs">${draftsSidebarHtml(
+  ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>\u7075\u611F\u5E93</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>\u8BBE\u7F6E</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <span class="list-head-actions"><button type="button" id="new-folder" title="\u65B0\u5EFA\u6587\u4EF6\u5939" aria-label="\u65B0\u5EFA\u6587\u4EF6\u5939">${I.folderClosed({ size: 16 })}</button><button type="button" id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></span></div><div class="docs" data-drop-project="">${draftsSidebarHtml(
     state.documents.filter(
       (d) => sameAccount(d.account, account) && d.status !== "final" && d.status !== "archive"
     ),
     current?.id,
-    I.folderClosed({ size: 14, stroke: 1.75, className: "docs-project-icon" })
+    {
+      closed: I.folderClosed({
+        size: 14,
+        stroke: 1.75,
+        className: "docs-project-icon"
+      }),
+      open: I.folder({
+        size: 14,
+        stroke: 1.75,
+        className: "docs-project-icon"
+      })
+    },
+    { collapsed: collapsedProjects, projects: draftProjects }
   )}</div></aside><main id="main"></main><div class="workspace-resizer hidden" id="workspace-resizer" title="\u62D6\u52A8\u8C03\u6574\u5BBD\u5EA6"></div><aside class="assistant hidden" id="rail"></aside>`;
   unmountAster?.();
   unmountAster = null;
@@ -32428,6 +32451,8 @@ function render2() {
       publishedSelection = /* @__PURE__ */ new Set();
       current = state.documents.find((d) => sameAccount(d.account, account));
       pending = null;
+      loadCollapsedProjects();
+      await refreshDraftProjects();
       render2();
     };
     b.oncontextmenu = (e) => {
@@ -32462,6 +32487,8 @@ function render2() {
     }
   );
   $2("#new").onclick = newDoc;
+  $2("#new-folder")?.addEventListener("click", () => createDraftFolder());
+  bindDraftProjectUi();
   $$(".doc").forEach((b) => {
     b.oncontextmenu = (e) => {
       e.preventDefault();
@@ -32474,6 +32501,206 @@ function render2() {
       ]);
     };
   });
+}
+function loadCollapsedProjects() {
+  try {
+    const raw = localStorage.getItem(
+      "inkdesk-draft-collapsed:" + (account || "")
+    );
+    collapsedProjects = new Set(JSON.parse(raw || "[]"));
+  } catch {
+    collapsedProjects = /* @__PURE__ */ new Set();
+  }
+}
+function saveCollapsedProjects() {
+  try {
+    localStorage.setItem(
+      "inkdesk-draft-collapsed:" + (account || ""),
+      JSON.stringify([...collapsedProjects])
+    );
+  } catch {
+  }
+}
+async function refreshDraftProjects() {
+  if (!account) {
+    draftProjects = [];
+    return;
+  }
+  try {
+    draftProjects = await api("draft-projects", { account }) || [];
+  } catch {
+    draftProjects = [];
+  }
+}
+function bindDraftProjectUi() {
+  $$("[data-toggle-project]").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const name = btn.dataset.toggleProject;
+      if (!name) return;
+      if (collapsedProjects.has(name)) collapsedProjects.delete(name);
+      else collapsedProjects.add(name);
+      saveCollapsedProjects();
+      const project = btn.closest(".docs-project");
+      const collapsed = collapsedProjects.has(name);
+      project?.classList.toggle("is-collapsed", collapsed);
+      btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      btn.title = collapsed ? "\u5C55\u5F00" : "\u6536\u8D77";
+      btn.querySelector(".lucide")?.remove();
+      btn.insertAdjacentHTML(
+        "afterbegin",
+        collapsed ? I.folderClosed({
+          size: 14,
+          stroke: 1.75,
+          className: "docs-project-icon"
+        }) : I.folder({
+          size: 14,
+          stroke: 1.75,
+          className: "docs-project-icon"
+        })
+      );
+    };
+    btn.oncontextmenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const name = btn.dataset.toggleProject;
+      showContextMenu(e.clientX, e.clientY, [
+        {
+          label: "\u5220\u9664\u6587\u4EF6\u5939",
+          danger: true,
+          run: () => deleteDraftFolder(name)
+        }
+      ]);
+    };
+  });
+  $$(".doc[draggable]").forEach((b) => {
+    b.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/inkdesk-doc", b.dataset.id);
+      e.dataTransfer.setData("text/plain", "inkdesk-doc:" + b.dataset.id);
+      e.dataTransfer.effectAllowed = "move";
+      b.classList.add("dragging");
+    });
+    b.addEventListener("dragend", () => {
+      b.classList.remove("dragging");
+      $$(".is-drop-target").forEach(
+        (el) => el.classList.remove("is-drop-target")
+      );
+    });
+  });
+  const dropTargets = [
+    $2(".docs"),
+    ...$$(".docs-project[data-drop-project]")
+  ].filter(Boolean);
+  for (const el of dropTargets) {
+    el.addEventListener("dragenter", (e) => {
+      if (!isDraftDocDrag(e)) return;
+      e.preventDefault();
+      el.classList.add("is-drop-target");
+    });
+    el.addEventListener("dragover", (e) => {
+      if (!isDraftDocDrag(e)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      el.classList.add("is-drop-target");
+    });
+    el.addEventListener("dragleave", (e) => {
+      if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+      el.classList.remove("is-drop-target");
+    });
+    el.addEventListener("drop", async (e) => {
+      if (!isDraftDocDrag(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      el.classList.remove("is-drop-target");
+      const id = e.dataTransfer.getData("text/inkdesk-doc") || String(e.dataTransfer.getData("text/plain") || "").replace(
+        /^inkdesk-doc:/,
+        ""
+      );
+      if (!id) return;
+      const project = el.dataset.dropProject === void 0 ? "" : el.dataset.dropProject;
+      await moveDraftToProject(id, project || null);
+    });
+  }
+}
+function isDraftDocDrag(e) {
+  const types = [...e.dataTransfer?.types || []];
+  return types.includes("text/inkdesk-doc") || types.includes("text/plain");
+}
+async function createDraftFolder() {
+  if (!account) return toast("\u8BF7\u5148\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7");
+  const name = await promptText("\u65B0\u5EFA\u6587\u4EF6\u5939", {
+    placeholder: "\u4F8B\u5982\uFF1AAI\u6E38\u620F\u7CFB\u5217",
+    okLabel: "\u521B\u5EFA"
+  });
+  if (!name) return;
+  sync();
+  try {
+    await persist();
+    const result = await api("draft-project-create", { account, name });
+    Object.assign(state, result);
+    await refreshDraftProjects();
+    collapsedProjects.delete(result.project || name);
+    saveCollapsedProjects();
+    render2();
+    toast("\u5DF2\u521B\u5EFA\u6587\u4EF6\u5939");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+async function deleteDraftFolder(name) {
+  if (!account || !name) return;
+  const count = state.documents.filter(
+    (d) => sameAccount(d.account, account) && d.status !== "final" && d.status !== "archive" && draftProjectOf(d) === name
+  ).length;
+  const ok = count ? await askConfirm(
+    "\u5220\u9664\u6587\u4EF6\u5939",
+    `\u300C${name}\u300D\u5185\u6709 ${count} \u7BC7\u8349\u7A3F\u3002\u5220\u9664\u6587\u4EF6\u5939\u5C06\u540C\u65F6\u6E05\u9664\u5176\u4E2D\u5168\u90E8\u6587\u4EF6\uFF0C\u4E14\u4E0D\u53EF\u6062\u590D\u3002\u786E\u5B9A\u7EE7\u7EED\uFF1F`
+  ) : await askConfirm("\u5220\u9664\u6587\u4EF6\u5939", `\u786E\u5B9A\u5220\u9664\u7A7A\u6587\u4EF6\u5939\u300C${name}\u300D\uFF1F`);
+  if (!ok) return;
+  sync();
+  try {
+    await persist();
+    const result = await api("draft-project-delete", { account, name });
+    Object.assign(state, result);
+    if (current && draftProjectOf(current) === name) {
+      current = state.documents.find((d) => sameAccount(d.account, account)) || state.documents[0] || null;
+      page = current ? "write" : "dashboard";
+    }
+    collapsedProjects.delete(name);
+    saveCollapsedProjects();
+    await refreshDraftProjects();
+    dirty = false;
+    pending = null;
+    render2();
+    toast(count ? `\u5DF2\u5220\u9664\u6587\u4EF6\u5939\u53CA ${count} \u7BC7\u8349\u7A3F` : "\u5DF2\u5220\u9664\u6587\u4EF6\u5939");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+async function moveDraftToProject(id, project) {
+  const doc3 = state.documents.find((d) => d.id === id);
+  if (!doc3) return;
+  const currentProject = draftProjectOf(doc3);
+  const next2 = project || null;
+  if ((currentProject || null) === next2) return;
+  sync();
+  try {
+    await persist();
+    const result = await api("draft-move", { id, project: next2 });
+    Object.assign(state, result);
+    current = state.documents.find((d) => d.id === id) || current;
+    await refreshDraftProjects();
+    if (next2) {
+      collapsedProjects.delete(next2);
+      saveCollapsedProjects();
+    }
+    dirty = false;
+    render2();
+    toast(next2 ? `\u5DF2\u79FB\u5230\u300C${next2}\u300D` : "\u5DF2\u79FB\u5230\u6839\u76EE\u5F55");
+  } catch (e) {
+    toast(e.message);
+  }
 }
 async function openComposerAddMenu(anchor) {
   if ($2("#composer-add-menu")) {
@@ -36448,6 +36675,8 @@ async function installAppUpdate() {
 state = await api("load");
 ensureAccount();
 current = state.documents.find((d) => sameAccount(d.account, account));
+loadCollapsedProjects();
+await refreshDraftProjects();
 if (!isWeb()) {
   try {
     const info = await api("app-info");
