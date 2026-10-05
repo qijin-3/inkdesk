@@ -143,7 +143,7 @@ function mountAgentUsage(root2, api2, providers, opts = {}) {
 }
 
 // ui/dom.js
-var $2 = (s, r = document) => r.querySelector(s);
+var $ = (s, r = document) => r.querySelector(s);
 var $$ = (s, r = document) => [...r.querySelectorAll(s)];
 var api = (n, d) => window.desk.call(n, d);
 var esc2 = (s = "") => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -156,7 +156,7 @@ var fmtBytes = (n) => {
 var formatBytes = fmtBytes;
 var toastTimer = 0;
 function toast(t, opts) {
-  const el = $2("#toast");
+  const el = $("#toast");
   if (!el) return;
   el.textContent = t;
   el.classList.add("show");
@@ -166,7 +166,7 @@ function toast(t, opts) {
 }
 function hideToast() {
   clearTimeout(toastTimer);
-  $2("#toast")?.classList.remove("show");
+  $("#toast")?.classList.remove("show");
 }
 var isWeb = () => typeof window === "undefined" ? false : !!window.desk?.web;
 function assetUrl(src) {
@@ -27882,18 +27882,18 @@ var import_calendar = __toESM(require_calendar());
 // ui/dialog.js
 function promptText(title, opts = {}) {
   return new Promise((resolve) => {
-    $2("#text-prompt-modal")?.remove();
+    $("#text-prompt-modal")?.remove();
     const m = document.createElement("div");
     m.id = "text-prompt-modal";
     m.className = "modal";
     m.innerHTML = `<div class="dialog" style="width:min(420px,92vw)"><h2>${esc2(title)}</h2><input id="text-prompt-input" type="text" value="${esc2(opts.value || "")}" placeholder="${esc2(opts.placeholder || "")}" autocomplete="off"><div class="row"><button type="button" id="text-prompt-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="text-prompt-ok">${esc2(opts.okLabel || "\u786E\u5B9A")}</button></div></div>`;
     document.body.append(m);
-    const input = $2("#text-prompt-input");
+    const input = $("#text-prompt-input");
     const done = (value) => {
       m.remove();
       resolve(value);
     };
-    $2("#text-prompt-cancel").onclick = () => done(null);
+    $("#text-prompt-cancel").onclick = () => done(null);
     m.addEventListener("click", (e) => {
       if (e.target === m) done(null);
     });
@@ -27901,7 +27901,7 @@ function promptText(title, opts = {}) {
       const v = input.value.trim();
       done(v || null);
     };
-    $2("#text-prompt-ok").onclick = submit;
+    $("#text-prompt-ok").onclick = submit;
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -27924,7 +27924,7 @@ function askCreateAccount() {
     m.className = "modal";
     m.innerHTML = `<div class="dialog account-create-dialog"><h2>\u65B0\u5EFA\u8D26\u53F7</h2><label class="account-create-field">\u8D26\u53F7\u540D\u79F0<input id="ask-account-name" type="text" value="" placeholder="\u4F8B\u5982\uFF1A\u91D1\u5947_AI" autocomplete="off"></label><div class="account-mode-label">\u8D26\u53F7\u6A21\u5F0F</div><div class="account-mode-cards" role="radiogroup" aria-label="\u8D26\u53F7\u6A21\u5F0F"><label class="account-mode-card is-selected"><input type="radio" name="account-mode" value="xhs" checked><img class="account-mode-card-img" src="assets/mode-xhs.png" alt="" draggable="false"><strong>\u5C0F\u7EA2\u4E66</strong></label><label class="account-mode-card"><input type="radio" name="account-mode" value="x"><img class="account-mode-card-img" src="assets/mode-x.png" alt="" draggable="false"><strong>X</strong></label></div><div class="row"><button type="button" id="ask-account-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="ask-account-ok">\u521B\u5EFA</button></div></div>`;
     document.body.append(m);
-    const input = $2("#ask-account-name");
+    const input = $("#ask-account-name");
     input?.focus();
     const syncCards = () => {
       m.querySelectorAll(".account-mode-card").forEach((card) => {
@@ -27939,14 +27939,14 @@ function askCreateAccount() {
       m.remove();
       resolve(v);
     };
-    $2("#ask-account-cancel").onclick = () => done(null);
+    $("#ask-account-cancel").onclick = () => done(null);
     const submit = () => {
       const name = input.value.trim();
       if (!name) return;
       const mode = m.querySelector('input[name="account-mode"]:checked')?.value === "x" ? "x" : "xhs";
       done({ name, mode });
     };
-    $2("#ask-account-ok").onclick = submit;
+    $("#ask-account-ok").onclick = submit;
     input?.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -27978,8 +27978,8 @@ function askAccountMode() {
       m.remove();
       resolve(v);
     };
-    $2("#ask-mode-cancel").onclick = () => done(null);
-    $2("#ask-mode-ok").onclick = () => {
+    $("#ask-mode-cancel").onclick = () => done(null);
+    $("#ask-mode-ok").onclick = () => {
       const mode = m.querySelector('input[name="account-mode"]:checked')?.value === "x" ? "x" : "xhs";
       done(mode);
     };
@@ -27997,11 +27997,11 @@ function askConfirm(title, message) {
     m.className = "modal";
     m.innerHTML = `<div class="dialog"><h2>${esc2(title)}</h2><p>${esc2(message)}</p><div class="row"><button type="button" id="ask-confirm-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="ask-confirm-ok">\u786E\u5B9A</button></div></div>`;
     document.body.append(m);
-    $2("#ask-confirm-cancel").onclick = () => {
+    $("#ask-confirm-cancel").onclick = () => {
       m.remove();
       resolve(false);
     };
-    $2("#ask-confirm-ok").onclick = () => {
+    $("#ask-confirm-ok").onclick = () => {
       m.remove();
       resolve(true);
     };
@@ -28010,7 +28010,7 @@ function askConfirm(title, message) {
 
 // ui/popover.js
 function showContextMenu(x, y, items) {
-  $2("#context-menu")?.remove();
+  $("#context-menu")?.remove();
   const menu = document.createElement("div");
   menu.id = "context-menu";
   menu.className = "context-menu";
@@ -30976,7 +30976,6 @@ function showUnmatchedMatcher(preview) {
     ).join(
       ""
     )}<div class="row"><button type="button" id="cancel-unmatched">\u53D6\u6D88\u5BFC\u5165</button><button type="button" id="confirm-unmatched" class="primary">\u786E\u8BA4\u5339\u914D</button></div></div>`;
-    document.body.append(m);
     m.querySelectorAll(".match-row").forEach((row) => {
       const u = preview.unmatched.find((x) => x.index === +row.dataset.index);
       const search = row.querySelector(".match-search");
@@ -30988,11 +30987,13 @@ function showUnmatchedMatcher(preview) {
           pick.value = current2;
       };
     });
-    $("#close-unmatched").onclick = $("#cancel-unmatched").onclick = () => {
+    const closeUnmatched = () => {
       m.remove();
       resolve(null);
     };
-    $("#confirm-unmatched").onclick = () => {
+    m.querySelector("#close-unmatched").onclick = closeUnmatched;
+    m.querySelector("#cancel-unmatched").onclick = closeUnmatched;
+    m.querySelector("#confirm-unmatched").onclick = () => {
       const extra = [];
       m.querySelectorAll(".match-row").forEach((row) => {
         const path = row.querySelector(".match-pick").value;
@@ -31001,6 +31002,10 @@ function showUnmatchedMatcher(preview) {
       m.remove();
       resolve(extra);
     };
+    m.addEventListener("click", (e) => {
+      if (e.target === m) closeUnmatched();
+    });
+    document.body.append(m);
   });
 }
 
@@ -31312,7 +31317,7 @@ function agentModelsPanelHtml(st, p, info) {
 // ui/provider-connect.js
 function promptConnectProvider(st) {
   return new Promise((resolve) => {
-    $2("#provider-connect-modal")?.remove();
+    $("#provider-connect-modal")?.remove();
     ensureAgentHttpStore(st);
     const connected = new Set(connectedHttpProviders(st).map((p) => p.id));
     const catalog = providerCatalog();
@@ -31333,8 +31338,8 @@ function promptConnectProvider(st) {
   <div class="provider-connect-list" id="provider-connect-list"></div>
 </div>`;
     document.body.append(m);
-    const listEl = $2("#provider-connect-list");
-    const filterEl = $2("#provider-connect-filter");
+    const listEl = $("#provider-connect-list");
+    const filterEl = $("#provider-connect-filter");
     const done = (value) => {
       m.remove();
       resolve(value);
@@ -31366,7 +31371,7 @@ function promptConnectProvider(st) {
         btn.onclick = () => done(btn.getAttribute("data-provider-id"));
       });
     };
-    $2("#provider-connect-close").onclick = () => done(null);
+    $("#provider-connect-close").onclick = () => done(null);
     m.addEventListener("click", (e) => {
       if (e.target === m) done(null);
     });
@@ -32302,7 +32307,7 @@ async function persist() {
   return docStore.persist();
 }
 function setSavedStatus(text) {
-  const n = $2("#saved");
+  const n = $("#saved");
   if (!n) return;
   n.textContent = text;
   n.hidden = !text;
@@ -32312,14 +32317,14 @@ function showSaveConflictDialog(msg) {
   docStore.saveConflict = true;
   setSavedStatus("\u4FDD\u5B58\u5DF2\u6682\u505C");
   toast("\u4FDD\u5B58\u5931\u8D25\uFF1A" + msg);
-  if ($2("#save-conflict-modal")) return;
+  if ($("#save-conflict-modal")) return;
   const m = document.createElement("div");
   m.id = "save-conflict-modal";
   m.className = "modal";
   m.innerHTML = '<div class="dialog"><h2>\u6587\u7AE0\u5DF2\u5728\u5916\u90E8\u4FEE\u6539</h2><p>\u78C1\u76D8\u4E0A\u7684\u8349\u7A3F\u4E0E\u5F53\u524D\u7F16\u8F91\u5668\u4E0D\u4E00\u81F4\u3002\u7EE7\u7EED\u81EA\u52A8\u4FDD\u5B58\u4F1A\u8986\u76D6\u5916\u90E8\u6539\u52A8\uFF0C\u56E0\u6B64\u5DF2\u6682\u505C\u4FDD\u5B58\u3002</p><p class="muted">\u5E38\u89C1\u539F\u56E0\uFF1A\u5728 Obsidian / \u5176\u4ED6\u7F16\u8F91\u5668\u4E2D\u6539\u8FC7\u540C\u4E00\u7BC7\uFF0C\u6216\u53E6\u4E00\u7A97\u53E3\u4E5F\u6253\u5F00\u4E86 Aster*\u3002</p><div class="row"><button type="button" id="conflict-keep">\u5148\u7559\u5728\u7F16\u8F91\u5668</button><button type="button" id="conflict-reload" class="primary">\u5907\u4EFD\u672A\u4FDD\u5B58\u5185\u5BB9\u5E76\u5237\u65B0</button></div></div>';
   document.body.append(m);
-  $2("#conflict-keep").onclick = () => m.remove();
-  $2("#conflict-reload").onclick = async () => {
+  $("#conflict-keep").onclick = () => m.remove();
+  $("#conflict-reload").onclick = async () => {
     try {
       const result = await api("recover-refresh", state);
       docStore.saveConflict = false;
@@ -32370,10 +32375,10 @@ function render2() {
     reviewMode = false;
     reviewIndex = 0;
   }
-  $2("#reference-drawer")?.remove();
-  $2("#published-drawer")?.remove();
-  $2("#topic-drawer")?.remove();
-  $2("#outline-popover")?.remove();
+  $("#reference-drawer")?.remove();
+  $("#published-drawer")?.remove();
+  $("#topic-drawer")?.remove();
+  $("#outline-popover")?.remove();
   removeArticleOutline();
   if (composer) {
     composer.destroy();
@@ -32392,7 +32397,7 @@ function render2() {
     previewDocId = null;
   }
   if (page !== "published-preview") publishedPreview = null;
-  $2("#app").innerHTML = `<aside class="sidebar"><div class="account">${accountList().map(
+  $("#app").innerHTML = `<aside class="sidebar"><div class="account">${accountList().map(
     (a) => `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc2(a.id)}" title="${esc2(a.label)}" aria-label="${esc2(a.label)}">${accountAvatarHtml(a)}</button>`
   ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>\u7075\u611F\u5E93</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>\u8BBE\u7F6E</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <span class="list-head-actions"><button type="button" id="new-folder" title="\u65B0\u5EFA\u6587\u4EF6\u5939" aria-label="\u65B0\u5EFA\u6587\u4EF6\u5939">${I.folderClosed({ size: 16 })}</button><button type="button" id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></span></div><div class="docs" data-drop-project="">${draftsSidebarHtml(
     state.documents.filter(
@@ -32481,8 +32486,8 @@ function render2() {
       render2();
     }
   );
-  $2("#new").onclick = newDoc;
-  $2("#new-folder")?.addEventListener("click", () => createDraftFolder());
+  $("#new").onclick = newDoc;
+  $("#new-folder")?.addEventListener("click", () => createDraftFolder());
   bindDraftProjectUi();
   $$(".doc").forEach((b) => {
     b.oncontextmenu = (e) => {
@@ -32584,7 +32589,7 @@ function bindDraftProjectUi() {
     });
   });
   const dropTargets = [
-    $2(".docs"),
+    $(".docs"),
     ...$$(".docs-project[data-drop-project]")
   ].filter(Boolean);
   for (const el of dropTargets) {
@@ -32698,9 +32703,9 @@ async function moveDraftToProject(id, project) {
   }
 }
 async function openComposerAddMenu(anchor) {
-  if ($2("#composer-add-menu")) {
+  if ($("#composer-add-menu")) {
     dismissActiveComposerMenu();
-    $2("#composer-add-menu")?.remove();
+    $("#composer-add-menu")?.remove();
     return;
   }
   dismissActiveComposerMenu();
@@ -32806,7 +32811,7 @@ async function deleteDraft(id) {
     toast(e.message);
   }
 }
-function enhanceWechatPreview(root2 = $2("#article-preview")) {
+function enhanceWechatPreview(root2 = $("#article-preview")) {
   if (!root2) return;
   root2.querySelectorAll("h1").forEach(splitWechatH1);
   const h2Style = `display:inline-block;max-width:100%;box-sizing:border-box;margin:16px 0 14px;padding:8px 10px;background:${WECHAT_BLUE};color:#ffffff;font-family:${WECHAT_SERIF};font-size:20px;font-weight:800;line-height:1.25;`;
@@ -32893,8 +32898,8 @@ function togglePreview() {
 }
 var closeVersionDropdown = null;
 function bindArticleHeader() {
-  if ($2("#layout")) $2("#layout").onclick = togglePreview;
-  $2("#save-version").onclick = async () => {
+  if ($("#layout")) $("#layout").onclick = togglePreview;
+  $("#save-version").onclick = async () => {
     closeVersionDropdown?.();
     sync();
     current.snapshots.push({
@@ -32906,9 +32911,9 @@ function bindArticleHeader() {
     dirty = true;
     if (await persist()) toast("\u5DF2\u4FDD\u5B58");
   };
-  $2("#version-menu").onclick = (e) => {
+  $("#version-menu").onclick = (e) => {
     e.stopPropagation();
-    if ($2("#version-dropdown")) {
+    if ($("#version-dropdown")) {
       closeVersionDropdown?.();
       return;
     }
@@ -32924,7 +32929,7 @@ async function openVersionHistoryMenu() {
   } catch (e) {
     return toast(e.message);
   }
-  const anchor = $2("#save-split");
+  const anchor = $("#save-split");
   if (!anchor) return;
   const menu = document.createElement("div");
   menu.id = "version-dropdown";
@@ -32948,11 +32953,11 @@ async function openVersionHistoryMenu() {
     if (top + h2 > window.innerHeight - 12)
       menu.style.top = Math.max(12, rect.top - h2 - 6) + "px";
   });
-  $2("#version-menu")?.setAttribute("aria-expanded", "true");
+  $("#version-menu")?.setAttribute("aria-expanded", "true");
   const close2 = () => {
     if (closeVersionDropdown === close2) closeVersionDropdown = null;
     menu.remove();
-    $2("#version-menu")?.setAttribute("aria-expanded", "false");
+    $("#version-menu")?.setAttribute("aria-expanded", "false");
     window.removeEventListener("click", close2);
     window.removeEventListener("resize", close2);
   };
@@ -32983,7 +32988,7 @@ async function openVersionHistoryMenu() {
   }, 0);
 }
 function bindFinalize() {
-  const btn = $2("#finalize");
+  const btn = $("#finalize");
   if (!btn) return;
   btn.onclick = async () => {
     if (!current) return toast("\u8BF7\u5148\u6253\u5F00\u4E00\u7BC7\u8349\u7A3F");
@@ -33029,20 +33034,20 @@ function clearAsterRail() {
   unmountAsterRail = null;
 }
 function syncRailVisibility() {
-  const rail = $2("#rail");
-  const resizer = $2("#workspace-resizer");
+  const rail = $("#rail");
+  const resizer = $("#workspace-resizer");
   const draftWriting = page === "write" && !!current;
   if (!rail) return;
   if (!draftWriting || previewMode) {
     rail.classList.add("hidden");
     resizer?.classList.add("hidden");
-    $2(".aster-dock")?.classList.add("hidden");
+    $(".aster-dock")?.classList.add("hidden");
     return;
   }
   rail.classList.toggle("hidden", !assistantOpen);
   resizer?.classList.toggle("hidden", !assistantOpen);
-  $2(".aster-dock")?.classList.toggle("hidden", assistantOpen);
-  const toggle = $2("#toggle-assistant");
+  $(".aster-dock")?.classList.toggle("hidden", assistantOpen);
+  const toggle = $("#toggle-assistant");
   if (toggle) {
     toggle.setAttribute(
       "aria-pressed",
@@ -33050,15 +33055,15 @@ function syncRailVisibility() {
     );
     syncAsterFace();
   }
-  $2("#article-materials")?.classList.toggle(
+  $("#article-materials")?.classList.toggle(
     "primary",
     assistantOpen && railMode === "materials"
   );
-  requestAnimationFrame(() => $2("#article-outline")?._place?.());
+  requestAnimationFrame(() => $("#article-outline")?._place?.());
 }
 function openAssistant() {
   if (page !== "write" || !current || previewMode) return;
-  const already = assistantOpen && railMode === "assistant" && $2("#panel")?.dataset.ready && $2("#rail")?.dataset.railMode === "assistant";
+  const already = assistantOpen && railMode === "assistant" && $("#panel")?.dataset.ready && $("#rail")?.dataset.railMode === "assistant";
   railMode = "assistant";
   if (already) {
     syncRailVisibility();
@@ -33076,7 +33081,7 @@ function openArticleMaterials() {
   renderAssistantRail();
 }
 function renderAssistantRail() {
-  const rail = $2("#rail");
+  const rail = $("#rail");
   if (!rail) return;
   clearAsterRail();
   if (composer) {
@@ -33105,7 +33110,7 @@ function renderAssistantRail() {
   if (railMode === "materials") {
     rail.dataset.railMode = "materials";
     rail.innerHTML = `<div class="assistant-head"><span>${I.library()} \u7D20\u6750</span><div class="assistant-head-actions"><button type="button" id="upload-article-material" class="ghost icon-btn" title="\u4E0A\u4F20" aria-label="\u4E0A\u4F20">${I.upload({ size: 18 })}</button><button type="button" id="close-assistant" class="ghost icon-btn" title="\u6536\u8D77" aria-label="\u6536\u8D77">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1" class="article-materials-panel"><div id="article-material-list" class="material-cards"></div></div>`;
-    $2("#close-assistant").onclick = () => {
+    $("#close-assistant").onclick = () => {
       assistantOpen = false;
       syncRailVisibility();
     };
@@ -33115,9 +33120,9 @@ function renderAssistantRail() {
   }
   rail.dataset.railMode = "assistant";
   rail.innerHTML = `<div class="assistant-head">${asterHtml({ size: 32, id: "aster-rail", button: false })}<select id="conversation" class="assistant-conversation" aria-label="\u5BF9\u8BDD">${conversationOptionsHTML()}</select><div class="assistant-head-actions"><button type="button" id="new-conversation" class="ghost icon-btn" title="\u4E3A\u672C\u7BC7\u521B\u5EFA\u65B0\u5BF9\u8BDD" aria-label="\u65B0\u5BF9\u8BDD">${I.plus({ size: 18 })}</button><button type="button" id="close-assistant" class="ghost icon-btn" title="\u6536\u8D77" aria-label="\u6536\u8D77">${I.panelClose({ size: 18 })}</button></div></div><div id="panel" data-ready="1"></div>`;
-  unmountAsterRail = mountAster($2("#aster-rail"));
+  unmountAsterRail = mountAster($("#aster-rail"));
   syncAsterFace();
-  $2("#close-assistant").onclick = () => {
+  $("#close-assistant").onclick = () => {
     assistantOpen = false;
     syncRailVisibility();
   };
@@ -33139,8 +33144,8 @@ function conversationOptionsHTML() {
   return current.conversations.map((c) => `<option value="${esc2(c.id)}">${esc2(c.title)}</option>`).join("");
 }
 function bindConversationHead() {
-  const sel = $2("#conversation");
-  const neu = $2("#new-conversation");
+  const sel = $("#conversation");
+  const neu = $("#new-conversation");
   if (!current || !sel) return;
   sel.innerHTML = conversationOptionsHTML();
   sel.value = conversation(current).id;
@@ -33164,9 +33169,9 @@ function bindConversationHead() {
     };
 }
 function bindArticleMaterialsPanel() {
-  const listEl = $2("#article-material-list");
-  const uploadBtn = $2("#upload-article-material");
-  const panel = $2("#panel.article-materials-panel") || $2(".article-materials-panel");
+  const listEl = $("#article-material-list");
+  const uploadBtn = $("#upload-article-material");
+  const panel = $("#panel.article-materials-panel") || $(".article-materials-panel");
   const doc3 = current;
   if (!listEl || !doc3) return;
   const draw = async () => {
@@ -33282,7 +33287,7 @@ function bindArticleMaterialsPanel() {
 }
 function setPreviewPane(pane) {
   previewPane = pane === "social" ? "social" : "wechat";
-  const wrap2 = $2(".paper-wrap");
+  const wrap2 = $(".paper-wrap");
   if (!wrap2) return;
   wrap2.querySelectorAll("[data-preview-pane]").forEach((btn) => {
     const on = btn.dataset.previewPane === previewPane;
@@ -33294,7 +33299,7 @@ function setPreviewPane(pane) {
   });
 }
 function removeArticleOutline() {
-  const outline = $2("#article-outline");
+  const outline = $("#article-outline");
   outline?._teardown?.();
   if (outline) {
     outline.hidden = true;
@@ -33310,17 +33315,17 @@ function renderPreviewInner() {
   previewDocId = current.id;
   removeArticleOutline();
   if (previewPane !== "social") previewPane = "wechat";
-  $2("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button><button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${articleSourceHTML()}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
   bindArticleHeader();
   bindFinalize();
   enhanceWechatPreview();
   $$("[data-preview-pane]").forEach((btn) => {
     btn.onclick = () => setPreviewPane(btn.dataset.previewPane);
   });
-  $2("#copy-publish").onclick = () => copyPublish(current);
-  $2("#push-wechat").onclick = () => pushWechatDraft(current);
+  $("#copy-publish").onclick = () => copyPublish(current);
+  $("#push-wechat").onclick = () => pushWechatDraft(current);
   renderAssistantRail();
-  socialPreviewCtl = bindSocialPreview($2(".paper-wrap") || document, {
+  socialPreviewCtl = bindSocialPreview($(".paper-wrap") || document, {
     html: socialSourceHTML(),
     title: current.title,
     api,
@@ -33342,34 +33347,34 @@ function renderPublishedPreviewInner() {
   };
   const html2 = publishedSourceHTML(doc3.body);
   if (isXAccount()) {
-    $2("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${esc2(publishedPreview.path.split("/").pop())} <span>${(doc3.body || "").length} \u5B57</span></div></div><div class="header-actions"><button type="button" id="published-backup">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" id="published-to-draft">\u79FB\u56DE\u8349\u7A3F</button><button id="layout" class="primary">\u8FD4\u56DE</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper"><h1 class="preview-title">${esc2(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${html2}</div></article></section></div>`;
-    $2("#layout").onclick = () => {
+    $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${esc2(publishedPreview.path.split("/").pop())} <span>${(doc3.body || "").length} \u5B57</span></div></div><div class="header-actions"><button type="button" id="published-backup">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" id="published-to-draft">\u79FB\u56DE\u8349\u7A3F</button><button id="layout" class="primary">\u8FD4\u56DE</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><article class="paper"><h1 class="preview-title">${esc2(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${html2}</div></article></section></div>`;
+    $("#layout").onclick = () => {
       publishedPreview = null;
       page = "dashboard";
       render2();
     };
-    $2("#published-to-draft").onclick = () => movePublishedToDraft(publishedPreview.path);
-    $2("#published-backup").onclick = () => backupPublishedArticle(publishedPreview.path);
+    $("#published-to-draft").onclick = () => movePublishedToDraft(publishedPreview.path);
+    $("#published-backup").onclick = () => backupPublishedArticle(publishedPreview.path);
     renderAssistantRail();
     return;
   }
   if (previewPane !== "social") previewPane = "wechat";
-  $2("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${esc2(publishedPreview.path.split("/").pop())} <span>${(doc3.body || "").length} \u5B57</span></div></div><div class="header-actions"><button type="button" id="published-backup">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" id="published-to-draft">\u79FB\u56DE\u8349\u7A3F</button><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc2(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${html2}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
-  $2("#layout").onclick = () => {
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div class="byline">${esc2(publishedPreview.path.split("/").pop())} <span>${(doc3.body || "").length} \u5B57</span></div></div><div class="header-actions"><button type="button" id="published-backup">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" id="published-to-draft">\u79FB\u56DE\u8349\u7A3F</button><button id="layout" class="primary">\u9000\u51FA\u9884\u89C8</button></div></header><div class="workspace preview-mode"><section class="paper-wrap"><div class="formatbar preview-toolbar"><div class="preview-tabs" role="tablist" aria-label="\u9884\u89C8\u5206\u680F"><button type="button" role="tab" data-preview-pane="wechat" class="${previewPane === "wechat" ? "active" : ""}" aria-selected="${previewPane === "wechat"}">\u516C\u4F17\u53F7</button><button type="button" role="tab" data-preview-pane="social" class="${previewPane === "social" ? "active" : ""}" aria-selected="${previewPane === "social"}">\u5C0F\u7EA2\u4E66</button></div><span></span><button type="button" id="social-export" disabled>${I.imageDown()} \u5BFC\u51FA\u56FE\u7247</button><button type="button" id="copy-publish">${I.copy()} \u590D\u5236\u6392\u7248</button><button type="button" id="push-wechat">${I.send()} \u63A8\u9001\u5230\u516C\u4F17\u53F7</button></div><div class="preview-pane" data-pane="wechat" ${previewPane !== "wechat" ? "hidden" : ""}><article class="paper wechat-preview"><h1 class="preview-title">${esc2(doc3.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1><div id="article-preview">${html2}</div></article></div><div class="preview-pane preview-pane-social" data-pane="social" ${previewPane !== "social" ? "hidden" : ""}><p id="social-status" class="social-pane-status">\u6B63\u5728\u6392\u7248\u2026</p><div id="social-pages"></div></div></section></div>`;
+  $("#layout").onclick = () => {
     publishedPreview = null;
     page = "dashboard";
     render2();
   };
-  $2("#published-to-draft").onclick = () => movePublishedToDraft(publishedPreview.path);
-  $2("#published-backup").onclick = () => backupPublishedArticle(publishedPreview.path);
+  $("#published-to-draft").onclick = () => movePublishedToDraft(publishedPreview.path);
+  $("#published-backup").onclick = () => backupPublishedArticle(publishedPreview.path);
   enhanceWechatPreview();
   $$("[data-preview-pane]").forEach((btn) => {
     btn.onclick = () => setPreviewPane(btn.dataset.previewPane);
   });
-  $2("#copy-publish").onclick = () => copyPublish(doc3);
-  $2("#push-wechat").onclick = () => pushWechatDraft(doc3);
+  $("#copy-publish").onclick = () => copyPublish(doc3);
+  $("#push-wechat").onclick = () => pushWechatDraft(doc3);
   renderAssistantRail();
-  socialPreviewCtl = bindSocialPreview($2(".paper-wrap") || document, {
+  socialPreviewCtl = bindSocialPreview($(".paper-wrap") || document, {
     html: html2,
     title: doc3.title,
     api,
@@ -33381,8 +33386,8 @@ function renderWrite(...a) {
 }
 function renderWriteInner() {
   if (!current) {
-    $2("#main").innerHTML = `<div class="empty"><span class="eyebrow">A SPACE FOR YOUR WORDS</span><h1>\u628A\u60F3\u8BF4\u7684\u8BDD\uFF0C\u5199\u4E0B\u6765\u3002</h1><p>\u4ECE\u8349\u7A3F\u5F00\u59CB\uFF0C\u6216\u5BFC\u5165\u5DF2\u6709\u6587\u7AE0\u3002AI \u5728\u4F60\u9700\u8981\u65F6\u5E2E\u5FD9\u3002</p><button class="primary" id="start">${I.plus()} \u65B0\u5EFA\u6587\u7AE0</button></div>`;
-    $2("#start").onclick = newDoc;
+    $("#main").innerHTML = `<div class="empty"><span class="eyebrow">A SPACE FOR YOUR WORDS</span><h1>\u628A\u60F3\u8BF4\u7684\u8BDD\uFF0C\u5199\u4E0B\u6765\u3002</h1><p>\u4ECE\u8349\u7A3F\u5F00\u59CB\uFF0C\u6216\u5BFC\u5165\u5DF2\u6709\u6587\u7AE0\u3002AI \u5728\u4F60\u9700\u8981\u65F6\u5E2E\u5FD9\u3002</p><button class="primary" id="start">${I.plus()} \u65B0\u5EFA\u6587\u7AE0</button></div>`;
+    $("#start").onclick = newDoc;
     renderAssistantRail();
     return;
   }
@@ -33401,19 +33406,19 @@ function renderWriteInner() {
   unmountAster?.();
   unmountAster = null;
   const previewBtn = isXAccount() ? "" : `<button id="layout">\u9884\u89C8</button>`;
-  $2("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div>${previewBtn}<button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(state, current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="\u5BA1\u9605" aria-haspopup="true" aria-expanded="false">${I.eye()} \u5BA1\u9605</button><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></div><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">\u5BA1\u9605\u4E2D</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">\u5168\u90E8\u63A5\u53D7</button><button type="button" data-inline="reject-all">\u5168\u90E8\u62D2\u7EDD</button><button type="button" data-inline="finish" class="primary">\u5B8C\u6210</button></div></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc2(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD</span></button></div></div>`;
-  unmountAster = mountAster($2("#toggle-assistant"));
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">${esc2(current.title || "\u672A\u547D\u540D\u6587\u7AE0")}</h1></div><div class="header-actions"><div class="save-split" id="save-split"><button type="button" id="save-version">\u4FDD\u5B58</button><button type="button" id="version-menu" aria-label="\u7248\u672C\u5386\u53F2" aria-haspopup="true" aria-expanded="false">${I.chevronDown({ size: 14 })}</button></div>${previewBtn}<button id="finalize" class="primary">\u5DF2\u53D1\u5E03</button></div></header><div class="workspace"><div class="paper-stage"><section class="paper-wrap"><div class="paper-meta-dock"><div class="paper-meta-stack"><aside id="article-outline" class="article-outline" hidden></aside><div class="paper-meta byline" aria-label="\u6587\u7AE0\u4FE1\u606F">${(/* @__PURE__ */ new Date()).toLocaleDateString("zh-CN")} <span id="wordcount">${current.body.length} \u5B57</span><span id="saved" hidden></span></div></div></div><div class="formatbar"><div class="formatbar-edit-tools"><button data-fmt="bold" title="\u52A0\u7C97">${I.bold()}</button><button data-fmt="italic" title="\u659C\u4F53">${I.italic()}</button><button data-fmt="heading1" title="\u4E00\u7EA7\u6807\u9898">${I.h1()}</button><button data-fmt="heading" title="\u4E8C\u7EA7\u6807\u9898">${I.h2()}</button><button data-fmt="bulletList" title="\u5217\u8868">${I.list()}</button><button data-fmt="blockquote" title="\u5F15\u7528">${I.quote()}</button><button id="image" title="\u63D2\u5165\u56FE\u7247">${I.image()}</button></div><span class="formatbar-spacer"></span><div class="formatbar-edit-tools formatbar-edit-end"><select id="article-group" class="article-group-inline" aria-label="\u6587\u7AE0\u5206\u7EC4" title="\u5206\u7EC4\u5F71\u54CD\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84">${groupOptionsHtml(state, current.group)}</select><div class="review-menu"><button type="button" id="toggle-review" title="\u5BA1\u9605" aria-haspopup="true" aria-expanded="false">${I.eye()} \u5BA1\u9605</button><div class="selection-bar" hidden><span id="selection-label">\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572</span><button id="tag-selection">${I.tags()} \u5F15\u7528\u9009\u6BB5</button></div></div><button id="focus" title="\u4E13\u6CE8">${I.focus()} \u4E13\u6CE8</button><button id="article-materials" title="\u672C\u6587\u7D20\u6750">${I.library()} \u7D20\u6750</button></div><div class="formatbar-review-tools" hidden><span class="formatbar-review-tag" aria-live="polite">\u5BA1\u9605\u4E2D</span><span class="formatbar-review-spacer"></span><button type="button" data-inline="accept-all">\u5168\u90E8\u63A5\u53D7</button><button type="button" data-inline="reject-all">\u5168\u90E8\u62D2\u7EDD</button><button type="button" data-inline="finish" class="primary">\u5B8C\u6210</button></div></div><article class="paper"><input id="title" placeholder="\u7ED9\u8FD9\u4E2A\u60F3\u6CD5\u8D77\u4E2A\u540D\u5B57" value="${esc2(current.title)}"><div id="editor"></div></article></section><div class="aster-dock">${asterHtml({ size: 48, state: "idle" })}</div></div><div id="selection-float" class="selection-float" hidden><button type="button" id="selection-float-add">${I.chat({ size: 14 })}<span>\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD</span></button></div></div>`;
+  unmountAster = mountAster($("#toggle-assistant"));
   syncAsterFace();
   const onSelectionScroll = () => {
     if (editor && !selectionDragging) placeSelectionFloat(editor);
   };
   editor = new Editor({
-    element: $2("#editor"),
+    element: $("#editor"),
     extensions: [src_default, src_default2, TableKit],
     content: current.richHTML ? sanitizeRichHTML(current.richHTML) : safeHTML(current.body),
     onUpdate() {
       sync();
-      $2("#wordcount").textContent = current.body.length + " \u5B57";
+      $("#wordcount").textContent = current.body.length + " \u5B57";
       changed();
     },
     onDestroy() {
@@ -33435,7 +33440,7 @@ function renderWriteInner() {
         selectionContext = null;
       }
       selectedText = selectionContext?.text || "";
-      const label = $2("#selection-label");
+      const label = $("#selection-label");
       if (label)
         label.textContent = selectedText ? "\u5DF2\u9009\u4E2D " + selectedText.length + " \u5B57" : "\u9009\u4E2D\u6B63\u6587\uFF0C\u8BA9 AI \u5E2E\u4F60\u63A8\u6572";
       if (!selectionDragging) placeSelectionFloat(e);
@@ -33499,7 +33504,7 @@ function renderWriteInner() {
   hideSelectionFloat();
   window.addEventListener("scroll", onSelectionScroll, true);
   window.addEventListener("resize", onSelectionScroll);
-  $2("#article-materials").onclick = () => {
+  $("#article-materials").onclick = () => {
     if (assistantOpen && railMode === "materials") {
       assistantOpen = false;
       syncRailVisibility();
@@ -33507,11 +33512,11 @@ function renderWriteInner() {
     }
     openArticleMaterials();
   };
-  $2("#title").oninput = (e) => {
+  $("#title").oninput = (e) => {
     current.title = e.target.value;
     changed();
   };
-  $2("#article-group").onchange = async (e) => {
+  $("#article-group").onchange = async (e) => {
     const value = e.target.value.trim();
     if (value === "__new__") {
       e.target.value = current.group || "";
@@ -33526,7 +33531,7 @@ function renderWriteInner() {
         current.group = name;
         changed();
         await persist();
-        const sel = $2("#article-group");
+        const sel = $("#article-group");
         if (sel) {
           sel.innerHTML = groupOptionsHtml(state, current.group) + `<option value="__new__">\uFF0B \u65B0\u5EFA\u5206\u7EC4\u2026</option>`;
           sel.value = current.group;
@@ -33541,7 +33546,7 @@ function renderWriteInner() {
     changed();
   };
   {
-    const sel = $2("#article-group");
+    const sel = $("#article-group");
     if (sel) {
       const opt = document.createElement("option");
       opt.value = "__new__";
@@ -33558,7 +33563,7 @@ function renderWriteInner() {
       else c["toggle" + f[0].toUpperCase() + f.slice(1)]().run();
     }
   );
-  $2("#image").onclick = async () => {
+  $("#image").onclick = async () => {
     try {
       const imageDoc = current, imageEditor = editor;
       sync();
@@ -33582,12 +33587,12 @@ function renderWriteInner() {
       toast(e.message);
     }
   };
-  $2("#focus").onclick = () => {
-    $2(".sidebar").classList.toggle("hidden");
+  $("#focus").onclick = () => {
+    $(".sidebar").classList.toggle("hidden");
   };
-  $2("#toggle-review").onclick = () => {
-    const bar = $2(".selection-bar");
-    const btn = $2("#toggle-review");
+  $("#toggle-review").onclick = () => {
+    const bar = $(".selection-bar");
+    const btn = $("#toggle-review");
     if (!bar || !btn) return;
     const open = bar.hasAttribute("hidden");
     if (open) bar.removeAttribute("hidden");
@@ -33596,7 +33601,7 @@ function renderWriteInner() {
     btn.setAttribute("aria-pressed", open ? "true" : "false");
     btn.setAttribute("aria-expanded", open ? "true" : "false");
   };
-  $2("#toggle-assistant").onclick = () => {
+  $("#toggle-assistant").onclick = () => {
     if (assistantOpen && railMode === "assistant") {
       assistantOpen = false;
       syncRailVisibility();
@@ -33615,12 +33620,12 @@ function renderWriteInner() {
       runTask(b.dataset.task);
     };
   });
-  $2("#tag-selection").onmousedown = (e) => e.preventDefault();
-  $2("#tag-selection").onclick = () => {
+  $("#tag-selection").onmousedown = (e) => e.preventDefault();
+  $("#tag-selection").onclick = () => {
     openAssistant();
     tagSelection();
   };
-  const floatAdd = $2("#selection-float-add");
+  const floatAdd = $("#selection-float-add");
   if (floatAdd) {
     floatAdd.onmousedown = (e) => e.preventDefault();
     floatAdd.onclick = () => {
@@ -33634,11 +33639,11 @@ function renderWriteInner() {
   renderAssistantRail();
 }
 function hideSelectionFloat() {
-  const float = $2("#selection-float");
+  const float = $("#selection-float");
   if (float) float.hidden = true;
 }
 function placeSelectionFloat(e) {
-  const float = $2("#selection-float");
+  const float = $("#selection-float");
   if (!float || !e) return;
   const { from: from2, to, empty: empty2 } = e.state.selection;
   if (empty2 || to <= from2 || previewMode) {
@@ -33658,9 +33663,9 @@ function placeSelectionFloat(e) {
   float.style.top = `${top}px`;
 }
 function mountArticleOutline() {
-  const stack = $2(".paper-meta-stack");
+  const stack = $(".paper-meta-stack");
   if (!stack || !editor) return;
-  let nav2 = $2("#article-outline");
+  let nav2 = $("#article-outline");
   if (!nav2) {
     nav2 = document.createElement("aside");
     nav2.id = "article-outline";
@@ -33679,7 +33684,7 @@ function mountArticleOutline() {
     nav2.style.width = outlineOpen ? "" : w + "px";
   };
   const refresh = () => {
-    const root2 = $2("#editor");
+    const root2 = $("#editor");
     if (!root2) return;
     const headings = [...root2.querySelectorAll("h1, h2, h3")].map((el) => ({
       el,
@@ -33743,8 +33748,8 @@ function mountArticleOutline() {
   refresh();
 }
 function bindWorkspaceResize() {
-  const resizer = $2("#workspace-resizer");
-  const aside = $2("#rail") || $2(".assistant");
+  const resizer = $("#workspace-resizer");
+  const aside = $("#rail") || $(".assistant");
   if (!resizer || !aside) return;
   const clamp = (w) => {
     const cap = previewMode && page === "write" || page === "published-preview" ? 640 : 560;
@@ -33795,13 +33800,13 @@ function enterReviewMode() {
 function exitReviewMode() {
   reviewMode = false;
   reviewIndex = 0;
-  $2("#inline-review-bar")?.remove();
-  $2("#inline-review-list")?.remove();
-  $2("#inline-review-diff")?.remove();
+  $("#inline-review-bar")?.remove();
+  $("#inline-review-list")?.remove();
+  $("#inline-review-diff")?.remove();
   document.querySelector(".paper-wrap .paper")?.classList.remove("is-reviewing");
-  const ed = $2("#editor");
+  const ed = $("#editor");
   if (ed) ed.hidden = false;
-  const title = $2("#title");
+  const title = $("#title");
   if (title) title.hidden = false;
   syncFormatbarReviewMode(false);
 }
@@ -33836,7 +33841,7 @@ function scrollReviewToCurrent(smooth = true) {
 function refreshReviewUI() {
   const paper = document.querySelector(".paper-wrap .paper");
   if (!paper || !pending || pending.doc !== current?.id || !reviewMode) return;
-  const listEl = $2("#inline-review-list");
+  const listEl = $("#inline-review-list");
   const tmp = document.createElement("div");
   tmp.innerHTML = reviewPageHTML(pending, current?.title);
   const newList = tmp.querySelector("#inline-review-list");
@@ -33993,23 +33998,23 @@ function bindInlineReviewBar() {
 function mountInlineReviewBar() {
   const paper = document.querySelector(".paper-wrap .paper");
   if (!paper) return;
-  $2("#inline-review-bar")?.remove();
-  $2("#inline-review-list")?.remove();
-  $2("#inline-review-diff")?.remove();
+  $("#inline-review-bar")?.remove();
+  $("#inline-review-list")?.remove();
+  $("#inline-review-diff")?.remove();
   paper.classList.remove("is-reviewing");
   if (!pending || pending.doc !== current?.id || previewMode || !reviewMode) {
-    const ed2 = $2("#editor");
+    const ed2 = $("#editor");
     if (ed2) ed2.hidden = false;
-    const title2 = $2("#title");
+    const title2 = $("#title");
     if (title2) title2.hidden = false;
     syncFormatbarReviewMode(false);
     return;
   }
   paper.classList.add("is-reviewing");
   syncFormatbarReviewMode(true);
-  const ed = $2("#editor");
+  const ed = $("#editor");
   if (ed) ed.hidden = true;
-  const title = $2("#title");
+  const title = $("#title");
   if (title) title.hidden = true;
   paper.insertAdjacentHTML("afterbegin", reviewPageHTML(pending, current?.title));
   bindInlineReviewBar();
@@ -34027,9 +34032,9 @@ function dismissActiveComposerMenu() {
   fn?.();
 }
 function bindAgentModeMenu() {
-  const root2 = $2(".agent-mode");
-  const modeBtn = $2("#agent-output");
-  const modeMenu = $2("#agent-mode-menu");
+  const root2 = $(".agent-mode");
+  const modeBtn = $("#agent-output");
+  const modeMenu = $("#agent-mode-menu");
   if (!root2 || !modeBtn || !modeMenu) return;
   let onDocPointer = null;
   const closeMode = () => {
@@ -34147,7 +34152,7 @@ function renderPanel() {
     composer = null;
   }
   $$("[data-task]").forEach((b) => b.disabled = busy);
-  const panel = $2("#panel");
+  const panel = $("#panel");
   if (!panel) return;
   tab = "chat";
   const key = tab;
@@ -34166,23 +34171,23 @@ function renderPanel() {
   }
   panel.innerHTML = `<div class="panel-scroll">${content}</div><div class="composer-dock">${docChip}<div class="composer agent-composer"><div id="composer-input"></div><div class="composer-tools"><button id="chat-upload" class="icon-btn" title="\u6DFB\u52A0" aria-label="\u6DFB\u52A0" aria-haspopup="menu">${I.plus()}</button>${agentModeHTML()}${modelPickerHTML()}<button id="send" class="primary icon-btn" title="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001\uFF08\u2318Enter\uFF09"}" aria-label="${busy ? "\u505C\u6B62\u751F\u6210" : "\u53D1\u9001"}">${busy ? "\u25A0" : I.send()}</button></div></div></div>`;
   bindConversationHead();
-  $2("#send").onclick = () => busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
+  $("#send").onclick = () => busy ? api("cancel") : runTask(agentMode === "edit" ? "rewrite" : "chat");
   bindAgentModeMenu();
   bindModelPicker();
-  composer = new Composer($2("#composer-input"), conversation(current), {
+  composer = new Composer($("#composer-input"), conversation(current), {
     changed: () => {
       dirty = true;
       docStore.deferPersist();
     },
-    send: () => $2("#send").click(),
+    send: () => $("#send").click(),
     picker: () => chooseChatFile()
   });
-  $2("#chat-upload").onclick = (e) => {
+  $("#chat-upload").onclick = (e) => {
     e.stopPropagation();
     openComposerAddMenu(e.currentTarget);
   };
-  $2("#chat-upload").onmousedown = (e) => e.preventDefault();
-  if ($2("#generate")) $2("#generate").onclick = () => runTask(tab);
+  $("#chat-upload").onmousedown = (e) => e.preventDefault();
+  if ($("#generate")) $("#generate").onclick = () => runTask(tab);
   $$("[data-copy]").forEach(
     (b) => b.onclick = () => api("copy", { text: current[key][+b.dataset.copy].text }).then(
       () => toast("\u5DF2\u590D\u5236")
@@ -34193,7 +34198,7 @@ function renderPanel() {
       const value = current[key][+b.dataset.use].text.split("\n")[0].replace(/^[-*#\d.、\s]+/, "").trim();
       if (value) {
         current.title = value;
-        $2("#title").value = value;
+        $("#title").value = value;
         changed();
       }
     }
@@ -34204,8 +34209,8 @@ function renderPanel() {
   $$("[data-hunk-reject]").forEach(
     (b) => b.onclick = () => decideHunk(b.dataset.hunkReject, false)
   );
-  if ($2("#accept"))
-    $2("#accept").onclick = () => {
+  if ($("#accept"))
+    $("#accept").onclick = () => {
       if (!pending) return;
       if (pending.hunks) {
         pending.hunks.forEach((h2) => {
@@ -34216,8 +34221,8 @@ function renderPanel() {
       }
       applyPendingResult(pending.next, "accepted");
     };
-  if ($2("#reject"))
-    $2("#reject").onclick = () => {
+  if ($("#reject"))
+    $("#reject").onclick = () => {
       if (!pending) return;
       applyPendingResult(pending.old, "rejected");
     };
@@ -34229,12 +34234,12 @@ function streamBubbleHTML() {
 }
 function scrollPanelToBottom() {
   const scroller = document.querySelector("#panel .panel-scroll");
-  const bubble = $2("#stream-bubble");
+  const bubble = $("#stream-bubble");
   if (bubble) bubble.scrollIntoView({ block: "end" });
   else if (scroller) scroller.scrollTop = scroller.scrollHeight;
 }
 function paintStreamBubble() {
-  const bubble = $2("#stream-bubble");
+  const bubble = $("#stream-bubble");
   if (!bubble) return;
   if (streamThinking) return;
   const activity = streamTools.length ? activityLine(streamTools.map((t) => ({ type: "tool_start", tool: t }))) : "aster \xB7 \u8F93\u51FA\u4E2D";
@@ -34334,7 +34339,7 @@ async function runTask(task) {
     if (e.type?.startsWith("tool")) {
       if (streamThinking) {
         streamThinking = false;
-        const bubble = $2("#stream-bubble");
+        const bubble = $("#stream-bubble");
         if (bubble)
           bubble.innerHTML = `<small class="message-role">aster \xB7 \u8F93\u51FA\u4E2D</small><div class="stream-text"></div>`;
       }
@@ -34348,7 +34353,7 @@ async function runTask(task) {
     streamText += chunk;
     if (streamThinking) {
       streamThinking = false;
-      const bubble = $2("#stream-bubble");
+      const bubble = $("#stream-bubble");
       if (bubble)
         bubble.innerHTML = `<small class="message-role">aster \xB7 \u8F93\u51FA\u4E2D</small><div class="stream-text"></div>`;
     }
@@ -34438,7 +34443,7 @@ async function pushWechatDraft(doc3) {
   if (doc3 === current) sync();
   if (!doc3) return;
   if (isWeb()) return toast("\u8349\u7A3F\u63A8\u9001\u4EC5\u652F\u6301\u684C\u9762\u7AEF");
-  const btn = $2("#push-wechat");
+  const btn = $("#push-wechat");
   if (btn) btn.disabled = true;
   try {
     toast("\u6B63\u5728\u751F\u6210\u6807\u9898\u56FE\u5E76\u63A8\u9001\u2026");
@@ -34480,13 +34485,13 @@ function askFollowers(defaultVal) {
     m.className = "modal";
     m.innerHTML = `<div class="dialog"><h2>\u66F4\u65B0\u8D26\u53F7\u6570\u636E</h2><p>\u8BF7\u8F93\u5165\u5F53\u524D\u7C89\u4E1D\u91CF\uFF08\u5C06\u663E\u793A\u5728\u4EEA\u8868\u76D8\uFF09</p><input id="follower-input" type="number" min="0" step="1" value="${esc2(defaultVal ?? "")}" placeholder="\u4F8B\u5982 12000"><div class="row"><button type="button" id="cancel-followers">\u53D6\u6D88</button><button type="button" id="confirm-followers" class="primary">\u7EE7\u7EED</button></div></div>`;
     document.body.append(m);
-    const input = $2("#follower-input");
+    const input = $("#follower-input");
     input.focus();
-    $2("#cancel-followers").onclick = () => {
+    $("#cancel-followers").onclick = () => {
       m.remove();
       resolve(null);
     };
-    $2("#confirm-followers").onclick = () => {
+    $("#confirm-followers").onclick = () => {
       const n = Number(String(input.value).replace(/,/g, "").trim());
       m.remove();
       resolve(Number.isFinite(n) && n >= 0 ? n : null);
@@ -34599,19 +34604,19 @@ function renderDashboardInner() {
     return `<tr class="${on ? "is-selected" : ""}"><td class="published-check"><input type="checkbox" data-select-published="${esc2(r.path)}" aria-label="\u9009\u62E9 ${esc2(r["\u6807\u9898"])}" ${on ? "checked" : ""}></td><td><button type="button" class="title-preview" data-published="${esc2(r.path)}">${esc2(r["\u6807\u9898"])}</button></td><td class="published-group">${g ? groupChipHtml(g) : "\u2014"}</td><td>${esc2(r["\u65E5\u671F"])}</td>${cells}</tr>`;
   };
   const emptyHint = xMode ? '<div class="empty-data">\u8FD8\u6CA1\u6709\u6570\u636E\u3002<p>\u5E16\u5B50\u5F52\u6863\u540E\uFF0C\u5BFC\u5165 X Analytics CSV \u6216\u5728 YAML \u4E2D\u586B\u5199\u66DD\u5149/\u4E92\u52A8\u7B49\u5B57\u6BB5\u5373\u53EF\u67E5\u770B\u3002</p></div>' : '<div class="empty-data">\u8FD8\u6CA1\u6709\u6570\u636E\u3002<p>\u6587\u7AE0\u5F52\u6863\u540E\uFF0C\u5728 YAML \u4E2D\u586B\u5199\u5E73\u53F0\u6570\u636E\u5373\u53EF\u67E5\u770B\u3002</p></div>';
-  $2("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BA9\u6BCF\u4E00\u6B21\u8868\u8FBE\uFF0C\u90FD\u6709\u56DE\u54CD\u3002</h1></div><div class="header-actions"><button type="button" id="refresh-dashboard" class="ghost icon-btn" title="\u4ECE\u78C1\u76D8\u540C\u6B65\u672C\u5730\u6570\u636E" aria-label="\u5237\u65B0">${I.refresh({ size: 18 })}</button><button id="import-notes" class="primary">\u66F4\u65B0\u6570\u636E</button></div></header><section class="dashboard"><div class="stats">${statCards.map(
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BA9\u6BCF\u4E00\u6B21\u8868\u8FBE\uFF0C\u90FD\u6709\u56DE\u54CD\u3002</h1></div><div class="header-actions"><button type="button" id="refresh-dashboard" class="ghost icon-btn" title="\u4ECE\u78C1\u76D8\u540C\u6B65\u672C\u5730\u6570\u636E" aria-label="\u5237\u65B0">${I.refresh({ size: 18 })}</button><button id="import-notes" class="primary">\u66F4\u65B0\u6570\u636E</button></div></header><section class="dashboard"><div class="stats">${statCards.map(
     ([k, l]) => `<div><small>${l}</small><strong title="${k === "\u6DA8\u7C89" ? "\u6C47\u603B\u6587\u7AE0 YAML \u7684\u6DA8\u7C89\u5B57\u6BB5\uFF0C\u4E0D\u662F\u8D26\u53F7\u51C0\u589E\u7C89\u4E1D\uFF0C\u4E5F\u4E0D\u662F\u5DE5\u4F5C\u53F0\u4F30\u7B97" : k === "\u7C89\u4E1D\u91CF" ? "\u5BFC\u5165\u6570\u636E\u65F6\u586B\u5199\u7684\u5F53\u524D\u7C89\u4E1D\u91CF" : ""}">${k === "\u6587\u7AE0" ? rows.length.toLocaleString() : k === "\u7C89\u4E1D\u91CF" ? state.followers?.[account] != null ? Number(state.followers[account]).toLocaleString() : "\u2014" : sum(k)}${deltaMark(k)}</strong></div>`
   ).join(
     ""
   )}</div><div id="publishing-calendar" class="dashboard-card"></div><div class="dashboard-card"><div class="row performance-head"><h3>\u5DF2\u53D1\u5E03</h3><div id="published-bulk" class="published-bulk" ${selectedCount ? "" : "hidden"}><span class="published-bulk-count">\u5DF2\u9009 ${selectedCount}</span><button type="button" id="bulk-group">${I.tags()} \u8BBE\u7F6E\u5206\u7EC4</button><button type="button" id="bulk-backup">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" id="bulk-to-draft">\u79FB\u56DE\u8349\u7A3F</button><button type="button" class="ghost" id="bulk-clear">\u53D6\u6D88\u9009\u62E9</button></div><select id="metrics-sort" aria-label="\u6587\u7AE0\u6392\u5E8F\u65B9\u5F0F">${sortKeys.map(([k, l]) => `<option value="${k}" ${metricsSort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>${rows.length ? `<table class="published-table"><thead><tr><th class="published-check"><input type="checkbox" id="published-select-all" aria-label="\u5168\u9009" ${allSelected ? "checked" : ""} ${selectedCount && !allSelected ? 'data-indeterminate="1"' : ""}></th>${tableHead}</tr></thead><tbody>${sorted.map(tableRow).join("")}</tbody></table>` : emptyHint}</div></section>`;
   renderCalendar(rows);
-  $2("#metrics-sort").onchange = (e) => {
+  $("#metrics-sort").onchange = (e) => {
     metricsSort = e.target.value;
     renderDashboard();
   };
-  $2("#refresh-dashboard").onclick = () => refreshDashboardData();
-  $2("#import-notes").onclick = () => runNoteImport();
-  const selectAll3 = $2("#published-select-all");
+  $("#refresh-dashboard").onclick = () => refreshDashboardData();
+  $("#import-notes").onclick = () => runNoteImport();
+  const selectAll3 = $("#published-select-all");
   if (selectAll3?.dataset.indeterminate) selectAll3.indeterminate = true;
   selectAll3?.addEventListener("change", () => {
     if (selectAll3.checked)
@@ -34627,19 +34632,19 @@ function renderDashboardInner() {
       renderDashboard();
     };
   });
-  $2("#bulk-clear")?.addEventListener("click", () => {
+  $("#bulk-clear")?.addEventListener("click", () => {
     publishedSelection.clear();
     renderDashboard();
   });
-  $2("#bulk-group")?.addEventListener(
+  $("#bulk-group")?.addEventListener(
     "click",
     () => setPublishedGroups([...publishedSelection])
   );
-  $2("#bulk-backup")?.addEventListener(
+  $("#bulk-backup")?.addEventListener(
     "click",
     () => backupPublishedArticle([...publishedSelection])
   );
-  $2("#bulk-to-draft")?.addEventListener(
+  $("#bulk-to-draft")?.addEventListener(
     "click",
     () => movePublishedToDraft([...publishedSelection])
   );
@@ -34665,16 +34670,16 @@ async function setPublishedGroups(paths) {
     ...new Set(list2.map((rel) => publishedGroup(state, rel) || ""))
   ];
   const selected = currentGroups.length === 1 ? currentGroups[0] || "" : "";
-  $2("#group-set-modal")?.remove();
+  $("#group-set-modal")?.remove();
   const m = document.createElement("div");
   m.id = "group-set-modal";
   m.className = "modal";
   m.innerHTML = `<div class="dialog"><h2>\u8BBE\u7F6E\u5206\u7EC4</h2><label>\u5206\u7EC4<select id="group-set-select">${groupOptionsHtml(state, selected)}</select></label><label>\u6216\u65B0\u5EFA\u5206\u7EC4<input id="group-set-new" placeholder="\u8F93\u5165\u65B0\u5206\u7EC4\u540D\u79F0" autocomplete="off"></label><div class="row"><button type="button" id="group-set-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="group-set-ok">\u4FDD\u5B58</button></div></div>`;
   document.body.append(m);
-  $2("#group-set-cancel").onclick = () => m.remove();
-  $2("#group-set-ok").onclick = async () => {
-    const created = $2("#group-set-new")?.value.trim() || "";
-    const picked = $2("#group-set-select")?.value || "";
+  $("#group-set-cancel").onclick = () => m.remove();
+  $("#group-set-ok").onclick = async () => {
+    const created = $("#group-set-new")?.value.trim() || "";
+    const picked = $("#group-set-select")?.value || "";
     const group = created || picked || null;
     try {
       if (created) {
@@ -34749,7 +34754,7 @@ async function backupPublishedArticle(paths) {
     }
     toast(`\u5DF2\u6309\u5206\u7EC4\u540C\u6B65 ${ok} \u7BC7`);
   };
-  $2("#backup-sync-modal")?.remove();
+  $("#backup-sync-modal")?.remove();
   const m = document.createElement("div");
   m.id = "backup-sync-modal";
   m.className = "modal";
@@ -34757,8 +34762,8 @@ async function backupPublishedArticle(paths) {
   const showDefaultBtn = mixedGroups ? allHaveDefault : !!defaultPath;
   m.innerHTML = `<div class="dialog"><h2>\u672C\u5730\u540C\u6B65</h2><p>\u5C06${label}\u5907\u4EFD\u4E3A Markdown \u5230\u672C\u673A\u6587\u4EF6\u5939\u3002</p><p class="muted">\u9ED8\u8BA4\u8DEF\u5F84\uFF1A${esc2(defaultHint)}</p>${canRemember ? `<label class="backup-remember"><input type="checkbox" id="backup-remember" ${defaultPath ? "" : "checked"}> \u5C06\u672C\u6B21\u9009\u62E9\u7684\u8DEF\u5F84\u8BBE\u4E3A${esc2(rememberTarget)}\u9ED8\u8BA4</label>` : ""}<div class="row"><button type="button" id="backup-cancel">\u53D6\u6D88</button>${showDefaultBtn ? `<button type="button" id="backup-pick">${I.folder()} \u9009\u62E9\u5176\u4ED6\u8DEF\u5F84</button><button type="button" class="primary" id="backup-default">${mixedGroups ? "\u6309\u5206\u7EC4\u540C\u6B65\u5230\u9ED8\u8BA4" : "\u540C\u6B65\u5230\u9ED8\u8BA4"}</button>` : `<button type="button" class="primary" id="backup-pick">${I.folder()} \u9009\u62E9\u5E76\u540C\u6B65</button>`}</div></div>`;
   document.body.append(m);
-  const remember = () => !!$2("#backup-remember")?.checked;
-  $2("#backup-cancel").onclick = () => m.remove();
+  const remember = () => !!$("#backup-remember")?.checked;
+  $("#backup-cancel").onclick = () => m.remove();
   const pickAndSync = async () => {
     try {
       const folder = await api("pick-backup-folder", {
@@ -34771,8 +34776,8 @@ async function backupPublishedArticle(paths) {
       toast(e.message || "\u540C\u6B65\u5931\u8D25");
     }
   };
-  $2("#backup-pick")?.addEventListener("click", pickAndSync);
-  $2("#backup-default")?.addEventListener("click", async () => {
+  $("#backup-pick")?.addEventListener("click", pickAndSync);
+  $("#backup-default")?.addEventListener("click", async () => {
     try {
       if (mixedGroups) await runBackupByGroup();
       else await runBackup(defaultPath, false);
@@ -34830,8 +34835,8 @@ async function refreshDashboardData() {
     m.className = "modal";
     m.innerHTML = '<div class="dialog"><h2>\u672C\u6B21\u4FDD\u5B58\u672A\u5B8C\u6210</h2><p>\u53EF\u4EE5\u4FDD\u7559\u5F53\u524D\u672A\u4FDD\u5B58\u5185\u5BB9\u5230\u672C\u5730\u6062\u590D\u6587\u4EF6\uFF0C\u518D\u8BFB\u53D6\u78C1\u76D8\u7248\u672C\u3002</p><button id="cancel-reload">\u7EE7\u7EED\u7F16\u8F91</button><button id="recover-reload" class="primary">\u5907\u4EFD\u672A\u4FDD\u5B58\u5185\u5BB9\u5E76\u5237\u65B0</button></div>';
     document.body.append(m);
-    $2("#cancel-reload").onclick = () => m.remove();
-    $2("#recover-reload").onclick = async () => {
+    $("#cancel-reload").onclick = () => m.remove();
+    $("#recover-reload").onclick = async () => {
       try {
         await apply2(await api("recover-refresh", state));
         m.remove();
@@ -34849,10 +34854,10 @@ async function refreshDashboardData() {
 }
 async function renderTopics() {
   if (!account) {
-    $2("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7075\u611F\u5E93</h1></div></header><section class="dashboard"><div class="empty-state"><img src="assets/empty-topics.png" alt="" class="empty-state-img" /><p class="empty-state-text">\u8BF7\u5148\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p></div></section>`;
+    $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7075\u611F\u5E93</h1></div></header><section class="dashboard"><div class="empty-state"><img src="assets/empty-topics.png" alt="" class="empty-state-img" /><p class="empty-state-text">\u8BF7\u5148\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p></div></section>`;
     return;
   }
-  $2("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7075\u611F\u5E93</h1></div></header><section class="dashboard topic-dashboard"><div class="topic-composer"><textarea id="topic-input" rows="5" placeholder="\u8BB0\u4E0B\u7075\u611F\u2026 \u652F\u6301 Markdown"></textarea><div class="topic-composer-bar"><span class="muted">Markdown \xB7 \u2318/Ctrl + Enter \u4FDD\u5B58</span><button type="button" id="topic-save" class="primary">\u8BB0\u4E0B</button></div></div><div class="topic-grid" id="topic-grid"><p class="muted">\u52A0\u8F7D\u4E2D\u2026</p></div></section>`;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7075\u611F\u5E93</h1></div></header><section class="dashboard topic-dashboard"><div class="topic-composer"><textarea id="topic-input" rows="5" placeholder="\u8BB0\u4E0B\u7075\u611F\u2026 \u652F\u6301 Markdown"></textarea><div class="topic-composer-bar"><span class="muted">Markdown \xB7 \u2318/Ctrl + Enter \u4FDD\u5B58</span><button type="button" id="topic-save" class="primary">\u8BB0\u4E0B</button></div></div><div class="topic-grid" id="topic-grid"><p class="muted">\u52A0\u8F7D\u4E2D\u2026</p></div></section>`;
   const writeFromTopic = async (rel) => {
     const topic = await api("topics-read", { path: rel });
     const firstLine = String(topic.body || "").split(/\r?\n/).map((l) => l.replace(/^#+\s*/, "").trim()).find(Boolean) || "\u672A\u547D\u540D\u6587\u7AE0";
@@ -34884,7 +34889,7 @@ async function renderTopics() {
   };
   const draw = (list2) => {
     if (page !== "topics") return;
-    const grid = $2("#topic-grid");
+    const grid = $("#topic-grid");
     if (!grid) return;
     grid.innerHTML = list2.map((t) => {
       const when = t.updated ? new Date(t.updated).toLocaleString("zh-CN") : "";
@@ -34896,7 +34901,7 @@ async function renderTopics() {
       if (!await askConfirm("\u5220\u9664\u7075\u611F", "\u786E\u5B9A\u5220\u9664\u8FD9\u6761\u7075\u611F\uFF1F")) return;
       try {
         draw(await api("topics-delete", { path: rel }));
-        $2("#topic-drawer")?.remove();
+        $("#topic-drawer")?.remove();
         toast("\u5DF2\u5220\u9664");
       } catch (err) {
         toast(err.message);
@@ -34946,7 +34951,7 @@ async function renderTopics() {
     });
   };
   const saveTopic = async () => {
-    const input = $2("#topic-input");
+    const input = $("#topic-input");
     const body = input?.value.trim() || "";
     if (!body) {
       input?.focus();
@@ -34961,14 +34966,14 @@ async function renderTopics() {
       toast(err.message);
     }
   };
-  $2("#topic-save").onclick = () => saveTopic();
-  $2("#topic-input").addEventListener("keydown", (e) => {
+  $("#topic-save").onclick = () => saveTopic();
+  $("#topic-input").addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
       e.preventDefault();
       saveTopic();
     }
   });
-  requestAnimationFrame(() => $2("#topic-input")?.focus());
+  requestAnimationFrame(() => $("#topic-input")?.focus());
   try {
     const list2 = await api("topics-list", { account });
     const hydrated = await Promise.all(
@@ -34984,7 +34989,7 @@ async function renderTopics() {
     );
     draw(hydrated);
   } catch (err) {
-    const grid = $2("#topic-grid");
+    const grid = $("#topic-grid");
     if (grid)
       grid.innerHTML = `<p class="muted">${esc2(err.message || "\u52A0\u8F7D\u5931\u8D25")}</p>`;
     toast(err.message);
@@ -34998,9 +35003,9 @@ async function openTopicDrawer(rel, opts = {}) {
     toast(err.message);
     return;
   }
-  $2("#topic-drawer")?.remove();
-  $2("#reference-drawer")?.remove();
-  $2("#published-drawer")?.remove();
+  $("#topic-drawer")?.remove();
+  $("#reference-drawer")?.remove();
+  $("#published-drawer")?.remove();
   const when = topic.updated ? new Date(topic.updated).toLocaleString("zh-CN") : topic.title || "\u7075\u611F";
   const n = document.createElement("aside");
   n.id = "topic-drawer";
@@ -35008,10 +35013,10 @@ async function openTopicDrawer(rel, opts = {}) {
   n.innerHTML = `<div class="row reference-drawer-head"><h3>${esc2(when)}</h3><div class="reference-drawer-toolbar"><button type="button" class="ghost" id="topic-drawer-mode">\u7F16\u8F91</button><button type="button" class="ghost icon-btn" id="topic-drawer-write" title="\u5199\u6210\u6587\u7AE0" aria-label="\u5199\u6210\u6587\u7AE0">${I.pen({ size: 16 })}</button><button type="button" class="ghost icon-btn" id="close-topic-drawer" title="\u5173\u95ED" aria-label="\u5173\u95ED">${I.close({ size: 18 })}</button></div></div><div class="reference-drawer-body topic-drawer-body"><div id="topic-drawer-preview" class="topic-drawer-preview is-md">${topic.body?.trim() ? safeHTML(topic.body) : '<p class="muted">\uFF08\u7A7A\uFF09</p>'}</div><textarea id="topic-drawer-editor" class="topic-drawer-editor hidden" spellcheck="false">${esc2(topic.body || "")}</textarea></div><div class="topic-drawer-foot hidden" id="topic-drawer-foot"><button type="button" class="ghost" id="topic-drawer-cancel">\u53D6\u6D88</button><button type="button" class="primary" id="topic-drawer-save">\u4FDD\u5B58</button></div>`;
   document.body.append(n);
   let editing = false;
-  const preview = $2("#topic-drawer-preview");
-  const editor2 = $2("#topic-drawer-editor");
-  const foot = $2("#topic-drawer-foot");
-  const modeBtn = $2("#topic-drawer-mode");
+  const preview = $("#topic-drawer-preview");
+  const editor2 = $("#topic-drawer-editor");
+  const foot = $("#topic-drawer-foot");
+  const modeBtn = $("#topic-drawer-mode");
   const setMode = (edit2) => {
     editing = edit2;
     preview.classList.toggle("hidden", edit2);
@@ -35028,13 +35033,13 @@ async function openTopicDrawer(rel, opts = {}) {
       preview.innerHTML = md.trim() ? safeHTML(md) : '<p class="muted">\uFF08\u7A7A\uFF09</p>';
     }
   };
-  $2("#close-topic-drawer").onclick = () => n.remove();
+  $("#close-topic-drawer").onclick = () => n.remove();
   modeBtn.onclick = () => setMode(!editing);
-  $2("#topic-drawer-cancel").onclick = () => {
+  $("#topic-drawer-cancel").onclick = () => {
     editor2.value = topic.body || "";
     setMode(false);
   };
-  $2("#topic-drawer-save").onclick = async () => {
+  $("#topic-drawer-save").onclick = async () => {
     try {
       const list2 = await api("topics-save", {
         path: topic.path,
@@ -35048,7 +35053,7 @@ async function openTopicDrawer(rel, opts = {}) {
       toast(err.message);
     }
   };
-  $2("#topic-drawer-write").onclick = async () => {
+  $("#topic-drawer-write").onclick = async () => {
     try {
       if (editing && editor2.value !== (topic.body || "")) {
         await api("topics-save", { path: topic.path, body: editor2.value });
@@ -35132,9 +35137,9 @@ function modelPickerHTML() {
   </div>`;
 }
 function bindModelPicker() {
-  const root2 = $2("#model-picker");
-  const trigger = $2("#model-picker-trigger");
-  const menu = $2("#model-picker-menu");
+  const root2 = $("#model-picker");
+  const trigger = $("#model-picker-trigger");
+  const menu = $("#model-picker-menu");
   if (!root2 || !trigger || !menu) return;
   let onDocPointer = null;
   const clearFixed = (el) => {
@@ -35298,7 +35303,7 @@ function openAgentDetail(id, tab2 = "connection") {
   render2();
 }
 function setModelRowStatus(provider, model, text, kind = "") {
-  const root2 = $2(`[data-agent-body="${provider}"]`) || $2(`.agent-card[data-agent="${provider}"]`) || document;
+  const root2 = $(`[data-agent-body="${provider}"]`) || $(`.agent-card[data-agent="${provider}"]`) || document;
   const el = [...root2.querySelectorAll("[data-model-status]")].find(
     (n) => n.getAttribute("data-model-status") === model
   );
@@ -35312,7 +35317,7 @@ async function persistAgentModels() {
   return persist();
 }
 async function fillAgentCard(p, refresh = false) {
-  const body = $2(`[data-agent-body="${p.id}"]`);
+  const body = $(`[data-agent-body="${p.id}"]`);
   if (!body) return;
   if (p.http) {
     let info2 = null;
@@ -35341,7 +35346,7 @@ async function fillAgentCard(p, refresh = false) {
 }
 function bindAgentModelControls(p) {
   if (p.http) {
-    const panel = $2(`[data-agent-body="${p.id}"]`) || document;
+    const panel = $(`[data-agent-body="${p.id}"]`) || document;
     const saveBtn = panel.querySelector(`[data-agent-http-save="${p.id}"]`);
     const keyInput = panel.querySelector(`[data-agent-http-key="${p.id}"]`);
     if (keyInput?.dataset.keySaved === "1") {
@@ -35403,13 +35408,13 @@ function bindAgentModelControls(p) {
       };
     });
   }
-  const refresh = $2(`[data-agent-refresh="${p.id}"]`);
+  const refresh = $(`[data-agent-refresh="${p.id}"]`);
   if (refresh) refresh.onclick = async () => {
     refresh.disabled = true;
     refresh.textContent = "\u5237\u65B0\u4E2D\u2026";
     await fillAgentCard(p, true);
   };
-  const useDefault = $2(`[data-agent-cli-default="${p.id}"]`);
+  const useDefault = $(`[data-agent-cli-default="${p.id}"]`);
   if (useDefault)
     useDefault.onclick = async () => {
       if (!agentEnabled(state, p.id)) await setAgentEnabled(p.id, true);
@@ -35418,9 +35423,9 @@ function bindAgentModelControls(p) {
       await persistAgentModels();
       render2();
     };
-  const addBtn = $2(`[data-agent-add-model="${p.id}"]`);
-  const pick = $2(`[data-agent-pick="${p.id}"]`);
-  const preset = $2(`[data-agent-preset="${p.id}"]`);
+  const addBtn = $(`[data-agent-add-model="${p.id}"]`);
+  const pick = $(`[data-agent-pick="${p.id}"]`);
+  const preset = $(`[data-agent-preset="${p.id}"]`);
   if (preset && pick)
     preset.onchange = () => {
       if (preset.value) pick.value = preset.value;
@@ -35495,7 +35500,7 @@ function bindAgentModelControls(p) {
 async function runAgentDefaultTest(id) {
   const p = providerMeta(state, id);
   if (!p?.http && !agentInstalled(state, id)) return toast("\u672A\u627E\u5230\u8BE5 CLI");
-  const btn = $2(`[data-agent-test-default="${id}"]`) || $2("#agent-test-default");
+  const btn = $(`[data-agent-test-default="${id}"]`) || $("#agent-test-default");
   if (btn) btn.disabled = true;
   toast(`${p?.label || id}\uFF1A\u6D4B\u8BD5${p?.http ? "\u8FDE\u901A" : " CLI \u9ED8\u8BA4"}\u2026`);
   try {
@@ -35512,7 +35517,7 @@ async function runAgentDefaultTest(id) {
   }
 }
 function refreshAgentCardList() {
-  const list2 = $2(".agent-card-list");
+  const list2 = $(".agent-card-list");
   if (!list2) return false;
   list2.innerHTML = connectedAgentProviders(state).map((p) => agentListItemHtml(state, p)).join("");
   bindAgentListControls();
@@ -35575,10 +35580,10 @@ async function mountAgentsSettings() {
   ensureAgentModelsStore(state);
   ensureAgentsEnabledStore(state);
   bindAgentListControls();
-  mountAgentUsage($2("#agent-usage"), api, connectedAgentProviders(state), {
+  mountAgentUsage($("#agent-usage"), api, connectedAgentProviders(state), {
     mode: "overview"
   });
-  const addBtn = $2("#add-agent-provider");
+  const addBtn = $("#add-agent-provider");
   if (addBtn)
     addBtn.onclick = async () => {
       const pick = await promptConnectProvider(state);
@@ -35625,16 +35630,16 @@ async function renderAgentDetail() {
     `<button type="button" class="ghost" id="agent-test-default" ${installed ? "" : "disabled"} title="\u4E0D\u6307\u5B9A\u6A21\u578B\uFF0C\u4F7F\u7528 CLI \u9ED8\u8BA4">\u6D4B\u8BD5\u9ED8\u8BA4</button>`
   ].filter(Boolean).join("");
   const shell = (body) => {
-    $2("#main").innerHTML = `<header><div class="header-lead account-detail-lead"><button type="button" class="ghost icon-btn" id="agent-detail-back" title="\u8FD4\u56DE\u6A21\u578B\u5217\u8868" aria-label="\u8FD4\u56DE\u6A21\u578B\u5217\u8868">${I.chevronLeft({ size: 22 })}</button><h1 class="dashboard-tagline">${esc2(p.label)}</h1></div><div class="header-actions">${actions}</div></header><section class="dashboard account-detail settings agent-detail"><nav class="settings-tabs account-detail-tabs" role="tablist">${tabs.map(
+    $("#main").innerHTML = `<header><div class="header-lead account-detail-lead"><button type="button" class="ghost icon-btn" id="agent-detail-back" title="\u8FD4\u56DE\u6A21\u578B\u5217\u8868" aria-label="\u8FD4\u56DE\u6A21\u578B\u5217\u8868">${I.chevronLeft({ size: 22 })}</button><h1 class="dashboard-tagline">${esc2(p.label)}</h1></div><div class="header-actions">${actions}</div></header><section class="dashboard account-detail settings agent-detail"><nav class="settings-tabs account-detail-tabs" role="tablist">${tabs.map(
       (t) => `<button type="button" role="tab" data-agent-tab="${t.id}" aria-selected="${agentDetailTab === t.id}" class="${agentDetailTab === t.id ? "active" : ""}">${t.title}</button>`
     ).join("")}</nav><div id="agent-detail-body" class="settings-body">${body}</div></section>`;
-    $2("#agent-detail-back").onclick = () => {
+    $("#agent-detail-back").onclick = () => {
       page = "settings";
       settingsTab = "agents";
       agentDetailId = null;
       render2();
     };
-    const setDefault = $2("#agent-set-default");
+    const setDefault = $("#agent-set-default");
     if (setDefault)
       setDefault.onclick = async () => {
         if (!agentInstalled(state, p.id)) return toast("\u672A\u627E\u5230\u8BE5 CLI");
@@ -35645,7 +35650,7 @@ async function renderAgentDetail() {
         toast(`\u5DF2\u8BBE\u4E3A\u9ED8\u8BA4\uFF1A${p.label}`);
         render2();
       };
-    const testDefault = $2("#agent-test-default");
+    const testDefault = $("#agent-test-default");
     if (testDefault)
       testDefault.onclick = () => runAgentDefaultTest(p.id);
     $$("[data-agent-tab]").forEach((b) => {
@@ -35663,7 +35668,7 @@ async function renderAgentDetail() {
         control: `<section id="agent-usage" class="agent-usage"></section>`
       })
     );
-    mountAgentUsage($2("#agent-usage"), api, connectedAgentProviders(state), {
+    mountAgentUsage($("#agent-usage"), api, connectedAgentProviders(state), {
       mode: "detail",
       provider: p.id
     });
@@ -35743,7 +35748,7 @@ function renderSettings() {
     ))
   });
   const body = settingsTab === "config" ? configBody : settingsTab === "agents" ? agentsBody : settingsTab === "accounts" ? accountsBody : settingsTab === "skills" ? `<div id="skills-settings-root"></div>` : groupsBody;
-  $2("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BBE\u7F6E</h1></div></header><section class="dashboard settings"><nav class="settings-tabs" role="tablist">${tabs.map(
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u8BBE\u7F6E</h1></div></header><section class="dashboard settings"><nav class="settings-tabs" role="tablist">${tabs.map(
     (t) => `<button type="button" role="tab" data-settings-tab="${t.id}" aria-selected="${settingsTab === t.id}" class="${settingsTab === t.id ? "active" : ""}">${t.title}</button>`
   ).join("")}</nav><div class="settings-body">${body}</div></section>`;
   $$("[data-settings-tab]").forEach(
@@ -35757,7 +35762,7 @@ function renderSettings() {
     const list2 = accountList();
     const skillAccount = list2.some((a) => a.id === account) ? account : list2[0]?.id;
     mountSkillsSettings(
-      $2("#skills-settings-root"),
+      $("#skills-settings-root"),
       api,
       skillAccount,
       list2,
@@ -35770,17 +35775,17 @@ function renderSettings() {
     mountAgentsSettings();
   }
   if (settingsTab === "config") {
-    $2("#open-releases").onclick = async () => {
+    $("#open-releases").onclick = async () => {
       try {
         await api("update-open-releases");
       } catch (e) {
         toast(e.message || "\u65E0\u6CD5\u6253\u5F00\u53D1\u5E03\u9875");
       }
     };
-    $2("#check-update").onclick = () => checkForAppUpdate({ manual: true });
-    const installBtn = $2("#install-update");
+    $("#check-update").onclick = () => checkForAppUpdate({ manual: true });
+    const installBtn = $("#install-update");
     if (installBtn) installBtn.onclick = () => installAppUpdate();
-    $2("#pick-vault").onclick = async () => {
+    $("#pick-vault").onclick = async () => {
       if (isWeb()) return toast("\u9009\u62E9\u4ED3\u5E93\u4EC5\u652F\u6301\u684C\u9762\u7AEF");
       if (state.vaultLocked) return toast("\u5F53\u524D\u4ED3\u5E93\u7531\u73AF\u5883\u53D8\u91CF\u6307\u5B9A\uFF0C\u65E0\u6CD5\u66F4\u6539");
       if (busy) return toast("AI \u6B63\u5728\u56DE\u590D\uFF0C\u8BF7\u7ED3\u675F\u540E\u518D\u5207\u6362");
@@ -35793,10 +35798,10 @@ function renderSettings() {
         toast(e.message || "\u5207\u6362\u5931\u8D25");
       }
     };
-    $2("#refresh-vault").onclick = () => refreshVault();
+    $("#refresh-vault").onclick = () => refreshVault();
   } else if (settingsTab === "accounts") {
-    const createBtn = $2("#create-account");
-    const registerBtn = $2("#register-account");
+    const createBtn = $("#create-account");
+    const registerBtn = $("#register-account");
     if (createBtn)
       createBtn.onclick = async () => {
         const created = await askCreateAccount();
@@ -35819,7 +35824,7 @@ function renderSettings() {
     });
   }
   if (settingsTab === "groups") {
-    $2("#create-group").onclick = async () => {
+    $("#create-group").onclick = async () => {
       const name = await promptText("\u65B0\u5EFA\u5206\u7EC4", {
         placeholder: "\u4F8B\u5982\uFF1A\u516C\u4F17\u53F7\u3001\u5C0F\u7EA2\u4E66",
         okLabel: "\u521B\u5EFA"
@@ -35996,7 +36001,7 @@ async function pickAccountFolderOnWeb() {
       ""
     )}</div><div class="row"><button type="button" id="cancel-folder-pick">\u53D6\u6D88</button></div></div>`;
     document.body.append(m);
-    $2("#cancel-folder-pick").onclick = () => {
+    $("#cancel-folder-pick").onclick = () => {
       m.remove();
       resolve(null);
     };
@@ -36033,8 +36038,8 @@ async function refreshVault() {
     m.className = "modal";
     m.innerHTML = '<div class="dialog"><h2>\u672C\u6B21\u4FDD\u5B58\u672A\u5B8C\u6210</h2><p>\u53EF\u4EE5\u4FDD\u7559\u5F53\u524D\u672A\u4FDD\u5B58\u5185\u5BB9\u5230\u672C\u5730\u6062\u590D\u6587\u4EF6\uFF0C\u518D\u8BFB\u53D6\u78C1\u76D8\u7248\u672C\u3002\u6062\u590D\u6587\u4EF6\u4F4D\u4E8E _system/inkdesk/recovery\u3002</p><button id="cancel-reload">\u7EE7\u7EED\u7F16\u8F91</button><button id="recover-reload" class="primary">\u5907\u4EFD\u672A\u4FDD\u5B58\u5185\u5BB9\u5E76\u5237\u65B0</button></div>';
     document.body.append(m);
-    $2("#cancel-reload").onclick = () => m.remove();
-    $2("#recover-reload").onclick = async () => {
+    $("#cancel-reload").onclick = () => m.remove();
+    $("#recover-reload").onclick = async () => {
       try {
         const result = await api("recover-refresh", state);
         m.remove();
@@ -36101,7 +36106,7 @@ function tagSelection() {
   });
 }
 async function uploadChatFiles() {
-  const doc3 = current, c = conversation(doc3), button = $2("#chat-upload");
+  const doc3 = current, c = conversation(doc3), button = $("#chat-upload");
   let insertionPosition = c.composerPosition;
   button.disabled = true;
   try {
@@ -36142,7 +36147,7 @@ async function chooseChatFile() {
     m.className = "modal";
     m.innerHTML = `<div class="dialog ref-picker-dialog"><div class="row ref-picker-head"><h2>\u5F15\u7528\u7D20\u6750</h2><button id="close-picker">\u5173\u95ED</button></div><input id="reference-search" placeholder="\u641C\u7D22\u7D20\u6750\u5E93"><div id="reference-options"></div></div>`;
     document.body.append(m);
-    $2("#close-picker").onclick = () => m.remove();
+    $("#close-picker").onclick = () => m.remove();
     const pick = async (id) => {
       const r = refs.find((x) => x.id === id);
       if (!r) return;
@@ -36162,7 +36167,7 @@ async function chooseChatFile() {
       }
     };
     const list2 = () => {
-      const q = $2("#reference-search").value.toLowerCase();
+      const q = $("#reference-search").value.toLowerCase();
       const match = (r) => r.name.toLowerCase().includes(q);
       const boundRows = refs.filter((r) => boundIds.has(r.id) && match(r));
       const otherRows = refs.filter((r) => !boundIds.has(r.id) && match(r));
@@ -36170,7 +36175,7 @@ async function chooseChatFile() {
       const sections = [];
       if (boundRows.length) sections.push(section("\u672C\u6587\u7D20\u6750", boundRows));
       if (otherRows.length) sections.push(section("\u7D20\u6750\u5E93", otherRows));
-      $2("#reference-options").innerHTML = sections.join("") || "<p>\u6682\u65E0\u7D20\u6750\uFF0C\u53EF\u5148\u672C\u5730\u9009\u62E9\u4E0A\u4F20\uFF0C\u6216\u5230\u7D20\u6750\u5E93\u521B\u5EFA\u3002</p>";
+      $("#reference-options").innerHTML = sections.join("") || "<p>\u6682\u65E0\u7D20\u6750\uFF0C\u53EF\u5148\u672C\u5730\u9009\u62E9\u4E0A\u4F20\uFF0C\u6216\u5230\u7D20\u6750\u5E93\u521B\u5EFA\u3002</p>";
       $$("#reference-options [data-ref-preview]").forEach(
         (b) => b.onclick = (e) => {
           e.preventDefault();
@@ -36178,9 +36183,9 @@ async function chooseChatFile() {
         }
       );
     };
-    $2("#reference-search").oninput = list2;
+    $("#reference-search").oninput = list2;
     list2();
-    $2("#reference-search").focus();
+    $("#reference-search").focus();
   } catch (e) {
     toast(e.message);
   }
@@ -36193,9 +36198,9 @@ function openPreview({
   material,
   doc: doc3 = current
 }) {
-  $2("#reference-drawer")?.remove();
-  $2("#published-drawer")?.remove();
-  $2("#topic-drawer")?.remove();
+  $("#reference-drawer")?.remove();
+  $("#published-drawer")?.remove();
+  $("#topic-drawer")?.remove();
   const r = material || reference || {
     name: title,
     text,
@@ -36209,9 +36214,9 @@ function openPreview({
   const headActions = reference ? `<button type="button" id="cite-file" class="ghost">\u5F15\u7528\u6587\u4EF6</button>` : "";
   n.innerHTML = `<div class="row reference-drawer-head"><h3>${esc2(title)}</h3><div class="reference-drawer-toolbar">${headActions}<button type="button" id="close-drawer" class="ghost icon-btn" title="\u5173\u95ED" aria-label="\u5173\u95ED">${I.close({ size: 18 })}</button></div></div><div class="reference-drawer-body">${materialDrawerBodyHTML({ ...r, kind, text: text || r.text, path: rel || r.path })}</div>`;
   document.body.append(n);
-  $2("#close-drawer").onclick = () => n.remove();
+  $("#close-drawer").onclick = () => n.remove();
   if (reference) {
-    $2("#cite-file").onclick = () => {
+    $("#cite-file").onclick = () => {
       putTag(
         { kind: "file", fileId: reference.id, label: reference.name },
         doc3
@@ -36225,12 +36230,12 @@ async function renderMaterials() {
   if (materialsFilter !== "all" && !drafts.some((d) => d.id === materialsFilter))
     materialsFilter = "all";
   const uploadTarget = materialsFilter !== "all" ? drafts.find((d) => d.id === materialsFilter) : sameAccount(current?.account, account) ? current : drafts[0];
-  $2("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7D20\u6750\u5E93</h1></div><div class="header-actions"><select id="material-filter" aria-label="\u6309\u6587\u7AE0\u7B5B\u9009\u7D20\u6750"><option value="all">\u5168\u90E8\u7D20\u6750</option>${drafts.map((d) => `<option value="${d.id}">${esc2(d.title)}</option>`).join("")}</select><button id="upload-reference" class="primary" ${uploadTarget ? "" : "disabled"}>${I.upload()} \u4E0A\u4F20\u6587\u4EF6</button></div></header><section class="dashboard"><div id="project-files" class="material-cards"></div></section>`;
-  $2("#material-filter").value = materialsFilter;
-  $2("#material-filter").onchange = (e) => {
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u7D20\u6750\u5E93</h1></div><div class="header-actions"><select id="material-filter" aria-label="\u6309\u6587\u7AE0\u7B5B\u9009\u7D20\u6750"><option value="all">\u5168\u90E8\u7D20\u6750</option>${drafts.map((d) => `<option value="${d.id}">${esc2(d.title)}</option>`).join("")}</select><button id="upload-reference" class="primary" ${uploadTarget ? "" : "disabled"}>${I.upload()} \u4E0A\u4F20\u6587\u4EF6</button></div></header><section class="dashboard"><div id="project-files" class="material-cards"></div></section>`;
+  $("#material-filter").value = materialsFilter;
+  $("#material-filter").onchange = (e) => {
     materialsFilter = e.target.value;
-    $2("#reference-drawer")?.remove();
-    $2("#published-drawer")?.remove();
+    $("#reference-drawer")?.remove();
+    $("#published-drawer")?.remove();
     if (materialsFilter !== "all")
       current = state.documents.find((d) => d.id === materialsFilter) || current;
     renderMaterials();
@@ -36241,7 +36246,7 @@ async function renderMaterials() {
       (m) => (m.usedBy || []).some((u) => u.id === materialsFilter)
     );
     const rows = await Promise.all(filtered.map(hydrateMaterialPreview));
-    $2("#project-files").innerHTML = rows.map((r) => materialPreviewCardHTML(r, { showRefCount: true })).join("") || '<div class="empty-state"><img src="assets/empty-materials.png" alt="" class="empty-state-img" /><p class="empty-state-text">\u7A7A\u7A7A\u5982\u4E5F</p></div>';
+    $("#project-files").innerHTML = rows.map((r) => materialPreviewCardHTML(r, { showRefCount: true })).join("") || '<div class="empty-state"><img src="assets/empty-materials.png" alt="" class="empty-state-img" /><p class="empty-state-text">\u7A7A\u7A7A\u5982\u4E5F</p></div>';
     $$("#project-files [data-ref-preview]").forEach(
       (b) => b.onclick = async () => {
         try {
@@ -36299,9 +36304,9 @@ async function renderMaterials() {
       };
     });
   };
-  $2("#upload-reference").onclick = async () => {
+  $("#upload-reference").onclick = async () => {
     if (!uploadTarget) return toast("\u8BF7\u5148\u521B\u5EFA\u4E00\u7BC7\u8349\u7A3F\u518D\u4E0A\u4F20");
-    const b = $2("#upload-reference");
+    const b = $("#upload-reference");
     b.disabled = true;
     b.textContent = "\u4E0A\u4F20\u4E2D\u2026";
     try {
@@ -36340,16 +36345,16 @@ async function renderAccountDetail() {
     { id: "skills", title: "\u6280\u80FD" }
   ];
   const shell = (body) => {
-    $2("#main").innerHTML = `<header><div class="header-lead account-detail-lead"><button type="button" class="ghost icon-btn" id="account-detail-back" title="\u8D26\u53F7\u5217\u8868" aria-label="\u8FD4\u56DE\u8D26\u53F7\u5217\u8868">${I.chevronLeft({ size: 22 })}</button><h1 class="dashboard-tagline">${esc2(acc.label)}</h1></div><div class="header-actions"><button type="button" class="danger" id="account-unregister">\u79FB\u9664\u8D26\u53F7</button></div></header><section class="dashboard account-detail settings"><nav class="settings-tabs account-detail-tabs" role="tablist">${tabs.map(
+    $("#main").innerHTML = `<header><div class="header-lead account-detail-lead"><button type="button" class="ghost icon-btn" id="account-detail-back" title="\u8D26\u53F7\u5217\u8868" aria-label="\u8FD4\u56DE\u8D26\u53F7\u5217\u8868">${I.chevronLeft({ size: 22 })}</button><h1 class="dashboard-tagline">${esc2(acc.label)}</h1></div><div class="header-actions"><button type="button" class="danger" id="account-unregister">\u79FB\u9664\u8D26\u53F7</button></div></header><section class="dashboard account-detail settings"><nav class="settings-tabs account-detail-tabs" role="tablist">${tabs.map(
       (t) => `<button type="button" role="tab" data-account-tab="${t.id}" aria-selected="${accountDetailTab === t.id}" class="${accountDetailTab === t.id ? "active" : ""}">${t.title}</button>`
     ).join("")}</nav><div id="account-detail-body" class="settings-body">${body}</div></section>`;
-    $2("#account-detail-back").onclick = async () => {
+    $("#account-detail-back").onclick = async () => {
       if (saveProfileEditor && !await saveProfileEditor()) return;
       page = "settings";
       settingsTab = "accounts";
       render2();
     };
-    $2("#account-unregister").onclick = async () => {
+    $("#account-unregister").onclick = async () => {
       const ok = await askConfirm(
         "\u79FB\u9664\u8D26\u53F7",
         "\u4EC5\u4ECE\u5217\u8868\u79FB\u9664\uFF0C\u4E0D\u4F1A\u5220\u9664\u78C1\u76D8\u6587\u4EF6\u5939\u3002\u7EE7\u7EED\uFF1F"
@@ -36414,10 +36419,10 @@ async function renderAccountDetail() {
       );
     }
     shell(sections.join(""));
-    $2("#account-set-avatar").onclick = () => pickAndSetAccountAvatar(a);
-    $2("#account-pick-backup").onclick = () => pickAccountBackupPath(a);
-    if ($2("#account-clear-backup"))
-      $2("#account-clear-backup").onclick = async () => {
+    $("#account-set-avatar").onclick = () => pickAndSetAccountAvatar(a);
+    $("#account-pick-backup").onclick = () => pickAccountBackupPath(a);
+    if ($("#account-clear-backup"))
+      $("#account-clear-backup").onclick = async () => {
         try {
           await applyAccountState(
             await api("account-set-backup-path", { id: a, path: "" })
@@ -36430,15 +36435,15 @@ async function renderAccountDetail() {
     if (!xMode) {
       const readWechatForm = () => {
         const next2 = {
-          appId: $2("#wechat-appid").value.trim(),
-          appSecret: $2("#wechat-secret").value.trim(),
-          author: $2("#wechat-author").value.trim(),
+          appId: $("#wechat-appid").value.trim(),
+          appSecret: $("#wechat-secret").value.trim(),
+          author: $("#wechat-author").value.trim(),
           coverPath: state.wechatAccounts?.[a]?.coverPath || state.wechat?.coverPath || ""
         };
         state.wechatAccounts = { ...state.wechatAccounts || {}, [a]: next2 };
         return next2;
       };
-      $2("#wechat-test").onclick = async () => {
+      $("#wechat-test").onclick = async () => {
         readWechatForm();
         await persist();
         try {
@@ -36448,7 +36453,7 @@ async function renderAccountDetail() {
           toast(e.message || "\u8FDE\u63A5\u5931\u8D25");
         }
       };
-      $2("#save-wechat").onclick = () => {
+      $("#save-wechat").onclick = () => {
         readWechatForm();
         persist();
         toast("\u516C\u4F17\u53F7\u8BBE\u7F6E\u5DF2\u4FDD\u5B58");
@@ -36459,7 +36464,7 @@ async function renderAccountDetail() {
   if (accountDetailTab === "skills") {
     shell(`<div id="account-skills-root"></div>`);
     mountSkillsSettings(
-      $2("#account-skills-root"),
+      $("#account-skills-root"),
       api,
       a,
       accountList(),
@@ -36498,7 +36503,7 @@ async function renderAccountDetail() {
         const next2 = { ...model.modules };
         let changed2 = false;
         for (const d of model.definitions) {
-          const el = $2(`#model-text-${d.id}`);
+          const el = $(`#model-text-${d.id}`);
           if (!el || el.value === model.modules[d.id]) continue;
           next2[d.id] = el.value;
           changed2 = true;
@@ -36555,7 +36560,7 @@ function renderCalendar(rows) {
     ])
   ].sort((a, b) => b - a);
   const c = (0, import_calendar.calendar)(rows, heatmapYear, today);
-  const node = $2("#publishing-calendar");
+  const node = $("#publishing-calendar");
   if (!node) return;
   const heatTip = (d) => {
     const head = `${d.date}${d.date === today ? " \xB7 \u4ECA\u5929" : ""} \xB7 ${d.count} \u7BC7${d.future ? "\uFF08\u672A\u6765\u65E5\u671F\uFF09" : ""}`;
@@ -36564,7 +36569,7 @@ function renderCalendar(rows) {
   const summary = (0, import_calendar.publishSummary)(rows, today);
   const summaryText = summary ? `\u60A8\u5DF2\u5199\u4F5C ${summary.writingDays} \u5929\uFF0C\u5171\u53D1\u5E03 ${summary.published} \u7BC7\uFF0C\u5E73\u5747 ${summary.avgDays} \u5929\u53D1\u5E03\u4E00\u7BC7\uFF0C\u4E0A\u4E00\u6B21\u66F4\u65B0\u662F\u5728 ${summary.daysSinceLast} \u5929\u524D` : "\u6682\u65E0\u6709\u6548\u53D1\u5E03\u8BB0\u5F55";
   node.innerHTML = `<div class="row"><h3>\u53D1\u5E03\u70ED\u529B\u56FE</h3><select id="heatmap-year" aria-label="\u70ED\u529B\u56FE\u5E74\u4EFD">${years.map((y) => `<option ${y === heatmapYear ? "selected" : ""}>${y}</option>`).join("")}</select></div><p>${summaryText}</p><div class="heatmap-scroll"><div class="heatmap-grid" role="group" aria-label="\u6BCF\u65E5\u53D1\u5E03\u6570\u91CF">${"<span></span>".repeat(c.offset)}${c.days.map((d) => `<button class="heatmap-day level-${Math.min(d.count, 4)} ${d.future ? "future" : ""} ${d.date === today ? "is-today" : ""}" ${d.date === today ? 'aria-current="date"' : ""} data-heat-date="${d.date}" title="${esc2(heatTip(d))}" aria-label="${esc2(heatTip(d).replace(/\n/g, "\uFF0C"))}"></button>`).join("")}</div></div>`;
-  $2("#heatmap-year").onchange = (e) => {
+  $("#heatmap-year").onchange = (e) => {
     heatmapYear = +e.target.value;
     renderCalendar(rows);
   };

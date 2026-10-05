@@ -71,7 +71,6 @@ export function showUnmatchedMatcher(preview) {
       .join(
         "",
       )}<div class="row"><button type="button" id="cancel-unmatched">取消导入</button><button type="button" id="confirm-unmatched" class="primary">确认匹配</button></div></div>`;
-    document.body.append(m);
     m.querySelectorAll(".match-row").forEach((row) => {
       const u = preview.unmatched.find((x) => x.index === +row.dataset.index);
       const search = row.querySelector(".match-search");
@@ -83,11 +82,13 @@ export function showUnmatchedMatcher(preview) {
           pick.value = current;
       };
     });
-    $("#close-unmatched").onclick = $("#cancel-unmatched").onclick = () => {
+    const closeUnmatched = () => {
       m.remove();
       resolve(null);
     };
-    $("#confirm-unmatched").onclick = () => {
+    m.querySelector("#close-unmatched").onclick = closeUnmatched;
+    m.querySelector("#cancel-unmatched").onclick = closeUnmatched;
+    m.querySelector("#confirm-unmatched").onclick = () => {
       const extra = [];
       m.querySelectorAll(".match-row").forEach((row) => {
         const path = row.querySelector(".match-pick").value;
@@ -96,5 +97,9 @@ export function showUnmatchedMatcher(preview) {
       m.remove();
       resolve(extra);
     };
+    m.addEventListener("click", (e) => {
+      if (e.target === m) closeUnmatched();
+    });
+    document.body.append(m);
   });
 }
