@@ -83,7 +83,7 @@ class DeskCore {
   projectUpload(payload) { return Materials.projectUpload(this, payload); }
   finalize(payload) { return Materials.finalize(this, payload); }
   toDraft(rel) { return Materials.toDraft(this, rel); }
-  image(payload = {}) { return Materials.image(this, payload = {}); }
+  image(payload = {}) { return Materials.image(this, payload); }
 
   runAgent(req, onProgress) { return Agents.runAgent(this, req, onProgress); }
 

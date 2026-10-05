@@ -58,3 +58,66 @@ test("readPublished reads archive without ReferenceError: fs", (t) => {
   const body = Groups.readPublished(core, rel);
   assert.match(body, /归档正文/);
 });
+
+test("image saves under Attachment/<draft basename> for draft and project draft", (t) => {
+  const core = fixture(t);
+  core.vault.saveDoc({
+    id: "img1",
+    title: "科普草稿",
+    account: "AI",
+    body: "正文",
+    conversations: [],
+    snapshots: [],
+  });
+  core.reload();
+  const url = Materials.image(core, {
+    articleId: "img1",
+    bytes: Array.from(Buffer.from("png-bytes")),
+    type: "image/png",
+  });
+  assert.match(
+    decodeURIComponent(url),
+    /Attachment\/科普草稿\/file-\d{17}\.png$/,
+  );
+  assert(fs.existsSync(core.vault.p("Attachment/科普草稿")));
+
+  core.vault.createDraftProject("Demo_AI", "虾皮猫");
+  core.vault.moveDraft("img1", "虾皮猫");
+  core.reload();
+  const url2 = Materials.image(core, {
+    articleId: "img1",
+    bytes: Array.from(Buffer.from("png-bytes-2")),
+    type: "image/png",
+  });
+  assert.match(
+    decodeURIComponent(url2),
+    /Attachment\/科普草稿\/file-\d{17}\.png$/,
+  );
+  assert.equal(core.vault.index.img1.path, "Demo_AI/02_Drafts/虾皮猫/科普草稿.md");
+});
+
+test("DeskCore.image forwards articleId (does not swallow payload)", (t) => {
+  const { DeskCore } = require("../desk-core.cjs");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ink-desk-image-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const desk = new DeskCore();
+  desk.data = root;
+  desk.vault = new Vault(root);
+  desk.vault.createAccount("Demo_AI");
+  desk.store = desk.vault.load();
+  desk.vault.saveDoc({
+    id: "d1",
+    title: "可插图",
+    account: "AI",
+    body: "x",
+    conversations: [],
+    snapshots: [],
+  });
+  desk.store = desk.vault.load();
+  const url = desk.image({
+    articleId: "d1",
+    bytes: Array.from(Buffer.from("x")),
+    type: "image/png",
+  });
+  assert.match(decodeURIComponent(url), /Attachment\/可插图\/file-\d{17}\.png$/);
+});
