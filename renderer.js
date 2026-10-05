@@ -446,17 +446,10 @@ function showSaveConflictDialog(msg) {
   $("#conflict-keep").onclick = () => m.remove();
   $("#conflict-reload").onclick = async () => {
     try {
-      const id = current?.id;
       const result = await api("recover-refresh", state);
-      Object.assign(state, result);
-      current =
-        state.documents.find((d) => d.id === id) ||
-        state.documents.find((d) => sameAccount(d.account, account));
-      dirty = false;
       docStore.saveConflict = false;
-      pending = null;
       m.remove();
-      render();
+      await applyAccountState(result);
       toast("已从磁盘重新加载");
     } catch (err) {
       toast(err.message);
@@ -3232,9 +3225,9 @@ async function setPublishedGroups(paths) {
     const group = created || picked || null;
     try {
       if (created) {
-        applyAccountState(await api("group-upsert", { name: created }));
+        await applyAccountState(await api("group-upsert", { name: created }));
       }
-      applyAccountState(await api("article-set-group", { paths: list, group }));
+      await applyAccountState(await api("article-set-group", { paths: list, group }));
       m.remove();
       toast(group ? `已设为分组「${group}」` : "已清除分组");
     } catch (e) {
@@ -3282,7 +3275,7 @@ async function backupPublishedArticle(paths) {
       ok += 1;
     }
     if (remember && singleGroup && destDir !== defaultPath) {
-      applyAccountState(
+      await applyAccountState(
         await api("group-set-backup-path", {
           name: singleGroup,
           path: destDir,
@@ -3294,7 +3287,7 @@ async function backupPublishedArticle(paths) {
       !mixedGroups &&
       destDir !== defaultPath
     ) {
-      applyAccountState(
+      await applyAccountState(
         await api("account-set-backup-path", {
           id: accountId,
           path: destDir,
@@ -3403,16 +3396,9 @@ async function movePublishedToDraft(paths) {
 async function refreshDashboardData() {
   if (busy) return toast("AI 正在回复，请结束后再刷新");
   sync();
-  const apply = (result) => {
-    const id = current?.id;
-    Object.assign(state, result);
-    current =
-      state.documents.find((d) => d.id === id) ||
-      state.documents.find((d) => sameAccount(d.account, account));
-    dirty = false;
-    pending = null;
+  const apply = async (result) => {
     page = "dashboard";
-    render();
+    await applyAccountState(result);
     toast(
       state.warnings?.length
         ? "已同步，部分文件未读取，请在存储设置查看"
@@ -3428,7 +3414,7 @@ async function refreshDashboardData() {
     $("#cancel-reload").onclick = () => m.remove();
     $("#recover-reload").onclick = async () => {
       try {
-        apply(await api("recover-refresh", state));
+        await apply(await api("recover-refresh", state));
         m.remove();
       } catch (e) {
         toast(e.message);
@@ -3437,7 +3423,7 @@ async function refreshDashboardData() {
     return;
   }
   try {
-    apply(await api("refresh"));
+    await apply(await api("refresh"));
   } catch (e) {
     toast(e.message);
   }
@@ -4556,7 +4542,7 @@ function renderSettings() {
       try {
         const result = await api("pick-vault");
         if (!result) return;
-        applyAccountState(result);
+        await applyAccountState(result);
         toast("已切换内容仓库");
       } catch (e) {
         toast(e.message || "切换失败");
@@ -4571,7 +4557,7 @@ function renderSettings() {
         const created = await askCreateAccount();
         if (!created?.name?.trim()) return;
         try {
-          applyAccountState(
+          await applyAccountState(
             await api("account-create", {
               name: created.name.trim(),
               mode: created.mode,
@@ -4595,7 +4581,7 @@ function renderSettings() {
       });
       if (!name) return;
       try {
-        applyAccountState(await api("group-upsert", { name }));
+        await applyAccountState(await api("group-upsert", { name }));
         toast("分组已创建");
       } catch (e) {
         toast(e.message || "创建失败");
@@ -4610,7 +4596,7 @@ function renderSettings() {
         });
         if (!name || name === oldName) return;
         try {
-          applyAccountState(
+          await applyAccountState(
             await api("group-upsert", {
               name,
               oldName,
@@ -4632,7 +4618,7 @@ function renderSettings() {
         )
           return;
         try {
-          applyAccountState(await api("group-delete", { name }));
+          await applyAccountState(await api("group-delete", { name }));
           toast("已删除分组");
         } catch (e) {
           toast(e.message || "删除失败");
@@ -4645,7 +4631,7 @@ function renderSettings() {
     $$("[data-clear-group-backup]").forEach((b) => {
       b.onclick = async () => {
         try {
-          applyAccountState(
+          await applyAccountState(
             await api("group-set-backup-path", {
               name: b.dataset.clearGroupBackup,
               path: "",
@@ -4672,7 +4658,7 @@ async function pickGroupBackupPath(name) {
       defaultPath: state.groups?.[name]?.backupPath || "",
     });
     if (!folder) return;
-    applyAccountState(
+    await applyAccountState(
       await api("group-set-backup-path", { name, path: folder }),
     );
     toast("分组默认同步路径已保存");
@@ -4694,7 +4680,7 @@ async function pickAccountBackupPath(accountId) {
       defaultPath: state.backupPaths?.[accountId] || "",
     });
     if (!folder) return;
-    applyAccountState(
+    await applyAccountState(
       await api("account-set-backup-path", { id: accountId, path: folder }),
     );
     toast("默认备份路径已保存");
@@ -4752,7 +4738,7 @@ async function pickAndSetAccountAvatar(accountId) {
         type: file.type || "image/png",
       });
     }
-    applyAccountState(result);
+    await applyAccountState(result);
     toast("头像已更新");
   } catch (e) {
     toast(e.message || "头像更新失败");
@@ -4782,7 +4768,7 @@ async function pickAndRegisterAccountFolder() {
       result = await api("account-register", { folder, mode });
     }
     if (!result) return;
-    applyAccountState(result);
+    await applyAccountState(result);
     toast("已添加账号");
   } catch (e) {
     toast(e.message || "添加失败");
@@ -4828,9 +4814,10 @@ async function pickAccountFolderOnWeb() {
 
 /**
  * 应用含账号列表的状态快照并重绘。
+ * 同步后必须重拉草稿文件夹列表，否则本地已删的空文件夹会残留在侧栏。
  * @param {object} result
  */
-function applyAccountState(result) {
+async function applyAccountState(result) {
   const id = current?.id;
   Object.assign(state, result);
   ensureAccount();
@@ -4840,13 +4827,14 @@ function applyAccountState(result) {
     null;
   dirty = false;
   pending = null;
+  await refreshDraftProjects();
   render();
 }
 async function refreshVault() {
   if (busy) return toast("AI 正在回复，请结束后刷新");
   sync();
-  const apply = (result) => {
-    applyAccountState(result);
+  const apply = async (result) => {
+    await applyAccountState(result);
     toast(
       state.warnings?.length
         ? "部分文件未读取，请在存储设置查看错误"
@@ -4864,7 +4852,7 @@ async function refreshVault() {
       try {
         const result = await api("recover-refresh", state);
         m.remove();
-        apply(result);
+        await apply(result);
       } catch (e) {
         toast(e.message);
       }
@@ -4872,7 +4860,7 @@ async function refreshVault() {
     return;
   }
   try {
-    apply(await api("refresh"));
+    await apply(await api("refresh"));
   } catch (e) {
     toast(e.message);
   }
@@ -5224,7 +5212,7 @@ async function renderAccountDetail() {
       try {
         page = "settings";
         settingsTab = "accounts";
-        applyAccountState(await api("account-unregister", { id: a }));
+        await applyAccountState(await api("account-unregister", { id: a }));
         toast("已移除账号");
       } catch (e) {
         toast(e.message || "移除失败");
@@ -5296,7 +5284,7 @@ async function renderAccountDetail() {
     if ($("#account-clear-backup"))
       $("#account-clear-backup").onclick = async () => {
         try {
-          applyAccountState(
+          await applyAccountState(
             await api("account-set-backup-path", { id: a, path: "" }),
           );
           toast("已清除默认备份路径");

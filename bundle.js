@@ -32321,15 +32321,10 @@ function showSaveConflictDialog(msg) {
   $2("#conflict-keep").onclick = () => m.remove();
   $2("#conflict-reload").onclick = async () => {
     try {
-      const id = current?.id;
       const result = await api("recover-refresh", state);
-      Object.assign(state, result);
-      current = state.documents.find((d) => d.id === id) || state.documents.find((d) => sameAccount(d.account, account));
-      dirty = false;
       docStore.saveConflict = false;
-      pending = null;
       m.remove();
-      render2();
+      await applyAccountState(result);
       toast("\u5DF2\u4ECE\u78C1\u76D8\u91CD\u65B0\u52A0\u8F7D");
     } catch (err) {
       toast(err.message);
@@ -34683,9 +34678,9 @@ async function setPublishedGroups(paths) {
     const group = created || picked || null;
     try {
       if (created) {
-        applyAccountState(await api("group-upsert", { name: created }));
+        await applyAccountState(await api("group-upsert", { name: created }));
       }
-      applyAccountState(await api("article-set-group", { paths: list2, group }));
+      await applyAccountState(await api("article-set-group", { paths: list2, group }));
       m.remove();
       toast(group ? `\u5DF2\u8BBE\u4E3A\u5206\u7EC4\u300C${group}\u300D` : "\u5DF2\u6E05\u9664\u5206\u7EC4");
     } catch (e) {
@@ -34729,14 +34724,14 @@ async function backupPublishedArticle(paths) {
       ok += 1;
     }
     if (remember2 && singleGroup && destDir !== defaultPath) {
-      applyAccountState(
+      await applyAccountState(
         await api("group-set-backup-path", {
           name: singleGroup,
           path: destDir
         })
       );
     } else if (remember2 && !singleGroup && !mixedGroups && destDir !== defaultPath) {
-      applyAccountState(
+      await applyAccountState(
         await api("account-set-backup-path", {
           id: accountId,
           path: destDir
@@ -34823,14 +34818,9 @@ async function movePublishedToDraft(paths) {
 async function refreshDashboardData() {
   if (busy) return toast("AI \u6B63\u5728\u56DE\u590D\uFF0C\u8BF7\u7ED3\u675F\u540E\u518D\u5237\u65B0");
   sync();
-  const apply2 = (result) => {
-    const id = current?.id;
-    Object.assign(state, result);
-    current = state.documents.find((d) => d.id === id) || state.documents.find((d) => sameAccount(d.account, account));
-    dirty = false;
-    pending = null;
+  const apply2 = async (result) => {
     page = "dashboard";
-    render2();
+    await applyAccountState(result);
     toast(
       state.warnings?.length ? "\u5DF2\u540C\u6B65\uFF0C\u90E8\u5206\u6587\u4EF6\u672A\u8BFB\u53D6\uFF0C\u8BF7\u5728\u5B58\u50A8\u8BBE\u7F6E\u67E5\u770B" : "\u5DF2\u540C\u6B65\u672C\u5730\u6570\u636E"
     );
@@ -34843,7 +34833,7 @@ async function refreshDashboardData() {
     $2("#cancel-reload").onclick = () => m.remove();
     $2("#recover-reload").onclick = async () => {
       try {
-        apply2(await api("recover-refresh", state));
+        await apply2(await api("recover-refresh", state));
         m.remove();
       } catch (e) {
         toast(e.message);
@@ -34852,7 +34842,7 @@ async function refreshDashboardData() {
     return;
   }
   try {
-    apply2(await api("refresh"));
+    await apply2(await api("refresh"));
   } catch (e) {
     toast(e.message);
   }
@@ -35797,7 +35787,7 @@ function renderSettings() {
       try {
         const result = await api("pick-vault");
         if (!result) return;
-        applyAccountState(result);
+        await applyAccountState(result);
         toast("\u5DF2\u5207\u6362\u5185\u5BB9\u4ED3\u5E93");
       } catch (e) {
         toast(e.message || "\u5207\u6362\u5931\u8D25");
@@ -35812,7 +35802,7 @@ function renderSettings() {
         const created = await askCreateAccount();
         if (!created?.name?.trim()) return;
         try {
-          applyAccountState(
+          await applyAccountState(
             await api("account-create", {
               name: created.name.trim(),
               mode: created.mode
@@ -35836,7 +35826,7 @@ function renderSettings() {
       });
       if (!name) return;
       try {
-        applyAccountState(await api("group-upsert", { name }));
+        await applyAccountState(await api("group-upsert", { name }));
         toast("\u5206\u7EC4\u5DF2\u521B\u5EFA");
       } catch (e) {
         toast(e.message || "\u521B\u5EFA\u5931\u8D25");
@@ -35851,7 +35841,7 @@ function renderSettings() {
         });
         if (!name || name === oldName) return;
         try {
-          applyAccountState(
+          await applyAccountState(
             await api("group-upsert", {
               name,
               oldName
@@ -35871,7 +35861,7 @@ function renderSettings() {
         ))
           return;
         try {
-          applyAccountState(await api("group-delete", { name }));
+          await applyAccountState(await api("group-delete", { name }));
           toast("\u5DF2\u5220\u9664\u5206\u7EC4");
         } catch (e) {
           toast(e.message || "\u5220\u9664\u5931\u8D25");
@@ -35884,7 +35874,7 @@ function renderSettings() {
     $$("[data-clear-group-backup]").forEach((b) => {
       b.onclick = async () => {
         try {
-          applyAccountState(
+          await applyAccountState(
             await api("group-set-backup-path", {
               name: b.dataset.clearGroupBackup,
               path: ""
@@ -35906,7 +35896,7 @@ async function pickGroupBackupPath(name) {
       defaultPath: state.groups?.[name]?.backupPath || ""
     });
     if (!folder) return;
-    applyAccountState(
+    await applyAccountState(
       await api("group-set-backup-path", { name, path: folder })
     );
     toast("\u5206\u7EC4\u9ED8\u8BA4\u540C\u6B65\u8DEF\u5F84\u5DF2\u4FDD\u5B58");
@@ -35922,7 +35912,7 @@ async function pickAccountBackupPath(accountId) {
       defaultPath: state.backupPaths?.[accountId] || ""
     });
     if (!folder) return;
-    applyAccountState(
+    await applyAccountState(
       await api("account-set-backup-path", { id: accountId, path: folder })
     );
     toast("\u9ED8\u8BA4\u5907\u4EFD\u8DEF\u5F84\u5DF2\u4FDD\u5B58");
@@ -35966,7 +35956,7 @@ async function pickAndSetAccountAvatar(accountId) {
         type: file.type || "image/png"
       });
     }
-    applyAccountState(result);
+    await applyAccountState(result);
     toast("\u5934\u50CF\u5DF2\u66F4\u65B0");
   } catch (e) {
     toast(e.message || "\u5934\u50CF\u66F4\u65B0\u5931\u8D25");
@@ -35985,7 +35975,7 @@ async function pickAndRegisterAccountFolder() {
       result = await api("account-register", { folder, mode });
     }
     if (!result) return;
-    applyAccountState(result);
+    await applyAccountState(result);
     toast("\u5DF2\u6DFB\u52A0\u8D26\u53F7");
   } catch (e) {
     toast(e.message || "\u6DFB\u52A0\u5931\u8D25");
@@ -36019,20 +36009,21 @@ async function pickAccountFolderOnWeb() {
     );
   });
 }
-function applyAccountState(result) {
+async function applyAccountState(result) {
   const id = current?.id;
   Object.assign(state, result);
   ensureAccount();
   current = state.documents.find((d) => d.id === id) || state.documents.find((d) => sameAccount(d.account, account)) || null;
   dirty = false;
   pending = null;
+  await refreshDraftProjects();
   render2();
 }
 async function refreshVault() {
   if (busy) return toast("AI \u6B63\u5728\u56DE\u590D\uFF0C\u8BF7\u7ED3\u675F\u540E\u5237\u65B0");
   sync();
-  const apply2 = (result) => {
-    applyAccountState(result);
+  const apply2 = async (result) => {
+    await applyAccountState(result);
     toast(
       state.warnings?.length ? "\u90E8\u5206\u6587\u4EF6\u672A\u8BFB\u53D6\uFF0C\u8BF7\u5728\u5B58\u50A8\u8BBE\u7F6E\u67E5\u770B\u9519\u8BEF" : "\u5DF2\u5237\u65B0\u5185\u5BB9\u4ED3\u5E93"
     );
@@ -36047,7 +36038,7 @@ async function refreshVault() {
       try {
         const result = await api("recover-refresh", state);
         m.remove();
-        apply2(result);
+        await apply2(result);
       } catch (e) {
         toast(e.message);
       }
@@ -36055,7 +36046,7 @@ async function refreshVault() {
     return;
   }
   try {
-    apply2(await api("refresh"));
+    await apply2(await api("refresh"));
   } catch (e) {
     toast(e.message);
   }
@@ -36367,7 +36358,7 @@ async function renderAccountDetail() {
       try {
         page = "settings";
         settingsTab = "accounts";
-        applyAccountState(await api("account-unregister", { id: a }));
+        await applyAccountState(await api("account-unregister", { id: a }));
         toast("\u5DF2\u79FB\u9664\u8D26\u53F7");
       } catch (e) {
         toast(e.message || "\u79FB\u9664\u5931\u8D25");
@@ -36428,7 +36419,7 @@ async function renderAccountDetail() {
     if ($2("#account-clear-backup"))
       $2("#account-clear-backup").onclick = async () => {
         try {
-          applyAccountState(
+          await applyAccountState(
             await api("account-set-backup-path", { id: a, path: "" })
           );
           toast("\u5DF2\u6E05\u9664\u9ED8\u8BA4\u5907\u4EFD\u8DEF\u5F84");

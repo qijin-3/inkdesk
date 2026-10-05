@@ -101,6 +101,15 @@ app.whenReady().then(() => {
       ? path.join(process.resourcesPath, "reference-reader")
       : path.join(__dirname, "assets/reference-reader"),
   });
+  desk.onAgentEvent = (e) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      try {
+        w.webContents.send("agent-event", e);
+      } catch {
+        /* ignore */
+      }
+    }
+  };
   protocol.handle("inkasset", async (request) => {
     try {
       const id = decodeURIComponent(new URL(request.url).pathname.slice(1));
@@ -395,11 +404,6 @@ ipcMain.handle("copy", async (_, p) => {
 ipcMain.handle("agent", async (event, req) =>
   desk.runAgent(req, (text) => event.sender.send("agent-progress", text)),
 );
-desk.onAgentEvent = (e) => {
-  for (const w of BrowserWindow.getAllWindows()) {
-    try { w.webContents.send("agent-event", e); } catch { /* ignore */ }
-  }
-};
 
 ipcMain.on("save-sync", (event, next) => {
   try {

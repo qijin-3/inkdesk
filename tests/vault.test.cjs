@@ -244,3 +244,12 @@ test("draft project create / move / delete", (t) => {
   assert.equal(v.index[d.id], undefined);
   assert.deepEqual(v.listDraftProjects("Demo_AI"), []);
 });
+
+test("外部删除文件夹后 listDraftProjects 不再返回", (t) => {
+  const v = fixture(t);
+  v.load();
+  v.createDraftProject("Demo_AI", "Muxin");
+  assert.deepEqual(v.listDraftProjects("Demo_AI"), ["Muxin"]);
+  fs.rmSync(v.p("Demo_AI/02_Drafts/Muxin"), { recursive: true, force: true });
+  assert.deepEqual(v.listDraftProjects("Demo_AI"), []);
+});
