@@ -9,7 +9,7 @@
     "dev": "node dev.cjs",
     "dev:server": "node server.cjs",
     "build:watch": "esbuild renderer.js --bundle --format=esm --outfile=bundle.js --watch",
-    "test": "node --test tests/test.cjs tests/vault.test.cjs tests/knowledge.test.cjs tests/model.test.cjs tests/wechat.test.cjs tests/publish-slice.test.cjs tests/ipc-channels.test.cjs tests/note-import.test.cjs tests/x-import.test.cjs tests/skills.test.cjs tests/agent-models.test.cjs tests/agent-usage.test.cjs tests/update.test.cjs tests/review-diff.test.cjs tests/wechat-png.test.cjs tests/groups.test.cjs tests/draft-projects.test.cjs tests/store-doc.test.cjs tests/perf.test.cjs tests/helpers.test.cjs tests/backup-plan.test.cjs tests/agent-store.test.cjs tests/materials-finalize.test.cjs tests/materials.test.cjs",
+    "test": "node --test tests/test.cjs tests/vault.test.cjs tests/knowledge.test.cjs tests/model.test.cjs tests/wechat.test.cjs tests/wechat-image.test.cjs tests/publish-slice.test.cjs tests/ipc-channels.test.cjs tests/note-import.test.cjs tests/x-import.test.cjs tests/skills.test.cjs tests/agent-models.test.cjs tests/agent-usage.test.cjs tests/update.test.cjs tests/review-diff.test.cjs tests/wechat-png.test.cjs tests/groups.test.cjs tests/draft-projects.test.cjs tests/store-doc.test.cjs tests/perf.test.cjs tests/helpers.test.cjs tests/backup-plan.test.cjs tests/agent-store.test.cjs tests/materials-finalize.test.cjs tests/materials.test.cjs",
     "package:mac": "node package-mac.cjs",
     "build": "esbuild renderer.js --bundle --format=esm --outfile=bundle.js && node scripts/build-css.cjs",
     "build:css": "node scripts/build-css.cjs",

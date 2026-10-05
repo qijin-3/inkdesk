@@ -42,7 +42,7 @@ test("wechatTokenBucket 同 appId 同桶", () => {
   assert.equal(Wechat.wechatTokenBucket(c, "a"), Wechat.wechatTokenBucket(c, "a"));
 });
 
-test("loadWechatImageBuffer data URL 解析/拒绝", () => {
+test("loadWechatImageBuffer data URL 解析；非法输入为 null", () => {
   const tiny = "data:image/png;base64," + Buffer.from("hi").toString("base64");
   const r = Wechat.loadWechatImageBuffer(core({}), tiny);
   assert.equal(r.name, "block.png");

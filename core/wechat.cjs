@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const wechatMp = require("../wechat-mp.cjs");
+const wechatImage = require("../wechat-image.cjs");
 
 /**
  * 对外暴露的各账号公众号配置快照。
@@ -83,10 +84,14 @@ async function pushWechatDraft(core, payload) {
     throw Error(
       "缺少封面图：请在账号设置中指定默认封面，或在正文加入至少一张本地图片",
     );
+  const cover = wechatMp.readImageForUpload(
+    coverPath,
+    wechatImage.COVER_MAX_BYTES,
+  );
   const thumb = await wechatMp.uploadPermanentImage(
     token,
-    wechatMp.readImageFile(coverPath, 10 * 1024 * 1024),
-    path.basename(coverPath),
+    cover.buf,
+    cover.name,
   );
 
   const title = String(payload.title || "未命名文章").slice(0, 32);
@@ -116,6 +121,7 @@ async function pushWechatDraft(core, payload) {
 
 /**
  * 把 img src 读成上传缓冲：支持 data URL 与本地路径。
+ * 超过 uploadimg 上限或非公众号格式时自动压成 JPEG。
  * @param {string} src
  * @returns {{ buf: Buffer, name: string, filePath?: string }|null}
  */
@@ -127,16 +133,24 @@ function loadWechatImageBuffer(core, src) {
     const meta = src.slice(0, comma);
     const buf = Buffer.from(src.slice(comma + 1), "base64");
     if (!buf.length) return null;
-    if (buf.length > 1024 * 1024)
-      throw Error("标题/引用图片超过 1MB，请精简文字后重试");
-    const ext = /image\/(png|jpe?g|gif|webp)/i.exec(meta)?.[1] || "png";
-    return { buf, name: `block.${ext === "jpeg" ? "jpg" : ext}` };
+    const ext = /image\/(png|jpe?g|gif|webp|bmp)/i.exec(meta)?.[1] || "png";
+    const rawName = `block.${ext === "jpeg" ? "jpg" : ext}`;
+    const ensured = wechatImage.ensureImageMaxBytes(
+      buf,
+      wechatImage.CONTENT_MAX_BYTES,
+      rawName,
+    );
+    return { buf: ensured.buf, name: ensured.name };
   }
   const filePath = resolveWechatImageSrc(core, src);
   if (!filePath) return null;
+  const ensured = wechatMp.readImageForUpload(
+    filePath,
+    wechatImage.CONTENT_MAX_BYTES,
+  );
   return {
-    buf: wechatMp.readImageFile(filePath),
-    name: path.basename(filePath),
+    buf: ensured.buf,
+    name: ensured.name,
     filePath,
   };
 }

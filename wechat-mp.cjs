@@ -135,17 +135,25 @@ function mimeOf(filename) {
 }
 
 /**
- * 从磁盘读取图片，默认限制约 1MB（uploadimg 上限）；封面可用更大上限。
+ * 从磁盘读取图片；超过上限或格式不可用时自动压缩（uploadimg 默认约 1MB）。
  * @param {string} filePath
  * @param {number} [maxBytes]
+ * @returns {Buffer}
  */
 function readImageFile(filePath, maxBytes = 1024 * 1024) {
-  const buf = fs.readFileSync(filePath);
-  if (buf.length > maxBytes)
-    throw Error(
-      `图片超过 ${Math.round(maxBytes / 1024 / 1024)}MB，请压缩后重试：${path.basename(filePath)}`,
-    );
-  return buf;
+  return readImageForUpload(filePath, maxBytes).buf;
+}
+
+/**
+ * 读取并确保在上传限制内，返回缓冲与用于 MIME 的文件名（必要时为 .jpg）。
+ * @param {string} filePath
+ * @param {number} [maxBytes]
+ * @returns {{ buf: Buffer, name: string }}
+ */
+function readImageForUpload(filePath, maxBytes = 1024 * 1024) {
+  const { ensureImageMaxBytes } = require("./wechat-image.cjs");
+  const raw = fs.readFileSync(filePath);
+  return ensureImageMaxBytes(raw, maxBytes, path.basename(filePath));
 }
 
 module.exports = {
@@ -154,5 +162,6 @@ module.exports = {
   uploadPermanentImage,
   addDraft,
   readImageFile,
+  readImageForUpload,
   mimeOf,
 };
