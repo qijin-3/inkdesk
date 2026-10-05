@@ -5,11 +5,11 @@ import { publishedGroup, backupPathFor } from "../ui/groups.js";
  * 纯函数：把“按哪些路径/分组/默认目录同步”的分支逻辑与弹窗 DOM 解耦，便于单测。
  *
  * @param {object} st state（archives/groups/backupPaths）
- * @param {{ paths: string|string[], account: string, preview?: { path?: string, title?: string }|null }} opts
+ * @param {{ paths: string|string[], account: string, preview?: { path?: string, title?: string }|null, label?: string }} opts
  * @returns {null | { list, accountId, groups, singleGroup, mixedGroups, defaultPath,
  *   perPathDefaults, allHaveDefault, label, rememberTarget, defaultHint }}
  */
-export function resolveBackupPlan(st, { paths, account, preview }) {
+export function resolveBackupPlan(st, { paths, account, preview, label: labelOpt }) {
   const list = (Array.isArray(paths) ? paths : [paths]).filter(Boolean);
   if (!list.length) return null;
   const first = list[0];
@@ -36,7 +36,11 @@ export function resolveBackupPlan(st, { paths, account, preview }) {
         rel.split("/").pop().replace(/\.md$/, "") ||
         "文章";
   const label =
-    list.length === 1 ? `「${titleOf(first)}」` : `选中的 ${list.length} 篇文章`;
+    typeof labelOpt === "string" && labelOpt.trim()
+      ? labelOpt.trim()
+      : list.length === 1
+        ? `「${titleOf(first)}」`
+        : `选中的 ${list.length} 篇文章`;
   const rememberTarget = singleGroup
     ? `分组「${singleGroup}」`
     : mixedGroups

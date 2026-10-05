@@ -28067,6 +28067,17 @@ function backupPathFor(st, group, accountId) {
   if (g && st.groups?.[g]?.backupPath) return st.groups[g].backupPath;
   return st.backupPaths?.[accountId] || "";
 }
+function groupedArchivePaths(st) {
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const a of st.archives || []) {
+    const rel = a?.path;
+    if (!rel || seen.has(rel) || !publishedGroup(st, rel)) continue;
+    seen.add(rel);
+    out.push(rel);
+  }
+  return out;
+}
 function groupOptionsHtml(st, selected, opts = {}) {
   const allowEmpty = opts.allowEmpty !== false;
   const emptyLabel = opts.emptyLabel || "\u65E0\u5206\u7EC4";
@@ -28326,7 +28337,7 @@ function formatDelta(n) {
 }
 
 // services/backup-plan.js
-function resolveBackupPlan(st, { paths, account: account2, preview }) {
+function resolveBackupPlan(st, { paths, account: account2, preview, label: labelOpt }) {
   const list2 = (Array.isArray(paths) ? paths : [paths]).filter(Boolean);
   if (!list2.length) return null;
   const first2 = list2[0];
@@ -28342,7 +28353,7 @@ function resolveBackupPlan(st, { paths, account: account2, preview }) {
   }));
   const allHaveDefault = perPathDefaults.every((x) => x.dest);
   const titleOf = (rel) => preview?.path === rel ? preview.title : (st.archives || []).find((a) => a.path === rel)?.title || rel.split("/").pop().replace(/\.md$/, "") || "\u6587\u7AE0";
-  const label = list2.length === 1 ? `\u300C${titleOf(first2)}\u300D` : `\u9009\u4E2D\u7684 ${list2.length} \u7BC7\u6587\u7AE0`;
+  const label = typeof labelOpt === "string" && labelOpt.trim() ? labelOpt.trim() : list2.length === 1 ? `\u300C${titleOf(first2)}\u300D` : `\u9009\u4E2D\u7684 ${list2.length} \u7BC7\u6587\u7AE0`;
   const rememberTarget = singleGroup ? `\u5206\u7EC4\u300C${singleGroup}\u300D` : mixedGroups ? "\uFF08\u591A\u5206\u7EC4\u65F6\u8BF7\u5206\u522B\u8BBE\u7F6E\uFF09" : "\u8BE5\u8D26\u53F7";
   const defaultHint = mixedGroups ? allHaveDefault ? "\u5404\u5206\u7EC4\u5DF2\u914D\u7F6E\u9ED8\u8BA4\u8DEF\u5F84\uFF0C\u53EF\u6309\u5206\u7EC4\u5206\u522B\u540C\u6B65" : "\u9009\u4E2D\u6587\u7AE0\u5206\u7EC4\u4E0D\u540C\u6216\u672A\u914D\u7F6E\u8DEF\u5F84\uFF0C\u8BF7\u9009\u62E9\u7EDF\u4E00\u8DEF\u5F84\uFF0C\u6216\u5148\u8BBE\u7F6E\u5206\u7EC4" : defaultPath ? defaultPath : singleGroup ? `\u5206\u7EC4\u300C${singleGroup}\u300D\u672A\u8BBE\u7F6E\uFF08\u53EF\u5728\u8BBE\u7F6E \xB7 \u5206\u7EC4\u4E2D\u914D\u7F6E\uFF09` : "\u672A\u8BBE\u7F6E\uFF08\u53EF\u5148\u4E3A\u6587\u7AE0\u6307\u5B9A\u5206\u7EC4\uFF0C\u6216\u5728\u8BBE\u7F6E \xB7 \u8D26\u53F7\u4E2D\u914D\u7F6E\uFF09";
   return {
@@ -33376,7 +33387,8 @@ function renderPublishedPreviewInner() {
   removeArticleOutline();
   const doc3 = {
     title: publishedPreview.title,
-    body: publishedPreview.body
+    body: publishedPreview.body,
+    account: publishedPreview.account || account || ""
   };
   const html2 = publishedSourceHTML(doc3.body);
   if (isXAccount()) {
@@ -34493,7 +34505,8 @@ async function pushWechatDraft(doc3) {
   try {
     toast("\u6B63\u5728\u751F\u6210\u6807\u9898\u56FE\u5E76\u63A8\u9001\u2026");
     const result = await api("wechat-draft-push", {
-      account: doc3.account,
+      // 已发布预览曾漏传 account，回退当前选中账号
+      account: doc3.account || account,
       title: doc3.title || "\u672A\u547D\u540D\u6587\u7AE0",
       html: await publishHTML(doc3.body, {
         keepImages: true,
@@ -34743,7 +34756,13 @@ async function openPublishedPreview(rel) {
   const title = row?.title || rel.split("/").pop().replace(/\.md$/, "") || "\u6587\u7AE0";
   try {
     const body = row?.body ?? await api("published-read", rel);
-    publishedPreview = { path: rel, title, body: body || "" };
+    publishedPreview = {
+      path: rel,
+      title,
+      body: body || "",
+      // 推送草稿依赖账号级 wechatAccounts；路径首段即账号文件夹
+      account: account || rel.split("/")[0] || ""
+    };
     page = "published-preview";
     previewPane = "wechat";
     render2();
@@ -34751,9 +34770,14 @@ async function openPublishedPreview(rel) {
     toast(e.message);
   }
 }
-async function backupPublishedArticle(paths) {
+async function backupPublishedArticle(paths, opts = {}) {
   if (isWeb()) return toast("\u672C\u5730\u540C\u6B65\u4EC5\u652F\u6301\u684C\u9762\u7AEF");
-  const plan = resolveBackupPlan(state, { paths, account, preview: publishedPreview });
+  const plan = resolveBackupPlan(state, {
+    paths,
+    account,
+    preview: publishedPreview,
+    label: opts.label
+  });
   if (!plan) return;
   const {
     list: list2,
@@ -35786,7 +35810,7 @@ function renderSettings() {
   });
   const groups = groupNames(state);
   const groupsBody = settingsSection({
-    control: `<div class="settings-panel-toolbar"><button type="button" class="primary" id="create-group">${I.plus()} \u65B0\u5EFA\u5206\u7EC4</button></div>` + (groups.length ? settingsPanel(
+    control: `<div class="settings-panel-toolbar"><button type="button" id="sync-grouped-articles">${I.folder()} \u672C\u5730\u540C\u6B65</button><button type="button" class="primary" id="create-group">${I.plus()} \u65B0\u5EFA\u5206\u7EC4</button></div>` + (groups.length ? settingsPanel(
       `<table class="groups-table"><thead><tr><th>\u5206\u7EC4</th><th>\u672C\u5730\u540C\u6B65\u9ED8\u8BA4\u8DEF\u5F84</th><th class="groups-actions-col">\u64CD\u4F5C</th></tr></thead><tbody>${groups.map((name) => {
         const backup = state.groups?.[name]?.backupPath || "";
         return `<tr><td>${groupChipHtml(name)}</td><td><span class="settings-path-row groups-path-row"><input type="text" value="${esc2(backup)}" placeholder="\u672A\u8BBE\u7F6E\uFF0C\u540C\u6B65\u65F6\u53EF\u9009\u62E9\u5E76\u8BB0\u4F4F" readonly><button type="button" data-pick-group-backup="${esc2(name)}">${I.folder()} \u9009\u62E9</button>${backup ? `<button type="button" class="ghost" data-clear-group-backup="${esc2(name)}">\u6E05\u9664</button>` : ""}</span></td><td class="groups-actions-col"><button type="button" class="ghost" data-rename-group="${esc2(name)}">\u91CD\u547D\u540D</button><button type="button" class="ghost" data-delete-group="${esc2(name)}">\u5220\u9664</button></td></tr>`;
@@ -35873,6 +35897,7 @@ function renderSettings() {
     });
   }
   if (settingsTab === "groups") {
+    $("#sync-grouped-articles").onclick = () => syncAllGroupedArticles();
     $("#create-group").onclick = async () => {
       const name = await promptText("\u65B0\u5EFA\u5206\u7EC4", {
         placeholder: "\u4F8B\u5982\uFF1A\u516C\u4F17\u53F7\u3001\u5C0F\u7EA2\u4E66",
@@ -35941,6 +35966,14 @@ function renderSettings() {
       };
     });
   }
+}
+async function syncAllGroupedArticles() {
+  if (isWeb()) return toast("\u672C\u5730\u540C\u6B65\u4EC5\u652F\u6301\u684C\u9762\u7AEF");
+  const paths = groupedArchivePaths(state);
+  if (!paths.length) return toast("\u6CA1\u6709\u5DF2\u5206\u7EC4\u7684\u5DF2\u53D1\u5E03\u6587\u7AE0");
+  await backupPublishedArticle(paths, {
+    label: `\u5168\u90E8\u6709\u5206\u7EC4\u7684 ${paths.length} \u7BC7\u6587\u7AE0`
+  });
 }
 async function pickGroupBackupPath(name) {
   if (isWeb()) return toast("\u9009\u62E9\u5907\u4EFD\u8DEF\u5F84\u4EC5\u652F\u6301\u684C\u9762\u7AEF");

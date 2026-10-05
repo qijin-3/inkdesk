@@ -36,6 +36,7 @@ import {
   groupChipHtml,
   publishedGroup,
   backupPathFor,
+  groupedArchivePaths,
   groupOptionsHtml,
 } from "./ui/groups.js";
 import {
@@ -1717,6 +1718,7 @@ function renderPublishedPreviewInner() {
   const doc = {
     title: publishedPreview.title,
     body: publishedPreview.body,
+    account: publishedPreview.account || account || "",
   };
   const html = publishedSourceHTML(doc.body);
   if (isXAccount()) {
@@ -2990,7 +2992,8 @@ async function pushWechatDraft(doc) {
   try {
     toast("正在生成标题图并推送…");
     const result = await api("wechat-draft-push", {
-      account: doc.account,
+      // 已发布预览曾漏传 account，回退当前选中账号
+      account: doc.account || account,
       title: doc.title || "未命名文章",
       html: await publishHTML(doc.body, {
         keepImages: true,
@@ -3287,7 +3290,13 @@ async function openPublishedPreview(rel) {
     row?.title || rel.split("/").pop().replace(/\.md$/, "") || "文章";
   try {
     const body = row?.body ?? (await api("published-read", rel));
-    publishedPreview = { path: rel, title, body: body || "" };
+    publishedPreview = {
+      path: rel,
+      title,
+      body: body || "",
+      // 推送草稿依赖账号级 wechatAccounts；路径首段即账号文件夹
+      account: account || rel.split("/")[0] || "",
+    };
     page = "published-preview";
     previewPane = "wechat";
     render();
@@ -3300,10 +3309,16 @@ async function openPublishedPreview(rel) {
  * 将已发布文章同步备份到本地目录（支持单篇或多选）。
  * 默认路径优先取文章分组的本地路径，无分组路径时回退账号路径。
  * @param {string|string[]} paths vault 相对路径
+ * @param {{ label?: string }} [opts]
  */
-async function backupPublishedArticle(paths) {
+async function backupPublishedArticle(paths, opts = {}) {
   if (isWeb()) return toast("本地同步仅支持桌面端");
-  const plan = resolveBackupPlan(state, { paths, account, preview: publishedPreview });
+  const plan = resolveBackupPlan(state, {
+    paths,
+    account,
+    preview: publishedPreview,
+    label: opts.label,
+  });
   if (!plan) return;
   const { list, accountId, singleGroup, mixedGroups, defaultPath, perPathDefaults,
     allHaveDefault, label, rememberTarget, defaultHint } = plan;
@@ -4510,7 +4525,7 @@ function renderSettings() {
   const groups = groupNames(state);
   const groupsBody = settingsSection({
     control:
-      `<div class="settings-panel-toolbar"><button type="button" class="primary" id="create-group">${I.plus()} 新建分组</button></div>` +
+      `<div class="settings-panel-toolbar"><button type="button" id="sync-grouped-articles">${I.folder()} 本地同步</button><button type="button" class="primary" id="create-group">${I.plus()} 新建分组</button></div>` +
       (groups.length
         ? settingsPanel(
             `<table class="groups-table"><thead><tr><th>分组</th><th>本地同步默认路径</th><th class="groups-actions-col">操作</th></tr></thead><tbody>${groups
@@ -4619,6 +4634,7 @@ function renderSettings() {
     });
   }
   if (settingsTab === "groups") {
+    $("#sync-grouped-articles").onclick = () => syncAllGroupedArticles();
     $("#create-group").onclick = async () => {
       const name = await promptText("新建分组", {
         placeholder: "例如：公众号、小红书",
@@ -4689,6 +4705,19 @@ function renderSettings() {
       };
     });
   }
+}
+
+/**
+ * 设置 · 分组：同步全部已发布且带分组标签的文章。
+ * 复用既有本地同步弹窗：可统一选路径，或按各分组默认路径分别同步。
+ */
+async function syncAllGroupedArticles() {
+  if (isWeb()) return toast("本地同步仅支持桌面端");
+  const paths = groupedArchivePaths(state);
+  if (!paths.length) return toast("没有已分组的已发布文章");
+  await backupPublishedArticle(paths, {
+    label: `全部有分组的 ${paths.length} 篇文章`,
+  });
 }
 
 /**

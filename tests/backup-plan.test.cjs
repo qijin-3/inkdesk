@@ -98,6 +98,15 @@ test("preview 标题优先于 archive", async () => {
   assert.equal(p.label, "「预览标题」");
 });
 
+test("可覆盖 label", async () => {
+  const p = resolveBackupPlan(st(), {
+    paths: ["acc1/a.md", "acc1/b.md"],
+    account: "acc1",
+    label: "全部有分组的 2 篇文章",
+  });
+  assert.equal(p.label, "全部有分组的 2 篇文章");
+});
+
 test("未知路径回退文件名与账号", async () => {
   const p = resolveBackupPlan(st(), {
     paths: "acc9/zz.md",

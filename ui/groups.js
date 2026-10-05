@@ -58,6 +58,23 @@ export function backupPathFor(st, group, accountId) {
 }
 
 /**
+ * 已发布且带分组标签的文章路径列表（设置页「本地同步」用）。
+ * @param {{ archives?: Array<{ path?: string, group?: string }>, metrics?: Array<Record<string, unknown>> }} st
+ * @returns {string[]}
+ */
+export function groupedArchivePaths(st) {
+  const seen = new Set();
+  const out = [];
+  for (const a of st.archives || []) {
+    const rel = a?.path;
+    if (!rel || seen.has(rel) || !publishedGroup(st, rel)) continue;
+    seen.add(rel);
+    out.push(rel);
+  }
+  return out;
+}
+
+/**
  * 分组下拉选项 HTML。
  * @param {object} st
  * @param {string|null|undefined} selected

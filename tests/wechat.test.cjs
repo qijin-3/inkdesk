@@ -22,6 +22,21 @@ test("wechatConfig 缺凭证抛错/回退全局", () => {
   assert.equal(cfg.appId, "1");
 });
 
+test("wechatConfig 按账号读 wechatAccounts，无 account 不误用其它账号", () => {
+  const store = {
+    wechatAccounts: {
+      Brand_AI: { appId: "wx-a", appSecret: "sec-a", author: "甲" },
+    },
+    wechat: {},
+  };
+  const cfg = Wechat.wechatConfig(core(store), "Brand_AI");
+  assert.equal(cfg.appId, "wx-a");
+  assert.equal(cfg.author, "甲");
+  // 已发布预览曾漏传 account：应仍报缺凭证，而不是静默成功用错号
+  assert.throws(() => Wechat.wechatConfig(core(store)), /AppID/);
+  assert.throws(() => Wechat.wechatConfig(core(store), ""), /AppID/);
+});
+
 test("wechatTokenBucket 同 appId 同桶", () => {
   const c = core({});
   assert.equal(Wechat.wechatTokenBucket(c, "a"), Wechat.wechatTokenBucket(c, "a"));

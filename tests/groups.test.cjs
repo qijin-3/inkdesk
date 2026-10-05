@@ -63,3 +63,20 @@ test("groupOptionsHtml 选中态与空选项", () => {
   const custom = mod.groupOptionsHtml(st(), null, { emptyLabel: "全部" });
   assert.match(custom, /全部/);
 });
+
+test("groupedArchivePaths 只收有分组的已发布路径", () => {
+  const s = {
+    archives: [
+      { path: "a/03_Archive/1.md", group: "增长" },
+      { path: "a/03_Archive/2.md" },
+      { path: "a/03_Archive/1.md", group: "增长" },
+      { path: "b/03_Archive/3.md", group: "产品" },
+    ],
+    metrics: [{ path: "a/03_Archive/2.md", 分组: "" }],
+  };
+  assert.deepEqual(mod.groupedArchivePaths(s), [
+    "a/03_Archive/1.md",
+    "b/03_Archive/3.md",
+  ]);
+  assert.deepEqual(mod.groupedArchivePaths({ archives: [] }), []);
+});
