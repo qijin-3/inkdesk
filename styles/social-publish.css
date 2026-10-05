@@ -353,7 +353,8 @@ button:disabled {
   font-size: 11px;
   color: #444444;
 }
-.article-materials-panel {
+/* ID 选择器压过 #panel { padding: 0 }（editor-preview.css） */
+#panel.article-materials-panel {
   padding: 12px 14px 20px;
   overflow: auto;
   position: relative;
@@ -361,28 +362,28 @@ button:disabled {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
-.article-materials-panel::-webkit-scrollbar {
+#panel.article-materials-panel::-webkit-scrollbar {
   display: none !important;
   width: 0 !important;
   height: 0 !important;
 }
-.article-materials-panel.is-uploading {
+#panel.article-materials-panel.is-uploading {
   opacity: 0.7;
   pointer-events: none;
 }
-.article-materials-panel .material-cards {
+#panel.article-materials-panel .material-cards {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-.article-materials-panel .material-card {
+#panel.article-materials-panel .material-card {
   margin: 0;
 }
-.article-materials-panel .material-preview-card {
+#panel.article-materials-panel .material-preview-card {
   height: 200px;
   max-height: 200px;
 }
-.article-materials-panel .empty-data {
+#panel.article-materials-panel .empty-data {
   margin: 8px 0;
   font-size: 12px;
   color: #999;
