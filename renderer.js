@@ -4211,19 +4211,18 @@ async function runAgentDefaultTest(id) {
   }
 }
 
-async function mountAgentsSettings() {
-  try {
-    const next = await api("load");
-    if (next?.agents) state.agents = next.agents;
-    if (next?.agentModels) state.agentModels = next.agentModels;
-    if (next?.agentHttp) state.agentHttp = next.agentHttp;
-    if (next?.agentsEnabled) state.agentsEnabled = next.agentsEnabled;
-  } catch {
-    /* keep cached */
-  }
-  ensureAgentModelsStore(state);
-  ensureAgentsEnabledStore(state);
+/** 就地刷新模型列表（不开整页 render，保留 #main 滚动位置） */
+function refreshAgentCardList() {
+  const list = $(".agent-card-list");
+  if (!list) return false;
+  list.innerHTML = connectedAgentProviders(state)
+    .map((p) => agentListItemHtml(state, p))
+    .join("");
+  bindAgentListControls();
+  return true;
+}
 
+function bindAgentListControls() {
   $$("[data-open-agent]").forEach((item) => {
     const open = () => openAgentDetail(item.dataset.openAgent);
     item.onclick = (e) => {
@@ -4259,7 +4258,7 @@ async function mountAgentsSettings() {
       input.disabled = true;
       try {
         await setAgentEnabled(id, input.checked);
-        render();
+        if (!refreshAgentCardList()) render();
       } catch (e) {
         input.checked = !input.checked;
         toast(e.message || "保存失败");
@@ -4267,6 +4266,22 @@ async function mountAgentsSettings() {
       }
     };
   });
+}
+
+async function mountAgentsSettings() {
+  try {
+    const next = await api("load");
+    if (next?.agents) state.agents = next.agents;
+    if (next?.agentModels) state.agentModels = next.agentModels;
+    if (next?.agentHttp) state.agentHttp = next.agentHttp;
+    if (next?.agentsEnabled) state.agentsEnabled = next.agentsEnabled;
+  } catch {
+    /* keep cached */
+  }
+  ensureAgentModelsStore(state);
+  ensureAgentsEnabledStore(state);
+
+  bindAgentListControls();
   mountAgentUsage($("#agent-usage"), api, connectedAgentProviders(state), {
     mode: "overview",
   });

@@ -35521,17 +35521,14 @@ async function runAgentDefaultTest(id) {
     if (btn) btn.disabled = false;
   }
 }
-async function mountAgentsSettings() {
-  try {
-    const next2 = await api("load");
-    if (next2?.agents) state.agents = next2.agents;
-    if (next2?.agentModels) state.agentModels = next2.agentModels;
-    if (next2?.agentHttp) state.agentHttp = next2.agentHttp;
-    if (next2?.agentsEnabled) state.agentsEnabled = next2.agentsEnabled;
-  } catch {
-  }
-  ensureAgentModelsStore(state);
-  ensureAgentsEnabledStore(state);
+function refreshAgentCardList() {
+  const list2 = $2(".agent-card-list");
+  if (!list2) return false;
+  list2.innerHTML = connectedAgentProviders(state).map((p) => agentListItemHtml(state, p)).join("");
+  bindAgentListControls();
+  return true;
+}
+function bindAgentListControls() {
   $$("[data-open-agent]").forEach((item) => {
     const open = () => openAgentDetail(item.dataset.openAgent);
     item.onclick = (e) => {
@@ -35567,7 +35564,7 @@ async function mountAgentsSettings() {
       input.disabled = true;
       try {
         await setAgentEnabled(id, input.checked);
-        render2();
+        if (!refreshAgentCardList()) render2();
       } catch (e) {
         input.checked = !input.checked;
         toast(e.message || "\u4FDD\u5B58\u5931\u8D25");
@@ -35575,6 +35572,19 @@ async function mountAgentsSettings() {
       }
     };
   });
+}
+async function mountAgentsSettings() {
+  try {
+    const next2 = await api("load");
+    if (next2?.agents) state.agents = next2.agents;
+    if (next2?.agentModels) state.agentModels = next2.agentModels;
+    if (next2?.agentHttp) state.agentHttp = next2.agentHttp;
+    if (next2?.agentsEnabled) state.agentsEnabled = next2.agentsEnabled;
+  } catch {
+  }
+  ensureAgentModelsStore(state);
+  ensureAgentsEnabledStore(state);
+  bindAgentListControls();
   mountAgentUsage($2("#agent-usage"), api, connectedAgentProviders(state), {
     mode: "overview"
   });
