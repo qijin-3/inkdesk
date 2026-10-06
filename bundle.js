@@ -1261,47 +1261,71 @@ async function socialPages(html2, _title) {
     }
     y += boxH + S(T.quoteMargin);
   }
-  async function picture(src) {
-    if (!src) return;
-    let objectUrl;
+  const drawnImages = /* @__PURE__ */ new Set();
+  const queuedImages = [];
+  {
+    const seen = /* @__PURE__ */ new Set();
+    for (const node of root2.querySelectorAll("img[src]")) {
+      const src = node.getAttribute("src");
+      if (!src || seen.has(src)) continue;
+      seen.add(src);
+      queuedImages.push(src);
+    }
+  }
+  async function loadPicture(src) {
+    const res = await fetch(src, {
+      mode: /^(https?:|inkasset:)/i.test(src) ? "cors" : "same-origin"
+    });
+    if (!res.ok) throw Error("\u56FE\u7247\u52A0\u8F7D\u5931\u8D25 HTTP " + res.status);
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
     try {
-      let blob;
-      if (/^(inkasset:|\/api\/asset\/|https?:|data:|blob:)/i.test(src)) {
-        const res = await fetch(src, { mode: "cors" });
-        if (!res.ok) throw Error("\u56FE\u7247\u52A0\u8F7D\u5931\u8D25 HTTP " + res.status);
-        blob = await res.blob();
-      } else {
-        const res = await fetch(src);
-        if (!res.ok) throw Error("\u56FE\u7247\u52A0\u8F7D\u5931\u8D25");
-        blob = await res.blob();
-      }
-      objectUrl = URL.createObjectURL(blob);
       const img = new Image();
       img.src = objectUrl;
       await Promise.race([
         img.decode(),
         new Promise((_, r) => setTimeout(() => r(Error("\u56FE\u7247\u52A0\u8F7D\u8D85\u65F6")), 12e3))
       ]);
-      const scale = Math.min(
-        contentW / img.naturalWidth,
-        S(620) / img.naturalHeight
-      );
-      const w = img.naturalWidth * scale;
-      const h2 = img.naturalHeight * scale;
-      const border = S(2);
-      const after = S(24);
-      ensure(h2 + after);
-      const x = pad + (contentW - w) / 2;
-      ctx.drawImage(img, x, y, w, h2);
-      ctx.strokeStyle = BLUE;
-      ctx.lineWidth = border;
-      ctx.strokeRect(
-        x + border / 2,
-        y + border / 2,
-        w - border,
-        h2 - border
-      );
-      y += h2 + after;
+      if (!img.naturalWidth || !img.naturalHeight)
+        throw Error("\u56FE\u7247\u5C3A\u5BF8\u65E0\u6548");
+      img._objectUrl = objectUrl;
+      return img;
+    } catch (e) {
+      URL.revokeObjectURL(objectUrl);
+      throw e;
+    }
+  }
+  function releasePicture(img) {
+    if (img?._objectUrl) {
+      URL.revokeObjectURL(img._objectUrl);
+      delete img._objectUrl;
+    }
+  }
+  function paintPicture(img, src) {
+    const scale = Math.min(
+      contentW / img.naturalWidth,
+      S(620) / img.naturalHeight
+    );
+    const w = img.naturalWidth * scale;
+    const h2 = img.naturalHeight * scale;
+    if (!(w > 0 && h2 > 0)) throw Error("\u56FE\u7247\u7F29\u653E\u65E0\u6548");
+    const border = S(2);
+    const after = S(24);
+    ensure(h2 + after);
+    const x = pad + (contentW - w) / 2;
+    ctx.drawImage(img, x, y, w, h2);
+    ctx.strokeStyle = BLUE;
+    ctx.lineWidth = border;
+    ctx.strokeRect(x + border / 2, y + border / 2, w - border, h2 - border);
+    y += h2 + after;
+    drawnImages.add(src);
+  }
+  async function picture(src) {
+    if (!src) return;
+    let img;
+    try {
+      img = await loadPicture(src);
+      paintPicture(img, src);
     } catch (e) {
       const msg = "\uFF3B\u56FE\u7247\u672A\u52A0\u8F7D\uFF3D";
       font(SANS, 400, S(14));
@@ -1311,8 +1335,56 @@ async function socialPages(html2, _title) {
       y += S(40);
       console.warn("social picture:", src, e);
     } finally {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      releasePicture(img);
     }
+  }
+  async function recoverImages(srcs) {
+    const recovered = [];
+    const savedCtx = ctx;
+    const savedY = y;
+    for (const src of srcs) {
+      let img;
+      try {
+        img = await loadPicture(src);
+      } catch (e) {
+        console.warn("social recover image:", src, e);
+        continue;
+      }
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = W;
+        canvas.height = H;
+        ctx = canvas.getContext("2d");
+        ctx.fillStyle = WHITE;
+        ctx.fillRect(0, 0, W, H);
+        ctx.textBaseline = "top";
+        y = pad;
+        const scale = Math.min(
+          contentW / img.naturalWidth,
+          S(620) / img.naturalHeight
+        );
+        const w = img.naturalWidth * scale;
+        const h2 = img.naturalHeight * scale;
+        if (!(w > 0 && h2 > 0)) throw Error("\u56FE\u7247\u7F29\u653E\u65E0\u6548");
+        const border = S(2);
+        const x = pad + (contentW - w) / 2;
+        ctx.drawImage(img, x, y, w, h2);
+        ctx.strokeStyle = BLUE;
+        ctx.lineWidth = border;
+        ctx.strokeRect(x + border / 2, y + border / 2, w - border, h2 - border);
+        recovered.push(canvas);
+        drawnImages.add(src);
+      } catch (e) {
+        console.warn("social recover paint:", src, e);
+      } finally {
+        releasePicture(img);
+      }
+    }
+    ctx = savedCtx;
+    y = savedY;
+    if (!recovered.length) return;
+    while (pages.length + recovered.length > 17) pages.pop();
+    pages.unshift(...recovered);
   }
   async function block2(node) {
     if (node.nodeName === "IMG") {
@@ -1366,8 +1438,13 @@ async function socialPages(html2, _title) {
   } catch (e) {
     if (e?.code !== "SOCIAL_TRUNCATED") throw e;
   }
+  if (truncated) {
+    const missing = queuedImages.filter((s) => !drawnImages.has(s));
+    if (missing.length) await recoverImages(missing);
+  }
   for (const c of pages) c.toDataURL("image/png");
   pages.truncated = truncated;
+  pages.keptImages = drawnImages.size;
   return pages;
 }
 function openSocialLightbox(canvases, startIndex) {

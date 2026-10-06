@@ -443,51 +443,95 @@ export async function socialPages(html, _title) {
     y += boxH + S(T.quoteMargin);
   }
 
+  /** 已成功绘入的图片 src（截断后补排用） */
+  const drawnImages = new Set();
+  /** 文中全部图片 src（保序去重） */
+  const queuedImages = [];
+  {
+    const seen = new Set();
+    for (const node of root.querySelectorAll("img[src]")) {
+      const src = node.getAttribute("src");
+      if (!src || seen.has(src)) continue;
+      seen.add(src);
+      queuedImages.push(src);
+    }
+  }
+
   /**
-   * 绘制图片，超高则翻页。
+   * 经 fetch→blob 解码图片，避免跨域污染 canvas。
+   * 调用方绘完后须 releasePicture。
    * @param {string} src
+   * @returns {Promise<HTMLImageElement & { _objectUrl?: string }>}
    */
-  async function picture(src) {
-    if (!src) return;
-    let objectUrl;
+  async function loadPicture(src) {
+    const res = await fetch(src, {
+      mode: /^(https?:|inkasset:)/i.test(src) ? "cors" : "same-origin",
+    });
+    if (!res.ok) throw Error("图片加载失败 HTTP " + res.status);
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
     try {
-      let blob;
-      if (/^(inkasset:|\/api\/asset\/|https?:|data:|blob:)/i.test(src)) {
-        const res = await fetch(src, { mode: "cors" });
-        if (!res.ok) throw Error("图片加载失败 HTTP " + res.status);
-        blob = await res.blob();
-      } else {
-        const res = await fetch(src);
-        if (!res.ok) throw Error("图片加载失败");
-        blob = await res.blob();
-      }
-      objectUrl = URL.createObjectURL(blob);
       const img = new Image();
       img.src = objectUrl;
       await Promise.race([
         img.decode(),
         new Promise((_, r) => setTimeout(() => r(Error("图片加载超时")), 12000)),
       ]);
-      const scale = Math.min(
-        contentW / img.naturalWidth,
-        S(620) / img.naturalHeight,
-      );
-      const w = img.naturalWidth * scale;
-      const h = img.naturalHeight * scale;
-      const border = S(2);
-      const after = S(24);
-      ensure(h + after);
-      const x = pad + (contentW - w) / 2;
-      ctx.drawImage(img, x, y, w, h);
-      ctx.strokeStyle = BLUE;
-      ctx.lineWidth = border;
-      ctx.strokeRect(
-        x + border / 2,
-        y + border / 2,
-        w - border,
-        h - border,
-      );
-      y += h + after;
+      if (!img.naturalWidth || !img.naturalHeight)
+        throw Error("图片尺寸无效");
+      img._objectUrl = objectUrl;
+      return img;
+    } catch (e) {
+      URL.revokeObjectURL(objectUrl);
+      throw e;
+    }
+  }
+
+  /**
+   * @param {HTMLImageElement & { _objectUrl?: string }} img
+   */
+  function releasePicture(img) {
+    if (img?._objectUrl) {
+      URL.revokeObjectURL(img._objectUrl);
+      delete img._objectUrl;
+    }
+  }
+
+  /**
+   * 将已解码图片绘入当前页（超高则翻页）。
+   * @param {HTMLImageElement} img
+   * @param {string} src
+   */
+  function paintPicture(img, src) {
+    const scale = Math.min(
+      contentW / img.naturalWidth,
+      S(620) / img.naturalHeight,
+    );
+    const w = img.naturalWidth * scale;
+    const h = img.naturalHeight * scale;
+    if (!(w > 0 && h > 0)) throw Error("图片缩放无效");
+    const border = S(2);
+    const after = S(24);
+    ensure(h + after);
+    const x = pad + (contentW - w) / 2;
+    ctx.drawImage(img, x, y, w, h);
+    ctx.strokeStyle = BLUE;
+    ctx.lineWidth = border;
+    ctx.strokeRect(x + border / 2, y + border / 2, w - border, h - border);
+    y += h + after;
+    drawnImages.add(src);
+  }
+
+  /**
+   * 绘制图片，超高则翻页。
+   * @param {string} src
+   */
+  async function picture(src) {
+    if (!src) return;
+    let img;
+    try {
+      img = await loadPicture(src);
+      paintPicture(img, src);
     } catch (e) {
       const msg = "［图片未加载］";
       font(SANS, 400, S(14));
@@ -497,8 +541,62 @@ export async function socialPages(html, _title) {
       y += S(40);
       console.warn("social picture:", src, e);
     } finally {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      releasePicture(img);
     }
+  }
+
+  /**
+   * 截断后为未绘配图腾出名额，独占一页并插到最前（小红书封面优先可见）。
+   * @param {string[]} srcs
+   */
+  async function recoverImages(srcs) {
+    const recovered = [];
+    const savedCtx = ctx;
+    const savedY = y;
+    for (const src of srcs) {
+      let img;
+      try {
+        img = await loadPicture(src);
+      } catch (e) {
+        console.warn("social recover image:", src, e);
+        continue;
+      }
+      try {
+        // 临时画到独立画布，不经 page()（避免踩 17 张上限）
+        const canvas = document.createElement("canvas");
+        canvas.width = W;
+        canvas.height = H;
+        ctx = canvas.getContext("2d");
+        ctx.fillStyle = WHITE;
+        ctx.fillRect(0, 0, W, H);
+        ctx.textBaseline = "top";
+        y = pad;
+        const scale = Math.min(
+          contentW / img.naturalWidth,
+          S(620) / img.naturalHeight,
+        );
+        const w = img.naturalWidth * scale;
+        const h = img.naturalHeight * scale;
+        if (!(w > 0 && h > 0)) throw Error("图片缩放无效");
+        const border = S(2);
+        const x = pad + (contentW - w) / 2;
+        ctx.drawImage(img, x, y, w, h);
+        ctx.strokeStyle = BLUE;
+        ctx.lineWidth = border;
+        ctx.strokeRect(x + border / 2, y + border / 2, w - border, h - border);
+        recovered.push(canvas);
+        drawnImages.add(src);
+      } catch (e) {
+        console.warn("social recover paint:", src, e);
+      } finally {
+        releasePicture(img);
+      }
+    }
+    ctx = savedCtx;
+    y = savedY;
+    if (!recovered.length) return;
+    while (pages.length + recovered.length > 17) pages.pop();
+    pages.unshift(...recovered);
   }
 
   /**
@@ -558,8 +656,13 @@ export async function socialPages(html, _title) {
   } catch (e) {
     if (e?.code !== "SOCIAL_TRUNCATED") throw e;
   }
+  if (truncated) {
+    const missing = queuedImages.filter((s) => !drawnImages.has(s));
+    if (missing.length) await recoverImages(missing);
+  }
   for (const c of pages) c.toDataURL("image/png");
   pages.truncated = truncated;
+  pages.keptImages = drawnImages.size;
   return pages;
 }
 
