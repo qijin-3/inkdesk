@@ -38,7 +38,14 @@ if (process.platform === "darwin") {
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "inkasset",
-    privileges: { standard: true, secure: true, supportFetchAPI: true },
+    // corsEnabled：小红书预览 fetch→blob 需跨域；stream：大图响应
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
   },
 ]);
 

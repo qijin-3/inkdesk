@@ -34,3 +34,8 @@ test("通道名无重复", () => {
     assert.equal(new Set(l).size, l.length, n + " has duplicates");
   }
 });
+
+test("inkasset 协议开启 corsEnabled（小红书预览 fetch→blob 需要）", () => {
+  assert.match(main, /scheme:\s*"inkasset"/);
+  assert.match(main, /corsEnabled:\s*true/);
+});
