@@ -57,3 +57,26 @@ test("resolveWechatImageSrc 非法输入给 null", () => {
   assert.equal(Wechat.resolveWechatImageSrc(c, ""), null);
   assert.equal(Wechat.resolveWechatImageSrc(c, "notaurl"), null);
 });
+
+test("pushWechatDraft 超 2 万字符时错误带上当前长度", async () => {
+  const wechatMp = require("../wechat-mp.cjs");
+  const orig = {
+    getAccessToken: wechatMp.getAccessToken,
+    uploadContentImage: wechatMp.uploadContentImage,
+    uploadPermanentImage: wechatMp.uploadPermanentImage,
+    addDraft: wechatMp.addDraft,
+  };
+  wechatMp.getAccessToken = async () => "tok";
+  wechatMp.uploadContentImage = async () => "https://mmbiz.qpic.cn/x/0";
+  wechatMp.uploadPermanentImage = async () => "thumb";
+  wechatMp.addDraft = async () => "mid";
+  const c = core({
+    wechat: { appId: "wx", appSecret: "sec", coverPath: "/tmp/no-cover" },
+  });
+  const html = `<p>${"字".repeat(20001)}</p>`;
+  await assert.rejects(
+    () => Wechat.pushWechatDraft(c, { title: "t", html }),
+    /正文 HTML 超过 2 万字符（当前 200\d{2}）/,
+  );
+  Object.assign(wechatMp, orig);
+});

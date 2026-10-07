@@ -30589,7 +30589,7 @@ var WECHAT_BLUE = "#0f3ff7";
 var WECHAT_BLUE_SOFT = "rgba(15, 63, 247, 0.2)";
 var WECHAT_SERIF = "'\u5BD2\u8749\u9526\u4E66\u5B8BCompact','Songti SC','STSong','\u534E\u6587\u5B8B\u4F53','\u5B8B\u4F53',SimSun,serif";
 var WECHAT_SERIF_PUBLISH = "Songti SC,STSong,\u534E\u6587\u5B8B\u4F53,\u5B8B\u4F53,SimSun,serif";
-var WECHAT_SANS = "'OPPO Sans 4.0','PingFang SC','Helvetica Neue',Arial,sans-serif";
+var WECHAT_SANS_PUBLISH = "PingFang SC,Helvetica Neue,Arial,sans-serif";
 var WECHAT_BLOCK_W = 360;
 var WECHAT_BLOCK_SCALE = 4;
 function normalizeHeadingText(raw) {
@@ -30731,17 +30731,14 @@ function renderWechatQuotePng(raw) {
 }
 function replaceWithWechatBlockImage(d, el, dataUrl, alt, margin) {
   const wrap2 = d.createElement("section");
-  wrap2.setAttribute(
-    "style",
-    `margin:${margin};padding:0;max-width:100%;box-sizing:border-box;`
-  );
+  wrap2.setAttribute("style", `margin:${margin};max-width:100%;`);
   const img = d.createElement("img");
   img.setAttribute("src", dataUrl);
   img.setAttribute("alt", alt);
   img.setAttribute("width", String(WECHAT_BLOCK_W));
   img.setAttribute(
     "style",
-    "width:100% !important;max-width:100% !important;height:auto !important;display:block !important;margin:0 !important;border:0;vertical-align:top;"
+    "width:100%;max-width:100%;height:auto;display:block;border:0;"
   );
   wrap2.appendChild(img);
   el.replaceWith(wrap2);
@@ -30853,6 +30850,7 @@ function sanitizeHtmlPreview(html2) {
 // ui/publish.js
 async function publishHTMLInner(md, opts = {}) {
   const serif = WECHAT_SERIF_PUBLISH;
+  const sans = WECHAT_SANS_PUBLISH;
   const d = new DOMParser().parseFromString(safeHTML(md), "text/html");
   if (opts.keepImages) {
     if (!isWeb())
@@ -30909,25 +30907,22 @@ async function publishHTMLInner(md, opts = {}) {
     d.querySelectorAll("h2").forEach((h2) => {
       const wrap2 = d.createElement("section");
       wrap2.setAttribute("data-wechat-h2", "1");
-      wrap2.setAttribute(
-        "style",
-        "margin:16px 0 14px;padding:0;max-width:100%;"
-      );
+      wrap2.setAttribute("style", "margin:16px 0 14px;max-width:100%;");
       const bar = d.createElement("section");
       bar.setAttribute(
         "style",
-        `display:inline-block;max-width:100%;box-sizing:border-box;padding:8px 10px;background-color:${WECHAT_BLUE};`
+        `display:inline-block;max-width:100%;padding:8px 10px;background:${WECHAT_BLUE};`
       );
       const label = d.createElement("span");
       label.setAttribute(
         "style",
-        `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};line-height:1.25;`
+        `color:#fff;font-size:20px;font-weight:700;font-family:${serif};line-height:1.25;`
       );
       while (h2.firstChild) label.appendChild(h2.firstChild);
       label.querySelectorAll("*").forEach((el) => {
         el.setAttribute(
           "style",
-          `color:#ffffff;font-size:20px;font-weight:bold;font-family:${serif};`
+          `color:#fff;font-size:20px;font-weight:700;font-family:${serif};`
         );
       });
       bar.appendChild(label);
@@ -30947,11 +30942,11 @@ async function publishHTMLInner(md, opts = {}) {
     });
   }
   const styles = {
-    p: `margin:0 0 16px;line-height:1.75;font-size:15px;color:#111;font-family:${WECHAT_SANS};font-weight:400;`,
+    p: "margin:0 0 16px;",
     h1: `display:flex;align-items:flex-end;justify-content:space-between;gap:12px;font-size:40px;line-height:1.1;margin:56px 0 20px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
     h3: `font-size:18px;margin:20px 0 12px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
     blockquote: `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:20px 0;padding:8px;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:15px;font-weight:800;line-height:1.7;`,
-    li: `line-height:1.75;margin:6px 0;font-size:15px;font-family:${WECHAT_SANS};`
+    li: "margin:6px 0;"
   };
   Object.entries(styles).forEach(
     ([tag2, style2]) => d.querySelectorAll(tag2).forEach((n) => {
@@ -30962,9 +30957,7 @@ async function publishHTMLInner(md, opts = {}) {
       if (tag2 === "p" && n.children.length === 1 && n.children[0].tagName === "IMG" && !["\u4E00\u7EA7\u6807\u9898", "\u4E8C\u7EA7\u6807\u9898", "\u5F15\u7528"].includes(
         n.children[0].getAttribute("alt") || ""
       )) {
-        const prev2 = n.getAttribute("style") || "";
-        const s = `margin:0;line-height:1.75;font-size:15px;color:#111;font-family:${WECHAT_SANS};font-weight:400;`;
-        n.setAttribute("style", prev2 ? `${prev2};${s}` : s);
+        n.setAttribute("style", "margin:0;");
         return;
       }
       const prev = n.getAttribute("style") || "";
@@ -30973,10 +30966,7 @@ async function publishHTMLInner(md, opts = {}) {
   );
   d.querySelectorAll("strong").forEach((n) => {
     if (n.closest("h1, blockquote, [data-wechat-h2]")) return;
-    n.setAttribute(
-      "style",
-      `font-weight:600;color:#111;font-family:${WECHAT_SANS};`
-    );
+    n.setAttribute("style", "font-weight:600;color:#111;");
   });
   if (!opts.blockImages) {
     d.querySelectorAll("blockquote > *").forEach((el) => {
@@ -31023,11 +31013,12 @@ async function publishHTMLInner(md, opts = {}) {
   d.querySelectorAll("img").forEach((img) => {
     if (["\u4E00\u7EA7\u6807\u9898", "\u4E8C\u7EA7\u6807\u9898", "\u5F15\u7528"].includes(img.getAttribute("alt") || ""))
       return;
-    const prev = img.getAttribute("style") || "";
-    const style2 = `max-width:100% !important;height:auto !important;box-sizing:border-box;border:2px solid ${WECHAT_BLUE};display:block;margin:0 0 24px;`;
-    img.setAttribute("style", prev ? `${prev};${style2}` : style2);
+    img.setAttribute(
+      "style",
+      `max-width:100%;height:auto;display:block;border:2px solid ${WECHAT_BLUE};margin:0 0 24px;`
+    );
   });
-  return `<section style="font-family:${WECHAT_SANS};padding:8px;color:#111;max-width:768px;">${d.body.innerHTML}</section>`;
+  return `<section style="font-family:${sans};font-size:15px;line-height:1.75;color:#111;padding:8px;max-width:768px;">${d.body.innerHTML}</section>`;
 }
 
 // ui/import-match.js

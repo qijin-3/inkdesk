@@ -52,4 +52,6 @@ test("主题常量与原实现一致", () => {
   assert.equal(mod.WECHAT_BLUE, "#0f3ff7");
   assert.equal(mod.WECHAT_BLOCK_W, 360);
   assert.equal(mod.WECHAT_BLOCK_SCALE, 4);
+  assert.match(mod.WECHAT_SANS_PUBLISH, /PingFang SC/);
+  assert.ok(!mod.WECHAT_SANS_PUBLISH.includes("OPPO"));
 });

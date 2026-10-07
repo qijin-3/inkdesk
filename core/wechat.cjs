@@ -76,7 +76,10 @@ async function pushWechatDraft(core, payload) {
   // 去掉上传失败留下的空 img
   html = html.replace(/<img\b[^>]*\bsrc=["']\s*["'][^>]*>/gi, "");
 
-  if (html.length > 20000) throw Error("正文超过 2 万字符，请精简后再推送");
+  if (html.length > 20000)
+    throw Error(
+      `正文 HTML 超过 2 万字符（当前 ${html.length}），请精简后再推送`,
+    );
 
   let coverPath =
     payload.coverPath || cfg.coverPath || uploadedFiles[0] || "";

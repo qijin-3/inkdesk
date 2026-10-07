@@ -10,6 +10,11 @@ export const WECHAT_SERIF =
 export const WECHAT_SERIF_PUBLISH = "Songti SC,STSong,华文宋体,宋体,SimSun,serif";
 export const WECHAT_SANS =
   "'OPPO Sans 4.0','PingFang SC','Helvetica Neue',Arial,sans-serif";
+/**
+ * 公众号 HTML 专用无衬线栈：不含本地定制字体（微信会丢弃整段 font-family），
+ * 且尽量短，避免每段重复写爆 2 万字符上限。
+ */
+export const WECHAT_SANS_PUBLISH = "PingFang SC,Helvetica Neue,Arial,sans-serif";
 
 /**
  * 推送用标题/引用图。
@@ -209,17 +214,15 @@ export function renderWechatQuotePng(raw) {
  */
 export function replaceWithWechatBlockImage(d, el, dataUrl, alt, margin) {
   const wrap = d.createElement("section");
-  wrap.setAttribute(
-    "style",
-    `margin:${margin};padding:0;max-width:100%;box-sizing:border-box;`,
-  );
+  wrap.setAttribute("style", `margin:${margin};max-width:100%;`);
   const img = d.createElement("img");
   img.setAttribute("src", dataUrl);
   img.setAttribute("alt", alt);
   img.setAttribute("width", String(WECHAT_BLOCK_W));
+  // 栏宽 100% 铺满；样式尽量短，多标题文推送时省字符
   img.setAttribute(
     "style",
-    "width:100% !important;max-width:100% !important;height:auto !important;display:block !important;margin:0 !important;border:0;vertical-align:top;",
+    "width:100%;max-width:100%;height:auto;display:block;border:0;",
   );
   wrap.appendChild(img);
   el.replaceWith(wrap);
