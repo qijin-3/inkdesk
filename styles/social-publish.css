@@ -1358,6 +1358,12 @@ pre {
 .wechat-preview #article-preview p {
   margin: 0 0 10px;
 }
+/* 列表容器默认带 1em 外边距 + 40px 左缩进，压到段间距并把序号左边距收到 30px */
+.wechat-preview #article-preview ul,
+.wechat-preview #article-preview ol {
+  margin: 10px 0;
+  padding-inline-start: 30px;
+}
 /* 一级标题上方与正文拉开；紧邻段落取消底边距，避免外边距折叠算不准 */
 .wechat-preview #article-preview p:has(+ h1),
 .wechat-preview #article-preview blockquote:has(+ h1),
@@ -1397,12 +1403,12 @@ pre {
   min-width: 0;
 }
 .wechat-preview #article-preview h1::after {
-  content: "——" counter(wechat-h1, decimal-leading-zero);
+  content: "—— " counter(wechat-h1, decimal-leading-zero);
   flex-shrink: 0;
   display: inline;
   color: var(--wechat-blue);
   font-family: var(--wechat-sans);
-  font-size: 15px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 0.85;
   letter-spacing: normal;

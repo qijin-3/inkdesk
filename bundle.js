@@ -967,11 +967,11 @@ var T = {
   /** 列表项间距：小于段间距，避免列表看起来比正文更松 */
   liAfter: 6,
   bodyTracking: 0.5,
-  /** 一级标题 32 / 行高 1.25；序号 24 单独一行，位于标题上方（设计稿以正文 24 标注） */
+  /** 一级标题 32 / 行高 1.25；序号与标题同字号，单独一行位于标题上方（设计稿以正文 24 标注） */
   h1: ref(32),
   h1Line: ref(32) * 1.25,
-  h1Num: ref(24),
-  h1NumLine: ref(24) * 0.85,
+  h1Num: ref(32),
+  h1NumLine: ref(32) * 0.85,
   /** 序号与标题的间距 */
   h1NumGap: ref(6),
   /** 标题字距：设计稿 5% */
@@ -1162,7 +1162,7 @@ async function socialPages(html2, _title) {
     let ty = y;
     ctx.fillStyle = BLUE;
     font(SANS, 700, numSize);
-    ctx.fillText("\u2014\u2014" + num, pad, ty);
+    ctx.fillText("\u2014\u2014 " + num, pad, ty);
     ty += numLine + numGap;
     font(SANS, 700, h1Size);
     for (const line of lines) {
@@ -1257,7 +1257,7 @@ async function socialPages(html2, _title) {
     ctx.fillStyle = BLUE_SOFT;
     ctx.fillRect(pad, y, contentW, boxH);
     ctx.fillStyle = BLUE;
-    font(SANS, 300, quoteMarkSize);
+    font(SANS, 700, quoteMarkSize);
     ctx.fillText("\u201C", pad + qPadX, y + qPadY);
     font(SANS, 300, qSize);
     let ty = y + qPadY + S(4);
@@ -32961,7 +32961,7 @@ function enhanceWechatPreview(root2 = $("#article-preview")) {
       mark.textContent = "\u201C";
       mark.setAttribute(
         "style",
-        `grid-column:1;grid-row:1;font-family:${WECHAT_SANS};font-size:15px;font-weight:300;line-height:1.25;color:${WECHAT_BLUE};`
+        `grid-column:1;grid-row:1;font-family:${WECHAT_SANS};font-size:18.75px;font-weight:700;line-height:1.25;color:${WECHAT_BLUE};`
       );
       bq.prepend(mark);
     }

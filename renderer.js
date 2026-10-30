@@ -1084,7 +1084,7 @@ function enhanceWechatPreview(root = $("#article-preview")) {
       mark.textContent = "“";
       mark.setAttribute(
         "style",
-        `grid-column:1;grid-row:1;font-family:${WECHAT_SANS};font-size:15px;font-weight:300;line-height:1.25;color:${WECHAT_BLUE};`,
+        `grid-column:1;grid-row:1;font-family:${WECHAT_SANS};font-size:18.75px;font-weight:700;line-height:1.25;color:${WECHAT_BLUE};`,
       );
       bq.prepend(mark);
     }
