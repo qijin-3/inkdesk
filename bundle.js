@@ -336,6 +336,14 @@ var ImagePlus = [
   ["circle", { cx: "9", cy: "9", r: "2" }]
 ];
 
+// node_modules/lucide/dist/esm/icons/images.mjs
+var Images = [
+  ["path", { d: "m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16" }],
+  ["path", { d: "M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2" }],
+  ["circle", { cx: "13", cy: "7", r: "1", fill: "currentColor" }],
+  ["rect", { x: "8", y: "2", width: "14", height: "14", rx: "2" }]
+];
+
 // node_modules/lucide/dist/esm/icons/italic.mjs
 var Italic = [
   ["line", { x1: "19", x2: "10", y1: "4", y2: "4" }],
@@ -607,6 +615,7 @@ var I = {
   sparkles: (o) => icon(Sparkles, o),
   lightbulb: (o) => icon(Lightbulb, o),
   library: (o) => icon(Library, o),
+  gallery: (o) => icon(Images, o),
   user: (o) => icon(CircleUser, o),
   plus: (o) => icon(Plus, o),
   image: (o) => icon(ImagePlus, o),
@@ -31164,6 +31173,51 @@ function materialDrawerBodyHTML(r) {
   return `<p class="muted">\u5DF2\u4FDD\u7559\u539F\u6587\u4EF6\uFF0C\u5F53\u524D\u683C\u5F0F\u6682\u4E0D\u652F\u6301\u5185\u5D4C\u9884\u89C8\u3002</p><pre id="reference-text" class="material-preview is-code">${esc2(text)}</pre>`;
 }
 
+// ui/gallery.js
+function bodyImageRefs(body) {
+  const out = [];
+  const re = /!\[[^\]]*\]\((?:inkasset:\/\/vault\/|\/api\/asset\/vault\/)([^)]+)\)/g;
+  let m;
+  while (m = re.exec(String(body || ""))) out.push(m[1]);
+  return out;
+}
+function galleryImages(st, account2) {
+  const map2 = /* @__PURE__ */ new Map();
+  const collect = (body, title) => {
+    for (const enc of bodyImageRefs(body)) {
+      const rel = decodeURIComponent(enc);
+      let item = map2.get(rel);
+      if (!item) {
+        item = {
+          path: rel,
+          ref: enc,
+          src: "inkasset://vault/" + enc,
+          name: rel.split("/").pop() || rel,
+          articles: []
+        };
+        map2.set(rel, item);
+      }
+      if (title && !item.articles.includes(title)) item.articles.push(title);
+    }
+  };
+  for (const d of st.documents || [])
+    if (sameAccount(d.account, account2)) collect(d.body, d.title);
+  for (const a of st.archives || [])
+    if (sameAccount(a.account, account2)) collect(a.body, a.title);
+  return [...map2.values()];
+}
+function galleryCardHTML(item, index) {
+  const src = assetUrl(item.src);
+  const from2 = item.articles[0] || "";
+  const more = item.articles.length > 1 ? ` \u7B49 ${item.articles.length} \u7BC7` : "";
+  return `<article class="gallery-card"><img class="gallery-img" src="${esc2(src)}" alt="${esc2(item.name)}" title="${esc2(item.name)}" loading="lazy"><div class="gallery-overlay"><button type="button" class="gallery-copy" data-gallery-copy="${index}" title="\u590D\u5236\u56FE\u7247" aria-label="\u590D\u5236\u56FE\u7247">${I.copy({ size: 16 })}</button><span class="gallery-from">\u6765\u81EA\u300A${esc2(from2)}\u300B${esc2(more)}</span></div></article>`;
+}
+function galleryGridHTML(items) {
+  if (!items.length)
+    return '<div class="empty-state"><img src="assets/empty-materials.png" alt="" class="empty-state-img" /><p class="empty-state-text">\u8FD8\u6CA1\u6709\u5D4C\u5165\u56FE\u7247</p></div>';
+  return items.map((it, i) => galleryCardHTML(it, i)).join("");
+}
+
 // ui/conversation.js
 function conversation(doc3) {
   doc3.conversations ||= [];
@@ -32522,7 +32576,7 @@ function render2() {
   if (page !== "published-preview") publishedPreview = null;
   $("#app").innerHTML = `<aside class="sidebar"><div class="account">${accountList().map(
     (a) => `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc2(a.id)}" title="${esc2(a.label)}" aria-label="${esc2(a.label)}">${accountAvatarHtml(a)}</button>`
-  ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>\u7075\u611F\u5E93</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>\u8BBE\u7F6E</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <span class="list-head-actions"><button type="button" id="new-folder" title="\u65B0\u5EFA\u6587\u4EF6\u5939" aria-label="\u65B0\u5EFA\u6587\u4EF6\u5939">${I.folderClosed({ size: 16 })}</button><button type="button" id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></span></div><div class="docs" data-drop-project="">${draftsSidebarHtml(
+  ).join("") || `<p class="account-empty">\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u8D26\u53F7</p>`}</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>\u4EEA\u8868\u76D8</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>\u7075\u611F\u5E93</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>\u7D20\u6750\u5E93</span></button><button data-page="gallery" class="${page === "gallery" ? "chosen" : ""}">${I.gallery()} <span>\u753B\u5ECA</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>\u8BBE\u7F6E</span></button></nav><div class="list-head">\u6211\u7684\u8349\u7A3F <span class="list-head-actions"><button type="button" id="new-folder" title="\u65B0\u5EFA\u6587\u4EF6\u5939" aria-label="\u65B0\u5EFA\u6587\u4EF6\u5939">${I.folderClosed({ size: 16 })}</button><button type="button" id="new" title="\u65B0\u5EFA\u6587\u7AE0" aria-label="\u65B0\u5EFA\u6587\u7AE0">${I.plus()}</button></span></div><div class="docs" data-drop-project="">${draftsSidebarHtml(
     state.documents.filter(
       (d) => sameAccount(d.account, account) && d.status !== "final" && d.status !== "archive"
     ),
@@ -32549,6 +32603,7 @@ function render2() {
   else if (page === "published-preview") renderPublishedPreview();
   else if (page === "topics") renderTopics();
   else if (page === "materials") renderMaterials();
+  else if (page === "gallery") renderGallery();
   else if (page === "account") renderAccountDetail();
   else if (page === "agent") renderAgentDetail();
   else renderSettings();
@@ -36495,6 +36550,32 @@ async function renderMaterials() {
     toast(e.message);
   }
 }
+function renderGallery() {
+  const items = galleryImages(state, account);
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u753B\u5ECA</h1></div><div class="header-actions"><span class="muted">\u5171 ${items.length} \u5F20\u56FE\u7247</span></div></header><section class="dashboard"><div id="gallery-grid" class="gallery-grid">${galleryGridHTML(items)}</div></section>`;
+  $$("#gallery-grid [data-gallery-copy]").forEach((b) => {
+    b.onclick = async () => {
+      const item = items[+b.dataset.galleryCopy];
+      if (!item) return;
+      b.disabled = true;
+      try {
+        const blob = await (await fetch(assetUrl(item.src))).blob();
+        await api("copy", {
+          text: `![\u56FE\u7247](${item.src})`,
+          image: {
+            bytes: Array.from(new Uint8Array(await blob.arrayBuffer())),
+            type: blob.type || "image/png"
+          }
+        });
+        toast("\u5DF2\u590D\u5236\u56FE\u7247");
+      } catch (e) {
+        toast(e.message || "\u590D\u5236\u5931\u8D25");
+      } finally {
+        if (b.isConnected) b.disabled = false;
+      }
+    };
+  });
+}
 async function renderAccountDetail() {
   const a = account;
   const acc = accountList().find((x) => x.id === a);
@@ -36886,6 +36967,7 @@ lucide/dist/esm/icons/heading-1.mjs:
 lucide/dist/esm/icons/heading-2.mjs:
 lucide/dist/esm/icons/image-down.mjs:
 lucide/dist/esm/icons/image-plus.mjs:
+lucide/dist/esm/icons/images.mjs:
 lucide/dist/esm/icons/italic.mjs:
 lucide/dist/esm/icons/layout-dashboard.mjs:
 lucide/dist/esm/icons/library.mjs:

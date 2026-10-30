@@ -74,6 +74,7 @@ import {
   materialPreviewCardHTML,
   materialDrawerBodyHTML,
 } from "./ui/materials-view.js";
+import { galleryImages, galleryGridHTML } from "./ui/gallery.js";
 import { conversation } from "./ui/conversation.js";
 import {
   AGENT_PROVIDERS,
@@ -548,7 +549,7 @@ function render() {
             `<button type="button" class="account-avatar-btn ${sameAccount(account, a.id) ? "active" : ""}" data-account="${esc(a.id)}" title="${esc(a.label)}" aria-label="${esc(a.label)}">${accountAvatarHtml(a)}</button>`,
         )
         .join("") || `<p class="account-empty">请在设置中添加账号</p>`
-    }</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>灵感库</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>设置</span></button></nav><div class="list-head">我的草稿 <span class="list-head-actions"><button type="button" id="new-folder" title="新建文件夹" aria-label="新建文件夹">${I.folderClosed({ size: 16 })}</button><button type="button" id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></span></div><div class="docs" data-drop-project="">${draftsSidebarHtml(
+    }</div><nav><button data-page="dashboard" class="${page === "dashboard" || page === "published-preview" ? "chosen" : ""}">${I.dashboard()} <span>仪表盘</span></button><button data-page="topics" class="${page === "topics" ? "chosen" : ""}">${I.lightbulb()} <span>灵感库</span></button><button data-page="materials" class="${page === "materials" ? "chosen" : ""}">${I.library()} <span>素材库</span></button><button data-page="gallery" class="${page === "gallery" ? "chosen" : ""}">${I.gallery()} <span>画廊</span></button><button data-page="settings" class="${page === "settings" || page === "account" ? "chosen" : ""}">${I.settings()} <span>设置</span></button></nav><div class="list-head">我的草稿 <span class="list-head-actions"><button type="button" id="new-folder" title="新建文件夹" aria-label="新建文件夹">${I.folderClosed({ size: 16 })}</button><button type="button" id="new" title="新建文章" aria-label="新建文章">${I.plus()}</button></span></div><div class="docs" data-drop-project="">${draftsSidebarHtml(
       state.documents.filter(
         (d) =>
           sameAccount(d.account, account) &&
@@ -578,6 +579,7 @@ function render() {
   else if (page === "published-preview") renderPublishedPreview();
   else if (page === "topics") renderTopics();
   else if (page === "materials") renderMaterials();
+  else if (page === "gallery") renderGallery();
   else if (page === "account") renderAccountDetail();
   else if (page === "agent") renderAgentDetail();
   else renderSettings();
@@ -5249,6 +5251,34 @@ async function renderMaterials() {
   } catch (e) {
     toast(e.message);
   }
+}
+/** 画廊：汇总当前账号草稿与已归档文章中嵌入的图片，可复制图片数据。 */
+function renderGallery() {
+  const items = galleryImages(state, account);
+  $("#main").innerHTML =
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">画廊</h1></div><div class="header-actions"><span class="muted">共 ${items.length} 张图片</span></div></header><section class="dashboard"><div id="gallery-grid" class="gallery-grid">${galleryGridHTML(items)}</div></section>`;
+  $$("#gallery-grid [data-gallery-copy]").forEach((b) => {
+    b.onclick = async () => {
+      const item = items[+b.dataset.galleryCopy];
+      if (!item) return;
+      b.disabled = true;
+      try {
+        const blob = await (await fetch(assetUrl(item.src))).blob();
+        await api("copy", {
+          text: `![图片](${item.src})`,
+          image: {
+            bytes: Array.from(new Uint8Array(await blob.arrayBuffer())),
+            type: blob.type || "image/png",
+          },
+        });
+        toast("已复制图片");
+      } catch (e) {
+        toast(e.message || "复制失败");
+      } finally {
+        if (b.isConnected) b.disabled = false;
+      }
+    };
+  });
 }
 async function renderAccountDetail() {
   const a = account;

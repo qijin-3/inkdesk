@@ -36,6 +36,14 @@
    */
   async function call(name, data) {
     if (name === "copy") {
+      if (data.image?.bytes?.length) {
+        const type = data.image.type || "image/png";
+        const blob = new Blob([new Uint8Array(data.image.bytes)], { type });
+        await navigator.clipboard.write([
+          new ClipboardItem({ [type]: blob }),
+        ]);
+        return true;
+      }
       if (data.html && navigator.clipboard.write) {
         await navigator.clipboard.write([
           new ClipboardItem({

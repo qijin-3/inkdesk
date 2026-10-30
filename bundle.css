@@ -5151,6 +5151,82 @@ textarea {
     box-shadow 0.15s;
 }
 
+/* 画廊：瀑布流展示各文章嵌入的图片，hover 显示来源与复制按钮 */
+.gallery-grid {
+  columns: 200px 4;
+  column-gap: 12px;
+}
+.gallery-grid > .empty-state {
+  column-span: all;
+}
+.gallery-card {
+  position: relative;
+  display: block;
+  break-inside: avoid;
+  margin: 0 0 12px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f4f4f4;
+  cursor: pointer;
+}
+.gallery-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.gallery-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.28) 0,
+    rgba(0, 0, 0, 0) 28%,
+    rgba(0, 0, 0, 0.62) 100%
+  );
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.gallery-card:hover .gallery-overlay {
+  opacity: 1;
+}
+.gallery-from {
+  width: 100%;
+  padding: 8px 10px;
+  color: #fff;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gallery-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  cursor: pointer;
+}
+.gallery-copy:hover {
+  background: rgba(0, 0, 0, 0.68);
+}
+.gallery-copy:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* ===== /styles/assistant-review.css ===== */
 button:focus-visible,
 input:focus-visible,

@@ -5,6 +5,7 @@ const {
   dialog,
   clipboard,
   ClipboardItem,
+  nativeImage,
   protocol,
   net,
 } = require("electron");
@@ -405,6 +406,10 @@ ipcMain.handle("import-notes-apply", (_, data) => desk.importNotesApply(data));
 ipcMain.handle("copy", async (_, p) => {
   const payload = { "text/plain": p.text };
   if (p.html) payload["text/html"] = p.html;
+  if (p.image?.bytes?.length) {
+    const img = nativeImage.createFromBuffer(Buffer.from(p.image.bytes));
+    if (!img.isEmpty()) payload["image/png"] = img;
+  }
   await clipboard.write([new ClipboardItem(payload)]);
   return true;
 });
