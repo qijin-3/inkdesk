@@ -2,45 +2,56 @@
 // 小红书设计稿基准 768×1024（3:4），画布放大到 1200×1600 导出。
 
 const BLUE = "#0f3ff7";
-const BLUE_SOFT = "rgba(15, 63, 247, 0.2)";
+const BLUE_SOFT = "#f2f5ff";
 const BLACK = "#111111";
 const WHITE = "#ffffff";
-const SERIF = '"寒蝉锦书宋Compact", "Songti SC", "Noto Serif SC", serif';
 const SANS = '"OPPO Sans 4.0", "PingFang SC", "Helvetica Neue", sans-serif';
 
 /** 设计稿宽度 → 画布缩放比（导出 1200 宽） */
 const DESIGN_W = 768;
 const CANVAS_W = 1200;
 const SCALE = CANVAS_W / DESIGN_W;
+/** 750px 设计稿参数 → 768px 版心的换算比 */
+const REF = DESIGN_W / 750;
+/** 设计稿正文标注为 24，实际正文 20 */
+const BODY = 20;
+/** 设计稿字号 → 实际正文字号（保持与正文的比例） */
+const ref = (n) => (n * BODY) / 24;
 
 /**
  * 小红书在 768 版心下的字号 / 行距 / 字距。
  * 绘制时一律 × SCALE。
  */
 const T = {
-  padX: 40,
+  padX: 32,
   padY: 40,
-  /** 正文 20 / 行高 1.7 / 段后 20 / 字距 0.5 */
-  body: 20,
-  bodyLine: 20 * 1.7,
-  bodyAfter: 20,
+  /** 正文 20 / 行高 1.7 / 段后 12 / 字距 0.5 */
+  body: BODY,
+  bodyLine: BODY * 1.7,
+  bodyAfter: 12,
+  /** 列表项间距：小于段间距，避免列表看起来比正文更松 */
+  liAfter: 6,
   bodyTracking: 0.5,
-  /** 一级标题 64 / 行高 72 / 序号 96 / 色块 112 */
-  h1: 64,
-  h1Line: 72,
-  h1Num: 96,
-  h1Badge: 112,
-  h1Gap: 16,
-  h1Tracking: 1.5,
-  h1MarginTop: 48,
-  h1MarginTopAtPageStart: 8,
-  h1MarginBottom: 24,
-  /** 二级标题 36 / 行高 1.25 / 字距 1 */
-  h2: 36,
-  h2Line: 36 * 1.25,
-  h2PadX: 12,
-  h2PadY: 10,
-  h2Tracking: 1,
+  /** 一级标题 32 / 行高 1.25；序号 24 单独一行，位于标题上方（设计稿以正文 24 标注） */
+  h1: ref(32),
+  h1Line: ref(32) * 1.25,
+  h1Num: ref(24),
+  h1NumLine: ref(24) * 0.85,
+  /** 序号与标题的间距 */
+  h1NumGap: ref(6),
+  /** 标题字距：设计稿 5% */
+  h1Tracking: ref(32) * 0.05,
+  h1MarginTop: 24,
+  h1MarginTopAtPageStart: 12,
+  /** 下间距与二级标题一致 */
+  h1MarginBottom: 16,
+  /** 二级标题 24 / 字重 SemiBold / 行高 1.25 / 内边距 8，标题前加 ## */
+  h2: ref(24),
+  h2Weight: 600,
+  h2Line: ref(24) * 1.25,
+  h2PadX: 8 * REF,
+  h2PadY: 8 * REF,
+  h2Tracking: ref(24) * 0.05,
   h2MarginTop: 20,
   h2MarginBottom: 16,
   h3: 28,
@@ -48,13 +59,16 @@ const T = {
   h3MarginTop: 24,
   h3MarginBottom: 14,
   h3Tracking: 0.8,
-  quote: 20,
-  quoteLine: 20 * 1.7,
-  quoteMark: 30,
-  quotePad: 12,
+  quote: ref(24),
+  quoteLine: ref(24) * 1.5,
+  quoteMark: ref(30),
+  quotePadX: 8 * REF,
+  quotePadY: 12 * REF,
   quoteGap: 10,
   quoteMarkW: 24,
-  quoteMargin: 24,
+  /** 引用上下间距：与段间距（bodyAfter）一致，上方段后另计 */
+  quoteMarginTop: 0,
+  quoteMargin: 12,
   continueY: 56,
 };
 
@@ -199,7 +213,7 @@ function collectRuns(node, bold = false) {
 
 /**
  * 按小红书 768 规格生成竖版分页。
- * 字号：H1 文字 64 / 序号 96，H2 36，正文 24；一级标题左文右号。
+ * 字体统一 OPPO Sans；一级标题序号在标题上方一行。
  * @param {string} html 正文 HTML
  * @param {string} [_title] 保留参数（导出文件名用），首屏不绘制标题
  */
@@ -222,8 +236,8 @@ export async function socialPages(html, _title) {
   const h1Line = S(T.h1Line);
   const h1Tracking = S(T.h1Tracking);
   const numSize = S(T.h1Num);
-  const badge = S(T.h1Badge);
-  const h1Gap = S(T.h1Gap);
+  const numLine = S(T.h1NumLine);
+  const numGap = S(T.h1NumGap);
   const h2Size = S(T.h2);
   const h2Line = S(T.h2Line);
   const h2Tracking = S(T.h2Tracking);
@@ -273,7 +287,7 @@ export async function socialPages(html, _title) {
   }
 
   /**
-   * 绘制一级标题：左文字、右序号方块，底对齐。
+   * 绘制一级标题：序号（蓝色）单独一行在标题上方，标题蓝色加粗。
    * 识别同一标题内 Shift+Enter 软换行；页首缩小顶距。
    * @param {string|Node} rawOrNode
    */
@@ -291,12 +305,11 @@ export async function socialPages(html, _title) {
       seed = en ? [zh, en] : [zh];
     }
     const num = String(++h1Index).padStart(2, "0");
-    const textW = contentW - badge - h1Gap;
-    font(SERIF, 800, h1Size);
+    font(SANS, 700, h1Size);
     const lines = seed.flatMap((para) =>
-      wrapLines(ctx, para, textW, h1Tracking),
+      wrapLines(ctx, para, contentW, h1Tracking),
     );
-    const textH = Math.max(badge, lines.length * h1Line);
+    const textH = numLine + numGap + Math.max(h1Line, lines.length * h1Line);
     const startTop = S(T.h1MarginTopAtPageStart);
     const midTop = S(T.h1MarginTop);
     const after = S(T.h1MarginBottom);
@@ -308,28 +321,22 @@ export async function socialPages(html, _title) {
     ensure(top + textH + after);
     y += y <= continueY + 1 ? startTop : top;
 
-    let ty = y + textH - lines.length * h1Line;
+    let ty = y;
     ctx.fillStyle = BLUE;
-    font(SERIF, 800, h1Size);
+    font(SANS, 700, numSize);
+    ctx.fillText("——" + num, pad, ty);
+    ty += numLine + numGap;
+    font(SANS, 700, h1Size);
     for (const line of lines) {
       fillTracked(ctx, line, pad, ty, h1Tracking);
       ty += h1Line;
     }
 
-    const bx = pad + contentW - badge;
-    const by = y + textH - badge;
-    ctx.fillStyle = BLUE_SOFT;
-    ctx.fillRect(bx, by, badge, badge);
-    font(SERIF, 800, numSize);
-    ctx.fillStyle = BLUE;
-    const nw = ctx.measureText(num).width;
-    ctx.fillText(num, bx + (badge - nw) / 2, by + (badge - numSize) / 2);
-
     y += textH + after;
   }
 
   /**
-   * 绘制二级标题（蓝底白字条）；识别同一标题内软换行。
+   * 绘制二级标题（蓝底白字条，标题前加 ##）；识别同一标题内软换行。
    * @param {string|Node} rawOrNode
    */
   function drawH2(rawOrNode) {
@@ -339,9 +346,10 @@ export async function socialPages(html, _title) {
         : blockPlainText(/** @type {Node} */ (rawOrNode));
     const soft = headingSoftLines(raw);
     if (!soft.length) return;
+    soft[0] = "## " + soft[0];
     const padX = S(T.h2PadX);
     const padY = S(T.h2PadY);
-    font(SERIF, 800, h2Size);
+    font(SANS, T.h2Weight, h2Size);
     const maxInner = contentW - padX * 2;
     const lines = soft.flatMap((para) =>
       wrapLines(ctx, para, maxInner, h2Tracking),
@@ -359,7 +367,7 @@ export async function socialPages(html, _title) {
     ctx.fillStyle = BLUE;
     ctx.fillRect(pad, y, barW, barH);
     ctx.fillStyle = WHITE;
-    font(SERIF, 800, h2Size);
+    font(SANS, T.h2Weight, h2Size);
     let ty = y + padY;
     for (const l of lines) {
       fillTracked(ctx, l, pad + padX, ty, h2Tracking);
@@ -403,7 +411,7 @@ export async function socialPages(html, _title) {
   }
 
   /**
-   * 绘制引用块（浅蓝底 + 引号 + 蓝宋体正文）。
+   * 绘制引用块（#f2f5ff 底 + 引号 + 蓝色 light 正文）。
    * @param {Element} node
    */
   function drawQuote(node) {
@@ -414,28 +422,29 @@ export async function socialPages(html, _title) {
       .join("")
       .replace(/\n+/g, " ")
       .trim();
-    const qPad = S(T.quotePad);
+    const qPadX = S(T.quotePadX);
+    const qPadY = S(T.quotePadY);
     const markW = S(T.quoteMarkW);
     const gap = S(T.quoteGap);
     const qSize = S(T.quote);
     const qLine = S(T.quoteLine);
-    const textMax = contentW - qPad * 2 - markW - gap;
-    font(SERIF, 800, qSize);
+    const textMax = contentW - qPadX * 2 - markW - gap;
+    font(SANS, 300, qSize);
     const lines = wrapLines(ctx, plain, textMax, bodyTracking);
     const boxH = Math.max(
-      quoteMarkSize + qPad * 2,
-      lines.length * qLine + qPad * 2,
+      quoteMarkSize + qPadY * 2,
+      lines.length * qLine + qPadY * 2,
     );
-    ensure(S(T.quoteMargin) + boxH + S(T.quoteMargin));
-    y += S(T.quoteMargin);
+    ensure(S(T.quoteMarginTop) + boxH + S(T.quoteMargin));
+    y += S(T.quoteMarginTop);
     ctx.fillStyle = BLUE_SOFT;
     ctx.fillRect(pad, y, contentW, boxH);
     ctx.fillStyle = BLUE;
-    font(SERIF, 800, quoteMarkSize);
-    ctx.fillText("“", pad + qPad, y + qPad);
-    font(SERIF, 800, qSize);
-    let ty = y + qPad + S(4);
-    const tx0 = pad + qPad + markW + gap;
+    font(SANS, 300, quoteMarkSize);
+    ctx.fillText("“", pad + qPadX, y + qPadY);
+    font(SANS, 300, qSize);
+    let ty = y + qPadY + S(4);
+    const tx0 = pad + qPadX + markW + gap;
     for (const line of lines) {
       fillTracked(ctx, line, tx0, ty, bodyTracking);
       ty += qLine;
@@ -634,7 +643,7 @@ export async function socialPages(html, _title) {
     }
     if (/^H[3-6]$/.test(node.nodeName)) {
       drawText(collectRuns(node), {
-        family: SERIF,
+        family: SANS,
         weight: 800,
         size: S(T.h3),
         line: S(T.h3Line),
@@ -646,8 +655,12 @@ export async function socialPages(html, _title) {
     }
     const runs = collectRuns(node);
     if (!runs.some((r) => r.text.trim())) return;
-    if (node.nodeName === "LI") runs.unshift({ text: "• ", bold: false });
-    drawText(runs, { line: bodyLine, after: S(T.bodyAfter) });
+    const isList = node.nodeName === "LI";
+    if (isList) runs.unshift({ text: "• ", bold: false });
+    drawText(runs, {
+      line: bodyLine,
+      after: S(isList ? T.liAfter : T.bodyAfter),
+    });
   }
 
   try {

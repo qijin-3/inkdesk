@@ -75,7 +75,7 @@ export async function publishHTMLInner(md, opts = {}) {
       splitWechatH1(h1);
       const num = String(i + 1).padStart(2, "0");
       const text = h1.innerHTML;
-      h1.innerHTML = `<span style="flex:1;min-width:0;color:${WECHAT_BLUE};font-family:${serif};font-size:40px;font-weight:800;">${text}</span><span style="flex-shrink:0;display:inline-block;width:80px;height:80px;line-height:80px;text-align:center;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:64px;font-weight:800;">${num}</span>`;
+      h1.innerHTML = `<span style="flex:1;min-width:0;color:${WECHAT_BLUE};font-family:${serif};font-size:25px;font-weight:800;line-height:1.25;">${text}</span><span style="flex-shrink:0;display:inline-block;color:${WECHAT_BLUE};font-family:${serif};font-size:25px;font-weight:800;line-height:1.25;">${num}</span>`;
     });
     // 二级标题：微信会重置 h1–h6 的 color，必须把白字写在 span 上
     d.querySelectorAll("h2").forEach((h2) => {
@@ -85,19 +85,19 @@ export async function publishHTMLInner(md, opts = {}) {
       const bar = d.createElement("section");
       bar.setAttribute(
         "style",
-        `display:inline-block;max-width:100%;padding:8px 10px;background:${WECHAT_BLUE};`,
+        `display:inline-block;max-width:100%;padding:8px;background:${WECHAT_BLUE};`,
       );
       const label = d.createElement("span");
       label.setAttribute(
         "style",
-        `color:#fff;font-size:20px;font-weight:700;font-family:${serif};line-height:1.25;`,
+        `color:#fff;font-size:25px;font-weight:800;font-family:${serif};line-height:1.25;`,
       );
       while (h2.firstChild) label.appendChild(h2.firstChild);
       label.querySelectorAll("*").forEach((el) => {
         el.setAttribute(
-          "style",
-          `color:#fff;font-size:20px;font-weight:700;font-family:${serif};`,
-        );
+        "style",
+        `color:#fff;font-size:25px;font-weight:800;font-family:${serif};line-height:1.25;`,
+      );
       });
       bar.appendChild(label);
       wrap.appendChild(bar);
@@ -110,7 +110,7 @@ export async function publishHTMLInner(md, opts = {}) {
       mark.textContent = "“";
       mark.setAttribute(
         "style",
-        `flex-shrink:0;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`,
+        `flex-shrink:0;font-family:${serif};font-size:25px;font-weight:400;line-height:1;color:${WECHAT_BLUE};`,
       );
       bq.prepend(mark);
     });
@@ -119,9 +119,9 @@ export async function publishHTMLInner(md, opts = {}) {
   // 段落/列表继承外层 sans；标题/引用单独写 serif（微信会重置 h1–h6）
   const styles = {
     p: "margin:0 0 16px;",
-    h1: `display:flex;align-items:flex-end;justify-content:space-between;gap:12px;font-size:40px;line-height:1.1;margin:56px 0 20px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
+    h1: `display:flex;align-items:baseline;justify-content:flex-start;gap:8px;font-size:25px;line-height:1.25;margin:56px 0 20px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
     h3: `font-size:18px;margin:20px 0 12px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
-    blockquote: `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:20px 0;padding:8px;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:15px;font-weight:800;line-height:1.7;`,
+    blockquote: `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:20px 0;padding:12px 8px;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:25px;font-weight:400;line-height:1.5;`,
     li: "margin:6px 0;",
   };
   Object.entries(styles).forEach(([tag, style]) =>
@@ -160,7 +160,7 @@ export async function publishHTMLInner(md, opts = {}) {
       if (el.classList?.contains("wechat-quote-mark")) {
         el.setAttribute(
           "style",
-          `grid-column:1;grid-row:1;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`,
+          `grid-column:1;grid-row:1;font-family:${serif};font-size:25px;font-weight:400;line-height:1.25;color:${WECHAT_BLUE};`,
         );
         return;
       }
@@ -170,7 +170,7 @@ export async function publishHTMLInner(md, opts = {}) {
     d.querySelectorAll("blockquote p").forEach((p) =>
       p.setAttribute(
         "style",
-        `margin:0;grid-column:2;color:${WECHAT_BLUE};font-family:${serif};font-size:15px;font-weight:800;line-height:1.7;`,
+        `margin:0;grid-column:2;font-family:${serif};font-size:25px;font-weight:400;line-height:1.5;color:${WECHAT_BLUE};`,
       ),
     );
     d.querySelectorAll("blockquote strong").forEach((el) =>
@@ -193,7 +193,7 @@ export async function publishHTMLInner(md, opts = {}) {
     d.querySelectorAll("h1 .h1-zh, h1 .h1-en").forEach((el) =>
       el.setAttribute(
         "style",
-        `display:block;font-size:40px;font-weight:800;line-height:1.1;color:${WECHAT_BLUE};font-family:${serif};`,
+        `display:block;font-size:25px;font-weight:800;line-height:1.25;color:${WECHAT_BLUE};font-family:${serif};`,
       ),
     );
   }

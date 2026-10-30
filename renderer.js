@@ -107,8 +107,6 @@ import {
 } from "./ui/provider-connect.js";
 import {
   WECHAT_BLUE,
-  WECHAT_BLUE_SOFT,
-  WECHAT_SERIF,
   WECHAT_SERIF_PUBLISH,
   WECHAT_SANS,
   WECHAT_BLOCK_W,
@@ -1060,21 +1058,25 @@ async function deleteDraft(id) {
 function enhanceWechatPreview(root = $("#article-preview")) {
   if (!root) return;
   root.querySelectorAll("h1").forEach(splitWechatH1);
-  const h2Style = `display:inline-block;max-width:100%;box-sizing:border-box;margin:16px 0 14px;padding:8px 10px;background:${WECHAT_BLUE};color:#ffffff;font-family:${WECHAT_SERIF};font-size:20px;font-weight:800;line-height:1.25;`;
+  const h2Style = `display:inline-block;max-width:100%;box-sizing:border-box;margin:16px 0 14px;padding:8px;background:${WECHAT_BLUE};color:#ffffff;font-family:${WECHAT_SANS};font-size:15px;font-weight:600;line-height:1.25;letter-spacing:0.05em;`;
   root.querySelectorAll("h2").forEach((h2) => {
     h2.setAttribute("style", h2Style);
-    // 子节点（如 strong）不得继承正文黑字/无衬线，否则看起来像「二级标题没变」
+    // 子节点（如 strong）不得继承正文黑字，否则看起来像「二级标题没变」
     h2.querySelectorAll("*").forEach((el) => {
       el.setAttribute(
         "style",
-        `color:#ffffff;font-family:${WECHAT_SERIF};font-size:20px;font-weight:800;`,
+        `color:#ffffff;font-family:${WECHAT_SANS};font-size:15px;font-weight:600;letter-spacing:0.05em;`,
       );
     });
   });
   root.querySelectorAll("blockquote").forEach((bq) => {
+    // 引用上下间距与段落一致；紧邻标题时让标题自己的边距生效（与段落行为相同）
+    const isHeading = (el) => el && /^H[12]$/.test(el.tagName);
+    const gapTop = isHeading(bq.previousElementSibling) ? 0 : 10;
+    const gapBottom = isHeading(bq.nextElementSibling) ? 0 : 10;
     bq.setAttribute(
       "style",
-      `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:20px 0;padding:8px;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${WECHAT_SERIF};font-size:15px;font-weight:800;line-height:1.7;`,
+      `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:${gapTop}px 0 ${gapBottom}px;padding:12px 8px;background:#f2f5ff;color:${WECHAT_BLUE};font-family:${WECHAT_SANS};font-size:15px;font-weight:300;line-height:1.5;`,
     );
     if (!bq.querySelector(".wechat-quote-mark")) {
       const mark = document.createElement("span");
@@ -1082,14 +1084,15 @@ function enhanceWechatPreview(root = $("#article-preview")) {
       mark.textContent = "“";
       mark.setAttribute(
         "style",
-        `grid-column:1;grid-row:1;font-family:${WECHAT_SERIF};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`,
+        `grid-column:1;grid-row:1;font-family:${WECHAT_SANS};font-size:15px;font-weight:300;line-height:1.25;color:${WECHAT_BLUE};`,
       );
       bq.prepend(mark);
     }
     bq.querySelectorAll("p, strong").forEach((el) => {
-      el.style.fontFamily =
-        "寒蝉锦书宋Compact, Songti SC, STSong, 华文宋体, 宋体, SimSun, serif";
-      el.style.fontWeight = "800";
+      if (el.tagName === "STRONG") {
+        el.style.fontFamily = WECHAT_SANS;
+        el.style.fontWeight = "700";
+      }
       el.style.color = WECHAT_BLUE;
       if (el.tagName === "P") el.style.gridColumn = "2";
     });

@@ -947,38 +947,46 @@ async function mountSkillsSettings(root2, api2, account2, accounts, onRefresh = 
 
 // social-layout.js
 var BLUE = "#0f3ff7";
-var BLUE_SOFT = "rgba(15, 63, 247, 0.2)";
+var BLUE_SOFT = "#f2f5ff";
 var BLACK = "#111111";
 var WHITE = "#ffffff";
-var SERIF = '"\u5BD2\u8749\u9526\u4E66\u5B8BCompact", "Songti SC", "Noto Serif SC", serif';
 var SANS = '"OPPO Sans 4.0", "PingFang SC", "Helvetica Neue", sans-serif';
 var DESIGN_W = 768;
 var CANVAS_W = 1200;
 var SCALE = CANVAS_W / DESIGN_W;
+var REF = DESIGN_W / 750;
+var BODY = 20;
+var ref = (n) => n * BODY / 24;
 var T = {
-  padX: 40,
+  padX: 32,
   padY: 40,
-  /** 正文 20 / 行高 1.7 / 段后 20 / 字距 0.5 */
-  body: 20,
-  bodyLine: 20 * 1.7,
-  bodyAfter: 20,
+  /** 正文 20 / 行高 1.7 / 段后 12 / 字距 0.5 */
+  body: BODY,
+  bodyLine: BODY * 1.7,
+  bodyAfter: 12,
+  /** 列表项间距：小于段间距，避免列表看起来比正文更松 */
+  liAfter: 6,
   bodyTracking: 0.5,
-  /** 一级标题 64 / 行高 72 / 序号 96 / 色块 112 */
-  h1: 64,
-  h1Line: 72,
-  h1Num: 96,
-  h1Badge: 112,
-  h1Gap: 16,
-  h1Tracking: 1.5,
-  h1MarginTop: 48,
-  h1MarginTopAtPageStart: 8,
-  h1MarginBottom: 24,
-  /** 二级标题 36 / 行高 1.25 / 字距 1 */
-  h2: 36,
-  h2Line: 36 * 1.25,
-  h2PadX: 12,
-  h2PadY: 10,
-  h2Tracking: 1,
+  /** 一级标题 32 / 行高 1.25；序号 24 单独一行，位于标题上方（设计稿以正文 24 标注） */
+  h1: ref(32),
+  h1Line: ref(32) * 1.25,
+  h1Num: ref(24),
+  h1NumLine: ref(24) * 0.85,
+  /** 序号与标题的间距 */
+  h1NumGap: ref(6),
+  /** 标题字距：设计稿 5% */
+  h1Tracking: ref(32) * 0.05,
+  h1MarginTop: 24,
+  h1MarginTopAtPageStart: 12,
+  /** 下间距与二级标题一致 */
+  h1MarginBottom: 16,
+  /** 二级标题 24 / 字重 SemiBold / 行高 1.25 / 内边距 8，标题前加 ## */
+  h2: ref(24),
+  h2Weight: 600,
+  h2Line: ref(24) * 1.25,
+  h2PadX: 8 * REF,
+  h2PadY: 8 * REF,
+  h2Tracking: ref(24) * 0.05,
   h2MarginTop: 20,
   h2MarginBottom: 16,
   h3: 28,
@@ -986,13 +994,16 @@ var T = {
   h3MarginTop: 24,
   h3MarginBottom: 14,
   h3Tracking: 0.8,
-  quote: 20,
-  quoteLine: 20 * 1.7,
-  quoteMark: 30,
-  quotePad: 12,
+  quote: ref(24),
+  quoteLine: ref(24) * 1.5,
+  quoteMark: ref(30),
+  quotePadX: 8 * REF,
+  quotePadY: 12 * REF,
   quoteGap: 10,
   quoteMarkW: 24,
-  quoteMargin: 24,
+  /** 引用上下间距：与段间距（bodyAfter）一致，上方段后另计 */
+  quoteMarginTop: 0,
+  quoteMargin: 12,
   continueY: 56
 };
 function S(n) {
@@ -1086,8 +1097,8 @@ async function socialPages(html2, _title) {
   const h1Line = S(T.h1Line);
   const h1Tracking = S(T.h1Tracking);
   const numSize = S(T.h1Num);
-  const badge = S(T.h1Badge);
-  const h1Gap = S(T.h1Gap);
+  const numLine = S(T.h1NumLine);
+  const numGap = S(T.h1NumGap);
   const h2Size = S(T.h2);
   const h2Line = S(T.h2Line);
   const h2Tracking = S(T.h2Tracking);
@@ -1133,12 +1144,11 @@ async function socialPages(html2, _title) {
       seed = en ? [zh, en] : [zh];
     }
     const num = String(++h1Index).padStart(2, "0");
-    const textW = contentW - badge - h1Gap;
-    font(SERIF, 800, h1Size);
+    font(SANS, 700, h1Size);
     const lines = seed.flatMap(
-      (para) => wrapLines(ctx, para, textW, h1Tracking)
+      (para) => wrapLines(ctx, para, contentW, h1Tracking)
     );
-    const textH = Math.max(badge, lines.length * h1Line);
+    const textH = numLine + numGap + Math.max(h1Line, lines.length * h1Line);
     const startTop = S(T.h1MarginTopAtPageStart);
     const midTop = S(T.h1MarginTop);
     const after = S(T.h1MarginBottom);
@@ -1149,21 +1159,16 @@ async function socialPages(html2, _title) {
     const top = y <= continueY + 1 ? startTop : midTop;
     ensure(top + textH + after);
     y += y <= continueY + 1 ? startTop : top;
-    let ty = y + textH - lines.length * h1Line;
+    let ty = y;
     ctx.fillStyle = BLUE;
-    font(SERIF, 800, h1Size);
+    font(SANS, 700, numSize);
+    ctx.fillText("\u2014\u2014" + num, pad, ty);
+    ty += numLine + numGap;
+    font(SANS, 700, h1Size);
     for (const line of lines) {
       fillTracked(ctx, line, pad, ty, h1Tracking);
       ty += h1Line;
     }
-    const bx = pad + contentW - badge;
-    const by = y + textH - badge;
-    ctx.fillStyle = BLUE_SOFT;
-    ctx.fillRect(bx, by, badge, badge);
-    font(SERIF, 800, numSize);
-    ctx.fillStyle = BLUE;
-    const nw = ctx.measureText(num).width;
-    ctx.fillText(num, bx + (badge - nw) / 2, by + (badge - numSize) / 2);
     y += textH + after;
   }
   function drawH2(rawOrNode) {
@@ -1173,9 +1178,10 @@ async function socialPages(html2, _title) {
     );
     const soft = headingSoftLines(raw);
     if (!soft.length) return;
+    soft[0] = "## " + soft[0];
     const padX = S(T.h2PadX);
     const padY = S(T.h2PadY);
-    font(SERIF, 800, h2Size);
+    font(SANS, T.h2Weight, h2Size);
     const maxInner = contentW - padX * 2;
     const lines = soft.flatMap(
       (para) => wrapLines(ctx, para, maxInner, h2Tracking)
@@ -1193,7 +1199,7 @@ async function socialPages(html2, _title) {
     ctx.fillStyle = BLUE;
     ctx.fillRect(pad, y, barW, barH);
     ctx.fillStyle = WHITE;
-    font(SERIF, 800, h2Size);
+    font(SANS, T.h2Weight, h2Size);
     let ty = y + padY;
     for (const l of lines) {
       fillTracked(ctx, l, pad + padX, ty, h2Tracking);
@@ -1233,28 +1239,29 @@ async function socialPages(html2, _title) {
     const runs = collectRuns(node).filter((r) => r.text.trim() || r.text === "\n");
     if (!runs.some((r) => r.text.trim())) return;
     const plain = runs.map((r) => r.text).join("").replace(/\n+/g, " ").trim();
-    const qPad = S(T.quotePad);
+    const qPadX = S(T.quotePadX);
+    const qPadY = S(T.quotePadY);
     const markW = S(T.quoteMarkW);
     const gap = S(T.quoteGap);
     const qSize = S(T.quote);
     const qLine = S(T.quoteLine);
-    const textMax = contentW - qPad * 2 - markW - gap;
-    font(SERIF, 800, qSize);
+    const textMax = contentW - qPadX * 2 - markW - gap;
+    font(SANS, 300, qSize);
     const lines = wrapLines(ctx, plain, textMax, bodyTracking);
     const boxH = Math.max(
-      quoteMarkSize + qPad * 2,
-      lines.length * qLine + qPad * 2
+      quoteMarkSize + qPadY * 2,
+      lines.length * qLine + qPadY * 2
     );
-    ensure(S(T.quoteMargin) + boxH + S(T.quoteMargin));
-    y += S(T.quoteMargin);
+    ensure(S(T.quoteMarginTop) + boxH + S(T.quoteMargin));
+    y += S(T.quoteMarginTop);
     ctx.fillStyle = BLUE_SOFT;
     ctx.fillRect(pad, y, contentW, boxH);
     ctx.fillStyle = BLUE;
-    font(SERIF, 800, quoteMarkSize);
-    ctx.fillText("\u201C", pad + qPad, y + qPad);
-    font(SERIF, 800, qSize);
-    let ty = y + qPad + S(4);
-    const tx0 = pad + qPad + markW + gap;
+    font(SANS, 300, quoteMarkSize);
+    ctx.fillText("\u201C", pad + qPadX, y + qPadY);
+    font(SANS, 300, qSize);
+    let ty = y + qPadY + S(4);
+    const tx0 = pad + qPadX + markW + gap;
     for (const line of lines) {
       fillTracked(ctx, line, tx0, ty, bodyTracking);
       ty += qLine;
@@ -1417,7 +1424,7 @@ async function socialPages(html2, _title) {
     }
     if (/^H[3-6]$/.test(node.nodeName)) {
       drawText(collectRuns(node), {
-        family: SERIF,
+        family: SANS,
         weight: 800,
         size: S(T.h3),
         line: S(T.h3Line),
@@ -1429,8 +1436,12 @@ async function socialPages(html2, _title) {
     }
     const runs = collectRuns(node);
     if (!runs.some((r) => r.text.trim())) return;
-    if (node.nodeName === "LI") runs.unshift({ text: "\u2022 ", bold: false });
-    drawText(runs, { line: bodyLine, after: S(T.bodyAfter) });
+    const isList2 = node.nodeName === "LI";
+    if (isList2) runs.unshift({ text: "\u2022 ", bold: false });
+    drawText(runs, {
+      line: bodyLine,
+      after: S(isList2 ? T.liAfter : T.bodyAfter)
+    });
   }
   try {
     page2();
@@ -24398,8 +24409,8 @@ function withRefKinds(draft, refs) {
   const walk = (nodes) => {
     for (const n of nodes || []) {
       if (n?.type === "referenceTag" && n.attrs) {
-        const ref = refs?.[n.attrs.refId];
-        n.attrs.kind = normalizeRefKind(ref?.kind || n.attrs.kind || "file");
+        const ref2 = refs?.[n.attrs.refId];
+        n.attrs.kind = normalizeRefKind(ref2?.kind || n.attrs.kind || "file");
       }
       if (n?.content) walk(n.content);
     }
@@ -30589,6 +30600,7 @@ var WECHAT_BLUE = "#0f3ff7";
 var WECHAT_BLUE_SOFT = "rgba(15, 63, 247, 0.2)";
 var WECHAT_SERIF = "'\u5BD2\u8749\u9526\u4E66\u5B8BCompact','Songti SC','STSong','\u534E\u6587\u5B8B\u4F53','\u5B8B\u4F53',SimSun,serif";
 var WECHAT_SERIF_PUBLISH = "Songti SC,STSong,\u534E\u6587\u5B8B\u4F53,\u5B8B\u4F53,SimSun,serif";
+var WECHAT_SANS = "'OPPO Sans 4.0','PingFang SC','Helvetica Neue',Arial,sans-serif";
 var WECHAT_SANS_PUBLISH = "PingFang SC,Helvetica Neue,Arial,sans-serif";
 var WECHAT_BLOCK_W = 360;
 var WECHAT_BLOCK_SCALE = 4;
@@ -30902,7 +30914,7 @@ async function publishHTMLInner(md, opts = {}) {
       splitWechatH1(h1);
       const num = String(i + 1).padStart(2, "0");
       const text = h1.innerHTML;
-      h1.innerHTML = `<span style="flex:1;min-width:0;color:${WECHAT_BLUE};font-family:${serif};font-size:40px;font-weight:800;">${text}</span><span style="flex-shrink:0;display:inline-block;width:80px;height:80px;line-height:80px;text-align:center;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:64px;font-weight:800;">${num}</span>`;
+      h1.innerHTML = `<span style="flex:1;min-width:0;color:${WECHAT_BLUE};font-family:${serif};font-size:25px;font-weight:800;line-height:1.25;">${text}</span><span style="flex-shrink:0;display:inline-block;color:${WECHAT_BLUE};font-family:${serif};font-size:25px;font-weight:800;line-height:1.25;">${num}</span>`;
     });
     d.querySelectorAll("h2").forEach((h2) => {
       const wrap2 = d.createElement("section");
@@ -30911,18 +30923,18 @@ async function publishHTMLInner(md, opts = {}) {
       const bar = d.createElement("section");
       bar.setAttribute(
         "style",
-        `display:inline-block;max-width:100%;padding:8px 10px;background:${WECHAT_BLUE};`
+        `display:inline-block;max-width:100%;padding:8px;background:${WECHAT_BLUE};`
       );
       const label = d.createElement("span");
       label.setAttribute(
         "style",
-        `color:#fff;font-size:20px;font-weight:700;font-family:${serif};line-height:1.25;`
+        `color:#fff;font-size:25px;font-weight:800;font-family:${serif};line-height:1.25;`
       );
       while (h2.firstChild) label.appendChild(h2.firstChild);
       label.querySelectorAll("*").forEach((el) => {
         el.setAttribute(
           "style",
-          `color:#fff;font-size:20px;font-weight:700;font-family:${serif};`
+          `color:#fff;font-size:25px;font-weight:800;font-family:${serif};line-height:1.25;`
         );
       });
       bar.appendChild(label);
@@ -30936,16 +30948,16 @@ async function publishHTMLInner(md, opts = {}) {
       mark.textContent = "\u201C";
       mark.setAttribute(
         "style",
-        `flex-shrink:0;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`
+        `flex-shrink:0;font-family:${serif};font-size:25px;font-weight:400;line-height:1;color:${WECHAT_BLUE};`
       );
       bq.prepend(mark);
     });
   }
   const styles = {
     p: "margin:0 0 16px;",
-    h1: `display:flex;align-items:flex-end;justify-content:space-between;gap:12px;font-size:40px;line-height:1.1;margin:56px 0 20px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
+    h1: `display:flex;align-items:baseline;justify-content:flex-start;gap:8px;font-size:25px;line-height:1.25;margin:56px 0 20px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
     h3: `font-size:18px;margin:20px 0 12px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
-    blockquote: `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:20px 0;padding:8px;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:15px;font-weight:800;line-height:1.7;`,
+    blockquote: `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:20px 0;padding:12px 8px;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:25px;font-weight:400;line-height:1.5;`,
     li: "margin:6px 0;"
   };
   Object.entries(styles).forEach(
@@ -30973,7 +30985,7 @@ async function publishHTMLInner(md, opts = {}) {
       if (el.classList?.contains("wechat-quote-mark")) {
         el.setAttribute(
           "style",
-          `grid-column:1;grid-row:1;font-family:${serif};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`
+          `grid-column:1;grid-row:1;font-family:${serif};font-size:25px;font-weight:400;line-height:1.25;color:${WECHAT_BLUE};`
         );
         return;
       }
@@ -30983,7 +30995,7 @@ async function publishHTMLInner(md, opts = {}) {
     d.querySelectorAll("blockquote p").forEach(
       (p) => p.setAttribute(
         "style",
-        `margin:0;grid-column:2;color:${WECHAT_BLUE};font-family:${serif};font-size:15px;font-weight:800;line-height:1.7;`
+        `margin:0;grid-column:2;font-family:${serif};font-size:25px;font-weight:400;line-height:1.5;color:${WECHAT_BLUE};`
       )
     );
     d.querySelectorAll("blockquote strong").forEach(
@@ -31006,7 +31018,7 @@ async function publishHTMLInner(md, opts = {}) {
     d.querySelectorAll("h1 .h1-zh, h1 .h1-en").forEach(
       (el) => el.setAttribute(
         "style",
-        `display:block;font-size:40px;font-weight:800;line-height:1.1;color:${WECHAT_BLUE};font-family:${serif};`
+        `display:block;font-size:25px;font-weight:800;line-height:1.25;color:${WECHAT_BLUE};font-family:${serif};`
       )
     );
   }
@@ -32925,20 +32937,23 @@ async function deleteDraft(id) {
 function enhanceWechatPreview(root2 = $("#article-preview")) {
   if (!root2) return;
   root2.querySelectorAll("h1").forEach(splitWechatH1);
-  const h2Style = `display:inline-block;max-width:100%;box-sizing:border-box;margin:16px 0 14px;padding:8px 10px;background:${WECHAT_BLUE};color:#ffffff;font-family:${WECHAT_SERIF};font-size:20px;font-weight:800;line-height:1.25;`;
+  const h2Style = `display:inline-block;max-width:100%;box-sizing:border-box;margin:16px 0 14px;padding:8px;background:${WECHAT_BLUE};color:#ffffff;font-family:${WECHAT_SANS};font-size:15px;font-weight:600;line-height:1.25;letter-spacing:0.05em;`;
   root2.querySelectorAll("h2").forEach((h2) => {
     h2.setAttribute("style", h2Style);
     h2.querySelectorAll("*").forEach((el) => {
       el.setAttribute(
         "style",
-        `color:#ffffff;font-family:${WECHAT_SERIF};font-size:20px;font-weight:800;`
+        `color:#ffffff;font-family:${WECHAT_SANS};font-size:15px;font-weight:600;letter-spacing:0.05em;`
       );
     });
   });
   root2.querySelectorAll("blockquote").forEach((bq) => {
+    const isHeading = (el) => el && /^H[12]$/.test(el.tagName);
+    const gapTop = isHeading(bq.previousElementSibling) ? 0 : 10;
+    const gapBottom = isHeading(bq.nextElementSibling) ? 0 : 10;
     bq.setAttribute(
       "style",
-      `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:20px 0;padding:8px;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${WECHAT_SERIF};font-size:15px;font-weight:800;line-height:1.7;`
+      `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:${gapTop}px 0 ${gapBottom}px;padding:12px 8px;background:#f2f5ff;color:${WECHAT_BLUE};font-family:${WECHAT_SANS};font-size:15px;font-weight:300;line-height:1.5;`
     );
     if (!bq.querySelector(".wechat-quote-mark")) {
       const mark = document.createElement("span");
@@ -32946,13 +32961,15 @@ function enhanceWechatPreview(root2 = $("#article-preview")) {
       mark.textContent = "\u201C";
       mark.setAttribute(
         "style",
-        `grid-column:1;grid-row:1;font-family:${WECHAT_SERIF};font-size:23px;font-weight:800;line-height:1;color:${WECHAT_BLUE};`
+        `grid-column:1;grid-row:1;font-family:${WECHAT_SANS};font-size:15px;font-weight:300;line-height:1.25;color:${WECHAT_BLUE};`
       );
       bq.prepend(mark);
     }
     bq.querySelectorAll("p, strong").forEach((el) => {
-      el.style.fontFamily = "\u5BD2\u8749\u9526\u4E66\u5B8BCompact, Songti SC, STSong, \u534E\u6587\u5B8B\u4F53, \u5B8B\u4F53, SimSun, serif";
-      el.style.fontWeight = "800";
+      if (el.tagName === "STRONG") {
+        el.style.fontFamily = WECHAT_SANS;
+        el.style.fontWeight = "700";
+      }
       el.style.color = WECHAT_BLUE;
       if (el.tagName === "P") el.style.gridColumn = "2";
     });
