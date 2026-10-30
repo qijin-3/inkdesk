@@ -1,7 +1,7 @@
 {
   "name": "inkdesk",
   "productName": "Aster*",
-  "version": "0.2.20",
+  "version": "0.3.0",
   "description": "Aster* — local writing desk for Content OS",
   "main": "main.cjs",
   "scripts": {
