@@ -55,3 +55,69 @@ test("主题常量与原实现一致", () => {
   assert.match(mod.WECHAT_SANS_PUBLISH, /PingFang SC/);
   assert.ok(!mod.WECHAT_SANS_PUBLISH.includes("OPPO"));
 });
+
+test("公众号块主题与预览新版样式一致", () => {
+  const theme = mod.WECHAT_BLOCK_THEME;
+  assert.equal(mod.WECHAT_BLUE_SOFT, "#f2f5ff");
+  assert.equal(theme.h1.fontSize, 20);
+  assert.equal(theme.h1.fontWeight, 700);
+  assert.match(theme.h1.fontFamily, /PingFang SC/);
+  assert.equal(theme.h2.fontSize, 15);
+  assert.equal(theme.h2.fontWeight, 600);
+  assert.equal(theme.h2.prefix, "## ");
+  assert.equal(theme.quote.fontSize, 15);
+  assert.equal(theme.quote.fontWeight, 300);
+  assert.equal(theme.quote.markFontSize, 18.75);
+  assert.equal(theme.quote.markFontWeight, 700);
+  assert.match(mod.wechatBlockCSS("h2"), /font-size:15px/);
+  assert.match(mod.wechatBlockCSS("quote"), /background:#f2f5ff/);
+});
+
+test("推送块图使用共享主题而非旧宋体参数", () => {
+  const fonts = [];
+  const fills = [];
+  const texts = [];
+  const ctx = {
+    scale() {},
+    measureText: (value) => ({ width: String(value).length * 10 }),
+    fillRect() {},
+    fillText(value) {
+      texts.push(value);
+    },
+    set font(value) {
+      fonts.push(value);
+    },
+    set fillStyle(value) {
+      fills.push(value);
+    },
+    set textBaseline(value) {},
+    set imageSmoothingEnabled(value) {},
+    set imageSmoothingQuality(value) {},
+    set letterSpacing(value) {},
+  };
+  const prevDocument = global.document;
+  global.document = {
+    createElement() {
+      return {
+        width: 0,
+        height: 0,
+        getContext: () => ctx,
+        toDataURL: () => "data:image/png;base64,x",
+      };
+    },
+  };
+  try {
+    mod.renderWechatH1Png("增长 Growth Playbook", "01");
+    mod.renderWechatH2Png("增长方法");
+    mod.renderWechatQuotePng("一句引用");
+  } finally {
+    global.document = prevDocument;
+  }
+  assert.ok(fonts.some((f) => /700 20px/.test(f)));
+  assert.ok(fonts.some((f) => /600 15px/.test(f)));
+  assert.ok(fonts.some((f) => /300 15px/.test(f)));
+  assert.ok(fonts.every((f) => !/Songti|STSong|SimSun/i.test(f)));
+  assert.ok(texts.includes("—— 01"));
+  assert.ok(texts.some((t) => String(t).startsWith("## ")));
+  assert.ok(fills.includes("#f2f5ff"));
+});

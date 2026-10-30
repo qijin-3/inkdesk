@@ -30606,11 +30606,90 @@ var lexer = _Lexer.lex;
 
 // ui/wechat-png.js
 var WECHAT_BLUE = "#0f3ff7";
-var WECHAT_BLUE_SOFT = "rgba(15, 63, 247, 0.2)";
-var WECHAT_SERIF = "'\u5BD2\u8749\u9526\u4E66\u5B8BCompact','Songti SC','STSong','\u534E\u6587\u5B8B\u4F53','\u5B8B\u4F53',SimSun,serif";
-var WECHAT_SERIF_PUBLISH = "Songti SC,STSong,\u534E\u6587\u5B8B\u4F53,\u5B8B\u4F53,SimSun,serif";
+var WECHAT_BLUE_SOFT = "#f2f5ff";
 var WECHAT_SANS = "'OPPO Sans 4.0','PingFang SC','Helvetica Neue',Arial,sans-serif";
 var WECHAT_SANS_PUBLISH = "PingFang SC,Helvetica Neue,Arial,sans-serif";
+var WECHAT_BLOCK_THEME = Object.freeze({
+  h1: Object.freeze({
+    fontFamily: WECHAT_SANS,
+    fontSize: 20,
+    fontWeight: 700,
+    lineHeight: 1.25,
+    letterSpacing: "0.05em",
+    color: WECHAT_BLUE,
+    marginTop: 24,
+    firstMarginTop: 12,
+    marginBottom: 14,
+    indexPrefix: "\u2014\u2014 ",
+    indexFontSize: 20,
+    indexFontWeight: 700,
+    indexLineHeight: 0.85,
+    indexLetterSpacing: "normal",
+    indexMarginBottom: 1
+  }),
+  h2: Object.freeze({
+    fontFamily: WECHAT_SANS,
+    fontSize: 15,
+    fontWeight: 600,
+    lineHeight: 1.25,
+    letterSpacing: "0.05em",
+    color: "#ffffff",
+    background: WECHAT_BLUE,
+    prefix: "## ",
+    marginTop: 16,
+    marginBottom: 14,
+    padding: 8
+  }),
+  quote: Object.freeze({
+    fontFamily: WECHAT_SANS,
+    fontSize: 15,
+    fontWeight: 300,
+    lineHeight: 1.5,
+    letterSpacing: "normal",
+    color: WECHAT_BLUE,
+    background: WECHAT_BLUE_SOFT,
+    margin: 10,
+    paddingX: 8,
+    paddingY: 12,
+    columnGap: 8,
+    mark: "\u201C",
+    markFontSize: 18.75,
+    markFontWeight: 700,
+    markLineHeight: 1.25
+  })
+});
+var cssLength = (value) => typeof value === "number" ? `${value}px` : String(value);
+function textDeclarations(style2) {
+  return `font-family:${style2.fontFamily};font-size:${cssLength(style2.fontSize)};font-weight:${style2.fontWeight};line-height:${style2.lineHeight};letter-spacing:${style2.letterSpacing};color:${style2.color};`;
+}
+function wechatBlockTextCSS(tag2, overrides = {}) {
+  return textDeclarations({ ...WECHAT_BLOCK_THEME[tag2], ...overrides });
+}
+function wechatBlockCSS(tag2, overrides = {}) {
+  const style2 = { ...WECHAT_BLOCK_THEME[tag2], ...overrides };
+  const text = textDeclarations(style2);
+  if (tag2 === "h1")
+    return `display:flex;flex-direction:column-reverse;align-items:flex-start;${text}margin:${cssLength(style2.marginTop)} 0 ${cssLength(style2.marginBottom)};`;
+  if (tag2 === "h2")
+    return `display:inline-block;max-width:100%;box-sizing:border-box;${text}margin:${cssLength(style2.marginTop)} 0 ${cssLength(style2.marginBottom)};padding:${cssLength(style2.padding)};background:${style2.background};`;
+  if (tag2 === "quote")
+    return `display:grid;grid-template-columns:auto 1fr;column-gap:${cssLength(style2.columnGap)};align-items:start;border:0;margin:${cssLength(style2.marginTop ?? style2.margin)} 0 ${cssLength(style2.marginBottom ?? style2.margin)};padding:${cssLength(style2.paddingY)} ${cssLength(style2.paddingX)};background:${style2.background};${text}`;
+  throw Error(`\u672A\u77E5\u516C\u4F17\u53F7\u5757\u6837\u5F0F\uFF1A${tag2}`);
+}
+function wechatH1IndexCSS(overrides = {}) {
+  const style2 = { ...WECHAT_BLOCK_THEME.h1, ...overrides };
+  return `flex-shrink:0;display:inline;font-family:${style2.fontFamily};font-size:${cssLength(style2.indexFontSize)};font-weight:${style2.indexFontWeight};line-height:${style2.indexLineHeight};letter-spacing:${style2.indexLetterSpacing};color:${style2.color};margin-bottom:${cssLength(style2.indexMarginBottom)};`;
+}
+function wechatQuoteMarkCSS(overrides = {}) {
+  const style2 = { ...WECHAT_BLOCK_THEME.quote, ...overrides };
+  return `grid-column:1;grid-row:1;font-family:${style2.fontFamily};font-size:${cssLength(style2.markFontSize)};font-weight:${style2.markFontWeight};line-height:${style2.markLineHeight};letter-spacing:normal;color:${style2.color};`;
+}
+function setCanvasFont(ctx, style2) {
+  ctx.font = `${style2.fontWeight} ${style2.fontSize}px ${style2.fontFamily}`;
+}
+function setCanvasLetterSpacing(ctx, value) {
+  ctx.letterSpacing = value === "normal" ? "0px" : value;
+}
 var WECHAT_BLOCK_W = 360;
 var WECHAT_BLOCK_SCALE = 4;
 function normalizeHeadingText(raw) {
@@ -30648,102 +30727,109 @@ function splitH1ZhEn(one) {
   return m ? { zh: m[1].trim(), en: m[2].trim() } : { zh: one, en: "" };
 }
 function renderWechatH1Png(raw, num) {
+  const style2 = WECHAT_BLOCK_THEME.h1;
   const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
-  const badge = 48;
-  const gap = 10;
-  const textW = WECHAT_BLOCK_W - badge - gap;
-  const fontSize = 40;
-  const lineH = 44;
   const measure = wechatBlockCanvas(1, 1).ctx;
-  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  setCanvasFont(measure, style2);
+  setCanvasLetterSpacing(measure, style2.letterSpacing);
   let lines = [];
   if (soft.length > 1) {
-    lines = soft.flatMap((para) => wechatWrapLines(measure, para, textW));
+    lines = soft.flatMap(
+      (para) => wechatWrapLines(measure, para, WECHAT_BLOCK_W)
+    );
   } else {
     const { zh, en } = splitH1ZhEn(soft[0] || "");
     lines = [
-      ...wechatWrapLines(measure, zh, textW),
-      ...en ? wechatWrapLines(measure, en, textW) : []
+      ...wechatWrapLines(measure, zh, WECHAT_BLOCK_W),
+      ...en ? wechatWrapLines(measure, en, WECHAT_BLOCK_W) : []
     ];
   }
-  const textH = Math.max(badge, lines.length * lineH);
+  const lineH = style2.fontSize * style2.lineHeight;
+  const indexH = style2.indexFontSize * style2.indexLineHeight + style2.indexMarginBottom;
+  const textH = Math.max(1, indexH + lines.length * lineH);
   const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, textH);
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, WECHAT_BLOCK_W, textH);
-  ctx.fillStyle = WECHAT_BLUE;
-  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  let y = textH - lines.length * lineH;
+  ctx.fillStyle = style2.color;
+  ctx.font = `${style2.indexFontWeight} ${style2.indexFontSize}px ${style2.fontFamily}`;
+  setCanvasLetterSpacing(ctx, style2.indexLetterSpacing);
+  ctx.fillText(`${style2.indexPrefix}${num}`, 0, 0);
+  setCanvasFont(ctx, style2);
+  setCanvasLetterSpacing(ctx, style2.letterSpacing);
+  let y = indexH;
   for (const line of lines) {
     ctx.fillText(line, 0, y);
     y += lineH;
   }
-  const bx = WECHAT_BLOCK_W - badge;
-  const by = textH - badge;
-  ctx.fillStyle = WECHAT_BLUE_SOFT;
-  ctx.fillRect(bx, by, badge, badge);
-  ctx.fillStyle = WECHAT_BLUE;
-  const numSize = 36;
-  ctx.font = `800 ${numSize}px ${WECHAT_SERIF}`;
-  const nw = ctx.measureText(num).width;
-  ctx.fillText(num, bx + (badge - nw) / 2, by + (badge - numSize) / 2);
   return c.toDataURL("image/png");
 }
 function renderWechatH2Png(raw) {
+  const style2 = WECHAT_BLOCK_THEME.h2;
   const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
-  const padX = 10;
-  const padY = 8;
-  const fontSize = 20;
-  const lineH = 25;
-  const maxInner = WECHAT_BLOCK_W - padX * 2;
+  const pad = style2.padding;
+  const lineH = style2.fontSize * style2.lineHeight;
+  const maxInner = WECHAT_BLOCK_W - pad * 2;
   const measure = wechatBlockCanvas(1, 1).ctx;
-  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  const lines = soft.flatMap(
+  setCanvasFont(measure, style2);
+  setCanvasLetterSpacing(measure, style2.letterSpacing);
+  const paragraphs = soft.length ? soft : [""];
+  paragraphs[0] = style2.prefix + paragraphs[0];
+  const lines = paragraphs.flatMap(
     (para) => wechatWrapLines(measure, para, maxInner)
   );
   const innerW = Math.min(
     maxInner,
     Math.ceil(Math.max(...lines.map((l) => measure.measureText(l).width), 1))
   );
-  const boxW = Math.min(WECHAT_BLOCK_W, innerW + padX * 2);
-  const boxH = Math.max(lineH + padY * 2, lines.length * lineH + padY * 2);
+  const boxW = Math.min(WECHAT_BLOCK_W, innerW + pad * 2);
+  const boxH = Math.max(lineH + pad * 2, lines.length * lineH + pad * 2);
   const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, boxH);
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
-  ctx.fillStyle = WECHAT_BLUE;
+  ctx.fillStyle = style2.background;
   ctx.fillRect(0, 0, boxW, boxH);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  let y = padY;
+  ctx.fillStyle = style2.color;
+  setCanvasFont(ctx, style2);
+  setCanvasLetterSpacing(ctx, style2.letterSpacing);
+  let y = pad;
   for (const line of lines) {
-    ctx.fillText(line, padX, y);
+    ctx.fillText(line, pad, y);
     y += lineH;
   }
   return c.toDataURL("image/png");
 }
 function renderWechatQuotePng(raw) {
+  const style2 = WECHAT_BLOCK_THEME.quote;
   const text = String(raw || "").replace(/\s+/g, " ").trim();
-  const pad = 8;
-  const markSize = 23;
-  const fontSize = 15;
-  const lineH = 26;
-  const markW = 20;
-  const gap = 8;
-  const textW = WECHAT_BLOCK_W - pad * 2 - markW - gap;
+  const padX = style2.paddingX;
+  const padY = style2.paddingY;
+  const lineH = style2.fontSize * style2.lineHeight;
+  const markLineH = style2.markFontSize * style2.markLineHeight;
   const measure = wechatBlockCanvas(1, 1).ctx;
-  measure.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
+  const markStyle = {
+    fontWeight: style2.markFontWeight,
+    fontSize: style2.markFontSize,
+    fontFamily: style2.fontFamily
+  };
+  setCanvasFont(measure, markStyle);
+  setCanvasLetterSpacing(measure, "normal");
+  const markW = Math.max(8, measure.measureText(style2.mark).width);
+  const textW = WECHAT_BLOCK_W - padX * 2 - markW - style2.columnGap;
+  setCanvasFont(measure, style2);
+  setCanvasLetterSpacing(measure, style2.letterSpacing);
   const lines = wechatWrapLines(measure, text, textW);
-  const boxH = Math.max(markSize + pad * 2, lines.length * lineH + pad * 2);
+  const boxH = Math.max(markLineH + padY * 2, lines.length * lineH + padY * 2);
   const { c, ctx } = wechatBlockCanvas(WECHAT_BLOCK_W, boxH);
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = style2.background;
   ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
-  ctx.fillStyle = WECHAT_BLUE_SOFT;
-  ctx.fillRect(0, 0, WECHAT_BLOCK_W, boxH);
-  ctx.fillStyle = WECHAT_BLUE;
-  ctx.font = `800 ${markSize}px ${WECHAT_SERIF}`;
-  ctx.fillText("\u201C", pad, pad);
-  ctx.font = `800 ${fontSize}px ${WECHAT_SERIF}`;
-  let y = pad + 4;
-  const tx = pad + markW + gap;
+  ctx.fillStyle = style2.color;
+  setCanvasFont(ctx, markStyle);
+  setCanvasLetterSpacing(ctx, "normal");
+  ctx.fillText(style2.mark, padX, padY);
+  setCanvasFont(ctx, style2);
+  setCanvasLetterSpacing(ctx, style2.letterSpacing);
+  let y = padY;
+  const tx = padX + markW + style2.columnGap;
   for (const line of lines) {
     ctx.fillText(line, tx, y);
     y += lineH;
@@ -30870,8 +30956,8 @@ function sanitizeHtmlPreview(html2) {
 
 // ui/publish.js
 async function publishHTMLInner(md, opts = {}) {
-  const serif = WECHAT_SERIF_PUBLISH;
   const sans = WECHAT_SANS_PUBLISH;
+  const theme = WECHAT_BLOCK_THEME;
   const d = new DOMParser().parseFromString(safeHTML(md), "text/html");
   if (opts.keepImages) {
     if (!isWeb())
@@ -30889,85 +30975,101 @@ async function publishHTMLInner(md, opts = {}) {
   }
   if (opts.blockImages) {
     await document.fonts.ready;
+    const blocks = [...d.querySelectorAll("h1, h2, blockquote")];
     let h1i = 0;
-    for (const h1 of [...d.querySelectorAll("h1")]) {
-      const num = String(++h1i).padStart(2, "0");
-      replaceWithWechatBlockImage(
-        d,
-        h1,
-        renderWechatH1Png(blockPlainText2(h1), num),
-        "\u4E00\u7EA7\u6807\u9898",
-        "56px 0 20px"
-      );
-    }
-    for (const h2 of [...d.querySelectorAll("h2")]) {
-      replaceWithWechatBlockImage(
-        d,
-        h2,
-        renderWechatH2Png(blockPlainText2(h2)),
-        "\u4E8C\u7EA7\u6807\u9898",
-        "16px 0 14px"
-      );
-    }
-    for (const bq of [...d.querySelectorAll("blockquote")]) {
-      replaceWithWechatBlockImage(
-        d,
-        bq,
-        renderWechatQuotePng(bq.textContent),
-        "\u5F15\u7528",
-        "20px 0"
-      );
+    for (const block2 of blocks) {
+      const prev = block2.previousElementSibling;
+      const next2 = block2.nextElementSibling;
+      if (block2.tagName === "H1") {
+        const num = String(++h1i).padStart(2, "0");
+        const top = block2 === d.body.firstElementChild ? theme.h1.firstMarginTop : theme.h1.marginTop;
+        replaceWithWechatBlockImage(
+          d,
+          block2,
+          renderWechatH1Png(blockPlainText2(block2), num),
+          "\u4E00\u7EA7\u6807\u9898",
+          `${top}px 0 ${theme.h1.marginBottom}px`
+        );
+      } else if (block2.tagName === "H2") {
+        replaceWithWechatBlockImage(
+          d,
+          block2,
+          renderWechatH2Png(blockPlainText2(block2)),
+          "\u4E8C\u7EA7\u6807\u9898",
+          `${theme.h2.marginTop}px 0 ${theme.h2.marginBottom}px`
+        );
+      } else {
+        const top = prev?.tagName === "H2" ? 0 : theme.quote.margin;
+        const bottom = /^H[12]$/.test(next2?.tagName || "") ? 0 : theme.quote.margin;
+        replaceWithWechatBlockImage(
+          d,
+          block2,
+          renderWechatQuotePng(blockPlainText2(block2)),
+          "\u5F15\u7528",
+          `${top}px 0 ${bottom}px`
+        );
+      }
     }
   } else {
     d.querySelectorAll("h1").forEach((h1, i) => {
       splitWechatH1(h1);
       const num = String(i + 1).padStart(2, "0");
+      const top = h1 === d.body.firstElementChild ? theme.h1.firstMarginTop : theme.h1.marginTop;
+      h1.setAttribute("style", wechatBlockCSS("h1", { marginTop: top }));
       const text = h1.innerHTML;
-      h1.innerHTML = `<span style="flex:1;min-width:0;color:${WECHAT_BLUE};font-family:${serif};font-size:25px;font-weight:800;line-height:1.25;">${text}</span><span style="flex-shrink:0;display:inline-block;color:${WECHAT_BLUE};font-family:${serif};font-size:25px;font-weight:800;line-height:1.25;">${num}</span>`;
+      h1.innerHTML = `<span class="h1-text" style="flex:1 1 auto;min-width:0;">${text}</span><span class="wechat-h1-index" style="${wechatH1IndexCSS()}">${theme.h1.indexPrefix}${num}</span>`;
+      h1.querySelectorAll(".h1-zh, .h1-en").forEach(
+        (el) => el.setAttribute("style", `display:block;${wechatBlockTextCSS("h1")}`)
+      );
     });
     d.querySelectorAll("h2").forEach((h2) => {
       const wrap2 = d.createElement("section");
       wrap2.setAttribute("data-wechat-h2", "1");
-      wrap2.setAttribute("style", "margin:16px 0 14px;max-width:100%;");
+      wrap2.setAttribute(
+        "style",
+        `margin:${theme.h2.marginTop}px 0 ${theme.h2.marginBottom}px;max-width:100%;`
+      );
       const bar = d.createElement("section");
       bar.setAttribute(
         "style",
-        `display:inline-block;max-width:100%;padding:8px;background:${WECHAT_BLUE};`
+        `display:inline-block;max-width:100%;box-sizing:border-box;padding:${theme.h2.padding}px;background:${theme.h2.background};`
       );
       const label = d.createElement("span");
-      label.setAttribute(
-        "style",
-        `color:#fff;font-size:25px;font-weight:800;font-family:${serif};line-height:1.25;`
-      );
+      label.setAttribute("style", wechatBlockTextCSS("h2"));
+      const prefix = d.createElement("span");
+      prefix.textContent = theme.h2.prefix;
+      prefix.setAttribute("style", wechatBlockTextCSS("h2"));
+      label.appendChild(prefix);
       while (h2.firstChild) label.appendChild(h2.firstChild);
       label.querySelectorAll("*").forEach((el) => {
-        el.setAttribute(
-          "style",
-          `color:#fff;font-size:25px;font-weight:800;font-family:${serif};line-height:1.25;`
-        );
+        el.setAttribute("style", wechatBlockTextCSS("h2"));
       });
       bar.appendChild(label);
       wrap2.appendChild(bar);
       h2.replaceWith(wrap2);
     });
     d.querySelectorAll("blockquote").forEach((bq) => {
-      if (bq.querySelector(".wechat-quote-mark")) return;
-      const mark = d.createElement("span");
-      mark.className = "wechat-quote-mark";
-      mark.textContent = "\u201C";
-      mark.setAttribute(
+      const top = bq.previousElementSibling?.hasAttribute("data-wechat-h2") ? 0 : theme.quote.margin;
+      const next2 = bq.nextElementSibling;
+      const bottom = next2?.tagName === "H1" || next2?.hasAttribute("data-wechat-h2") ? 0 : theme.quote.margin;
+      bq.setAttribute(
         "style",
-        `flex-shrink:0;font-family:${serif};font-size:25px;font-weight:400;line-height:1;color:${WECHAT_BLUE};`
+        wechatBlockCSS("quote", { marginTop: top, marginBottom: bottom })
       );
-      bq.prepend(mark);
+      let mark = bq.querySelector(".wechat-quote-mark");
+      if (!mark) {
+        mark = d.createElement("span");
+        mark.className = "wechat-quote-mark";
+        mark.textContent = theme.quote.mark;
+        bq.prepend(mark);
+      }
+      mark.setAttribute("style", wechatQuoteMarkCSS());
     });
   }
   const styles = {
     p: "margin:0 0 16px;",
-    h1: `display:flex;align-items:baseline;justify-content:flex-start;gap:8px;font-size:25px;line-height:1.25;margin:56px 0 20px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
-    h3: `font-size:18px;margin:20px 0 12px;color:${WECHAT_BLUE};font-family:${serif};font-weight:800;`,
-    blockquote: `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:20px 0;padding:12px 8px;background:${WECHAT_BLUE_SOFT};color:${WECHAT_BLUE};font-family:${serif};font-size:25px;font-weight:400;line-height:1.5;`,
-    li: "margin:6px 0;"
+    h3: `font-size:18px;margin:20px 0 12px;color:${WECHAT_BLUE};font-family:${sans};font-weight:800;`,
+    li: "margin:4px 0;"
   };
   Object.entries(styles).forEach(
     ([tag2, style2]) => d.querySelectorAll(tag2).forEach((n) => {
@@ -30990,46 +31092,28 @@ async function publishHTMLInner(md, opts = {}) {
     n.setAttribute("style", "font-weight:600;color:#111;");
   });
   if (!opts.blockImages) {
-    d.querySelectorAll("blockquote > *").forEach((el) => {
-      if (el.classList?.contains("wechat-quote-mark")) {
+    d.querySelectorAll("blockquote").forEach((bq) => {
+      const textStyle = wechatBlockTextCSS("quote");
+      bq.querySelectorAll(":scope > :not(.wechat-quote-mark)").forEach((el) => {
+        const prev = el.getAttribute("style") || "";
         el.setAttribute(
           "style",
-          `grid-column:1;grid-row:1;font-family:${serif};font-size:25px;font-weight:400;line-height:1.25;color:${WECHAT_BLUE};`
+          `${prev};grid-column:2;${textStyle}`.replace(/^;/, "")
         );
-        return;
-      }
-      const prev = el.getAttribute("style") || "";
-      el.setAttribute("style", `${prev};grid-column:2;`.replace(/^;/, ""));
-    });
-    d.querySelectorAll("blockquote p").forEach(
-      (p) => p.setAttribute(
-        "style",
-        `margin:0;grid-column:2;font-family:${serif};font-size:25px;font-weight:400;line-height:1.5;color:${WECHAT_BLUE};`
-      )
-    );
-    d.querySelectorAll("blockquote strong").forEach(
-      (el) => el.setAttribute(
-        "style",
-        `font-family:${serif};font-weight:800;color:${WECHAT_BLUE};`
-      )
-    );
-    d.querySelectorAll("h1 .h1-zh, h1 .h1-en, h1 span").forEach((el) => {
-      const prev = el.getAttribute("style") || "";
-      if (!/font-family/.test(prev))
-        el.setAttribute(
+      });
+      bq.querySelectorAll("p").forEach(
+        (p, i) => p.setAttribute(
           "style",
-          `${prev};font-family:${serif};color:${WECHAT_BLUE};`.replace(
-            /^;/,
-            ""
-          )
-        );
+          `margin:${i ? 10 : 0}px 0 0;grid-column:2;${textStyle}`
+        )
+      );
+      bq.querySelectorAll("strong").forEach(
+        (el) => el.setAttribute(
+          "style",
+          `${wechatBlockTextCSS("quote")}font-weight:700;`
+        )
+      );
     });
-    d.querySelectorAll("h1 .h1-zh, h1 .h1-en").forEach(
-      (el) => el.setAttribute(
-        "style",
-        `display:block;font-size:25px;font-weight:800;line-height:1.25;color:${WECHAT_BLUE};font-family:${serif};`
-      )
-    );
   }
   d.querySelectorAll("img").forEach((img) => {
     if (["\u4E00\u7EA7\u6807\u9898", "\u4E8C\u7EA7\u6807\u9898", "\u5F15\u7528"].includes(img.getAttribute("alt") || ""))
@@ -33016,42 +33100,66 @@ async function deleteDraft(id) {
 }
 function enhanceWechatPreview(root2 = $("#article-preview")) {
   if (!root2) return;
-  root2.querySelectorAll("h1").forEach(splitWechatH1);
-  const h2Style = `display:inline-block;max-width:100%;box-sizing:border-box;margin:16px 0 14px;padding:8px;background:${WECHAT_BLUE};color:#ffffff;font-family:${WECHAT_SANS};font-size:15px;font-weight:600;line-height:1.25;letter-spacing:0.05em;`;
+  const theme = WECHAT_BLOCK_THEME;
+  root2.querySelectorAll("h1").forEach((h1) => {
+    splitWechatH1(h1);
+    const marginTop = h1.previousElementSibling ? theme.h1.marginTop : theme.h1.firstMarginTop;
+    h1.setAttribute("style", wechatBlockCSS("h1", { marginTop }));
+    h1.querySelector(".h1-text")?.setAttribute(
+      "style",
+      "flex:1 1 auto;min-width:0;"
+    );
+    h1.querySelectorAll(".h1-zh, .h1-en").forEach(
+      (el) => el.setAttribute("style", `display:block;${wechatBlockTextCSS("h1")}`)
+    );
+    let index = h1.querySelector(".wechat-h1-index");
+    if (!index) {
+      index = document.createElement("span");
+      index.className = "wechat-h1-index";
+      h1.append(index);
+    }
+    index.textContent = `${theme.h1.indexPrefix}${String(
+      [...root2.querySelectorAll("h1")].indexOf(h1) + 1
+    ).padStart(2, "0")}`;
+    index.setAttribute("style", wechatH1IndexCSS());
+  });
+  const h2Style = wechatBlockCSS("h2");
+  const h2TextStyle = wechatBlockTextCSS("h2");
   root2.querySelectorAll("h2").forEach((h2) => {
     h2.setAttribute("style", h2Style);
-    h2.querySelectorAll("*").forEach((el) => {
-      el.setAttribute(
-        "style",
-        `color:#ffffff;font-family:${WECHAT_SANS};font-size:15px;font-weight:600;letter-spacing:0.05em;`
-      );
-    });
+    if (!h2.querySelector(".wechat-h2-prefix")) {
+      const prefix = document.createElement("span");
+      prefix.className = "wechat-h2-prefix";
+      prefix.textContent = theme.h2.prefix;
+      h2.prepend(prefix);
+    }
+    h2.querySelectorAll("*").forEach(
+      (el) => el.setAttribute("style", h2TextStyle)
+    );
   });
   root2.querySelectorAll("blockquote").forEach((bq) => {
     const isHeading = (el) => el && /^H[12]$/.test(el.tagName);
-    const gapTop = isHeading(bq.previousElementSibling) ? 0 : 10;
-    const gapBottom = isHeading(bq.nextElementSibling) ? 0 : 10;
+    const gapTop = isHeading(bq.previousElementSibling) ? 0 : theme.quote.margin;
+    const gapBottom = isHeading(bq.nextElementSibling) ? 0 : theme.quote.margin;
     bq.setAttribute(
       "style",
-      `display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:start;border:0;margin:${gapTop}px 0 ${gapBottom}px;padding:12px 8px;background:#f2f5ff;color:${WECHAT_BLUE};font-family:${WECHAT_SANS};font-size:15px;font-weight:300;line-height:1.5;`
+      wechatBlockCSS("quote", { marginTop: gapTop, marginBottom: gapBottom })
     );
-    if (!bq.querySelector(".wechat-quote-mark")) {
-      const mark = document.createElement("span");
+    let mark = bq.querySelector(".wechat-quote-mark");
+    if (!mark) {
+      mark = document.createElement("span");
       mark.className = "wechat-quote-mark";
-      mark.textContent = "\u201C";
-      mark.setAttribute(
-        "style",
-        `grid-column:1;grid-row:1;font-family:${WECHAT_SANS};font-size:18.75px;font-weight:700;line-height:1.25;color:${WECHAT_BLUE};`
-      );
+      mark.textContent = theme.quote.mark;
       bq.prepend(mark);
     }
+    mark.setAttribute("style", wechatQuoteMarkCSS());
     bq.querySelectorAll("p, strong").forEach((el) => {
-      if (el.tagName === "STRONG") {
-        el.style.fontFamily = WECHAT_SANS;
-        el.style.fontWeight = "700";
-      }
-      el.style.color = WECHAT_BLUE;
-      if (el.tagName === "P") el.style.gridColumn = "2";
+      const weight = el.tagName === "STRONG" ? "font-weight:700;" : "";
+      const column = el.tagName === "P" ? "grid-column:2;" : "";
+      el.setAttribute(
+        "style",
+        `${column}${wechatBlockTextCSS("quote")}${weight}`
+      );
     });
   });
 }

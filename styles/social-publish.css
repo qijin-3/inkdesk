@@ -1381,12 +1381,12 @@ pre {
 .wechat-preview #article-preview h2 + blockquote {
   margin-top: 0;
 }
-/* 一级标题：设计稿 32（正文 24 基准）→ 正文 15px 时 20px；序号 24→15px 单独一行在标题上方 */
+/* H1/H2/引用由 ui/wechat-png.js 的 WECHAT_BLOCK_THEME 写入内联样式；
+   这里只保留无 JS 时的同值兜底，不用 !important 压过未来主题更新。 */
 .wechat-preview #article-preview h1 {
   display: flex;
   flex-direction: column-reverse;
   align-items: flex-start;
-  counter-increment: wechat-h1;
   font-family: var(--wechat-sans);
   font-size: 20px;
   font-weight: 700;
@@ -1402,18 +1402,6 @@ pre {
   flex: 1 1 auto;
   min-width: 0;
 }
-.wechat-preview #article-preview h1::after {
-  content: "—— " counter(wechat-h1, decimal-leading-zero);
-  flex-shrink: 0;
-  display: inline;
-  color: var(--wechat-blue);
-  font-family: var(--wechat-sans);
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 0.85;
-  letter-spacing: normal;
-  margin-bottom: 1px;
-}
 .wechat-preview #article-preview h1 .h1-zh,
 .wechat-preview #article-preview h1 .h1-en {
   display: block;
@@ -1421,26 +1409,23 @@ pre {
   font-weight: 700;
   line-height: 1.25;
 }
-/* 二级标题：蓝底白字，字重 SemiBold，标题前加 ##（含子元素，避免 strong 盖成正文样式） */
+/* 二级标题：蓝底白字，字重 SemiBold（前缀由共享主题插入） */
 .wechat-preview #article-preview h2,
 .wechat-preview #article-preview h2 * {
-  font-family: var(--wechat-sans) !important;
-  font-size: 15px !important;
-  font-weight: 600 !important;
-  color: #ffffff !important;
-  line-height: 1.25 !important;
-  letter-spacing: 0.05em !important;
+  font-family: var(--wechat-sans);
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.25;
+  letter-spacing: 0.05em;
 }
 .wechat-preview #article-preview h2 {
-  display: inline-block !important;
+  display: inline-block;
   max-width: 100%;
   box-sizing: border-box;
-  margin: 16px 0 14px !important;
-  padding: 8px !important;
-  background: #0f3ff7 !important;
-}
-.wechat-preview #article-preview h2::before {
-  content: "## ";
+  margin: 16px 0 14px;
+  padding: 8px;
+  background: #0f3ff7;
 }
 .wechat-preview #article-preview h3 {
   font-family: var(--wechat-sans);
@@ -1465,16 +1450,7 @@ pre {
   font-weight: 300;
   line-height: 1.5;
 }
-.wechat-preview #article-preview blockquote::before {
-  content: "“";
-  grid-column: 1;
-  grid-row: 1;
-  font-family: var(--wechat-sans);
-  font-size: 15px;
-  font-weight: 300;
-  line-height: 1.25;
-  color: var(--wechat-blue);
-}
+/* 引号由共享主题插入 .wechat-quote-mark，避免伪元素重复叠加。 */
 .wechat-preview #article-preview blockquote > * {
   grid-column: 2;
 }

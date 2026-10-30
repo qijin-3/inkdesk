@@ -1,5 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const Wechat = require("../core/wechat.cjs");
 
 const core = (store = {}) => ({
@@ -79,4 +82,62 @@ test("pushWechatDraft 超 2 万字符时错误带上当前长度", async () => {
     /正文 HTML 超过 2 万字符（当前 200\d{2}）/,
   );
   Object.assign(wechatMp, orig);
+});
+
+test("pushWechatDraft 上传块图后正文不含 data URL 且低于长度上限", async () => {
+  const wechatMp = require("../wechat-mp.cjs");
+  const orig = {
+    getAccessToken: wechatMp.getAccessToken,
+    uploadContentImage: wechatMp.uploadContentImage,
+    uploadPermanentImage: wechatMp.uploadPermanentImage,
+    addDraft: wechatMp.addDraft,
+    readImageForUpload: wechatMp.readImageForUpload,
+  };
+  const coverPath = path.join(os.tmpdir(), `inkdesk-cover-${process.pid}.png`);
+  fs.writeFileSync(coverPath, Buffer.from("cover"));
+  let uploaded = 0;
+  let draft = null;
+  wechatMp.getAccessToken = async () => "tok";
+  wechatMp.uploadContentImage = async () =>
+    `https://mmbiz.qpic.cn/block/${++uploaded}.png`;
+  wechatMp.uploadPermanentImage = async () => "thumb";
+  wechatMp.readImageForUpload = () => ({
+    buf: Buffer.from("cover"),
+    name: "cover.png",
+  });
+  wechatMp.addDraft = async (_token, article) => {
+    draft = article;
+    return "mid";
+  };
+  try {
+    const html = `<section>${["一级标题", "二级标题", "引用"]
+      .map((alt, i) => {
+        const src =
+          "data:image/png;base64," +
+          Buffer.from(`block-image-${i}`).toString("base64");
+        return `<img src="${src}" alt="${alt}">`;
+      })
+      .join("")}</section>`;
+    const result = await Wechat.pushWechatDraft(
+      core({
+        wechat: {
+          appId: "wx",
+          appSecret: "sec",
+          coverPath,
+        },
+      }),
+      { title: "t", html },
+    );
+    assert.equal(uploaded, 3);
+    assert.equal(result.imageCount, 3);
+    assert.ok(draft.content.length < 20000);
+    assert.doesNotMatch(draft.content, /data:image/);
+    assert.equal(
+      (draft.content.match(/https:\/\/mmbiz\.qpic\.cn\/block\//g) || []).length,
+      3,
+    );
+  } finally {
+    Object.assign(wechatMp, orig);
+    fs.unlinkSync(coverPath);
+  }
 });
