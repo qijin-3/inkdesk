@@ -407,8 +407,12 @@ ipcMain.handle("copy", async (_, p) => {
   const payload = { "text/plain": p.text };
   if (p.html) payload["text/html"] = p.html;
   if (p.image?.bytes?.length) {
-    const img = nativeImage.createFromBuffer(Buffer.from(p.image.bytes));
-    if (!img.isEmpty()) payload["image/png"] = img;
+    const buf = Buffer.from(p.image.bytes);
+    const img = nativeImage.createFromBuffer(buf);
+    // ClipboardItem 只接受 string / Blob，统一转成 PNG Blob 写入
+    payload["image/png"] = new Blob([img.isEmpty() ? buf : img.toPNG()], {
+      type: "image/png",
+    });
   }
   await clipboard.write([new ClipboardItem(payload)]);
   return true;
