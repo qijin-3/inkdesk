@@ -145,6 +145,8 @@ let metricsSort = "阅读";
 /** 仪表盘已发布文章多选路径 */
 let publishedSelection = new Set();
 let materialsFilter = "all";
+/** 画廊按来源文章筛选的标题（空 = 全部） */
+let galleryFilter = "";
 /** 文档保存协议：防抖 timer 与冲突标志由 store 拥有 */
 const docStore = createDocStore({
   getState: () => state,
@@ -5252,11 +5254,23 @@ async function renderMaterials() {
     toast(e.message);
   }
 }
-/** 画廊：汇总当前账号草稿与已归档文章中嵌入的图片，可复制图片数据。 */
+/** 画廊：汇总当前账号草稿与已归档文章中嵌入的图片，按时间排序、可按文章筛选，可复制图片数据。 */
 function renderGallery() {
-  const items = galleryImages(state, account);
+  const all = galleryImages(state, account);
+  const titles = [];
+  for (const it of all)
+    for (const t of it.articles) if (!titles.includes(t)) titles.push(t);
+  if (galleryFilter && !titles.includes(galleryFilter)) galleryFilter = "";
+  const items = galleryFilter
+    ? all.filter((it) => it.articles.includes(galleryFilter))
+    : all;
   $("#main").innerHTML =
-    `<header><div class="header-lead"><h1 class="dashboard-tagline">画廊</h1></div><div class="header-actions"><span class="muted">共 ${items.length} 张图片</span></div></header><section class="dashboard"><div id="gallery-grid" class="gallery-grid">${galleryGridHTML(items)}</div></section>`;
+    `<header><div class="header-lead"><h1 class="dashboard-tagline">画廊</h1></div><div class="header-actions"><select id="gallery-filter" aria-label="按文章筛选图片"><option value="">全部图片</option>${titles.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join("")}</select><span class="muted">共 ${items.length} 张图片</span></div></header><section class="dashboard"><div id="gallery-grid" class="gallery-grid">${galleryGridHTML(items)}</div></section>`;
+  $("#gallery-filter").value = galleryFilter;
+  $("#gallery-filter").onchange = (e) => {
+    galleryFilter = e.target.value;
+    renderGallery();
+  };
   $$("#gallery-grid [data-gallery-copy]").forEach((b) => {
     b.onclick = async () => {
       const item = items[+b.dataset.galleryCopy];
@@ -5267,7 +5281,7 @@ function renderGallery() {
         await api("copy", {
           text: `![图片](${item.src})`,
           image: {
-            bytes: Array.from(new Uint8Array(await blob.arrayBuffer())),
+            bytes: new Uint8Array(await blob.arrayBuffer()),
             type: blob.type || "image/png",
           },
         });

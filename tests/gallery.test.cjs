@@ -78,6 +78,60 @@ test("galleryImages 兼容网页版 /api/asset/vault 地址并与之去重", () 
   assert.ok(items.some((i) => i.path === "b.png"));
 });
 
+test("galleryImages 按图片时间新→旧排序，缺时间戳回退文章更新时间", () => {
+  const body = (rel) =>
+    `![图片](inkasset://vault/${encodeURIComponent(rel)})`;
+  const st = {
+    documents: [
+      {
+        account: "A",
+        title: "旧图",
+        updated: "2026-01-01T00:00:00.000Z",
+        body: body("Attachment/a/file-20250101090000000.png"),
+      },
+      {
+        account: "A",
+        title: "新图",
+        updated: "2026-02-01T00:00:00.000Z",
+        body: body("Attachment/a/file-20260101090000000.png"),
+      },
+      {
+        account: "A",
+        title: "无名图",
+        updated: "2024-06-01T00:00:00.000Z",
+        body: body("Attachment/a/legacy.png"),
+      },
+    ],
+  };
+  const items = mod.galleryImages(st, "A");
+  assert.deepEqual(
+    items.map((i) => i.name),
+    ["file-20260101090000000.png", "file-20250101090000000.png", "legacy.png"],
+  );
+  assert.equal(items[2].time, Date.parse("2024-06-01T00:00:00.000Z"));
+});
+
+test("galleryImages 归档图片回退发布时间排序", () => {
+  const st = {
+    archives: [
+      {
+        account: "A",
+        title: "已发",
+        fields: { 发布时间: "2023-05-06" },
+        body: "![图片](inkasset://vault/Attachment/a/legacy.png)",
+      },
+      {
+        account: "A",
+        title: "草稿",
+        body: `![图片](inkasset://vault/${encodeURIComponent("Attachment/a/file-20240101090000000.png")})`,
+      },
+    ],
+  };
+  const items = mod.galleryImages(st, "A");
+  assert.equal(items[0].name, "file-20240101090000000.png");
+  assert.equal(items[1].time, Date.parse("2023-05-06"));
+});
+
 test("galleryGridHTML 空态与卡片转义", () => {
   assert.match(mod.galleryGridHTML([]), /empty-state/);
   const html = mod.galleryGridHTML([

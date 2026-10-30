@@ -31181,9 +31181,27 @@ function bodyImageRefs(body) {
   while (m = re.exec(String(body || ""))) out.push(m[1]);
   return out;
 }
+function fileTime(rel) {
+  const m = /file-(\d{17})/.exec(rel);
+  if (!m) return 0;
+  const s = m[1];
+  const t = new Date(
+    +s.slice(0, 4),
+    +s.slice(4, 6) - 1,
+    +s.slice(6, 8),
+    +s.slice(8, 10),
+    +s.slice(10, 12),
+    +s.slice(12, 14),
+    +s.slice(14, 17)
+  ).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+function articleTime(a) {
+  return Date.parse(a.updated || a.fields?.["\u53D1\u5E03\u65F6\u95F4"] || "") || 0;
+}
 function galleryImages(st, account2) {
   const map2 = /* @__PURE__ */ new Map();
-  const collect = (body, title) => {
+  const collect = (body, title, at) => {
     for (const enc of bodyImageRefs(body)) {
       const rel = decodeURIComponent(enc);
       let item = map2.get(rel);
@@ -31193,18 +31211,24 @@ function galleryImages(st, account2) {
           ref: enc,
           src: "inkasset://vault/" + enc,
           name: rel.split("/").pop() || rel,
+          time: fileTime(rel),
           articles: []
         };
         map2.set(rel, item);
       }
+      if (!item.time && at) item.time = at;
       if (title && !item.articles.includes(title)) item.articles.push(title);
     }
   };
   for (const d of st.documents || [])
-    if (sameAccount(d.account, account2)) collect(d.body, d.title);
+    if (sameAccount(d.account, account2))
+      collect(d.body, d.title, articleTime(d));
   for (const a of st.archives || [])
-    if (sameAccount(a.account, account2)) collect(a.body, a.title);
-  return [...map2.values()];
+    if (sameAccount(a.account, account2))
+      collect(a.body, a.title, articleTime(a));
+  return [...map2.values()].sort(
+    (a, b) => b.time - a.time || a.path.localeCompare(b.path)
+  );
 }
 function galleryCardHTML(item, index) {
   const src = assetUrl(item.src);
@@ -32272,6 +32296,7 @@ var heatmapYear = (/* @__PURE__ */ new Date()).getFullYear();
 var metricsSort = "\u9605\u8BFB";
 var publishedSelection = /* @__PURE__ */ new Set();
 var materialsFilter = "all";
+var galleryFilter = "";
 var docStore = createDocStore({
   getState: () => state,
   getCurrent: () => current,
@@ -36551,8 +36576,18 @@ async function renderMaterials() {
   }
 }
 function renderGallery() {
-  const items = galleryImages(state, account);
-  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u753B\u5ECA</h1></div><div class="header-actions"><span class="muted">\u5171 ${items.length} \u5F20\u56FE\u7247</span></div></header><section class="dashboard"><div id="gallery-grid" class="gallery-grid">${galleryGridHTML(items)}</div></section>`;
+  const all = galleryImages(state, account);
+  const titles = [];
+  for (const it of all)
+    for (const t of it.articles) if (!titles.includes(t)) titles.push(t);
+  if (galleryFilter && !titles.includes(galleryFilter)) galleryFilter = "";
+  const items = galleryFilter ? all.filter((it) => it.articles.includes(galleryFilter)) : all;
+  $("#main").innerHTML = `<header><div class="header-lead"><h1 class="dashboard-tagline">\u753B\u5ECA</h1></div><div class="header-actions"><select id="gallery-filter" aria-label="\u6309\u6587\u7AE0\u7B5B\u9009\u56FE\u7247"><option value="">\u5168\u90E8\u56FE\u7247</option>${titles.map((t) => `<option value="${esc2(t)}">${esc2(t)}</option>`).join("")}</select><span class="muted">\u5171 ${items.length} \u5F20\u56FE\u7247</span></div></header><section class="dashboard"><div id="gallery-grid" class="gallery-grid">${galleryGridHTML(items)}</div></section>`;
+  $("#gallery-filter").value = galleryFilter;
+  $("#gallery-filter").onchange = (e) => {
+    galleryFilter = e.target.value;
+    renderGallery();
+  };
   $$("#gallery-grid [data-gallery-copy]").forEach((b) => {
     b.onclick = async () => {
       const item = items[+b.dataset.galleryCopy];
@@ -36563,7 +36598,7 @@ function renderGallery() {
         await api("copy", {
           text: `![\u56FE\u7247](${item.src})`,
           image: {
-            bytes: Array.from(new Uint8Array(await blob.arrayBuffer())),
+            bytes: new Uint8Array(await blob.arrayBuffer()),
             type: blob.type || "image/png"
           }
         });
