@@ -81,22 +81,6 @@ function S(n) {
 }
 
 /**
- * 拆分「中文 + 英文」一级标题。
- * @param {string} raw
- * @returns {{ zh: string, en: string }}
- */
-function splitTitle(raw) {
-  const text = String(raw || "")
-    .replace(/\s+/g, " ")
-    .trim();
-  const m = text.match(
-    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/,
-  );
-  if (!m) return { zh: text, en: "" };
-  return { zh: m[1].trim(), en: m[2].trim() };
-}
-
-/**
  * 按中文字符换行（可计入字距）。
  * @param {CanvasRenderingContext2D} ctx
  * @param {string} text
@@ -190,6 +174,20 @@ function headingSoftLines(raw) {
     .split("\n")
     .map((l) => l.replace(/[ \t]+/g, " ").trim())
     .filter(Boolean);
+}
+
+/**
+ * 生成小红书一级标题行：仅显式软换行强制分段，其余按实际宽度换行。
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {string} raw
+ * @param {number} maxW
+ * @param {number} [tracking=0]
+ * @returns {string[]}
+ */
+export function socialHeadingLines(ctx, raw, maxW, tracking = 0) {
+  return headingSoftLines(raw).flatMap((para) =>
+    wrapLines(ctx, para, maxW, tracking),
+  );
 }
 
 /**
@@ -296,19 +294,9 @@ export async function socialPages(html, _title) {
       typeof rawOrNode === "string"
         ? rawOrNode
         : blockPlainText(/** @type {Node} */ (rawOrNode));
-    const soft = headingSoftLines(raw);
-    /** @type {string[]} */
-    let seed;
-    if (soft.length > 1) seed = soft;
-    else {
-      const { zh, en } = splitTitle(soft[0] || "");
-      seed = en ? [zh, en] : [zh];
-    }
     const num = String(++h1Index).padStart(2, "0");
     font(SANS, 700, h1Size);
-    const lines = seed.flatMap((para) =>
-      wrapLines(ctx, para, contentW, h1Tracking),
-    );
+    const lines = socialHeadingLines(ctx, raw, contentW, h1Tracking);
     const textH = numLine + numGap + Math.max(h1Line, lines.length * h1Line);
     const startTop = S(T.h1MarginTopAtPageStart);
     const midTop = S(T.h1MarginTop);

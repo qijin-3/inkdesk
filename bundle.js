@@ -1018,14 +1018,6 @@ var T = {
 function S(n) {
   return n * SCALE;
 }
-function splitTitle(raw) {
-  const text = String(raw || "").replace(/\s+/g, " ").trim();
-  const m = text.match(
-    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/
-  );
-  if (!m) return { zh: text, en: "" };
-  return { zh: m[1].trim(), en: m[2].trim() };
-}
 function wrapLines(ctx, text, maxW, tracking = 0) {
   const lines = [];
   for (const para of String(text || "").split(/\n/)) {
@@ -1074,6 +1066,11 @@ function blockPlainText(node) {
 }
 function headingSoftLines(raw) {
   return String(raw || "").split("\n").map((l) => l.replace(/[ \t]+/g, " ").trim()).filter(Boolean);
+}
+function socialHeadingLines(ctx, raw, maxW, tracking = 0) {
+  return headingSoftLines(raw).flatMap(
+    (para) => wrapLines(ctx, para, maxW, tracking)
+  );
 }
 function collectRuns(node, bold = false) {
   const runs = [];
@@ -1145,18 +1142,9 @@ async function socialPages(html2, _title) {
       /** @type {Node} */
       rawOrNode
     );
-    const soft = headingSoftLines(raw);
-    let seed;
-    if (soft.length > 1) seed = soft;
-    else {
-      const { zh, en } = splitTitle(soft[0] || "");
-      seed = en ? [zh, en] : [zh];
-    }
     const num = String(++h1Index).padStart(2, "0");
     font(SANS, 700, h1Size);
-    const lines = seed.flatMap(
-      (para) => wrapLines(ctx, para, contentW, h1Tracking)
-    );
+    const lines = socialHeadingLines(ctx, raw, contentW, h1Tracking);
     const textH = numLine + numGap + Math.max(h1Line, lines.length * h1Line);
     const startTop = S(T.h1MarginTopAtPageStart);
     const midTop = S(T.h1MarginTop);
