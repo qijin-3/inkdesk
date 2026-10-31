@@ -1401,9 +1401,9 @@ pre {
 .wechat-preview #article-preview h1 .h1-text {
   flex: 1 1 auto;
   min-width: 0;
+  width: 100%;
 }
-.wechat-preview #article-preview h1 .h1-zh,
-.wechat-preview #article-preview h1 .h1-en {
+.wechat-preview #article-preview h1 .h1-line {
   display: block;
   font-size: 20px;
   font-weight: 700;

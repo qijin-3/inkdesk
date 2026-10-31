@@ -36,18 +36,6 @@ test("wechatWrapLines 按中文字符换行", () => {
   assert.deepEqual(mod.wechatWrapLines(fakeCtx(), "", 10), [""]);
 });
 
-test("splitH1ZhEn 拆中英标题", () => {
-  assert.deepEqual(mod.splitH1ZhEn("增长实战 Growth Playbook"), {
-    zh: "增长实战",
-    en: "Growth Playbook",
-  });
-  assert.deepEqual(mod.splitH1ZhEn("纯中文标题"), {
-    zh: "纯中文标题",
-    en: "",
-  });
-  assert.deepEqual(mod.splitH1ZhEn(""), { zh: "", en: "" });
-});
-
 test("主题常量与原实现一致", () => {
   assert.equal(mod.WECHAT_BLUE, "#0f3ff7");
   assert.equal(mod.WECHAT_BLOCK_W, 360);
@@ -120,4 +108,40 @@ test("推送块图使用共享主题而非旧宋体参数", () => {
   assert.ok(texts.includes("—— 01"));
   assert.ok(texts.some((t) => String(t).startsWith("## ")));
   assert.ok(fills.includes("#f2f5ff"));
+});
+
+test("H1 宽度足够时按实际宽度单行渲染", () => {
+  const texts = [];
+  const ctx = {
+    scale() {},
+    measureText: (value) => ({ width: String(value).length * 10 }),
+    fillRect() {},
+    fillText(value) {
+      texts.push(value);
+    },
+    set font(value) {},
+    set fillStyle(value) {},
+    set textBaseline(value) {},
+    set imageSmoothingEnabled(value) {},
+    set imageSmoothingQuality(value) {},
+    set letterSpacing(value) {},
+  };
+  const prevDocument = global.document;
+  global.document = {
+    createElement() {
+      return {
+        width: 0,
+        height: 0,
+        getContext: () => ctx,
+        toDataURL: () => "data:image/png;base64,x",
+      };
+    },
+  };
+  try {
+    mod.renderWechatH1Png("从 Pinterest 到前端 UI", "01");
+  } finally {
+    global.document = prevDocument;
+  }
+  assert.ok(texts.includes("从 Pinterest 到前端 UI"));
+  assert.ok(!texts.includes("UI"));
 });

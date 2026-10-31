@@ -94,8 +94,8 @@ export async function publishHTMLInner(md, opts = {}) {
           : theme.h1.marginTop;
       h1.setAttribute("style", wechatBlockCSS("h1", { marginTop: top }));
       const text = h1.innerHTML;
-      h1.innerHTML = `<span class="h1-text" style="flex:1 1 auto;min-width:0;">${text}</span><span class="wechat-h1-index" style="${wechatH1IndexCSS()}">${theme.h1.indexPrefix}${num}</span>`;
-      h1.querySelectorAll(".h1-zh, .h1-en").forEach((el) =>
+      h1.innerHTML = `<span class="h1-text" style="flex:1 1 auto;min-width:0;width:100%;">${text}</span><span class="wechat-h1-index" style="${wechatH1IndexCSS()}">${theme.h1.indexPrefix}${num}</span>`;
+      h1.querySelectorAll(".h1-line").forEach((el) =>
         el.setAttribute("style", `display:block;${wechatBlockTextCSS("h1")}`),
       );
     });

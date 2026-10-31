@@ -1065,9 +1065,9 @@ function enhanceWechatPreview(root = $("#article-preview")) {
     h1.setAttribute("style", wechatBlockCSS("h1", { marginTop }));
     h1.querySelector(".h1-text")?.setAttribute(
       "style",
-      "flex:1 1 auto;min-width:0;",
+      "flex:1 1 auto;min-width:0;width:100%;",
     );
-    h1.querySelectorAll(".h1-zh, .h1-en").forEach((el) =>
+    h1.querySelectorAll(".h1-line").forEach((el) =>
       el.setAttribute("style", `display:block;${wechatBlockTextCSS("h1")}`),
     );
     let index = h1.querySelector(".wechat-h1-index");

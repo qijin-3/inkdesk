@@ -77,49 +77,31 @@ export function sanitizeRichHTML(html) {
 }
 
 /**
- * 将一级标题拆成中文主标题 + 英文副标题（若存在）；保留 Shift+Enter 软换行。
+ * 将一级标题包装为按容器实际宽度换行的文本块；保留 Shift+Enter 软换行。
  * @param {HTMLElement} h1
  */
 export function splitWechatH1(h1) {
-  if (h1.querySelector(".h1-en, .h1-zh")) return;
-  const soft = normalizeHeadingText(blockPlainText(h1)).split("\n");
+  if (h1.querySelector(".h1-line")) return;
+  const soft = normalizeHeadingText(blockPlainText(h1))
+    .split("\n")
+    .filter(Boolean);
   if (!soft.length) return;
   const doc = h1.ownerDocument;
   const wrap = doc.createElement("span");
   wrap.className = "h1-text";
 
   /**
-   * 追加一行标题 span。
+   * 追加一个标题段落；仅显式软换行会单独成段。
    * @param {string} line
-   * @param {"h1-zh"|"h1-en"} cls
    */
-  function addLine(line, cls) {
+  function addLine(line) {
     const span = doc.createElement("span");
-    span.className = cls;
-    if (cls === "h1-en") span.lang = "en";
+    span.className = "h1-line";
     span.textContent = line;
     wrap.append(span);
   }
 
-  if (soft.length > 1) {
-    for (let i = 0; i < soft.length; i++) {
-      const line = soft[i];
-      const isEn =
-        i === soft.length - 1 &&
-        /^[A-Za-z][A-Za-z0-9&/.,'’\- ]{0,60}$/.test(line);
-      addLine(line, isEn ? "h1-en" : "h1-zh");
-    }
-    h1.replaceChildren(wrap);
-    return;
-  }
-
-  const text = soft[0];
-  const m = text.match(
-    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/,
-  );
-  if (!m) return;
-  addLine(m[1].trim(), "h1-zh");
-  addLine(m[2].trim(), "h1-en");
+  for (const line of soft) addLine(line);
   h1.replaceChildren(wrap);
 }
 

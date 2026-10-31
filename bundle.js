@@ -30720,30 +30720,15 @@ function wechatBlockCanvas(cssW, cssH) {
   ctx.imageSmoothingQuality = "high";
   return { c, ctx };
 }
-function splitH1ZhEn(one) {
-  const m = String(one || "").match(
-    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/
-  );
-  return m ? { zh: m[1].trim(), en: m[2].trim() } : { zh: one, en: "" };
-}
 function renderWechatH1Png(raw, num) {
   const style2 = WECHAT_BLOCK_THEME.h1;
-  const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
+  const soft = normalizeHeadingText(raw).split("\n");
   const measure = wechatBlockCanvas(1, 1).ctx;
   setCanvasFont(measure, style2);
   setCanvasLetterSpacing(measure, style2.letterSpacing);
-  let lines = [];
-  if (soft.length > 1) {
-    lines = soft.flatMap(
-      (para) => wechatWrapLines(measure, para, WECHAT_BLOCK_W)
-    );
-  } else {
-    const { zh, en } = splitH1ZhEn(soft[0] || "");
-    lines = [
-      ...wechatWrapLines(measure, zh, WECHAT_BLOCK_W),
-      ...en ? wechatWrapLines(measure, en, WECHAT_BLOCK_W) : []
-    ];
-  }
+  const lines = soft.flatMap(
+    (para) => wechatWrapLines(measure, para, WECHAT_BLOCK_W)
+  );
   const lineH = style2.fontSize * style2.lineHeight;
   const indexH = style2.indexFontSize * style2.indexLineHeight + style2.indexMarginBottom;
   const textH = Math.max(1, indexH + lines.length * lineH);
@@ -30904,35 +30889,19 @@ function sanitizeRichHTML(html2) {
   return d.body.innerHTML;
 }
 function splitWechatH1(h1) {
-  if (h1.querySelector(".h1-en, .h1-zh")) return;
-  const soft = normalizeHeadingText(blockPlainText2(h1)).split("\n");
+  if (h1.querySelector(".h1-line")) return;
+  const soft = normalizeHeadingText(blockPlainText2(h1)).split("\n").filter(Boolean);
   if (!soft.length) return;
   const doc3 = h1.ownerDocument;
   const wrap2 = doc3.createElement("span");
   wrap2.className = "h1-text";
-  function addLine(line, cls) {
+  function addLine(line) {
     const span = doc3.createElement("span");
-    span.className = cls;
-    if (cls === "h1-en") span.lang = "en";
+    span.className = "h1-line";
     span.textContent = line;
     wrap2.append(span);
   }
-  if (soft.length > 1) {
-    for (let i = 0; i < soft.length; i++) {
-      const line = soft[i];
-      const isEn = i === soft.length - 1 && /^[A-Za-z][A-Za-z0-9&/.,'’\- ]{0,60}$/.test(line);
-      addLine(line, isEn ? "h1-en" : "h1-zh");
-    }
-    h1.replaceChildren(wrap2);
-    return;
-  }
-  const text = soft[0];
-  const m = text.match(
-    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/
-  );
-  if (!m) return;
-  addLine(m[1].trim(), "h1-zh");
-  addLine(m[2].trim(), "h1-en");
+  for (const line of soft) addLine(line);
   h1.replaceChildren(wrap2);
 }
 function safeHTML(md) {
@@ -31017,8 +30986,8 @@ async function publishHTMLInner(md, opts = {}) {
       const top = h1 === d.body.firstElementChild ? theme.h1.firstMarginTop : theme.h1.marginTop;
       h1.setAttribute("style", wechatBlockCSS("h1", { marginTop: top }));
       const text = h1.innerHTML;
-      h1.innerHTML = `<span class="h1-text" style="flex:1 1 auto;min-width:0;">${text}</span><span class="wechat-h1-index" style="${wechatH1IndexCSS()}">${theme.h1.indexPrefix}${num}</span>`;
-      h1.querySelectorAll(".h1-zh, .h1-en").forEach(
+      h1.innerHTML = `<span class="h1-text" style="flex:1 1 auto;min-width:0;width:100%;">${text}</span><span class="wechat-h1-index" style="${wechatH1IndexCSS()}">${theme.h1.indexPrefix}${num}</span>`;
+      h1.querySelectorAll(".h1-line").forEach(
         (el) => el.setAttribute("style", `display:block;${wechatBlockTextCSS("h1")}`)
       );
     });
@@ -33107,9 +33076,9 @@ function enhanceWechatPreview(root2 = $("#article-preview")) {
     h1.setAttribute("style", wechatBlockCSS("h1", { marginTop }));
     h1.querySelector(".h1-text")?.setAttribute(
       "style",
-      "flex:1 1 auto;min-width:0;"
+      "flex:1 1 auto;min-width:0;width:100%;"
     );
-    h1.querySelectorAll(".h1-zh, .h1-en").forEach(
+    h1.querySelectorAll(".h1-line").forEach(
       (el) => el.setAttribute("style", `display:block;${wechatBlockTextCSS("h1")}`)
     );
     let index = h1.querySelector(".wechat-h1-index");

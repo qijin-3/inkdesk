@@ -162,41 +162,20 @@ export function wechatBlockCanvas(cssW, cssH) {
 }
 
 /**
- * 单行一级标题按“中文 + 空格 + 英文”拆成主副标题（原 renderWechatH1Png 内联逻辑，原样抽出）。
- * @returns {{ zh: string, en: string }}
- */
-export function splitH1ZhEn(one) {
-  const m = String(one || "").match(
-    /^([\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef0-9A-Za-z\s\u2014\u2013\-·、，。！？：；“”‘’（）【】《》]+?)\s+([A-Za-z][A-Za-z0-9&/.,'’\- ]{1,60})$/,
-  );
-  return m ? { zh: m[1].trim(), en: m[2].trim() } : { zh: one, en: "" };
-}
-
-/**
  * 画一级标题图（蓝字 + 序号方块）；保留标题内软换行。
  * @param {string} raw
  * @param {string} num
  */
 export function renderWechatH1Png(raw, num) {
   const style = WECHAT_BLOCK_THEME.h1;
-  const soft = normalizeHeadingText(raw).split("\n").filter(Boolean);
+  const soft = normalizeHeadingText(raw).split("\n");
   const measure = wechatBlockCanvas(1, 1).ctx;
   setCanvasFont(measure, style);
   setCanvasLetterSpacing(measure, style.letterSpacing);
 
-  /** @type {string[]} */
-  let lines = [];
-  if (soft.length > 1) {
-    lines = soft.flatMap((para) =>
-      wechatWrapLines(measure, para, WECHAT_BLOCK_W),
-    );
-  } else {
-    const { zh, en } = splitH1ZhEn(soft[0] || "");
-    lines = [
-      ...wechatWrapLines(measure, zh, WECHAT_BLOCK_W),
-      ...(en ? wechatWrapLines(measure, en, WECHAT_BLOCK_W) : []),
-    ];
-  }
+  const lines = soft.flatMap((para) =>
+    wechatWrapLines(measure, para, WECHAT_BLOCK_W),
+  );
 
   const lineH = style.fontSize * style.lineHeight;
   const indexH =

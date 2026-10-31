@@ -45,10 +45,34 @@ test("html 模块纯文本/换行清洗", () => {
   );
 });
 
-test("splitWechatH1 拆中英标题/DOM 效应", () => {
+test("splitWechatH1 保留完整标题并按实际宽度换行", () => {
   const { splitWechatH1 } = mods.html;
-  // run in node: escape DOMParser via minimal shim impossible -> guard layer only
-  assert.equal(typeof splitWechatH1, "function");
+  const h1 = {
+    querySelector: () => null,
+    ownerDocument: {
+      createElement: () => {
+        const node = {
+          className: "",
+          textContent: "",
+          children: [],
+          append(child) {
+            this.children.push(child);
+          },
+        };
+        return node;
+      },
+    },
+    childNodes: [{ nodeType: 3, textContent: "从 Pinterest 到前端 UI" }],
+    replaceChildren(node) {
+      this.replaced = node;
+    },
+  };
+  splitWechatH1(h1);
+  assert.equal(h1.replaced.className, "h1-text");
+  assert.deepEqual(
+    h1.replaced.children.map((node) => [node.className, node.textContent]),
+    [["h1-line", "从 Pinterest 到前端 UI"]],
+  );
 });
 
 test("publishHTMLInner 空 opts 直接转换", async () => {
